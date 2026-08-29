@@ -1,0 +1,51 @@
+# Capture format
+
+## Purpose
+
+The canonical capture is designed for crash recovery, deterministic machine processing, human inspection, and later re-decoding. It is a directory in schema `bedrockdebugproxy.capture.v1`.
+
+```text
+capture-directory/
+  manifest.json
+  events.jsonl
+  blobs/
+    sha256/
+      ab/
+        abcdef...bin
+```
+
+## Manifest
+
+`manifest.json` identifies the capture, generator, host platform, options, known limitations, completion status, and final counters. It is written when the capture opens and replaced from a synced temporary file when the recorder closes. Readers must tolerate an `open` manifest whose event stream contains newer data after an interrupted run.
+
+A capture with `completeness.complete` set to `false` is still useful. The adjacent limitations and counters explain known missing, dropped, truncated, or failed data. An `open` status after the process is gone means the session did not close cleanly.
+
+## Event stream
+
+`events.jsonl` contains one JSON object per newline-terminated line. Sequence numbers start at one and define the canonical order. Each event also has UTC wall time, Unix nanoseconds, and elapsed monotonic nanoseconds from capture start. Nanosecond fields are decimal JSON strings so JavaScript and other limited-number readers do not lose precision.
+
+Event kinds are namespaced strings such as `session.open`, `transport.payload`, `packet.raw`, `packet.decoded`, `packet.decode_error`, `resource_pack.archive`, and `capture.limit`.
+
+Connection and protocol context remains explicit through session ID, connection ID, hop, channel, logical direction, stage, source, and destination fields. A parent sequence can link a derived event to an earlier observation when the adapter can prove the relationship.
+
+Decoded packet fields are stored in the optional `data` object. Each struct carries its Go type. Binary fields are summarized with their size, SHA-256 digest, and an optional short preview. The exact packet payload remains available through the raw packet event and blob reference.
+
+## Raw blobs
+
+Raw data is addressed by lowercase SHA-256 digest. The canonical path uses the first digest byte as a directory and the full digest as the file name. Identical bytes are written once and may be referenced by many events.
+
+Blob references include the digest, byte length, relative path, media type, and representation. Representation describes the observation boundary. For example, `packet_payload` and `bedrock_transport_payload` are different evidence and must not be conflated.
+
+Blob paths are always relative and derived from the digest. Readers must reject absolute paths, parent traversal, non-canonical paths, hash mismatches, and size mismatches.
+
+## Durability
+
+The initial recorder writes each event synchronously under one ordering lock. Raw blobs are synced and renamed before their referencing event is appended. The CLI enables per-event sync by default for maximum recoverability.
+
+This policy may add latency during very high traffic. A future buffered mode must expose its queue limits and loss policy in the manifest. It must never silently discard evidence.
+
+## Compatibility
+
+Readers must select behavior from the schema string instead of assuming the newest layout. Existing captures are immutable evidence. Schema migrations create a new capture or export and retain provenance to the source.
+
+The capture verifier checks sequence continuity, capture identity, event counts, blob counts, canonical paths, byte lengths, and SHA-256 digests.
