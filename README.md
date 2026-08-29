@@ -48,6 +48,18 @@ The CLI can stream selected canonical events as JSON Lines, produce a determinis
 
 Export refuses open or invalid captures, never replaces an existing output, and writes entries in deterministic order with fixed ZIP metadata. A `.bdpcap` file still contains the complete sensitive capture, including raw blobs and any retained resource-pack keys.
 
+## Quality checks
+
+Run the shared quality gate before committing or declaring a code change complete.
+
+```powershell
+.\tools\quality.ps1
+```
+
+The gate checks deterministic `gofmt` formatting, module tidiness and checksums, tests, builds, selected high-signal static analyzers, reachable known vulnerabilities, and Git whitespace errors. Analyzer and vulnerability-scanner versions are pinned in the script and do not modify `go.mod`.
+
+Use `.\tools\format.ps1` to format every Go source file. CI runs the same quality gate with the race detector on Linux and repeats tests and builds on Windows. A local Windows environment with `CGO_ENABLED=0` should use the normal command because Go's race detector requires cgo.
+
 ## Initial scope
 
 The proxy will observe both client-to-server and server-to-client traffic. It will preserve raw data where the networking layer exposes it, decode packets when possible, record unknown and malformed input, and make encryption, compression, batching, framing, timing, and protocol metadata visible.

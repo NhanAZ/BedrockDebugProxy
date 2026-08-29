@@ -85,6 +85,8 @@ Transport, compression, encryption, batching, framing, packet decoding, resource
 
 Run formatting, unit tests, static analysis, build checks, and `git diff --check` before committing. A successful local build is not evidence of compatibility with a real Bedrock client or public server. Keep manual and live verification status explicit.
 
+Use `tools/quality.ps1` as the project-wide pre-commit quality gate and `tools/format.ps1` as the canonical formatting command. Do not replace, bypass, or duplicate this workflow in an issue-specific script. Add a linter only when it provides actionable signal for this codebase, and prefer resolving valid findings over broad exclusions. Keep tool versions pinned and review version changes separately from unrelated behavior changes.
+
 After a commit changes protocol handling, networking, resource packs, or observable behavior, provide a short human validation plan. Name the server or server category, the flow to exercise, the packets or behavior to observe, the expected result, and the capture or log needed if it fails. Automated checks and real-world validation must be reported separately.
 
 Fuzz parsers and decoders that consume untrusted network or capture data when practical. Bound memory, disk, and goroutine growth without hiding the fact that a limit was reached.
