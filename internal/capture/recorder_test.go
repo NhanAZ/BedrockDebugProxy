@@ -6,6 +6,7 @@ import (
 	"errors"
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 	"time"
 )
@@ -199,6 +200,59 @@ func TestInvalidEventDataDoesNotConsumeSequence(t *testing.T) {
 	}
 	if len(verification.Issues) != 0 {
 		t.Fatalf("Verify() issues = %v", verification.Issues)
+	}
+}
+
+func TestRecordReaderStreamsAndDeduplicatesBlobs(t *testing.T) {
+	root := filepath.Join(t.TempDir(), "capture")
+	recorder, err := New(root, Options{})
+	if err != nil {
+		t.Fatal(err)
+	}
+	first, err := recorder.RecordReader(context.Background(), Event{Kind: "resource_pack.archive"}, strings.NewReader("archive"), 7, "application/zip", "resource_pack_archive")
+	if err != nil {
+		t.Fatal(err)
+	}
+	second, err := recorder.Record(context.Background(), Record{Event: Event{Kind: "packet.raw"}, Raw: []byte("archive")})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if first.Blob == nil || second.Blob == nil || first.Blob.SHA256 != second.Blob.SHA256 {
+		t.Fatalf("blobs were not deduplicated: %#v %#v", first.Blob, second.Blob)
+	}
+	if err := recorder.Close("closed", nil); err != nil {
+		t.Fatal(err)
+	}
+	manifest, err := ReadManifest(root)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if manifest.Counts.Events != 2 || manifest.Counts.Blobs != 1 || manifest.Counts.BlobBytes != 7 {
+		t.Fatalf("counts = %#v", manifest.Counts)
+	}
+}
+
+func TestRecordReaderRejectsSizeMismatch(t *testing.T) {
+	root := filepath.Join(t.TempDir(), "capture")
+	recorder, err := New(root, Options{})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := recorder.RecordReader(context.Background(), Event{Kind: "resource_pack.archive"}, strings.NewReader("short"), 10, "application/zip", "resource_pack_archive"); err == nil {
+		t.Fatal("RecordReader() accepted a size mismatch")
+	}
+	if _, err := recorder.Record(context.Background(), Record{Event: Event{Kind: "later"}}); err == nil {
+		t.Fatal("recorder did not retain the stream failure")
+	}
+	entries, err := os.ReadDir(filepath.Join(root, filepath.FromSlash(blobRoot)))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(entries) != 0 {
+		t.Fatalf("temporary blob entries remain: %v", entries)
+	}
+	if err := recorder.Close("failed", errors.New("stream size mismatch")); err != nil {
+		t.Fatal(err)
 	}
 }
 

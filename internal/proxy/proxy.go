@@ -216,6 +216,10 @@ func (r *Runner) connectUpstream(ctx context.Context, network bedrock.Network, o
 		_ = r.record("upstream.dial_error", capture.SeverityError, map[string]any{"error": err.Error(), "type": fmt.Sprintf("%T", err)})
 		return nil, fmt.Errorf("connect to upstream server: %w", err)
 	}
+	if err := bedrock.RecordResourcePacks(ctx, r.config.Recorder, sessionID, upstreamConnectionID, 1, conn.RemoteAddr(), conn.LocalAddr(), conn.ResourcePacks()); err != nil {
+		_ = conn.Close()
+		return nil, err
+	}
 	if err := r.record("upstream.connected", capture.SeverityInfo, map[string]any{
 		"local_address":       conn.LocalAddr().String(),
 		"remote_address":      conn.RemoteAddr().String(),

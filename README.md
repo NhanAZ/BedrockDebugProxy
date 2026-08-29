@@ -60,7 +60,7 @@ Project-wide working principles are in `AGENTS.md`. The capture layout and obser
 - Raw UDP datagrams and RakNet acknowledgement, fragmentation, retransmission, and loss details are not captured.
 - Transport payloads are captured at the post-RakNet application boundary. Their encryption and compression state is not yet classified per event.
 - The upstream resource-pack-required flag is not mirrored to the downstream listener.
-- Resource-pack packets and downloaded archives pass through the current adapter, but dedicated archive artifacts and reconstruction reports are not implemented yet.
+- Downloaded resource-pack archives, metadata, checksums, and content keys are stored. Decryption and extraction are not implemented yet.
 
 ## Security
 

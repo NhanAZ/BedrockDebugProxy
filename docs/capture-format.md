@@ -30,6 +30,8 @@ Connection and protocol context remains explicit through session ID, connection 
 
 Decoded packet fields are stored in the optional `data` object. Each struct carries its Go type. Binary fields are summarized with their size, SHA-256 digest, and an optional short preview. The exact packet payload remains available through the raw packet event and blob reference.
 
+A `resource_pack.archive` event references the exact archive retained by the adapter after download. Its data includes the pack UUID, version, manifest, byte length, computed checksum, delivery mechanism, feature flags, download URL when present, and content key when supplied by the server. The archive is stored before any decryption or extraction.
+
 ## Raw blobs
 
 Raw data is addressed by lowercase SHA-256 digest. The canonical path uses the first digest byte as a directory and the full digest as the file name. Identical bytes are written once and may be referenced by many events.

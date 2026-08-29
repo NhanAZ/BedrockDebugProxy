@@ -122,7 +122,7 @@ func runProxy(args []string, stdout, stderr io.Writer) int {
 			"This version accepts one client and records one upstream hop per process",
 			"Transfer packets are recorded but automatic hop following is not implemented",
 			"The upstream resource-pack-required flag is not mirrored to the downstream listener",
-			"Downloaded resource packs are observed as packets but dedicated archive artifacts are not yet stored",
+			"Resource pack archives and content keys are stored but decryption and extraction are not implemented",
 			"Transport payload encryption and compression state is not yet classified per event",
 		},
 	})

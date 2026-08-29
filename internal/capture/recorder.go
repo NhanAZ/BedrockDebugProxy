@@ -1,6 +1,7 @@
 package capture
 
 import (
+	"bytes"
 	"context"
 	"crypto/rand"
 	"crypto/sha256"
@@ -142,6 +143,27 @@ func (r *Recorder) Manifest() Manifest {
 }
 
 func (r *Recorder) Record(ctx context.Context, record Record) (Event, error) {
+	var raw io.Reader
+	expectedSize := int64(-1)
+	if record.Raw != nil {
+		raw = bytes.NewReader(record.Raw)
+		expectedSize = int64(len(record.Raw))
+	}
+	return r.record(ctx, record.Event, raw, expectedSize, record.MediaType, record.Representation)
+}
+
+// RecordReader records an event while streaming its raw blob from raw. expectedSize may be -1 when the size is unknown.
+func (r *Recorder) RecordReader(ctx context.Context, event Event, raw io.Reader, expectedSize int64, mediaType, representation string) (Event, error) {
+	if raw == nil {
+		return Event{}, errors.New("raw reader is nil")
+	}
+	if expectedSize < -1 {
+		return Event{}, errors.New("expected raw size must be -1 or greater")
+	}
+	return r.record(ctx, event, raw, expectedSize, mediaType, representation)
+}
+
+func (r *Recorder) record(ctx context.Context, event Event, raw io.Reader, expectedSize int64, mediaType, representation string) (Event, error) {
 	if ctx == nil {
 		ctx = context.Background()
 	}
@@ -165,7 +187,6 @@ func (r *Recorder) Record(ctx context.Context, record Record) (Event, error) {
 	default:
 	}
 
-	event := record.Event
 	now := r.now()
 	sequence := r.sequence + 1
 	event.Schema = SchemaVersion
@@ -184,8 +205,8 @@ func (r *Recorder) Record(ctx context.Context, record Record) (Event, error) {
 		event.Direction = DirectionUnknown
 	}
 
-	if record.Raw != nil {
-		ref, err := r.storeBlobLocked(record.Raw, record.MediaType, record.Representation, sequence)
+	if raw != nil {
+		ref, err := r.storeBlobLocked(ctx, raw, expectedSize, mediaType, representation, sequence)
 		if err != nil {
 			r.manifest.Counts.WriteErrors++
 			r.manifest.Completeness.Complete = false
@@ -302,23 +323,8 @@ func (r *Recorder) Close(status string, cause error) error {
 	return result
 }
 
-func (r *Recorder) storeBlobLocked(data []byte, mediaType, representation string, sequence uint64) (BlobRef, error) {
-	digest := sha256.Sum256(data)
-	hexDigest := hex.EncodeToString(digest[:])
-	relative := filepath.ToSlash(filepath.Join(blobRoot, hexDigest[:2], hexDigest+".bin"))
-	destination := filepath.Join(r.root, filepath.FromSlash(relative))
-	if info, err := os.Stat(destination); err == nil {
-		if info.Size() != int64(len(data)) {
-			return BlobRef{}, fmt.Errorf("existing blob %s has size %d, expected %d", hexDigest, info.Size(), len(data))
-		}
-		return BlobRef{SHA256: hexDigest, Size: int64(len(data)), Path: relative, MediaType: mediaType, Representation: representation}, nil
-	} else if !errors.Is(err, os.ErrNotExist) {
-		return BlobRef{}, fmt.Errorf("inspect blob %s: %w", hexDigest, err)
-	}
-	if err := os.MkdirAll(filepath.Dir(destination), 0o700); err != nil {
-		return BlobRef{}, fmt.Errorf("create blob directory: %w", err)
-	}
-	temporary := fmt.Sprintf("%s.tmp-%d", destination, sequence)
+func (r *Recorder) storeBlobLocked(ctx context.Context, source io.Reader, expectedSize int64, mediaType, representation string, sequence uint64) (BlobRef, error) {
+	temporary := filepath.Join(r.root, filepath.FromSlash(blobRoot), fmt.Sprintf(".tmp-%d", sequence))
 	f, err := os.OpenFile(temporary, os.O_CREATE|os.O_EXCL|os.O_WRONLY, 0o600)
 	if err != nil {
 		return BlobRef{}, fmt.Errorf("create blob temporary file: %w", err)
@@ -327,23 +333,60 @@ func (r *Recorder) storeBlobLocked(data []byte, mediaType, representation string
 		_ = f.Close()
 		_ = os.Remove(temporary)
 	}
-	if err := writeAll(f, data); err != nil {
+	hash := sha256.New()
+	written, err := io.Copy(io.MultiWriter(f, hash), &contextReader{ctx: ctx, source: source})
+	if err != nil {
 		cleanup()
-		return BlobRef{}, fmt.Errorf("write blob %s: %w", hexDigest, err)
+		return BlobRef{}, fmt.Errorf("write blob stream: %w", err)
+	}
+	if expectedSize >= 0 && written != expectedSize {
+		cleanup()
+		return BlobRef{}, fmt.Errorf("raw stream size is %d, expected %d", written, expectedSize)
 	}
 	if err := f.Sync(); err != nil {
 		cleanup()
-		return BlobRef{}, fmt.Errorf("sync blob %s: %w", hexDigest, err)
+		return BlobRef{}, fmt.Errorf("sync blob stream: %w", err)
 	}
 	if err := f.Close(); err != nil {
 		_ = os.Remove(temporary)
-		return BlobRef{}, fmt.Errorf("close blob %s: %w", hexDigest, err)
+		return BlobRef{}, fmt.Errorf("close blob stream: %w", err)
+	}
+	hexDigest := hex.EncodeToString(hash.Sum(nil))
+	relative := filepath.ToSlash(filepath.Join(blobRoot, hexDigest[:2], hexDigest+".bin"))
+	destination := filepath.Join(r.root, filepath.FromSlash(relative))
+	if info, err := os.Stat(destination); err == nil {
+		_ = os.Remove(temporary)
+		if info.Size() != written {
+			return BlobRef{}, fmt.Errorf("existing blob %s has size %d, expected %d", hexDigest, info.Size(), written)
+		}
+		return BlobRef{SHA256: hexDigest, Size: written, Path: relative, MediaType: mediaType, Representation: representation}, nil
+	} else if !errors.Is(err, os.ErrNotExist) {
+		_ = os.Remove(temporary)
+		return BlobRef{}, fmt.Errorf("inspect blob %s: %w", hexDigest, err)
+	}
+	if err := os.MkdirAll(filepath.Dir(destination), 0o700); err != nil {
+		_ = os.Remove(temporary)
+		return BlobRef{}, fmt.Errorf("create blob directory: %w", err)
 	}
 	if err := os.Rename(temporary, destination); err != nil {
 		_ = os.Remove(temporary)
 		return BlobRef{}, fmt.Errorf("publish blob %s: %w", hexDigest, err)
 	}
-	return BlobRef{SHA256: hexDigest, Size: int64(len(data)), Path: relative, MediaType: mediaType, Representation: representation}, nil
+	return BlobRef{SHA256: hexDigest, Size: written, Path: relative, MediaType: mediaType, Representation: representation}, nil
+}
+
+type contextReader struct {
+	ctx    context.Context
+	source io.Reader
+}
+
+func (r *contextReader) Read(buffer []byte) (int, error) {
+	select {
+	case <-r.ctx.Done():
+		return 0, r.ctx.Err()
+	default:
+		return r.source.Read(buffer)
+	}
 }
 
 func (r *Recorder) writeManifestLocked() error {
