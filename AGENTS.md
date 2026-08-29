@@ -71,9 +71,13 @@ Do not weaken authentication, encryption, or certificate validation merely to si
 
 ## Dependencies and source reuse
 
+BedrockDebugProxy is licensed `GPL-3.0-or-later`. The repository is private only during development and is intended to become public when ready. Do not describe private status as an all-rights-reserved license or as an exception to the GPL.
+
 Check dependency licenses, maintenance status, supported protocol versions, and extension points before adoption. Prefer stable public APIs, but retain access to raw boundaries required for debugging.
 
 Ideas may be reimplemented after study. Source code may be copied only when its license permits the intended use and attribution requirements are satisfied. Record copied or substantially adapted code in `THIRD_PARTY_NOTICES.md` with its source revision and license.
+
+Keep independent implementation, dependency use, research influence, and copied or substantially adapted source distinguishable. Update provenance in the same commit that introduces reused code. Preserve required copyright, license, and notice text in source and binary distributions. A compatible dependency does not make unlicensed source reusable, and code whose license would add obligations beyond `GPL-3.0-or-later` requires an explicit project decision before reuse.
 
 Do not copy code from a source whose license is absent, unclear, or incompatible. Private repositories owned by the project owner remain separate works unless their code and license are deliberately imported and documented.
 

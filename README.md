@@ -97,4 +97,10 @@ Captures can contain credentials, server addresses, identifiers, chat, and propr
 
 ## License
 
-No public source-code license has been selected yet. This private repository remains all rights reserved until a license file is added deliberately.
+BedrockDebugProxy is licensed under the GNU General Public License version 3 or any later version. Its SPDX identifier is `GPL-3.0-or-later`. See [LICENSE](LICENSE) for the complete terms.
+
+Copyright (C) 2026 NhanAZ.
+
+The repository is private while the project is under development, with the intent to make it public when it is stable and ready. Private development does not change the license. "Information wants to be free" expresses the project's preference for debugging knowledge and distributed improvements to remain available to the community.
+
+Third-party dependencies and provenance are recorded in [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md) and `docs/research/`.

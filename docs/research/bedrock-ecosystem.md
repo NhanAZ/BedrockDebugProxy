@@ -50,7 +50,7 @@ BedrockDebugProxy will record application-batch bytes at this boundary in the fi
 
 The fork demonstrates practical requirements that are easy to miss in a minimal proxy. It keeps hooks for pre-play packets, resource-pack handling, packet timing, transfers, and raw capture. Its resource-pack work shows that downstream pack announcements must remain sequential and that large packs need bounded queues and explicit completion handling.
 
-The fork also keeps a detailed resource-pack decryption investigation. BedrockDebugProxy will independently implement and test the protocol behavior it needs. It will not copy GPL source into the current all-rights-reserved repository.
+The fork also keeps a detailed resource-pack decryption investigation. BedrockDebugProxy will independently implement and test the protocol behavior it needs. No source from the fork was copied into the initial implementation. Any future reuse must be deliberate, compatible with `GPL-3.0-or-later`, and recorded with exact provenance.
 
 The local fork pins a patched Go toolchain for a Windows asynchronous `WSARecvFrom` stability issue. BedrockDebugProxy will use `toolchain go1.26.6` while the development host reports Go 1.26.1, then re-evaluate the pin when the project has its own long-running Windows tests.
 
@@ -59,7 +59,7 @@ The local fork pins a patched Go toolchain for a Windows asynchronous `WSARecvFr
 - Repository reviewed at the current owner fork lineage and upstream metadata
 - License is GPL-3.0
 
-The upstream project is a broad Bedrock tooling suite rather than a narrow capture engine. Its breadth is useful for use-case discovery, especially authentication, transfer handling, downloads, and world data. Its architecture and source license are not a fit for direct reuse in the initial core.
+The upstream project is a broad Bedrock tooling suite rather than a narrow capture engine. Its breadth is useful for use-case discovery, especially authentication, transfer handling, downloads, and world data. Its architecture and scope are not a fit for direct reuse in the initial core. Its GPL-3.0 license is compatible with the selected project direction, but no source was copied.
 
 ### PrismarineJS bedrock-protocol
 
@@ -80,7 +80,7 @@ ProxyPass shows a mature terminating-proxy feature surface that includes online 
 
 The fork maintains modified protocol and network submodules. That improves its ability to debug those libraries but also demonstrates the maintenance cost of deep stack forks. BedrockDebugProxy will begin with public gophertunnel extension points and add a narrow adapter or fork only when a documented fidelity requirement cannot be met otherwise.
 
-No ProxyPass source will be copied under the current project license.
+No ProxyPass source will be copied without an explicit decision to accept the additional AGPL network-use obligations and record the resulting provenance. The current implementation uses ProxyPass only as a research reference.
 
 ### EndstoneMC spyglass
 
