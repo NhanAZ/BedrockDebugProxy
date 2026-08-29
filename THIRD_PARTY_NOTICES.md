@@ -8,6 +8,8 @@ Reviewing another implementation, protocol definition, or packet capture does no
 
 At the time of this notice, the repository contains no vendored, copied, or substantially adapted third-party source files. Update this section in the same commit if that changes. Identify the affected files, upstream URL and revision, upstream copyright holder, license, and whether the material was copied or adapted.
 
+The resource-pack decryption behavior was cross-checked against MIT, Apache-2.0, LGPL-3.0, and AGPL-3.0 implementations plus official NIST AES validation material. No source from those projects was copied or adapted. Exact revisions, file links, licenses, the resolved header-field discrepancy, and validation boundaries are recorded in [`docs/research/resource-pack-encryption.md`](docs/research/resource-pack-encryption.md).
+
 ## Direct runtime dependencies
 
 The Go module uses the following direct dependencies. Their source remains under their respective licenses and is not relicensed by BedrockDebugProxy.
