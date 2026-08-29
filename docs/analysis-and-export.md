@@ -28,6 +28,6 @@ The command verifies referenced blobs before streaming and exits with status 1 i
 
 ## Portable export
 
-`export` accepts only a closed capture with no verifier issues. It creates a deterministic, uncompressed ZIP-compatible `.bdpcap` file outside the source directory without replacing any existing file. The CLI returns the absolute output path, archive SHA-256, byte length, and entry count as JSON.
+`export` accepts only a closed capture with no verifier issues. It creates a deterministic, uncompressed ZIP-compatible `.bdpcap` file outside the source directory without replacing any existing file. The CLI returns the absolute output path, archive SHA-256, byte length, entry count, and whether decrypted resource-pack artifacts are present as JSON. When they are present, it also writes a warning to standard error that the project license grants no ownership or redistribution rights for those assets.
 
-Uncompressed entries preserve exact bytes and avoid wasting CPU on already-compressed or encrypted payloads. Fixed archive metadata makes the digest reproducible for the same capture. Consumers must still run `verify` after extraction rather than trusting the container alone.
+Uncompressed entries preserve exact bytes and avoid wasting CPU on already-compressed or encrypted payloads. Fixed archive metadata makes the digest reproducible for the same capture. Consumers must still run `verify` after extraction rather than trusting the container alone. An export is a local copy, not a publication permission or a change to the ownership of captured content.

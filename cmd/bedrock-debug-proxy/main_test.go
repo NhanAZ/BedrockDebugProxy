@@ -125,3 +125,32 @@ func TestCaptureInspectionAnalysisExplanationAndExportCommands(t *testing.T) {
 		t.Fatalf("export stdout = %s", stdout.String())
 	}
 }
+
+func TestExportWarnsAboutDecryptedResourcePackArtifacts(t *testing.T) {
+	root := filepath.Join(t.TempDir(), "capture")
+	recorder, err := capture.New(root, capture.Options{CaptureID: "decrypted-export-test"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := recorder.Record(context.Background(), capture.Record{
+		Event: capture.Event{Kind: "resource_pack.contents_manifest"},
+		Raw:   []byte(`{"content":[]}`),
+	}); err != nil {
+		t.Fatal(err)
+	}
+	if err := recorder.Close("closed", nil); err != nil {
+		t.Fatal(err)
+	}
+
+	var stdout, stderr bytes.Buffer
+	output := filepath.Join(t.TempDir(), "decrypted-export-test.bdpcap")
+	if code := run([]string{"export", root, output}, &stdout, &stderr); code != 0 {
+		t.Fatalf("export code = %d, stderr = %s", code, stderr.String())
+	}
+	if !strings.Contains(stdout.String(), `"contains_decrypted_resource_packs": true`) {
+		t.Fatalf("export stdout = %s", stdout.String())
+	}
+	if !strings.Contains(stderr.String(), "ownership and redistribution rights") {
+		t.Fatalf("export stderr = %s", stderr.String())
+	}
+}

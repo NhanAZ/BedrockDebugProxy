@@ -77,6 +77,7 @@ func runProxy(args []string, stdout, stderr io.Writer) int {
 	maxDecompressed := flags.Int("max-decompressed-bytes", 64<<20, "downstream decompressed batch limit")
 	binaryPreview := flags.Int("decoded-binary-preview", 32, "decoded binary preview bytes")
 	maxCollection := flags.Int("max-decoded-items", 0, "decoded items per collection - zero keeps all")
+	decryptResourcePacks := flags.Bool("decrypt-resource-packs", false, "derive decrypted resource pack artifacts when a supported content key is available")
 	flags.Usage = func() {
 		_, _ = fmt.Fprintln(stderr, "Usage - bedrock-debug-proxy run --upstream HOST:PORT [options]")
 		flags.PrintDefaults()
@@ -114,6 +115,18 @@ func runProxy(args []string, stdout, stderr io.Writer) int {
 			return 1
 		}
 	}
+	limitations := []string{
+		"Raw UDP datagrams and RakNet acknowledgement or retransmission frames are not captured",
+		"This version accepts one client and records one upstream hop per process",
+		"Transfer packets are recorded but automatic hop following is not implemented",
+		"The upstream resource-pack-required flag is not mirrored to the downstream listener",
+		"Transport payload encryption and compression state is not yet classified per event",
+	}
+	if *decryptResourcePacks {
+		limitations = append(limitations, "Resource pack decryption supports only the documented AES-256-CFB8 contents format; unsupported variants are retained with a decrypt error")
+	} else {
+		limitations = append(limitations, "Encrypted resource pack archives and content keys are stored; decryption was not requested")
+	}
 	recorder, err := capture.New(exactCapturePath, capture.Options{
 		GeneratorName: "bedrock-debug-proxy",
 		Version:       buildinfo.Version,
@@ -121,20 +134,14 @@ func runProxy(args []string, stdout, stderr io.Writer) int {
 		SyncEachEvent: *syncEachEvent,
 		RawLayers:     []string{"bedrock_transport_payload", "bedrock_packet_payload"},
 		Values: map[string]string{
-			"listen_address":   *listen,
-			"upstream_address": *upstream,
-			"auth_mode":        *authMode,
-			"protocol_id":      strconv.FormatInt(int64(protocol.CurrentProtocol), 10),
-			"game_version":     protocol.CurrentVersion,
+			"listen_address":         *listen,
+			"upstream_address":       *upstream,
+			"auth_mode":              *authMode,
+			"protocol_id":            strconv.FormatInt(int64(protocol.CurrentProtocol), 10),
+			"game_version":           protocol.CurrentVersion,
+			"decrypt_resource_packs": strconv.FormatBool(*decryptResourcePacks),
 		},
-		Limitations: []string{
-			"Raw UDP datagrams and RakNet acknowledgement or retransmission frames are not captured",
-			"This version accepts one client and records one upstream hop per process",
-			"Transfer packets are recorded but automatic hop following is not implemented",
-			"The upstream resource-pack-required flag is not mirrored to the downstream listener",
-			"Resource pack archives and content keys are stored but decryption and extraction are not implemented",
-			"Transport payload encryption and compression state is not yet classified per event",
-		},
+		Limitations: limitations,
 	})
 	if err != nil {
 		_, _ = fmt.Fprintf(stderr, "Create capture - %v\n", err)
@@ -152,6 +159,7 @@ func runProxy(args []string, stdout, stderr io.Writer) int {
 		MaxDecompressedBytes:       *maxDecompressed,
 		DecodedBinaryPreviewBytes:  *binaryPreview,
 		MaxDecodedCollectionItems:  *maxCollection,
+		DecryptResourcePacks:       *decryptResourcePacks,
 	})
 	if err != nil {
 		_ = recorder.Close("failed", err)
@@ -332,6 +340,9 @@ func runExport(args []string, stdout, stderr io.Writer) int {
 	if err != nil {
 		_, _ = fmt.Fprintf(stderr, "Export capture - %v\n", err)
 		return 1
+	}
+	if result.ContainsDecryptedResourcePacks {
+		_, _ = fmt.Fprintln(stderr, "Warning - this local export contains decrypted resource-pack assets and keys whose ownership and redistribution rights are not granted by the BedrockDebugProxy license.")
 	}
 	if err := writeJSON(stdout, result); err != nil {
 		_, _ = fmt.Fprintf(stderr, "Write export result - %v\n", err)

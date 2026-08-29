@@ -33,6 +33,13 @@ func TestAnalyzeAndExplainCapture(t *testing.T) {
 	}, Raw: []byte("archive"), Representation: "minecraft_resource_pack_archive"}); err != nil {
 		t.Fatal(err)
 	}
+	parent := uint64(3)
+	decryptionData := []byte(`{"uuid":"11111111-1111-1111-1111-111111111111","version":"1.0.0","report":{"algorithm":"AES-256-CFB8","authenticated":false,"decrypted_files":2}}`)
+	if _, err := recorder.Record(context.Background(), capture.Record{Event: capture.Event{
+		Kind: "resource_pack.decrypted_archive", Direction: capture.DirectionServerToClient, Data: decryptionData, ParentSequence: &parent,
+	}, Raw: []byte("decrypted archive"), Representation: "minecraft_resource_pack_decrypted_archive"}); err != nil {
+		t.Fatal(err)
+	}
 	if err := recorder.Close("closed", nil); err != nil {
 		t.Fatal(err)
 	}
@@ -41,14 +48,17 @@ func TestAnalyzeAndExplainCapture(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if summary.CaptureID != "analysis-test" || summary.ObservedEvents != 3 || len(summary.Packets) != 1 || len(summary.Errors) != 1 || len(summary.ResourcePacks) != 1 {
+	if summary.CaptureID != "analysis-test" || summary.ObservedEvents != 4 || len(summary.Packets) != 1 || len(summary.Errors) != 1 || len(summary.ResourcePacks) != 1 || len(summary.PackDecryptions) != 1 {
 		t.Fatalf("summary = %#v", summary)
 	}
 	if !summary.ResourcePacks[0].HasContentKey || summary.ResourcePacks[0].BlobSHA256 == "" {
 		t.Fatalf("resource pack = %#v", summary.ResourcePacks[0])
 	}
+	if summary.PackDecryptions[0].Algorithm != "AES-256-CFB8" || summary.PackDecryptions[0].Authenticated || summary.PackDecryptions[0].DecryptedFiles != 2 {
+		t.Fatalf("resource pack decryption = %#v", summary.PackDecryptions[0])
+	}
 	explanation := Explain(summary)
-	for _, expected := range []string{"analysis-test", "synthetic limitation", "Test Pack", "synthetic failure", "real Minecraft client"} {
+	for _, expected := range []string{"analysis-test", "synthetic limitation", "Test Pack", "AES-256-CFB8", "synthetic failure", "real Minecraft client"} {
 		if !strings.Contains(explanation, expected) {
 			t.Fatalf("explanation does not contain %q:\n%s", expected, explanation)
 		}

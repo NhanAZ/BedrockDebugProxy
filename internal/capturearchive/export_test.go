@@ -81,6 +81,30 @@ func TestExportRejectsOpenCaptureAndExistingOutput(t *testing.T) {
 	}
 }
 
+func TestExportReportsDecryptedResourcePackArtifacts(t *testing.T) {
+	root := filepath.Join(t.TempDir(), "capture")
+	recorder, err := capture.New(root, capture.Options{})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := recorder.Record(context.Background(), capture.Record{
+		Event: capture.Event{Kind: "resource_pack.decrypted_archive"},
+		Raw:   []byte("synthetic decrypted archive"),
+	}); err != nil {
+		t.Fatal(err)
+	}
+	if err := recorder.Close("closed", nil); err != nil {
+		t.Fatal(err)
+	}
+	result, err := Export(root, filepath.Join(t.TempDir(), "capture.bdpcap"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !result.ContainsDecryptedResourcePacks {
+		t.Fatal("Export() did not report decrypted resource-pack artifacts")
+	}
+}
+
 func TestExportRejectsBlobSymlinkOutsideCapture(t *testing.T) {
 	root := filepath.Join(t.TempDir(), "capture")
 	recorder, err := capture.New(root, capture.Options{})

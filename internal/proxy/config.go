@@ -21,6 +21,7 @@ type Config struct {
 	MaxDecompressedBytes       int
 	DecodedBinaryPreviewBytes  int
 	MaxDecodedCollectionItems  int
+	DecryptResourcePacks       bool
 }
 
 func (c *Config) normalize() error {

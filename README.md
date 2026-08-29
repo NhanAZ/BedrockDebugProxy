@@ -2,6 +2,8 @@
 
 BedrockDebugProxy is a high-fidelity Minecraft Bedrock traffic observation and research proxy.
 
+BedrockDebugProxy is an independent project. It is not an official Minecraft product and is not approved by or associated with Mojang or Microsoft.
+
 The project is designed around one principle.
 
 > Capture once, analyze many times.
@@ -27,6 +29,14 @@ Upstream Xbox device authentication is enabled by default. Use `--auth none` onl
 
 Each run creates a new directory under `captures/`. The exact path is printed before the listener starts. After a clean shutdown, the CLI verifies event ordering, manifest counts, blob paths, sizes, and SHA-256 digests.
 
+Encrypted resource-pack decryption is opt-in because it creates additional sensitive plaintext artifacts. Use it only for packs you are authorized to inspect.
+
+```powershell
+.\bedrock-debug-proxy.exe run --upstream example.org:19132 --decrypt-resource-packs
+```
+
+The supported AES-256-CFB8 variant is evidence-backed and bounded. Unsupported variants retain their original archive and produce a structured warning instead of triggering a guessed compatibility fallback.
+
 An existing capture can be verified separately.
 
 ```powershell
@@ -46,7 +56,7 @@ The CLI can stream selected canonical events as JSON Lines, produce a determinis
 
 `inspect` preserves the original event objects and supports exact `--kind`, `--direction`, and `--channel` filters plus `--from-sequence` and `--limit`. `analyze` groups packet, error, artifact, direction, channel, and resource-pack evidence without embedding raw payloads or content keys. `explain` is derived from the same summary and distinguishes capture integrity from real server compatibility.
 
-Export refuses open or invalid captures, never replaces an existing output, and writes entries in deterministic order with fixed ZIP metadata. A `.bdpcap` file still contains the complete sensitive capture, including raw blobs and any retained resource-pack keys.
+Export refuses open or invalid captures, never replaces an existing output, and writes entries in deterministic order with fixed ZIP metadata. A `.bdpcap` file still contains the complete sensitive capture, including raw blobs, retained resource-pack keys, decrypted contents manifests, and decrypted pack assets when present.
 
 ## Quality checks
 
@@ -64,7 +74,7 @@ Use `.\tools\format.ps1` to format every Go source file. CI runs the same qualit
 
 The proxy will observe both client-to-server and server-to-client traffic. It will preserve raw data where the networking layer exposes it, decode packets when possible, record unknown and malformed input, and make encryption, compression, batching, framing, timing, and protocol metadata visible.
 
-Resource-pack collection, reconstruction, integrity validation, and decryption are part of the planned capture pipeline when a connection exposes the required data and keys.
+Resource-pack collection, reconstruction, integrity validation, and opt-in decryption are implemented when a connection exposes the required archive and keys.
 
 Packet mutation, dropping, injection, replay, cheat behavior, and exploit tooling are not initial goals.
 
@@ -77,6 +87,7 @@ Packet mutation, dropping, injection, replay, cheat behavior, and exploit toolin
 - `internal/capturearchive` creates verified portable capture archives.
 - `internal/packetview` produces JSON-safe decoded packet views.
 - `internal/proxy` owns login, resource-pack negotiation, spawn, and forwarding.
+- `internal/resourcepack` owns bounded derivation of supported encrypted resource-pack archives.
 - `docs/decisions` records material architecture choices.
 - `docs/research` records source revisions, licenses, evidence, and open questions.
 
@@ -89,11 +100,13 @@ Project-wide working principles are in `AGENTS.md`. The capture layout, analysis
 - Raw UDP datagrams and RakNet acknowledgement, fragmentation, retransmission, and loss details are not captured.
 - Transport payloads are captured at the post-RakNet application boundary. Their encryption and compression state is not yet classified per event.
 - The upstream resource-pack-required flag is not mirrored to the downstream listener.
-- Downloaded resource-pack archives, metadata, checksums, and content keys are stored. Decryption and extraction are not implemented yet.
+- Downloaded resource-pack archives, metadata, checksums, and content keys are stored. Opt-in decryption supports only the documented AES-256-CFB8 format and does not extract files to the filesystem.
 
 ## Security
 
 Captures can contain credentials, server addresses, identifiers, chat, and proprietary content. Treat every capture as sensitive. Never commit real captures or authentication state.
+
+Resource packs and other captured content remain owned and licensed by their respective rights holders. They do not become `GPL-3.0-or-later` merely because BedrockDebugProxy captured or decrypted them. Operators are responsible for having authority to inspect a session and for any retention, disclosure, or redistribution of its artifacts. See [`docs/legal-and-responsible-use.md`](docs/legal-and-responsible-use.md) for the implementation trace, risk boundaries, and current source review.
 
 ## License
 

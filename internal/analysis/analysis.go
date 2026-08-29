@@ -27,6 +27,7 @@ type Summary struct {
 	Packets            []PacketCount         `json:"packets,omitempty"`
 	Artifacts          []ArtifactCount       `json:"artifacts,omitempty"`
 	ResourcePacks      []ResourcePack        `json:"resource_packs,omitempty"`
+	PackDecryptions    []PackDecryption      `json:"resource_pack_decryptions,omitempty"`
 	Errors             []ErrorCount          `json:"errors,omitempty"`
 	VerificationIssues []string              `json:"verification_issues,omitempty"`
 }
@@ -62,6 +63,19 @@ type ResourcePack struct {
 	Encrypted      bool   `json:"encrypted"`
 	HasContentKey  bool   `json:"has_content_key"`
 	BlobSHA256     string `json:"blob_sha256,omitempty"`
+}
+
+type PackDecryption struct {
+	Sequence       uint64 `json:"sequence"`
+	ParentSequence uint64 `json:"parent_sequence,omitempty"`
+	UUID           string `json:"uuid"`
+	Version        string `json:"version"`
+	Status         string `json:"status"`
+	Algorithm      string `json:"algorithm,omitempty"`
+	Authenticated  bool   `json:"authenticated"`
+	DecryptedFiles int    `json:"decrypted_files,omitempty"`
+	BlobSHA256     string `json:"blob_sha256,omitempty"`
+	Error          string `json:"error,omitempty"`
 }
 
 type ErrorCount struct {
@@ -183,6 +197,49 @@ func Analyze(root string) (Summary, error) {
 			}
 			summary.ResourcePacks = append(summary.ResourcePacks, entry)
 		}
+		if event.Kind == "resource_pack.decrypted_archive" {
+			var derived struct {
+				UUID    string `json:"uuid"`
+				Version string `json:"version"`
+				Report  struct {
+					Algorithm      string `json:"algorithm"`
+					Authenticated  bool   `json:"authenticated"`
+					DecryptedFiles int    `json:"decrypted_files"`
+				} `json:"report"`
+			}
+			if err := json.Unmarshal(event.Data, &derived); err != nil {
+				return fmt.Errorf("decode resource pack decryption event %d: %w", event.Sequence, err)
+			}
+			entry := PackDecryption{
+				Sequence: event.Sequence, UUID: derived.UUID, Version: derived.Version, Status: "decrypted",
+				Algorithm: derived.Report.Algorithm, Authenticated: derived.Report.Authenticated,
+				DecryptedFiles: derived.Report.DecryptedFiles,
+			}
+			if event.ParentSequence != nil {
+				entry.ParentSequence = *event.ParentSequence
+			}
+			if event.Blob != nil {
+				entry.BlobSHA256 = event.Blob.SHA256
+			}
+			summary.PackDecryptions = append(summary.PackDecryptions, entry)
+		}
+		if event.Kind == "resource_pack.decrypt_error" {
+			var derived struct {
+				UUID    string `json:"uuid"`
+				Version string `json:"version"`
+			}
+			if err := json.Unmarshal(event.Data, &derived); err != nil {
+				return fmt.Errorf("decode resource pack decryption error event %d: %w", event.Sequence, err)
+			}
+			entry := PackDecryption{Sequence: event.Sequence, UUID: derived.UUID, Version: derived.Version, Status: "error"}
+			if event.ParentSequence != nil {
+				entry.ParentSequence = *event.ParentSequence
+			}
+			if event.Error != nil {
+				entry.Error = event.Error.Message
+			}
+			summary.PackDecryptions = append(summary.PackDecryptions, entry)
+		}
 		return nil
 	})
 	if err != nil {
@@ -272,6 +329,17 @@ func Explain(summary Summary) string {
 	} else {
 		for _, pack := range summary.ResourcePacks {
 			fmt.Fprintf(&output, "- `%s` version `%s` UUID `%s` has %d archive bytes via `%s`. Encrypted is %t and content key retained is %t.\n", sanitizeInline(pack.Name), sanitizeInline(pack.Version), sanitizeInline(pack.UUID), pack.ArchiveBytes, sanitizeInline(pack.Delivery), pack.Encrypted, pack.HasContentKey)
+		}
+		for _, decryption := range summary.PackDecryptions {
+			if decryption.Status == "decrypted" {
+				fmt.Fprintf(&output, "- Derived archive for UUID `%s` decrypted %d file(s) with `%s`. Authenticated plaintext is %t.\n", sanitizeInline(decryption.UUID), decryption.DecryptedFiles, sanitizeInline(decryption.Algorithm), decryption.Authenticated)
+			} else {
+				fmt.Fprintf(&output, "- Derived decryption for UUID `%s` failed and the original archive remains available", sanitizeInline(decryption.UUID))
+				if decryption.Error != "" {
+					fmt.Fprintf(&output, " with error `%s`", sanitizeInline(decryption.Error))
+				}
+				output.WriteString(".\n")
+			}
 		}
 		output.WriteString("\n")
 	}

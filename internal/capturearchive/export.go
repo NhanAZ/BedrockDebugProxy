@@ -19,10 +19,11 @@ import (
 var archiveTime = time.Date(1980, time.January, 1, 0, 0, 0, 0, time.UTC)
 
 type Result struct {
-	Path    string `json:"path"`
-	SHA256  string `json:"sha256"`
-	Bytes   int64  `json:"bytes"`
-	Entries int    `json:"entries"`
+	Path                           string `json:"path"`
+	SHA256                         string `json:"sha256"`
+	Bytes                          int64  `json:"bytes"`
+	Entries                        int    `json:"entries"`
+	ContainsDecryptedResourcePacks bool   `json:"contains_decrypted_resource_packs"`
 }
 
 func Export(root, output string) (Result, error) {
@@ -48,7 +49,11 @@ func Export(root, output string) (Result, error) {
 	}
 	paths := []string{"manifest.json", verification.Manifest.EventsPath}
 	seen := map[string]struct{}{"manifest.json": {}, verification.Manifest.EventsPath: {}}
+	containsDecryptedResourcePacks := false
 	if err := capture.ScanEvents(root, func(event capture.Event) error {
+		if event.Kind == "resource_pack.contents_manifest" || event.Kind == "resource_pack.decrypted_archive" {
+			containsDecryptedResourcePacks = true
+		}
 		if event.Blob == nil {
 			return nil
 		}
@@ -99,6 +104,7 @@ func Export(root, output string) (Result, error) {
 	if err != nil {
 		return Result{}, err
 	}
+	result.ContainsDecryptedResourcePacks = containsDecryptedResourcePacks
 	removeOutput = false
 	return result, nil
 }

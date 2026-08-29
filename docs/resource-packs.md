@@ -8,7 +8,7 @@ Each `resource_pack.archive` event records the following evidence.
 
 - Parsed UUID, version, name, description, and manifest plus any retained download URL and content key
 - Parsed manifest and broad module flags
-- Download mechanism reported as RakNet or HTTP
+- Download mechanism inferred from the reconstructed pack object
 - Archive byte length and SHA-256 checksum
 - Upstream connection, endpoints, hop, direction, and sequence
 - A blob reference to the exact archive bytes before decryption or extraction
@@ -19,14 +19,26 @@ The recorder streams the archive to disk and hashes it in one pass. This avoids 
 
 The current gophertunnel listener handles requested resource packs sequentially. It sends one `ResourcePackDataInfo`, services the chunk requests for that pack, and then advances to the next pack. BedrockDebugProxy uses that public listener path when offering the downloaded upstream packs to the client. It does not add a second transfer scheduler or assume a fixed ordering between independent server implementations.
 
-## Encryption status
+## Opt-in decryption
 
-The server-supplied content key is preserved because it is required to analyze encrypted pack entries. The archive itself is never overwritten. This version does not claim to decrypt or extract a pack.
+The server-supplied content key is preserved because it is required to analyze encrypted pack entries. The archive itself is never overwritten. Decryption is disabled by default and can be requested with `--decrypt-resource-packs`.
+
+For the documented 32-byte-key AES-256-CFB8 format, an enabled run writes the following derived events with the original `resource_pack.archive` sequence as their parent.
+
+- `resource_pack.contents_manifest` retains each decrypted root or subpack `contents.json` as a sensitive JSON blob. Its event metadata contains counts, paths, and identifiers but not per-file keys.
+- `resource_pack.decrypted_archive` retains a deterministic ZIP containing copied plaintext files and decrypted declared files. It omits the encrypted `contents.json` files because their plaintext is already preserved separately.
+- `resource_pack.decrypt_error` records an unsupported format or failed derivation as a warning. It also adds a capture limitation and does not abort the connection or discard the raw archive.
+
+AES-CFB8 is not authenticated. A derived archive is useful for analysis but is not integrity proof and never replaces the original captured bytes. The supported header, key, subpack, path, size, provenance, and verification boundaries are documented in [`docs/research/resource-pack-encryption.md`](research/resource-pack-encryption.md).
 
 Resource-pack content keys and archives may be private, licensed, or account-scoped. They remain inside the sensitive local capture and must not be committed or published without permission.
 
+The master key comes from the upstream server's `ResourcePacksInfo` for the current connection. BedrockDebugProxy does not derive, search for, guess, brute-force, or recover it. The current CLI has no offline decrypt command. Decryption produces a mode-restricted ZIP in the operating system's temporary directory and persistent plaintext blobs inside the capture, so it must not be described as memory-only. The temporary file is removed on normal success or failure, but an abnormal process or machine termination may leave it behind for local cleanup.
+
+The GPL license for BedrockDebugProxy source does not relicense captured packs or their textures, models, sounds, scripts, or other assets. Rights and redistribution permission remain with the applicable creator, server operator, Microsoft, Mojang, Marketplace partner, or other rights holder. The precise data flow and legal-risk distinctions are documented in [`docs/legal-and-responsible-use.md`](legal-and-responsible-use.md).
+
 ## Evidence and validation
 
-The implementation follows the `ResourcePacksInfo`, pack download, `FetchResourcePacks`, `Pack.ReadAt`, `Pack.Checksum`, and sequential listener delivery behavior reviewed in Sandertv gophertunnel `v1.61.0` at commit `283a5a97dfe65da94bcc0b401807f6aefa9e72ee`.
+The implementation follows the `ResourcePacksInfo`, pack download, `FetchResourcePacks`, `Pack.ReadAt`, `Pack.Checksum`, and sequential listener delivery behavior reviewed in Sandertv gophertunnel `v1.61.0` at commit `283a5a97dfe65da94bcc0b401807f6aefa9e72ee`. Its current upstream dial path requests `ResourcePackChunkData` over RakNet even when `ResourcePacksInfo` advertises an HTTP URL. That URL remains observable in the raw packet event, but `resource.Read` does not copy it into the reconstructed `resource.Pack`, so the structured archive event must not be treated as proof that the server advertised no URL.
 
-Synthetic archive tests verify byte equality, content-key retention, metadata, endpoint context, stream sizing, deduplication, and final capture integrity. Live validation with a real client and servers that use no pack, one pack, multiple packs, HTTP delivery, RakNet delivery, and encrypted entries remains required.
+Synthetic archive tests verify byte equality, content-key retention, metadata, endpoint context, stream sizing, deduplication, encryption vectors, root and subpack decryption, failure retention, derived event ancestry, and final capture integrity. Live validation with a real client and owner-controlled servers that use no pack, one pack, multiple packs, an advertised HTTP URL, RakNet delivery, and encrypted entries remains required. For an advertised HTTP URL, verify that the raw `ResourcePacksInfo` retains the URL and that the current upstream connection still requests pack chunks over RakNet.
