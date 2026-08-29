@@ -65,6 +65,8 @@ Treat authentication tokens, private keys, chain data, server addresses, device 
 
 Never commit live credentials, user captures, decrypted private resource packs, or generated authentication caches. Default capture directories and secrets must be ignored by Git.
 
+Resource-pack decryption is a conservative project boundary. Production code may use only the archive and `ContentKey` delivered by the upstream server on the current accepted connection. Do not add an offline decrypt command, arbitrary remote pack retrieval, a shared key database, key guessing, brute force, recovery, authentication bypass, automated upload, or redistribution without explicit maintainer review of the technical need, legal risk, and documentation. Preserve the encrypted archive before deriving plaintext. This invariant records actual scope and is not a claim that every use is legally authorized.
+
 Redaction must be an explicit export operation. Preserve the original local capture unless the operator requests deletion. Documentation and test fixtures must use synthetic or deliberately public data.
 
 Do not weaken authentication, encryption, or certificate validation merely to simplify implementation. Document unavoidable trust boundaries and local interception requirements.
@@ -72,6 +74,8 @@ Do not weaken authentication, encryption, or certificate validation merely to si
 ## Dependencies and source reuse
 
 BedrockDebugProxy is licensed `GPL-3.0-or-later`. The repository is private only during development and is intended to become public when ready. Do not describe private status as an all-rights-reserved license or as an exception to the GPL.
+
+Captured and decrypted third-party content is not automatically covered by the project GPL. Keep the source-code license, dependency licenses, capture ownership, and artifact redistribution rights distinct in code, documentation, release material, and support responses.
 
 Check dependency licenses, maintenance status, supported protocol versions, and extension points before adoption. Prefer stable public APIs, but retain access to raw boundaries required for debugging.
 

@@ -10,9 +10,14 @@ coverage.out
 /captures/
 /exports/
 /resource-packs/
+/decrypted-resource-packs/
 *.bdpcap
 *.pcap
 *.pcapng
+*.mcpack
+*.mcaddon
+*.mctemplate
+*.mcworld
 
 # Credentials and local state
 /.env

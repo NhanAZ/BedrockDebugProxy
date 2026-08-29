@@ -60,6 +60,21 @@ try {
     Invoke-QualityCommand "golangci-lint config" "go" @("run", "github.com/golangci/golangci-lint/v2/cmd/golangci-lint@$golangCILintVersion", "config", "verify")
     Invoke-QualityCommand "static analysis" "go" @("run", "github.com/golangci/golangci-lint/v2/cmd/golangci-lint@$golangCILintVersion", "run", "./...")
     Invoke-QualityCommand "vulnerability scan" "go" @("run", "golang.org/x/vuln/cmd/govulncheck@$govulncheckVersion", "./...")
+
+    Write-Host "==> tracked capture artifacts"
+    $trackedFiles = @(& git ls-files)
+    if ($LASTEXITCODE -ne 0) {
+        throw "git ls-files failed with exit code $LASTEXITCODE."
+    }
+    $blockedArtifacts = @($trackedFiles | Where-Object {
+            $_ -match '(^|/)(captures|exports|resource-packs|decrypted-resource-packs)/' -or
+            $_ -match '\.(bdpcap|pcap|pcapng|mcpack|mcaddon|mctemplate|mcworld)$'
+        })
+    if ($blockedArtifacts.Count -ne 0) {
+        $blockedArtifacts | ForEach-Object { Write-Host $_ }
+        throw "Tracked capture or resource-pack artifacts are forbidden. Use synthetic source-generated fixtures."
+    }
+
     Invoke-QualityCommand "whitespace errors" "git" @("diff", "--check", "HEAD")
 } finally {
     Pop-Location
