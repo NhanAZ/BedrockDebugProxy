@@ -128,7 +128,7 @@ func addFile(writer *zip.Writer, root, relative string) error {
 	if err != nil {
 		return fmt.Errorf("open archive entry %s: %w", relative, err)
 	}
-	defer source.Close()
+	defer func() { _ = source.Close() }()
 	info, err := source.Stat()
 	if err != nil {
 		return fmt.Errorf("inspect archive entry %s: %w", relative, err)
@@ -153,15 +153,19 @@ func inspectArchive(path string, expectedEntries int) (Result, error) {
 	if err != nil {
 		return Result{}, fmt.Errorf("reopen archive: %w", err)
 	}
-	defer reader.Close()
+	defer func() { _ = reader.Close() }()
 	if len(reader.File) != expectedEntries {
 		return Result{}, fmt.Errorf("archive contains %d entries, expected %d", len(reader.File), expectedEntries)
 	}
 	for _, entry := range reader.File {
+		if entry.Method != zip.Store {
+			return Result{}, fmt.Errorf("archived entry %s uses unexpected compression method %d", entry.Name, entry.Method)
+		}
 		content, err := entry.Open()
 		if err != nil {
 			return Result{}, fmt.Errorf("open archived entry %s: %w", entry.Name, err)
 		}
+		// #nosec G110 -- Export creates only uncompressed entries from already verified local files.
 		_, copyErr := io.Copy(io.Discard, content)
 		closeErr := content.Close()
 		if copyErr != nil || closeErr != nil {
@@ -172,7 +176,7 @@ func inspectArchive(path string, expectedEntries int) (Result, error) {
 	if err != nil {
 		return Result{}, fmt.Errorf("open completed archive: %w", err)
 	}
-	defer f.Close()
+	defer func() { _ = f.Close() }()
 	hash := sha256.New()
 	size, err := io.Copy(hash, f)
 	if err != nil {

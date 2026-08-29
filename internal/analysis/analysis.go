@@ -212,7 +212,9 @@ func Analyze(root string) (Summary, error) {
 	for representation, aggregate := range artifacts {
 		entry := ArtifactCount{Representation: representation, References: aggregate.references, UniqueBlobs: uint64(len(aggregate.blobs))}
 		for _, size := range aggregate.blobs {
-			entry.UniqueBytes += uint64(size)
+			if size > 0 {
+				entry.UniqueBytes += uint64(size)
+			}
 		}
 		summary.Artifacts = append(summary.Artifacts, entry)
 	}

@@ -164,6 +164,9 @@ func (r *Recorder) RecordReader(ctx context.Context, event Event, raw io.Reader,
 }
 
 func (r *Recorder) record(ctx context.Context, event Event, raw io.Reader, expectedSize int64, mediaType, representation string) (Event, error) {
+	if event.Blob != nil {
+		return Event{}, errors.New("event blob references are recorder-owned")
+	}
 	if ctx == nil {
 		ctx = context.Background()
 	}
@@ -205,6 +208,7 @@ func (r *Recorder) record(ctx context.Context, event Event, raw io.Reader, expec
 		event.Direction = DirectionUnknown
 	}
 
+	var blobBytes uint64
 	if raw != nil {
 		ref, err := r.storeBlobLocked(ctx, raw, expectedSize, mediaType, representation, sequence)
 		if err != nil {
@@ -213,6 +217,10 @@ func (r *Recorder) record(ctx context.Context, event Event, raw io.Reader, expec
 			r.failed = err
 			return Event{}, err
 		}
+		if ref.Size < 0 {
+			return Event{}, errors.New("stored blob size is negative")
+		}
+		blobBytes = uint64(ref.Size)
 		event.Blob = &ref
 	}
 
@@ -243,7 +251,7 @@ func (r *Recorder) record(ctx context.Context, event Event, raw io.Reader, expec
 		if _, seen := r.seenBlob[event.Blob.SHA256]; !seen {
 			r.seenBlob[event.Blob.SHA256] = struct{}{}
 			r.manifest.Counts.Blobs++
-			r.manifest.Counts.BlobBytes += uint64(event.Blob.Size)
+			r.manifest.Counts.BlobBytes += blobBytes
 		}
 	}
 	if event.Kind == "packet.decode_error" {

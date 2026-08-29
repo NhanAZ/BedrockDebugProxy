@@ -31,7 +31,10 @@ type Network struct {
 func (n Network) DialContext(ctx context.Context, address string) (net.Conn, error) {
 	conn, err := (raknet.Dialer{ErrorLog: n.Logger}).DialContext(ctx, address)
 	if err != nil {
-		n.recordConnection("transport.connection_error", nil, err)
+		captureErr := n.recordConnection("transport.connection_error", nil, err)
+		if captureErr != nil {
+			return nil, errors.Join(err, captureErr)
+		}
 		return nil, err
 	}
 	return n.wrap(conn)
@@ -44,7 +47,10 @@ func (n Network) PingContext(ctx context.Context, address string) ([]byte, error
 func (n Network) Listen(address string) (minecraft.NetworkListener, error) {
 	listener, err := (raknet.ListenConfig{ErrorLog: n.Logger}).Listen(address)
 	if err != nil {
-		n.recordConnection("transport.listen_error", nil, err)
+		captureErr := n.recordConnection("transport.listen_error", nil, err)
+		if captureErr != nil {
+			return nil, errors.Join(err, captureErr)
+		}
 		return nil, err
 	}
 	return &observedListener{Listener: listener, network: n}, nil
@@ -160,12 +166,12 @@ func (c *observedConn) Context() context.Context {
 
 func (c *observedConn) recordPayload(operation string, payload []byte, attempted, transferred int, operationErr error) error {
 	direction := c.network.ReadDirection
-	source := c.Conn.RemoteAddr()
-	destination := c.Conn.LocalAddr()
+	source := c.RemoteAddr()
+	destination := c.LocalAddr()
 	if operation == "write" {
 		direction = c.network.WriteDirection
-		source = c.Conn.LocalAddr()
-		destination = c.Conn.RemoteAddr()
+		source = c.LocalAddr()
+		destination = c.RemoteAddr()
 	}
 	data, _ := json.Marshal(map[string]any{
 		"operation":         operation,
@@ -211,10 +217,9 @@ func captureError(operation string, err error) *capture.ErrorInfo {
 		return nil
 	}
 	info := &capture.ErrorInfo{Operation: operation, Message: err.Error(), Type: fmt.Sprintf("%T", err)}
-	if netErr, ok := err.(net.Error); ok {
-		temporary := netErr.Temporary()
+	var netErr net.Error
+	if errors.As(err, &netErr) {
 		timeout := netErr.Timeout()
-		info.Temporary = &temporary
 		info.Timeout = &timeout
 	}
 	return info

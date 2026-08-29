@@ -147,7 +147,11 @@ func (e *encoder) value(value reflect.Value, path string, depth int) any {
 		if value.Type().Elem().Kind() == reflect.Uint8 {
 			bytesValue := make([]byte, value.Len())
 			for index := range bytesValue {
-				bytesValue[index] = byte(value.Index(index).Uint())
+				integer := value.Index(index).Uint()
+				if integer > math.MaxUint8 {
+					panic("uint8 reflection value exceeds one byte")
+				}
+				bytesValue[index] = byte(integer)
 			}
 			return e.binary(bytesValue)
 		}

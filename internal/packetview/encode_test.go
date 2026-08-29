@@ -20,6 +20,7 @@ func TestEncodeProducesTypedJSONSafeView(t *testing.T) {
 		Name:   "packet",
 		Bytes:  []byte{0xde, 0xad, 0xbe, 0xef},
 		Values: map[int]string{2: "two", 1: "one"},
+		hidden: "must not be captured",
 	}
 	value.Next = value
 	encoded, notices, err := Encode(value, Options{BinaryPreviewBytes: 2})
@@ -34,6 +35,9 @@ func TestEncodeProducesTypedJSONSafeView(t *testing.T) {
 		if !strings.Contains(text, expected) {
 			t.Errorf("encoded JSON does not contain %s: %s", expected, text)
 		}
+	}
+	if strings.Contains(text, value.hidden) {
+		t.Fatalf("encoded JSON exposes an unexported field: %s", text)
 	}
 	if len(notices) != 1 || notices[0].Kind != "cycle" {
 		t.Fatalf("notices = %#v", notices)

@@ -256,6 +256,22 @@ func TestRecordReaderRejectsSizeMismatch(t *testing.T) {
 	}
 }
 
+func TestRecorderRejectsCallerOwnedBlobReference(t *testing.T) {
+	recorder, err := New(filepath.Join(t.TempDir(), "capture"), Options{})
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer func() { _ = recorder.Close("closed", nil) }()
+
+	_, err = recorder.Record(context.Background(), Record{Event: Event{
+		Kind: "packet.raw",
+		Blob: &BlobRef{SHA256: strings.Repeat("0", 64), Size: -1, Path: "outside"},
+	}})
+	if err == nil || !strings.Contains(err.Error(), "recorder-owned") {
+		t.Fatalf("Record() error = %v", err)
+	}
+}
+
 func sequenceClock(start time.Time, step time.Duration) func() time.Time {
 	current := start.Add(-step)
 	return func() time.Time {

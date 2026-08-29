@@ -37,7 +37,7 @@ func ScanEvents(root string, visit func(Event) error) error {
 	if err != nil {
 		return fmt.Errorf("open event stream: %w", err)
 	}
-	defer f.Close()
+	defer func() { _ = f.Close() }()
 
 	reader := bufio.NewReaderSize(f, 256*1024)
 	lineNumber := 0
@@ -132,7 +132,7 @@ func verifyBlob(root string, ref BlobRef) error {
 	if err != nil {
 		return fmt.Errorf("open: %w", err)
 	}
-	defer f.Close()
+	defer func() { _ = f.Close() }()
 	hash := sha256.New()
 	n, err := io.Copy(hash, f)
 	if err != nil {

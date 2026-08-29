@@ -111,7 +111,7 @@ func (r *Runner) Run(ctx context.Context) error {
 	if err != nil {
 		return fmt.Errorf("listen for Bedrock client: %w", err)
 	}
-	defer listener.Close()
+	defer func() { _ = listener.Close() }()
 	stopAccept := context.AfterFunc(runCtx, func() { _ = listener.Close() })
 	defer stopAccept()
 
@@ -136,7 +136,7 @@ func (r *Runner) Run(ctx context.Context) error {
 		_ = accepted.Close()
 		return fmt.Errorf("accepted unexpected connection type %T", accepted)
 	}
-	defer clientConn.Close()
+	defer func() { _ = clientConn.Close() }()
 	if slot.err != nil {
 		_ = listener.Disconnect(clientConn, "BedrockDebugProxy could not connect to the destination server")
 		return slot.err
@@ -146,7 +146,7 @@ func (r *Runner) Run(ctx context.Context) error {
 		return errors.New("upstream connection was not established during resource-pack negotiation")
 	}
 	serverConn := slot.conn
-	defer serverConn.Close()
+	defer func() { _ = serverConn.Close() }()
 	stopConnections := context.AfterFunc(runCtx, func() {
 		_ = clientConn.Close()
 		_ = serverConn.Close()
@@ -376,10 +376,9 @@ func networkError(operation string, err error) *capture.ErrorInfo {
 		return nil
 	}
 	info := &capture.ErrorInfo{Operation: operation, Message: err.Error(), Type: fmt.Sprintf("%T", err)}
-	if netErr, ok := err.(net.Error); ok {
-		temporary := netErr.Temporary()
+	var netErr net.Error
+	if errors.As(err, &netErr) {
 		timeout := netErr.Timeout()
-		info.Temporary = &temporary
 		info.Timeout = &timeout
 	}
 	return info
