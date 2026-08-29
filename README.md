@@ -80,7 +80,7 @@ Packet mutation, dropping, injection, replay, cheat behavior, and exploit toolin
 - `docs/decisions` records material architecture choices.
 - `docs/research` records source revisions, licenses, evidence, and open questions.
 
-Project-wide working principles are in `AGENTS.md`. The capture layout, analysis contract, and observation boundaries are documented in `docs/capture-format.md`, `docs/analysis-and-export.md`, and `docs/decisions/0001-capture-first-terminating-proxy.md`.
+Project-wide working principles are in `AGENTS.md`. The capture layout, analysis contract, protocol update workflow, and observation boundaries are documented in `docs/capture-format.md`, `docs/analysis-and-export.md`, `docs/protocol-updates.md`, and `docs/decisions/0001-capture-first-terminating-proxy.md`.
 
 ## Current limitations
 
