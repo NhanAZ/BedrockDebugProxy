@@ -19,9 +19,29 @@ Make technical decisions in this order.
 
 Do not select an architecture only because an existing proxy uses it. Research current implementations, compare trade-offs, and record consequential choices before committing to them.
 
+## Maintainer posture
+
+Maintain the project conservatively. Prefer the smallest focused change that fixes the demonstrated root cause. Do not turn a bug fix, protocol update, issue, or pull request into a broad refactor unless the existing design makes the focused change unsafe.
+
+Do not add a feature, public API, abstraction, helper, framework, compatibility layer, subsystem, or dependency because it may be useful later. Require a current use case and evidence that existing project mechanisms cannot address it cleanly. Feature additions and removals are material decisions and must not be hidden inside unrelated fixes.
+
+Before editing code, trace the relevant data path and inspect call sites, shared helpers, interfaces, similar implementations, tests, documentation, and useful Git history. Search for existing functionality before creating another implementation. Reuse or improve the established path when it fits rather than introducing duplicate or competing logic.
+
+When uncertainty remains between adding code and investigating further, investigate further. When both a small and a large patch solve the verified root cause, prefer the small patch.
+
+## Issue and pull request triage
+
+Treat an issue as a report to investigate, not an implementation order. Determine whether it is reproducible, intentional, duplicate, in scope, supported by evidence, and compatible with the project mission. It is valid to request more information or recommend closing an issue when the technical reason is explicit.
+
+Review pull requests against the current implementation and architecture before judging their diff. Check correctness, duplicate functionality, unrelated changes, dependencies, protocol assumptions, capture fidelity, cross-server compatibility, tests, and maintenance cost. Compilation alone is not sufficient evidence for approval. Request focused, actionable changes or recommend closing a pull request when warranted.
+
 ## Protocol research
 
 Use primary sources whenever possible. Inspect the actual source revision, protocol definitions, tests, and wire behavior. Distinguish confirmed behavior, reasoned inference, and unknown behavior in code comments and documentation.
+
+Cross-check protocol work against multiple independent implementations or captures when practical. Useful references include gophertunnel, go-raknet, Cloudburst Protocol and ProxyPass, Kas-tle ProxyPass, PrismarineJS bedrock-protocol, Endstone protocol-dumper and spyglass, bedrocktool, Dragonfly, and observed Bedrock Dedicated Server behavior. If sources disagree, investigate protocol versions, optional fields, experiments, feature flags, transport differences, and implementation workarounds before choosing a definition.
+
+Never infer packet IDs, field types, serialization order, version gates, or required packet order merely because a proposed layout appears plausible. Every new protocol behavior needs a traceable source or capture. Record why the selected interpretation fits the evidence.
 
 Record important protocol findings in `docs/research/`. Include source URLs, revision identifiers, access dates when useful, relevant license information, and the impact on this project. Do not let important findings exist only in a chat, commit message, or code comment.
 
@@ -65,6 +85,8 @@ Transport, compression, encryption, batching, framing, packet decoding, resource
 
 Run formatting, unit tests, static analysis, build checks, and `git diff --check` before committing. A successful local build is not evidence of compatibility with a real Bedrock client or public server. Keep manual and live verification status explicit.
 
+After a commit changes protocol handling, networking, resource packs, or observable behavior, provide a short human validation plan. Name the server or server category, the flow to exercise, the packets or behavior to observe, the expected result, and the capture or log needed if it fails. Automated checks and real-world validation must be reported separately.
+
 Fuzz parsers and decoders that consume untrusted network or capture data when practical. Bound memory, disk, and goroutine growth without hiding the fact that a limit was reached.
 
 ## Compatibility and protocol updates
@@ -74,6 +96,10 @@ Keep protocol support isolated behind explicit interfaces and version metadata. 
 Prefer focused updates that preserve BedrockDebugProxy hooks. Do not copy a large upstream tree blindly. Validate packet IDs, field changes, compression negotiation, resource-pack flow, authentication, and representative capture fixtures.
 
 When a new Bedrock release is not fully understood, capture unknown data faithfully and mark decode confidence instead of guessing fields.
+
+Do not assume all Bedrock servers use the same valid packet sequence. Featured Experiences, Creator Experiences, Bedrock Dedicated Server, and other server software may delay, omit, reorder, or add packets where the protocol permits it. Avoid order-dependent logic unless the protocol requires that order and the requirement has evidence. State machines must tolerate the valid sequences demonstrated by supported server categories.
+
+For a bug that appears after a protocol update, verify packet definitions, field order, optional fields, version gates, decoding boundaries, and server-specific behavior before adding a compatibility workaround. Fix protocol understanding before patching symptoms when the evidence supports it.
 
 ## Documentation
 
