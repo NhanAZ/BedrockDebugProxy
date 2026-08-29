@@ -3,6 +3,7 @@ package main
 import (
 	"bytes"
 	"context"
+	"os"
 	"path/filepath"
 	"strings"
 	"testing"
@@ -66,5 +67,61 @@ func TestRunRejectsMissingUpstream(t *testing.T) {
 	}
 	if !strings.Contains(stderr.String(), "--upstream is required") {
 		t.Fatalf("stderr = %s", stderr.String())
+	}
+}
+
+func TestCaptureInspectionAnalysisExplanationAndExportCommands(t *testing.T) {
+	root := filepath.Join(t.TempDir(), "capture")
+	recorder, err := capture.New(root, capture.Options{CaptureID: "command-test"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := recorder.Record(context.Background(), capture.Record{Event: capture.Event{
+		Kind: "packet.decoded", Direction: capture.DirectionClientToServer, Channel: "bridge",
+		Packet: &capture.PacketInfo{ID: 9, Name: "Text", DecodeStatus: "decoded"},
+	}}); err != nil {
+		t.Fatal(err)
+	}
+	if err := recorder.Close("closed", nil); err != nil {
+		t.Fatal(err)
+	}
+
+	var stdout, stderr bytes.Buffer
+	if code := run([]string{"inspect", "--kind", "packet.decoded", root}, &stdout, &stderr); code != 0 {
+		t.Fatalf("inspect code = %d, stderr = %s", code, stderr.String())
+	}
+	if !strings.Contains(stdout.String(), `"kind":"packet.decoded"`) {
+		t.Fatalf("inspect stdout = %s", stdout.String())
+	}
+
+	stdout.Reset()
+	stderr.Reset()
+	if code := run([]string{"analyze", root}, &stdout, &stderr); code != 0 {
+		t.Fatalf("analyze code = %d, stderr = %s", code, stderr.String())
+	}
+	if !strings.Contains(stdout.String(), `"capture_id": "command-test"`) || !strings.Contains(stdout.String(), `"name": "Text"`) {
+		t.Fatalf("analyze stdout = %s", stdout.String())
+	}
+
+	stdout.Reset()
+	stderr.Reset()
+	if code := run([]string{"explain", root}, &stdout, &stderr); code != 0 {
+		t.Fatalf("explain code = %d, stderr = %s", code, stderr.String())
+	}
+	if !strings.Contains(stdout.String(), "command-test") || !strings.Contains(stdout.String(), "verifier found no") {
+		t.Fatalf("explain stdout = %s", stdout.String())
+	}
+
+	stdout.Reset()
+	stderr.Reset()
+	output := filepath.Join(t.TempDir(), "command-test.bdpcap")
+	if code := run([]string{"export", root, output}, &stdout, &stderr); code != 0 {
+		t.Fatalf("export code = %d, stderr = %s", code, stderr.String())
+	}
+	if info, err := os.Stat(output); err != nil || info.Size() == 0 {
+		t.Fatalf("export output = %v, %v", info, err)
+	}
+	if !strings.Contains(stdout.String(), `"entries": 2`) {
+		t.Fatalf("export stdout = %s", stdout.String())
 	}
 }

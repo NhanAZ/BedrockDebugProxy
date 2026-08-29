@@ -33,6 +33,21 @@ An existing capture can be verified separately.
 .\bedrock-debug-proxy.exe verify C:\path\to\capture
 ```
 
+## Inspect and export
+
+The CLI can stream selected canonical events as JSON Lines, produce a deterministic JSON summary, render a concise Markdown explanation, or package a closed verified capture into a portable `.bdpcap` archive.
+
+```powershell
+.\bedrock-debug-proxy.exe inspect --direction server_to_client --kind packet.decoded C:\path\to\capture
+.\bedrock-debug-proxy.exe analyze C:\path\to\capture > analysis.json
+.\bedrock-debug-proxy.exe explain C:\path\to\capture > explanation.md
+.\bedrock-debug-proxy.exe export C:\path\to\capture C:\path\to\session.bdpcap
+```
+
+`inspect` preserves the original event objects and supports exact `--kind`, `--direction`, and `--channel` filters plus `--from-sequence` and `--limit`. `analyze` groups packet, error, artifact, direction, channel, and resource-pack evidence without embedding raw payloads or content keys. `explain` is derived from the same summary and distinguishes capture integrity from real server compatibility.
+
+Export refuses open or invalid captures, never replaces an existing output, and writes entries in deterministic order with fixed ZIP metadata. A `.bdpcap` file still contains the complete sensitive capture, including raw blobs and any retained resource-pack keys.
+
 ## Initial scope
 
 The proxy will observe both client-to-server and server-to-client traffic. It will preserve raw data where the networking layer exposes it, decode packets when possible, record unknown and malformed input, and make encryption, compression, batching, framing, timing, and protocol metadata visible.
@@ -45,13 +60,15 @@ Packet mutation, dropping, injection, replay, cheat behavior, and exploit toolin
 
 - `cmd/bedrock-debug-proxy` contains the CLI.
 - `internal/bedrock` adapts gophertunnel and go-raknet observation hooks.
+- `internal/analysis` creates deterministic machine and human summaries.
 - `internal/capture` owns the protocol-neutral capture schema, recorder, and verifier.
+- `internal/capturearchive` creates verified portable capture archives.
 - `internal/packetview` produces JSON-safe decoded packet views.
 - `internal/proxy` owns login, resource-pack negotiation, spawn, and forwarding.
 - `docs/decisions` records material architecture choices.
 - `docs/research` records source revisions, licenses, evidence, and open questions.
 
-Project-wide working principles are in `AGENTS.md`. The capture layout and observation boundaries are documented in `docs/capture-format.md` and `docs/decisions/0001-capture-first-terminating-proxy.md`.
+Project-wide working principles are in `AGENTS.md`. The capture layout, analysis contract, and observation boundaries are documented in `docs/capture-format.md`, `docs/analysis-and-export.md`, and `docs/decisions/0001-capture-first-terminating-proxy.md`.
 
 ## Current limitations
 

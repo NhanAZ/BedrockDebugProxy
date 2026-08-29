@@ -1,0 +1,306 @@
+package analysis
+
+import (
+	"encoding/json"
+	"fmt"
+	"sort"
+	"strings"
+
+	"github.com/NhanAZ/BedrockDebugProxy/internal/capture"
+)
+
+type Summary struct {
+	Schema             string                `json:"schema"`
+	CaptureID          string                `json:"capture_id"`
+	Status             string                `json:"status"`
+	StartedAt          string                `json:"started_at"`
+	EndedAt            string                `json:"ended_at,omitempty"`
+	Complete           bool                  `json:"complete"`
+	Limitations        []string              `json:"limitations,omitempty"`
+	ManifestCounts     capture.CaptureCounts `json:"manifest_counts"`
+	ObservedEvents     uint64                `json:"observed_events"`
+	FirstSequence      uint64                `json:"first_sequence,omitempty"`
+	LastSequence       uint64                `json:"last_sequence,omitempty"`
+	Kinds              []NamedCount          `json:"kinds,omitempty"`
+	Directions         []NamedCount          `json:"directions,omitempty"`
+	Channels           []NamedCount          `json:"channels,omitempty"`
+	Packets            []PacketCount         `json:"packets,omitempty"`
+	Artifacts          []ArtifactCount       `json:"artifacts,omitempty"`
+	ResourcePacks      []ResourcePack        `json:"resource_packs,omitempty"`
+	Errors             []ErrorCount          `json:"errors,omitempty"`
+	VerificationIssues []string              `json:"verification_issues,omitempty"`
+}
+
+type NamedCount struct {
+	Name  string `json:"name"`
+	Count uint64 `json:"count"`
+}
+
+type PacketCount struct {
+	Direction    capture.Direction `json:"direction"`
+	ID           uint32            `json:"id"`
+	Name         string            `json:"name,omitempty"`
+	DecodeStatus string            `json:"decode_status,omitempty"`
+	Count        uint64            `json:"count"`
+}
+
+type ArtifactCount struct {
+	Representation string `json:"representation"`
+	References     uint64 `json:"references"`
+	UniqueBlobs    uint64 `json:"unique_blobs"`
+	UniqueBytes    uint64 `json:"unique_bytes"`
+}
+
+type ResourcePack struct {
+	Sequence       uint64 `json:"sequence"`
+	UUID           string `json:"uuid"`
+	Version        string `json:"version"`
+	Name           string `json:"name"`
+	ArchiveBytes   int64  `json:"archive_bytes"`
+	ChecksumSHA256 string `json:"checksum_sha256"`
+	Delivery       string `json:"delivery"`
+	Encrypted      bool   `json:"encrypted"`
+	HasContentKey  bool   `json:"has_content_key"`
+	BlobSHA256     string `json:"blob_sha256,omitempty"`
+}
+
+type ErrorCount struct {
+	Kind          string `json:"kind"`
+	Operation     string `json:"operation,omitempty"`
+	Type          string `json:"type,omitempty"`
+	Message       string `json:"message,omitempty"`
+	Count         uint64 `json:"count"`
+	FirstSequence uint64 `json:"first_sequence"`
+	LastSequence  uint64 `json:"last_sequence"`
+}
+
+type packetKey struct {
+	direction    capture.Direction
+	id           uint32
+	name         string
+	decodeStatus string
+}
+
+type errorKey struct {
+	kind      string
+	operation string
+	typeName  string
+	message   string
+}
+
+type artifactAggregate struct {
+	references uint64
+	blobs      map[string]int64
+}
+
+func Analyze(root string) (Summary, error) {
+	verification, err := capture.Verify(root)
+	if err != nil {
+		return Summary{}, err
+	}
+	manifest := verification.Manifest
+	summary := Summary{
+		Schema:             manifest.Schema,
+		CaptureID:          manifest.CaptureID,
+		Status:             manifest.Status,
+		StartedAt:          manifest.StartedAt,
+		EndedAt:            manifest.EndedAt,
+		Complete:           manifest.Completeness.Complete,
+		Limitations:        append([]string(nil), manifest.Completeness.Limitations...),
+		ManifestCounts:     manifest.Counts,
+		VerificationIssues: append([]string(nil), verification.Issues...),
+	}
+	kinds := make(map[string]uint64)
+	directions := make(map[string]uint64)
+	channels := make(map[string]uint64)
+	packets := make(map[packetKey]uint64)
+	errorsByKey := make(map[errorKey]*ErrorCount)
+	artifacts := make(map[string]*artifactAggregate)
+	err = capture.ScanEvents(root, func(event capture.Event) error {
+		summary.ObservedEvents++
+		if summary.FirstSequence == 0 {
+			summary.FirstSequence = event.Sequence
+		}
+		summary.LastSequence = event.Sequence
+		kinds[event.Kind]++
+		directions[string(event.Direction)]++
+		channels[event.Channel]++
+		if event.Packet != nil {
+			packets[packetKey{
+				direction: event.Direction, id: event.Packet.ID,
+				name: event.Packet.Name, decodeStatus: event.Packet.DecodeStatus,
+			}]++
+		}
+		if event.Blob != nil {
+			representation := event.Blob.Representation
+			aggregate := artifacts[representation]
+			if aggregate == nil {
+				aggregate = &artifactAggregate{blobs: make(map[string]int64)}
+				artifacts[representation] = aggregate
+			}
+			aggregate.references++
+			aggregate.blobs[event.Blob.SHA256] = event.Blob.Size
+		}
+		if event.Error != nil || event.Severity == capture.SeverityError {
+			key := errorKey{kind: event.Kind}
+			if event.Error != nil {
+				key.operation = event.Error.Operation
+				key.typeName = event.Error.Type
+				key.message = event.Error.Message
+			}
+			aggregate := errorsByKey[key]
+			if aggregate == nil {
+				aggregate = &ErrorCount{
+					Kind: key.kind, Operation: key.operation, Type: key.typeName, Message: key.message,
+					FirstSequence: event.Sequence,
+				}
+				errorsByKey[key] = aggregate
+			}
+			aggregate.Count++
+			aggregate.LastSequence = event.Sequence
+		}
+		if event.Kind == "resource_pack.archive" {
+			var pack struct {
+				UUID           string `json:"uuid"`
+				Version        string `json:"version"`
+				Name           string `json:"name"`
+				ArchiveBytes   int64  `json:"archive_bytes"`
+				ChecksumSHA256 string `json:"checksum_sha256"`
+				Delivery       string `json:"delivery"`
+				Encrypted      bool   `json:"encrypted"`
+				ContentKey     string `json:"content_key"`
+			}
+			if err := json.Unmarshal(event.Data, &pack); err != nil {
+				return fmt.Errorf("decode resource pack event %d: %w", event.Sequence, err)
+			}
+			entry := ResourcePack{
+				Sequence: event.Sequence, UUID: pack.UUID, Version: pack.Version, Name: pack.Name,
+				ArchiveBytes: pack.ArchiveBytes, ChecksumSHA256: pack.ChecksumSHA256,
+				Delivery: pack.Delivery, Encrypted: pack.Encrypted, HasContentKey: pack.ContentKey != "",
+			}
+			if event.Blob != nil {
+				entry.BlobSHA256 = event.Blob.SHA256
+			}
+			summary.ResourcePacks = append(summary.ResourcePacks, entry)
+		}
+		return nil
+	})
+	if err != nil {
+		return Summary{}, err
+	}
+	summary.Kinds = sortedNamedCounts(kinds)
+	summary.Directions = sortedNamedCounts(directions)
+	summary.Channels = sortedNamedCounts(channels)
+	for key, count := range packets {
+		summary.Packets = append(summary.Packets, PacketCount{
+			Direction: key.direction, ID: key.id, Name: key.name, DecodeStatus: key.decodeStatus, Count: count,
+		})
+	}
+	sort.Slice(summary.Packets, func(i, j int) bool {
+		left, right := summary.Packets[i], summary.Packets[j]
+		if left.Direction != right.Direction {
+			return left.Direction < right.Direction
+		}
+		if left.ID != right.ID {
+			return left.ID < right.ID
+		}
+		if left.Name != right.Name {
+			return left.Name < right.Name
+		}
+		return left.DecodeStatus < right.DecodeStatus
+	})
+	for representation, aggregate := range artifacts {
+		entry := ArtifactCount{Representation: representation, References: aggregate.references, UniqueBlobs: uint64(len(aggregate.blobs))}
+		for _, size := range aggregate.blobs {
+			entry.UniqueBytes += uint64(size)
+		}
+		summary.Artifacts = append(summary.Artifacts, entry)
+	}
+	sort.Slice(summary.Artifacts, func(i, j int) bool { return summary.Artifacts[i].Representation < summary.Artifacts[j].Representation })
+	for _, aggregate := range errorsByKey {
+		summary.Errors = append(summary.Errors, *aggregate)
+	}
+	sort.Slice(summary.Errors, func(i, j int) bool {
+		if summary.Errors[i].FirstSequence != summary.Errors[j].FirstSequence {
+			return summary.Errors[i].FirstSequence < summary.Errors[j].FirstSequence
+		}
+		return summary.Errors[i].Kind < summary.Errors[j].Kind
+	})
+	return summary, nil
+}
+
+func Explain(summary Summary) string {
+	var output strings.Builder
+	fmt.Fprintf(&output, "# BedrockDebugProxy capture explanation\n\n")
+	fmt.Fprintf(&output, "Capture `%s` uses schema `%s` and has status `%s`. It contains %d observed events from sequence %d through %d.\n\n", sanitizeInline(summary.CaptureID), sanitizeInline(summary.Schema), sanitizeInline(summary.Status), summary.ObservedEvents, summary.FirstSequence, summary.LastSequence)
+	fmt.Fprintf(&output, "## Integrity and completeness\n\n")
+	if len(summary.VerificationIssues) == 0 {
+		fmt.Fprintf(&output, "The capture verifier found no event ordering, manifest count, blob path, size, or SHA-256 integrity issues.\n\n")
+	} else {
+		fmt.Fprintf(&output, "The capture verifier found %d issue(s). Treat conclusions as provisional.\n\n", len(summary.VerificationIssues))
+		for _, issue := range summary.VerificationIssues {
+			fmt.Fprintf(&output, "- `%s`\n", sanitizeInline(issue))
+		}
+		output.WriteString("\n")
+	}
+	if summary.Complete {
+		output.WriteString("The manifest marks the capture complete.\n\n")
+	} else {
+		output.WriteString("The manifest marks the capture incomplete or limited.\n\n")
+	}
+	if len(summary.Limitations) != 0 {
+		for _, limitation := range summary.Limitations {
+			fmt.Fprintf(&output, "- `%s`\n", sanitizeInline(limitation))
+		}
+		output.WriteString("\n")
+	}
+	fmt.Fprintf(&output, "## Traffic\n\n")
+	for _, direction := range summary.Directions {
+		fmt.Fprintf(&output, "- `%s` has %d event(s)\n", sanitizeInline(direction.Name), direction.Count)
+	}
+	output.WriteString("\n")
+	if len(summary.Packets) == 0 {
+		output.WriteString("No packet metadata events were found.\n\n")
+	} else {
+		fmt.Fprintf(&output, "The capture contains %d distinct packet ID, direction, name, and decode-status combinations.\n\n", len(summary.Packets))
+	}
+	fmt.Fprintf(&output, "## Resource packs\n\n")
+	if len(summary.ResourcePacks) == 0 {
+		output.WriteString("No reconstructed resource-pack archive events were found.\n\n")
+	} else {
+		for _, pack := range summary.ResourcePacks {
+			fmt.Fprintf(&output, "- `%s` version `%s` UUID `%s` has %d archive bytes via `%s`. Encrypted is %t and content key retained is %t.\n", sanitizeInline(pack.Name), sanitizeInline(pack.Version), sanitizeInline(pack.UUID), pack.ArchiveBytes, sanitizeInline(pack.Delivery), pack.Encrypted, pack.HasContentKey)
+		}
+		output.WriteString("\n")
+	}
+	fmt.Fprintf(&output, "## Errors\n\n")
+	if len(summary.Errors) == 0 {
+		output.WriteString("No error-severity or structured error events were found.\n\n")
+	} else {
+		for _, entry := range summary.Errors {
+			fmt.Fprintf(&output, "- `%s` occurred %d time(s) from sequence %d through %d", sanitizeInline(entry.Kind), entry.Count, entry.FirstSequence, entry.LastSequence)
+			if entry.Message != "" {
+				fmt.Fprintf(&output, " with message `%s`", sanitizeInline(entry.Message))
+			}
+			output.WriteString(".\n")
+		}
+		output.WriteString("\n")
+	}
+	output.WriteString("Capture integrity does not by itself prove compatibility with a real Minecraft client or every Bedrock server implementation. Compare packet sequences and failures with the named server flow used during collection.\n")
+	return output.String()
+}
+
+func sortedNamedCounts(values map[string]uint64) []NamedCount {
+	result := make([]NamedCount, 0, len(values))
+	for name, count := range values {
+		result = append(result, NamedCount{Name: name, Count: count})
+	}
+	sort.Slice(result, func(i, j int) bool { return result[i].Name < result[j].Name })
+	return result
+}
+
+func sanitizeInline(value string) string {
+	value = strings.ReplaceAll(value, "`", "'")
+	value = strings.ReplaceAll(value, "\r", " ")
+	return strings.ReplaceAll(value, "\n", " ")
+}

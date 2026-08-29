@@ -51,3 +51,11 @@ This policy may add latency during very high traffic. A future buffered mode mus
 Readers must select behavior from the schema string instead of assuming the newest layout. Existing captures are immutable evidence. Schema migrations create a new capture or export and retain provenance to the source.
 
 The capture verifier checks sequence continuity, capture identity, event counts, blob counts, canonical paths, byte lengths, and SHA-256 digests.
+
+## Portable archive
+
+The `export` command packages an already closed and verified capture as a ZIP-compatible `.bdpcap` file. It stores `manifest.json`, `events.jsonl`, and each referenced content-addressed blob exactly once. Entry order, timestamps, modes, compression method, and archive comment are fixed so exporting an unchanged capture twice produces identical bytes.
+
+The exporter refuses an output inside the source capture, an existing output, paths that escape the capture directory, and source entries that resolve outside the capture through symbolic links. It reopens every completed entry to check ZIP integrity before returning the archive byte length and SHA-256 digest.
+
+The archive is a portable copy, not a redacted report. It retains the same sensitive payloads, identifiers, endpoints, and resource-pack data as the source capture.

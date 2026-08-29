@@ -15,8 +15,10 @@ import (
 	"syscall"
 	"time"
 
+	"github.com/NhanAZ/BedrockDebugProxy/internal/analysis"
 	"github.com/NhanAZ/BedrockDebugProxy/internal/buildinfo"
 	"github.com/NhanAZ/BedrockDebugProxy/internal/capture"
+	"github.com/NhanAZ/BedrockDebugProxy/internal/capturearchive"
 	"github.com/NhanAZ/BedrockDebugProxy/internal/proxy"
 	"github.com/sandertv/gophertunnel/minecraft/auth"
 	"github.com/sandertv/gophertunnel/minecraft/protocol"
@@ -37,6 +39,14 @@ func run(args []string, stdout, stderr io.Writer) int {
 		return runProxy(args[1:], stdout, stderr)
 	case "verify":
 		return runVerify(args[1:], stdout, stderr)
+	case "inspect":
+		return runInspect(args[1:], stdout, stderr)
+	case "analyze":
+		return runAnalyze(args[1:], stdout, stderr)
+	case "explain":
+		return runExplain(args[1:], stdout, stderr)
+	case "export":
+		return runExport(args[1:], stdout, stderr)
 	case "version":
 		_, _ = fmt.Fprintf(stdout, "bedrock-debug-proxy %s", buildinfo.Version)
 		if buildinfo.Commit != "" {
@@ -219,6 +229,132 @@ func runVerify(args []string, stdout, stderr io.Writer) int {
 	return 0
 }
 
+func runInspect(args []string, stdout, stderr io.Writer) int {
+	flags := flag.NewFlagSet("inspect", flag.ContinueOnError)
+	flags.SetOutput(stderr)
+	kind := flags.String("kind", "", "exact event kind")
+	direction := flags.String("direction", "", "exact event direction")
+	channel := flags.String("channel", "", "exact event channel")
+	fromSequence := flags.Uint64("from-sequence", 0, "minimum event sequence")
+	limit := flags.Uint64("limit", 0, "maximum matching events - zero keeps all")
+	flags.Usage = func() {
+		_, _ = fmt.Fprintln(stderr, "Usage - bedrock-debug-proxy inspect [filters] CAPTURE_DIRECTORY")
+		flags.PrintDefaults()
+	}
+	if err := flags.Parse(args); err != nil {
+		return 2
+	}
+	if flags.NArg() != 1 {
+		flags.Usage()
+		return 2
+	}
+	if !validDirectionFilter(*direction) {
+		_, _ = fmt.Fprintf(stderr, "Unsupported direction %q.\n", *direction)
+		return 2
+	}
+	verification, err := capture.Verify(flags.Arg(0))
+	if err != nil {
+		_, _ = fmt.Fprintf(stderr, "Inspect capture - %v\n", err)
+		return 1
+	}
+	encoder := json.NewEncoder(stdout)
+	var matched uint64
+	err = capture.ScanEvents(flags.Arg(0), func(event capture.Event) error {
+		if event.Sequence < *fromSequence || *kind != "" && event.Kind != *kind ||
+			*direction != "" && string(event.Direction) != *direction || *channel != "" && event.Channel != *channel {
+			return nil
+		}
+		if *limit != 0 && matched >= *limit {
+			return nil
+		}
+		matched++
+		return encoder.Encode(event)
+	})
+	if err != nil {
+		_, _ = fmt.Fprintf(stderr, "Inspect capture - %v\n", err)
+		return 1
+	}
+	if len(verification.Issues) != 0 {
+		for _, issue := range verification.Issues {
+			_, _ = fmt.Fprintf(stderr, "Capture issue - %s\n", issue)
+		}
+		return 1
+	}
+	return 0
+}
+
+func runAnalyze(args []string, stdout, stderr io.Writer) int {
+	if len(args) != 1 {
+		_, _ = fmt.Fprintln(stderr, "Usage - bedrock-debug-proxy analyze CAPTURE_DIRECTORY")
+		return 2
+	}
+	summary, err := analysis.Analyze(args[0])
+	if err != nil {
+		_, _ = fmt.Fprintf(stderr, "Analyze capture - %v\n", err)
+		return 1
+	}
+	if err := writeJSON(stdout, summary); err != nil {
+		_, _ = fmt.Fprintf(stderr, "Write analysis - %v\n", err)
+		return 1
+	}
+	if len(summary.VerificationIssues) != 0 {
+		return 1
+	}
+	return 0
+}
+
+func runExplain(args []string, stdout, stderr io.Writer) int {
+	if len(args) != 1 {
+		_, _ = fmt.Fprintln(stderr, "Usage - bedrock-debug-proxy explain CAPTURE_DIRECTORY")
+		return 2
+	}
+	summary, err := analysis.Analyze(args[0])
+	if err != nil {
+		_, _ = fmt.Fprintf(stderr, "Explain capture - %v\n", err)
+		return 1
+	}
+	if _, err := io.WriteString(stdout, analysis.Explain(summary)); err != nil {
+		_, _ = fmt.Fprintf(stderr, "Write explanation - %v\n", err)
+		return 1
+	}
+	if len(summary.VerificationIssues) != 0 {
+		return 1
+	}
+	return 0
+}
+
+func runExport(args []string, stdout, stderr io.Writer) int {
+	if len(args) != 2 {
+		_, _ = fmt.Fprintln(stderr, "Usage - bedrock-debug-proxy export CAPTURE_DIRECTORY OUTPUT.bdpcap")
+		return 2
+	}
+	result, err := capturearchive.Export(args[0], args[1])
+	if err != nil {
+		_, _ = fmt.Fprintf(stderr, "Export capture - %v\n", err)
+		return 1
+	}
+	if err := writeJSON(stdout, result); err != nil {
+		_, _ = fmt.Fprintf(stderr, "Write export result - %v\n", err)
+		return 1
+	}
+	return 0
+}
+
+func writeJSON(writer io.Writer, value any) error {
+	encoder := json.NewEncoder(writer)
+	encoder.SetIndent("", "  ")
+	return encoder.Encode(value)
+}
+
+func validDirectionFilter(value string) bool {
+	switch capture.Direction(value) {
+	case "", capture.DirectionClientToServer, capture.DirectionServerToClient, capture.DirectionInternal, capture.DirectionUnknown:
+		return true
+	default:
+		return false
+	}
+}
+
 func nextCapturePath(root string, now time.Time) (string, error) {
 	if strings.TrimSpace(root) == "" {
 		return "", errors.New("capture root is empty")
@@ -250,5 +386,9 @@ func printUsage(writer io.Writer) {
 	_, _ = fmt.Fprintln(writer, "Usage")
 	_, _ = fmt.Fprintln(writer, "  bedrock-debug-proxy run --upstream HOST:PORT [options]")
 	_, _ = fmt.Fprintln(writer, "  bedrock-debug-proxy verify CAPTURE_DIRECTORY")
+	_, _ = fmt.Fprintln(writer, "  bedrock-debug-proxy inspect [filters] CAPTURE_DIRECTORY")
+	_, _ = fmt.Fprintln(writer, "  bedrock-debug-proxy analyze CAPTURE_DIRECTORY")
+	_, _ = fmt.Fprintln(writer, "  bedrock-debug-proxy explain CAPTURE_DIRECTORY")
+	_, _ = fmt.Fprintln(writer, "  bedrock-debug-proxy export CAPTURE_DIRECTORY OUTPUT.bdpcap")
 	_, _ = fmt.Fprintln(writer, "  bedrock-debug-proxy version")
 }
