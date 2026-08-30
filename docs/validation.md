@@ -2,6 +2,8 @@
 
 Automated tests establish that the implementation matches local expectations. They do not establish that those expectations match live Minecraft Bedrock clients and servers. Runtime, networking, protocol, authentication, session, resource-pack, capture, encoding, and decoding changes remain awaiting manual validation until this workflow is complete.
 
+For the end-to-end pull request checklist, use [`../CONTRIBUTING.md`](../CONTRIBUTING.md). For the ordered six-server release checklist, use [`releasing.md`](releasing.md). This document defines how to create and judge the validation evidence used by both workflows.
+
 The automated suite includes a loopback integration session over RakNet. It exercises offline login, resource-pack negotiation with no packs, StartGame and spawn, typed packet forwarding in both directions, clean shutdown, raw packet capture, decoded events, connection metadata, and GameData snapshots. This catches local forwarding and capture regressions without accounts or public infrastructure. It does not exercise Microsoft authentication, the retail Minecraft client, public-server routing, transfers, live resource packs, or server-specific behavior and therefore does not replace the gates below.
 
 ## Development and pull requests
@@ -29,14 +31,18 @@ Commit the revision, ensure the working tree is clean, run the quality gate, and
 Run the stamped binary and complete the required live session. Stop it cleanly, then generate the sanitized report with project tooling rather than adding another command to the product CLI.
 
 ```powershell
-.\bin\bedrock-debug-proxy.exe run --upstream <TARGET> --decrypt-resource-packs
+.\bin\bedrock-debug-proxy.exe `
+    run `
+    --listen 0.0.0.0:19132 `
+    --upstream "experience:The Hive" `
+    --auth device
 .\tools\create-validation-report.ps1 `
     -Binary .\bin\bedrock-debug-proxy.exe `
     -Capture .\captures\<SESSION> `
     -Server "The Hive" `
     -Result pass `
     -Check @("normal_session=pass") `
-    -Output .\validation\<REVISION>-the-hive.json
+    -Output .\validation\local\<REVISION>\the-hive.json
 ```
 
 Use public server labels rather than addresses in `-Server`. A manual check uses `lowercase_name=pass`, `lowercase_name=fail`, or `lowercase_name=not_observed`. Add one for each flow reviewed, such as `resource_pack_transfer=pass` or `resource_pack_decryption=pass`.
@@ -53,11 +59,15 @@ The manifest `complete` flag remains in the report but is not by itself a pass g
 
 Normal connection termination currently produces a read-side `transport.payload` error and `bridge.read_error` evidence when a read loop ends. The report preserves counts for those events as termination errors without automatically treating them as protocol failures. The developer must still inspect them and may mark the session `fail` when their timing or cause is abnormal. Transport writes, library errors, resource-pack derivation errors, and all other error kinds block an automatic pass.
 
-The report derives revision, timestamps, client and upstream versions, protocol IDs, traffic counts, resource-pack counts, and safe error-kind counts from the capture. It omits addresses, packet payloads, error messages, player identifiers, content keys, resource-pack metadata, decrypted assets, and the text of capture limitations because a dynamic limitation may contain a pack identifier. It retains only the limitation count. Review the JSON before committing it. Keep the raw capture local and sensitive.
+The report derives revision, timestamps, client and upstream versions, protocol IDs, traffic counts, resource-pack counts, and safe error-kind counts from the capture. It omits addresses, packet payloads, error messages, player identifiers, content keys, resource-pack metadata, decrypted assets, and the text of capture limitations because a dynamic limitation may contain a pack identifier. It retains only the limitation count. Review the JSON before uploading it. Keep the raw capture local and sensitive.
 
 If an anomaly exists, use `-Result fail`. If a server or required flow could not be tested, use `-Result incomplete` and the applicable `not_observed` check. Never omit a failed or unavailable baseline silently. A report is evidence of one observed session, not a guarantee for other servers or later revisions.
 
-Small JSON reports may be committed under `validation/` with the pull request or release. Do not commit `.bdpcap`, raw captures, authentication state, resource-pack keys, or third-party assets.
+Generate candidate reports under the ignored `validation/local/<REVISION>/` directory. Upload the sanitized JSON as pull request or release evidence without adding it to the candidate commit. Committing a report would change the pull request head or release revision after the tested binary was stamped. Keep any long-term archive as a release asset or in a deliberate later documentation-only record that preserves the original `tested_revision`.
+
+Do not commit `.bdpcap`, raw captures, authentication state, resource-pack keys, or third-party assets.
+
+Add `--decrypt-resource-packs` only when the change or release test explicitly needs to validate the authorized resource-pack decryption flow. It is not part of the default connection sanity test.
 
 ## Release gate
 
@@ -73,3 +83,5 @@ Every official release requires a full client session and a revision-matched rep
 For each server, check connection, authentication, resource packs when offered, spawn, both traffic directions, packet decoding, stability, and unexplained protocol or decode errors. Do not assume the six servers use the same packet order, timing, optional packets, software, or infrastructure.
 
 A baseline failure starts an investigation. Determine whether the cause is a proxy bug, protocol misunderstanding, valid server behavior, or an external outage before changing code. Do not add a server-specific workaround merely to make the release matrix green. If an external condition prevents testing, retain an `incomplete` report and keep the release not ready until the maintainer explicitly resolves the gate.
+
+After generating all six reports for one revision, run `tools/check-release-readiness.ps1 -Revision <40-character-commit>`. It checks that every required label has a passing report with automatic and manual gates for that exact revision. It does not replace human review of the local captures.

@@ -1,64 +1,104 @@
 # BedrockDebugProxy
 
-BedrockDebugProxy is a high-fidelity Minecraft Bedrock traffic observation and research proxy.
-
-BedrockDebugProxy is an independent project. It is not an official Minecraft product and is not approved by or associated with Mojang or Microsoft.
-
-The project is designed around one principle.
+BedrockDebugProxy is a high-fidelity Minecraft Bedrock traffic observation and research proxy. It records one client-to-server session as structured, machine-readable evidence that can be inspected again later.
 
 > Capture once, analyze many times.
 
-Its first priority is to preserve enough structured evidence for AI agents to reconstruct a session, correlate events, inspect decoded packets, revisit raw payloads, and explain uncertainty. Human debugging and protocol reverse engineering are equally important consumers of the same capture.
+BedrockDebugProxy is independent software. It is not an official Minecraft product and is not approved by or associated with Mojang or Microsoft.
 
-## Status
+## Quick start
 
-The repository has an initial single-client terminating proxy for the current protocol shipped by gophertunnel `v1.61.0`. It records transport payloads, raw packet payloads, decoded packet views, decoded login and game-state snapshots, library failures, and lifecycle events in a durable capture directory.
-
-Automated tests, static analysis, module verification, and local builds pass. The suite includes a full local RakNet session that completes offline login and spawn, forwards typed packets in both directions, and verifies the resulting raw and decoded capture evidence. Real Minecraft client and cross-server validation is still pending. The proxy is not ready for production use.
-
-## Run
-
-Go 1.25 or newer is required. The module pins a tested Go toolchain for Windows development.
+Already have `bin\bedrock-debug-proxy.exe` and only want a useful debug capture? Run this from the repository root.
 
 ```powershell
-go build ./cmd/bedrock-debug-proxy
-.\bedrock-debug-proxy.exe run --upstream example.org:19132
+.\bin\bedrock-debug-proxy.exe `
+    run `
+    --listen 0.0.0.0:19132 `
+    --upstream "experience:The Hive" `
+    --auth device
 ```
 
-Upstream Xbox device authentication is enabled by default. Use `--auth none` only for a server that accepts unauthenticated connections. The downstream listener requires authenticated clients by default. Use `--allow-unauthenticated-client` only in a controlled test environment.
+Then follow these steps.
 
-Each run creates a new directory under `captures/`. The exact path is printed before the listener starts. After a clean shutdown, the CLI verifies event ordering, manifest counts, blob paths, sizes, and SHA-256 digests.
+1. Complete the Microsoft device login shown in the terminal.
+2. In Minecraft Bedrock, connect to port `19132` on the computer running the proxy. Use that computer's LAN address from another device. Do not enter `0.0.0.0` as the Minecraft server address.
+3. Join the server and reproduce the behavior you want to debug.
+4. Press `Ctrl+C` in the proxy terminal when finished.
+5. Wait for the capture verification result. The exact output path is printed when the proxy starts and is normally `captures\session-<UTC timestamp>`.
 
-Encrypted resource-pack decryption is opt-in because it creates additional sensitive plaintext artifacts. Use it only for packs you are authorized to inspect.
+That capture directory is the debug result. Keep it local because it may contain identifiers, chat, server data, resource packs, and other sensitive content.
+
+`0.0.0.0` exposes the listener to reachable network interfaces. Use it only on a trusted network with an appropriate firewall. Use `127.0.0.1:19132` when only local software needs to connect.
+
+If the binary does not exist yet, install the Go version declared in `go.mod`, keep the working tree clean, and build it once.
 
 ```powershell
-.\bedrock-debug-proxy.exe run --upstream example.org:19132 --decrypt-resource-packs
+.\tools\build.ps1 -Version dev
 ```
 
-The supported AES-256-CFB8 variant is evidence-backed and bounded. Unsupported variants retain their original archive and produce a structured warning instead of triggering a guessed compatibility fallback.
+## Choosing an upstream
 
-An existing capture can be verified separately.
+The `experience:` form resolves the current destination through Minecraft services, so a Featured Experience or Creator Experience does not need a manually discovered IP and port.
 
 ```powershell
-.\bedrock-debug-proxy.exe verify C:\path\to\capture
+--upstream "experience:The Hive"
+--upstream "experience:CubeCraft"
+--upstream "experience:<exact name shown by Minecraft>"
 ```
 
-## Inspect and export
+Experience names are matched exactly without case sensitivity. An Experience UUID is also accepted. Device authentication is required because the resolver uses the same authorized Minecraft services session as the upstream connection. The resolver preserves the transport returned by the service, including RakNet and supported NetherNet variants.
 
-The CLI can stream selected canonical events as JSON Lines, produce a deterministic JSON summary, render a concise Markdown explanation, or package a closed verified capture into a portable `.bdpcap` archive.
+For a normal Bedrock server, use its address directly.
 
 ```powershell
-.\bedrock-debug-proxy.exe inspect --direction server_to_client --kind packet.decoded C:\path\to\capture
-.\bedrock-debug-proxy.exe analyze C:\path\to\capture > analysis.json
-.\bedrock-debug-proxy.exe explain C:\path\to\capture > explanation.md
-.\bedrock-debug-proxy.exe export C:\path\to\capture C:\path\to\session.bdpcap
+--upstream example.org:19132
 ```
 
-`inspect` preserves the original event objects and supports exact `--kind`, `--direction`, and `--channel` filters plus `--from-sequence` and `--limit`. `analyze` groups packet, error, artifact, direction, channel, and resource-pack evidence without embedding raw payloads or content keys. `explain` is derived from the same summary and distinguishes capture integrity from real server compatibility.
+Use `--auth none` only when that direct server accepts unauthenticated connections. The downstream listener still requires authenticated Minecraft clients unless `--allow-unauthenticated-client` is deliberately enabled in a controlled test environment.
 
-Export refuses open or invalid captures, never replaces an existing output, and writes entries in deterministic order with fixed ZIP metadata. A `.bdpcap` file still contains the complete sensitive capture, including raw blobs, retained resource-pack keys, decrypted contents manifests, and decrypted pack assets when present.
+## What a session preserves
 
-## Quality checks
+The canonical capture retains ordered evidence from both directions, including transport payloads exposed after the active transport, exact packet payloads, decoded packet views, unknown and malformed packet evidence, login and game-state snapshots, errors, protocol metadata, and connection lifecycle events.
+
+Representative packet coverage includes skin and cape data, entities, chunks and subchunk requests, block updates, inventory content and transactions, movement, emotes, and other decoded packets that pass through the proxy. Binary fields are summarized in decoded views while their exact packet payload remains in content-addressed raw blobs.
+
+Resource-pack archives, metadata, checksums, download information, and content keys supplied by the current upstream session are retained. Decryption is opt-in because it creates additional sensitive plaintext artifacts.
+
+```powershell
+.\bin\bedrock-debug-proxy.exe run --upstream "experience:The Hive" --decrypt-resource-packs
+```
+
+Unsupported encryption variants retain the original archive and produce structured error evidence instead of a guessed fallback.
+
+## Inspecting a capture
+
+The quick-start capture can be verified, filtered, summarized, explained, or packaged without reconnecting to the server.
+
+```powershell
+.\bin\bedrock-debug-proxy.exe verify C:\path\to\capture
+.\bin\bedrock-debug-proxy.exe inspect --direction server_to_client --kind packet.decoded C:\path\to\capture
+.\bin\bedrock-debug-proxy.exe analyze C:\path\to\capture > analysis.json
+.\bin\bedrock-debug-proxy.exe explain C:\path\to\capture > explanation.md
+.\bin\bedrock-debug-proxy.exe export C:\path\to\capture C:\path\to\session.bdpcap
+```
+
+An exported `.bdpcap` is a portable copy, not a redacted copy. It can contain all sensitive evidence present in the source capture.
+
+## Status and limitations
+
+The project currently uses gophertunnel `v1.61.0` and supports one downstream client with one upstream hop per process. Automated tests include a full local RakNet session and focused tests for capture integrity, representative packet preservation, Experience response parsing, and transport capability preservation.
+
+Automated success does not prove live Minecraft compatibility. Runtime changes require a stamped real-client session on The Hive, and releases require the six-server validation matrix. Until the current candidate completes that process, treat it as development software rather than a production-ready proxy.
+
+Current known boundaries include the following.
+
+- Transfer packets are recorded but not followed automatically.
+- Raw UDP datagrams and RakNet acknowledgement, fragmentation, retransmission, and loss details are outside the current capture boundary.
+- Transport payloads are captured at the post-transport application boundary.
+- The upstream resource-pack-required flag is not mirrored to the downstream listener.
+- Opt-in resource-pack decryption supports only the documented AES-256-CFB8 contents format and does not extract pack files to the filesystem.
+
+## Developer path
 
 Run the shared quality gate before committing or declaring a code change complete.
 
@@ -66,56 +106,37 @@ Run the shared quality gate before committing or declaring a code change complet
 .\tools\quality.ps1
 ```
 
-The gate checks deterministic `gofmt` formatting, module tidiness and checksums, tests, builds, selected high-signal static analyzers, reachable known vulnerabilities, and Git whitespace errors. Analyzer and vulnerability-scanner versions are pinned in the script and do not modify `go.mod`.
+Use `tools\format.ps1` for deterministic Go formatting. CI runs the quality gate with the race detector on Linux and repeats tests and builds on Windows.
 
-Use `.\tools\format.ps1` to format every Go source file. CI runs the same quality gate with the race detector on Linux and repeats tests and builds on Windows. A local Windows environment with `CGO_ENABLED=0` should use the normal command because Go's race detector requires cgo.
+Use the document that matches your task.
 
-Runtime behavior also requires a stamped real-client session and a structured validation report. The Hive is the minimum development and pull-request baseline. Releases require all six project baselines. See [`docs/validation.md`](docs/validation.md) for the exact workflow.
-
-## Initial scope
-
-The proxy will observe both client-to-server and server-to-client traffic. It will preserve raw data where the networking layer exposes it, decode packets when possible, record unknown and malformed input, and make encryption, compression, batching, framing, timing, and protocol metadata visible.
-
-Resource-pack collection, reconstruction, integrity validation, and opt-in decryption are implemented when a connection exposes the required archive and keys.
-
-Packet mutation, dropping, injection, replay, cheat behavior, exploit tooling, and a growing set of one-purpose download commands are not initial goals. The preferred workflow is one high-fidelity session that can support many later analyses.
+- New contributors should follow [`CONTRIBUTING.md`](CONTRIBUTING.md).
+- Pull requests use the repository template and the workflow in [`CONTRIBUTING.md`](CONTRIBUTING.md).
+- Live capture and report details are in [`docs/validation.md`](docs/validation.md).
+- Maintainers preparing a release should follow [`docs/releasing.md`](docs/releasing.md).
+- Protocol updates must follow [`docs/protocol-updates.md`](docs/protocol-updates.md).
+- Capture and analysis contracts are in [`docs/capture-format.md`](docs/capture-format.md) and [`docs/analysis-and-export.md`](docs/analysis-and-export.md).
+- Resource-pack behavior and legal boundaries are in [`docs/resource-packs.md`](docs/resource-packs.md) and [`docs/legal-and-responsible-use.md`](docs/legal-and-responsible-use.md).
+- AI-agent and long-term maintenance principles are in [`AGENTS.md`](AGENTS.md).
 
 ## Repository layout
 
 - `cmd/bedrock-debug-proxy` contains the CLI.
-- `internal/bedrock` adapts gophertunnel and go-raknet observation hooks.
-- `internal/analysis` creates deterministic machine and human summaries.
-- `internal/capture` owns the protocol-neutral capture schema, recorder, and verifier.
-- `internal/capturearchive` creates verified portable capture archives.
-- `internal/packetview` produces JSON-safe decoded packet views.
+- `internal/experience` resolves Experience names and selects the returned upstream transport.
+- `internal/bedrock` adapts transport and packet observation hooks.
 - `internal/proxy` owns login, resource-pack negotiation, spawn, and forwarding.
-- `internal/resourcepack` owns bounded derivation of supported encrypted resource-pack archives.
-- `docs/decisions` records material architecture choices.
+- `internal/capture` owns the protocol-neutral capture schema, recorder, and verifier.
+- `internal/analysis` and `internal/capturearchive` provide later analysis and portable export.
 - `docs/research` records source revisions, licenses, evidence, and open questions.
 
-Project-wide working principles are in `AGENTS.md`. The capture layout, analysis contract, validation workflow, protocol update workflow, and observation boundaries are documented in `docs/capture-format.md`, `docs/analysis-and-export.md`, `docs/validation.md`, `docs/protocol-updates.md`, and `docs/decisions/0001-capture-first-terminating-proxy.md`.
+## Security and content ownership
 
-## Current limitations
+Never commit real captures, authentication state, resource-pack keys, decrypted packs, or third-party assets. Resource packs and other captured content remain owned and licensed by their respective rights holders. They do not become `GPL-3.0-or-later` because BedrockDebugProxy captured or decrypted them. Operators are responsible for their authority to inspect, retain, disclose, or redistribute session artifacts.
 
-- One downstream client and one fixed upstream hop are handled per process.
-- Transfer packets are recorded, but the proxy does not follow them.
-- Raw UDP datagrams and RakNet acknowledgement, fragmentation, retransmission, and loss details are not captured.
-- Transport payloads are captured at the post-RakNet application boundary. Their encryption and compression state is not yet classified per event.
-- The upstream resource-pack-required flag is not mirrored to the downstream listener.
-- Downloaded resource-pack archives, metadata, checksums, and content keys are stored. Opt-in decryption supports only the documented AES-256-CFB8 format and does not extract files to the filesystem.
-
-## Security
-
-Captures can contain credentials, server addresses, identifiers, chat, and proprietary content. Treat every capture as sensitive. Never commit real captures or authentication state.
-
-Resource packs and other captured content remain owned and licensed by their respective rights holders. They do not become `GPL-3.0-or-later` merely because BedrockDebugProxy captured or decrypted them. Operators are responsible for having authority to inspect a session and for any retention, disclosure, or redistribution of its artifacts. See [`docs/legal-and-responsible-use.md`](docs/legal-and-responsible-use.md) for the implementation trace, risk boundaries, and current source review.
+See [`docs/legal-and-responsible-use.md`](docs/legal-and-responsible-use.md) for the implementation trace, boundaries, and legal research notes.
 
 ## License
 
-BedrockDebugProxy is licensed under the GNU General Public License version 3 or any later version. Its SPDX identifier is `GPL-3.0-or-later`. See [LICENSE](LICENSE) for the complete terms.
+BedrockDebugProxy is licensed under `GPL-3.0-or-later`. See [LICENSE](LICENSE). Third-party dependency licenses and source provenance are recorded in [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md) and `docs/research/`.
 
 Copyright (C) 2026 NhanAZ.
-
-The repository is private while the project is under development, with the intent to make it public when it is stable and ready. Private development does not change the license. "Information wants to be free" expresses the project's preference for debugging knowledge and distributed improvements to remain available to the community.
-
-Third-party dependencies and provenance are recorded in [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md) and `docs/research/`.

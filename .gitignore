@@ -11,6 +11,7 @@ coverage.out
 /exports/
 /resource-packs/
 /decrypted-resource-packs/
+/validation/local/
 *.bdpcap
 *.pcap
 *.pcapng
@@ -26,6 +27,7 @@ coverage.out
 /.cache/
 /.local/
 *.token
+token*.json
 
 # Editors and operating systems
 .idea/
