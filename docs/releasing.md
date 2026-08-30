@@ -2,6 +2,19 @@
 
 This is the required path from a release candidate commit to an official BedrockDebugProxy release. `docs/validation.md` defines the evidence in detail. This file defines the order of operations.
 
+## Maintainer and AI agent handoff
+
+When the maintainer says "I want to release", the AI agent should drive this document rather than returning the whole checklist as homework.
+
+1. The agent audits the commits since the latest release, proposes or confirms the version, checks the working tree, documentation, licenses, provenance, known limitations, CI, and unresolved review findings.
+2. The agent runs the automated quality gate and builds the exact stamped candidate.
+3. The agent asks the maintainer to perform the live Minecraft sessions that cannot be automated. A short instruction should identify the server, target command, actions to perform, approximate duration, and when to press `Ctrl+C`.
+4. The maintainer reports that the session is complete and mentions any visible problem. The agent locates and inspects the closed capture, verifies the revision and evidence, and generates the sanitized report. The maintainer does not need to run report scripts unless they are performing the release without an agent.
+5. After all required sessions, the agent runs the release gate, prepares the checksum and release notes, and reports any exact blocker.
+6. If the maintainer explicitly requested a release, the version is settled, every gate passes, and signing or GitHub access is available, the agent creates and pushes the tag, publishes the release assets, and verifies the result. It must not publish from an incomplete or mismatched validation set.
+
+The remaining sections retain the complete manual procedure so another developer can reproduce and audit what the agent performs.
+
 ## 1. Choose the candidate
 
 1. Decide the semantic version, such as `0.1.0`, and set it for the commands below.

@@ -29,6 +29,8 @@ Keep the product CLI small. Do not add specialized download, extraction, logging
 
 Before editing code, trace the relevant data path and inspect call sites, shared helpers, interfaces, similar implementations, tests, documentation, and useful Git history. Search for existing functionality before creating another implementation. Reuse or improve the established path when it fits rather than introducing duplicate or competing logic.
 
+Treat every requested solution, including one from the project owner, as a proposal to evaluate rather than proof that the requested implementation is correct. Confirm the underlying need, project fit, existing behavior, evidence, risk, and smallest maintainable solution before changing code. Ask a focused question when missing information would materially change the result. Otherwise proceed with the best-supported narrow solution and state any important assumption. Push back, propose a different approach, reduce scope, or decline implementation when the request conflicts with evidence, project boundaries, security, capture fidelity, licensing, or maintenance goals. Explain the technical reason and give an actionable alternative when possible.
+
 When uncertainty remains between adding code and investigating further, investigate further. When both a small and a large patch solve the verified root cause, prefer the small patch.
 
 ## Issue and pull request triage
@@ -41,7 +43,7 @@ Review pull requests against the current implementation and architecture before 
 
 Use primary sources whenever possible. Inspect the actual source revision, protocol definitions, tests, and wire behavior. Distinguish confirmed behavior, reasoned inference, and unknown behavior in code comments and documentation.
 
-Cross-check protocol work against multiple independent implementations or captures when practical. Useful references include gophertunnel, go-raknet, Cloudburst Protocol and ProxyPass, Kas-tle ProxyPass, PrismarineJS bedrock-protocol, Endstone protocol-dumper and spyglass, bedrocktool, Dragonfly, and observed Bedrock Dedicated Server behavior. If sources disagree, investigate protocol versions, optional fields, experiments, feature flags, transport differences, and implementation workarounds before choosing a definition.
+Cross-check protocol work against multiple independent implementations or captures when practical. Useful references include gophertunnel, go-raknet, Cloudburst Protocol and ProxyPass, Kas-tle ProxyPass, PrismarineJS bedrock-protocol, Endstone protocol-dumper and spyglass, `bedrock-tool/bedrocktool`, Dragonfly, and observed Bedrock Dedicated Server behavior. If sources disagree, investigate protocol versions, optional fields, experiments, feature flags, transport differences, and implementation workarounds before choosing a definition.
 
 Never infer packet IDs, field types, serialization order, version gates, or required packet order merely because a proposed layout appears plausible. Every new protocol behavior needs a traceable source or capture. Record why the selected interpretation fits the evidence.
 
@@ -106,6 +108,14 @@ The Hive is the minimum live baseline for every runtime-affecting development ch
 Every official release requires revision-matched reports for The Hive, CubeCraft, Galaxite, Lifeboat, Mineville Zeqa, and Enchanted. Record external outages or unavailable tests explicitly. A failed server starts root-cause investigation and does not authorize a server-specific workaround. Follow `docs/validation.md` for the report workflow and sensitive-data boundary.
 
 Fuzz parsers and decoders that consume untrusted network or capture data when practical. Bound memory, disk, and goroutine growth without hiding the fact that a limit was reached.
+
+## Release stewardship
+
+When the maintainer says they want to release, treat that as a request to perform a complete release-readiness audit, not as a request to immediately create a tag. The agent owns every automatable step: inspect the diff and commits since the latest release, propose or confirm the version, check scope and provenance, run quality and build gates, verify CI, create the stamped candidate binary, inspect completed captures, generate sanitized reports, run the six-server gate, prepare checksums and release notes, and verify the published release.
+
+Ask the maintainer to perform only actions that require a real Minecraft client, account interaction, judgment of visible gameplay, unavailable signing authority, or another human-only boundary. Give one short concrete live-test instruction at a time when practical. After the maintainer reports completion, inspect the generated capture and machine-readable evidence rather than asking them to run validation scripts manually. If any gate is incomplete, explain the exact blocker and do not publish. If the maintainer explicitly requested the release, the version is settled, every required gate passes, and no unresolved review issue remains, proceed with the tag and GitHub release workflow in `docs/releasing.md` without asking them to repeat already established release intent.
+
+After a substantial capability, protocol update, capture schema or storage change, networking or authentication change, compatibility fix, or coherent series of large commits, compare the current state with the latest release. Consider whether a release checkpoint would create a useful tested and reversible boundary before more work accumulates. Recommend pausing for release validation when justified, but do not stop unrelated work, tag, publish, or turn commit count alone into a release requirement. State why a checkpoint is useful, what remains unverified, and the minimum human validation still required.
 
 ## Compatibility and protocol updates
 
