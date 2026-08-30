@@ -8,9 +8,22 @@ BedrockDebugProxy is independent software. It is not an official Minecraft produ
 
 ## Quick start
 
-Already have `bin\bedrock-debug-proxy.exe` and only want a useful debug capture? Run this from the repository root.
+Already have `bin\bedrock-debug-proxy.exe` and only want a useful debug capture? Choose an upstream and run the general form below from the repository root.
 
 ```powershell
+# General form. Replace <UPSTREAM> before running.
+# Use experience:<exact name shown in Minecraft> or HOST:PORT.
+.\bin\bedrock-debug-proxy.exe `
+    run `
+    --listen 0.0.0.0:19132 `
+    --upstream "<UPSTREAM>" `
+    --auth device
+```
+
+For example, the following command selects The Hive by its current Featured Experience name. The Hive is only an example target and is not required by the proxy.
+
+```powershell
+# Example only. Replace The Hive with the exact Experience name you want to debug.
 .\bin\bedrock-debug-proxy.exe `
     run `
     --listen 0.0.0.0:19132 `
@@ -41,9 +54,8 @@ If the binary does not exist yet, install the Go version declared in `go.mod`, k
 The `experience:` form resolves the current destination through Minecraft services, so a Featured Experience or Creator Experience does not need a manually discovered IP and port.
 
 ```powershell
---upstream "experience:The Hive"
---upstream "experience:CubeCraft"
 --upstream "experience:<exact name shown by Minecraft>"
+--upstream "experience:<Experience UUID>"
 ```
 
 Experience names are matched exactly without case sensitivity. An Experience UUID is also accepted. Device authentication is required because the resolver uses the same authorized Minecraft services session as the upstream connection. The resolver preserves the transport returned by the service, including RakNet and supported NetherNet variants.
@@ -65,7 +77,8 @@ Representative packet coverage includes skin and cape data, entities, chunks and
 Resource-pack archives, metadata, checksums, download information, and content keys supplied by the current upstream session are retained. Decryption is opt-in because it creates additional sensitive plaintext artifacts.
 
 ```powershell
-.\bin\bedrock-debug-proxy.exe run --upstream "experience:The Hive" --decrypt-resource-packs
+# Replace <UPSTREAM> with an Experience selector or direct HOST:PORT.
+.\bin\bedrock-debug-proxy.exe run --upstream "<UPSTREAM>" --decrypt-resource-packs
 ```
 
 Unsupported encryption variants retain the original archive and produce structured error evidence instead of a guessed fallback.
