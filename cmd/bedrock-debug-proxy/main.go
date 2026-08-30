@@ -19,6 +19,7 @@ import (
 	"github.com/NhanAZ/BedrockDebugProxy/internal/buildinfo"
 	"github.com/NhanAZ/BedrockDebugProxy/internal/capture"
 	"github.com/NhanAZ/BedrockDebugProxy/internal/capturearchive"
+	"github.com/NhanAZ/BedrockDebugProxy/internal/experience"
 	"github.com/NhanAZ/BedrockDebugProxy/internal/proxy"
 	"github.com/sandertv/gophertunnel/minecraft/auth"
 	"github.com/sandertv/gophertunnel/minecraft/protocol"
@@ -68,7 +69,7 @@ func runProxy(args []string, stdout, stderr io.Writer) int {
 	flags := flag.NewFlagSet("run", flag.ContinueOnError)
 	flags.SetOutput(stderr)
 	listen := flags.String("listen", "127.0.0.1:19132", "local Bedrock address")
-	upstream := flags.String("upstream", "", "destination Bedrock address")
+	upstream := flags.String("upstream", "", "destination HOST:PORT or experience:NAME")
 	capturePath := flags.String("capture", "", "exact capture directory")
 	captureRoot := flags.String("capture-root", "captures", "parent for generated capture directories")
 	authMode := flags.String("auth", "device", "upstream authentication mode - device or none")
@@ -79,7 +80,7 @@ func runProxy(args []string, stdout, stderr io.Writer) int {
 	maxCollection := flags.Int("max-decoded-items", 0, "decoded items per collection - zero keeps all")
 	decryptResourcePacks := flags.Bool("decrypt-resource-packs", false, "derive decrypted resource pack artifacts when a supported content key is available")
 	flags.Usage = func() {
-		_, _ = fmt.Fprintln(stderr, "Usage - bedrock-debug-proxy run --upstream HOST:PORT [options]")
+		_, _ = fmt.Fprintln(stderr, "Usage - bedrock-debug-proxy run --upstream HOST:PORT|experience:NAME [options]")
 		flags.PrintDefaults()
 	}
 	if err := flags.Parse(args); err != nil {
@@ -105,12 +106,28 @@ func runProxy(args []string, stdout, stderr io.Writer) int {
 		_, _ = fmt.Fprintf(stderr, "Unsupported authentication mode %q. Use device or none.\n", *authMode)
 		return 2
 	}
+	if experience.IsSelector(*upstream) && tokenSource == nil {
+		_, _ = fmt.Fprintln(stderr, "Experience targets require --auth device.")
+		return 2
+	}
+
+	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
+	defer stop()
+	target, err := experience.Resolve(ctx, *upstream, tokenSource, nil)
+	if err != nil {
+		_, _ = fmt.Fprintf(stderr, "Resolve upstream - %v\n", err)
+		return 1
+	}
+	if experience.IsSelector(*upstream) {
+		_, _ = fmt.Fprintf(stdout, "Resolved experience %q using %s.\n", target.Name, target.Transport)
+	}
 
 	exactCapturePath := *capturePath
 	if exactCapturePath == "" {
 		var err error
 		exactCapturePath, err = nextCapturePath(*captureRoot, time.Now())
 		if err != nil {
+			_ = target.Close()
 			_, _ = fmt.Fprintf(stderr, "Choose capture path - %v\n", err)
 			return 1
 		}
@@ -135,7 +152,11 @@ func runProxy(args []string, stdout, stderr io.Writer) int {
 		RawLayers:     []string{"bedrock_transport_payload", "bedrock_packet_payload"},
 		Values: map[string]string{
 			"listen_address":         *listen,
-			"upstream_address":       *upstream,
+			"upstream_selector":      target.Selector,
+			"upstream_address":       target.Address,
+			"upstream_transport":     target.Transport,
+			"upstream_name":          target.Name,
+			"upstream_experience_id": target.ExperienceID,
 			"auth_mode":              *authMode,
 			"protocol_id":            strconv.FormatInt(int64(protocol.CurrentProtocol), 10),
 			"game_version":           protocol.CurrentVersion,
@@ -144,6 +165,7 @@ func runProxy(args []string, stdout, stderr io.Writer) int {
 		Limitations: limitations,
 	})
 	if err != nil {
+		_ = target.Close()
 		_, _ = fmt.Fprintf(stderr, "Create capture - %v\n", err)
 		return 1
 	}
@@ -151,9 +173,10 @@ func runProxy(args []string, stdout, stderr io.Writer) int {
 
 	runner, err := proxy.New(proxy.Config{
 		ListenAddress:              *listen,
-		UpstreamAddress:            *upstream,
+		UpstreamAddress:            target.Address,
+		UpstreamNetwork:            target.Network,
 		AllowUnauthenticatedClient: *allowUnauthenticated,
-		TokenSource:                tokenSource,
+		TokenSource:                target.TokenSource,
 		Recorder:                   recorder,
 		Output:                     stdout,
 		MaxDecompressedBytes:       *maxDecompressed,
@@ -162,13 +185,13 @@ func runProxy(args []string, stdout, stderr io.Writer) int {
 		DecryptResourcePacks:       *decryptResourcePacks,
 	})
 	if err != nil {
+		err = errors.Join(err, target.Close())
 		_ = recorder.Close("failed", err)
 		_, _ = fmt.Fprintf(stderr, "Configure proxy - %v\n", err)
 		return 2
 	}
-	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
-	defer stop()
 	runErr := runner.Run(ctx)
+	runErr = errors.Join(runErr, target.Close())
 	status := "closed"
 	if runErr != nil {
 		status = "failed"
@@ -395,7 +418,7 @@ func printUsage(writer io.Writer) {
 	_, _ = fmt.Fprintln(writer, "BedrockDebugProxy")
 	_, _ = fmt.Fprintln(writer)
 	_, _ = fmt.Fprintln(writer, "Usage")
-	_, _ = fmt.Fprintln(writer, "  bedrock-debug-proxy run --upstream HOST:PORT [options]")
+	_, _ = fmt.Fprintln(writer, "  bedrock-debug-proxy run --upstream HOST:PORT|experience:NAME [options]")
 	_, _ = fmt.Fprintln(writer, "  bedrock-debug-proxy verify CAPTURE_DIRECTORY")
 	_, _ = fmt.Fprintln(writer, "  bedrock-debug-proxy inspect [filters] CAPTURE_DIRECTORY")
 	_, _ = fmt.Fprintln(writer, "  bedrock-debug-proxy analyze CAPTURE_DIRECTORY")

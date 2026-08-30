@@ -2,6 +2,7 @@ package bedrock
 
 import (
 	"context"
+	"crypto/ecdsa"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -16,6 +17,7 @@ import (
 )
 
 type Network struct {
+	Transport      minecraft.Network
 	Recorder       *capture.Recorder
 	Observer       *Observer
 	Failures       *FailureSink
@@ -29,7 +31,28 @@ type Network struct {
 }
 
 func (n Network) DialContext(ctx context.Context, address string) (net.Conn, error) {
-	conn, err := (raknet.Dialer{ErrorLog: n.Logger}).DialContext(ctx, address)
+	conn, err := n.transport().DialContext(ctx, address)
+	if err != nil {
+		captureErr := n.recordConnection("transport.connection_error", nil, err)
+		if captureErr != nil {
+			return nil, errors.Join(err, captureErr)
+		}
+		return nil, err
+	}
+	return n.wrap(conn)
+}
+
+// DialContextIdentity preserves gophertunnel's authenticated transport hook when
+// Network observes a transport such as NetherNet.
+func (n Network) DialContextIdentity(ctx context.Context, address, token string, key *ecdsa.PrivateKey) (net.Conn, error) {
+	transport := n.transport()
+	identityTransport, ok := transport.(interface {
+		DialContextIdentity(context.Context, string, string, *ecdsa.PrivateKey) (net.Conn, error)
+	})
+	if !ok {
+		return n.DialContext(ctx, address)
+	}
+	conn, err := identityTransport.DialContextIdentity(ctx, address, token, key)
 	if err != nil {
 		captureErr := n.recordConnection("transport.connection_error", nil, err)
 		if captureErr != nil {
@@ -41,11 +64,11 @@ func (n Network) DialContext(ctx context.Context, address string) (net.Conn, err
 }
 
 func (n Network) PingContext(ctx context.Context, address string) ([]byte, error) {
-	return (raknet.Dialer{ErrorLog: n.Logger}).PingContext(ctx, address)
+	return n.transport().PingContext(ctx, address)
 }
 
 func (n Network) Listen(address string) (minecraft.NetworkListener, error) {
-	listener, err := (raknet.ListenConfig{ErrorLog: n.Logger}).Listen(address)
+	listener, err := n.transport().Listen(address)
 	if err != nil {
 		captureErr := n.recordConnection("transport.listen_error", nil, err)
 		if captureErr != nil {
@@ -53,7 +76,30 @@ func (n Network) Listen(address string) (minecraft.NetworkListener, error) {
 		}
 		return nil, err
 	}
-	return &observedListener{Listener: listener, network: n}, nil
+	return &observedListener{listener: listener, network: n}, nil
+}
+
+func (n Network) transport() minecraft.Network {
+	if n.Transport != nil {
+		return n.Transport
+	}
+	return rakNetNetwork{logger: n.Logger}
+}
+
+type rakNetNetwork struct {
+	logger *slog.Logger
+}
+
+func (n rakNetNetwork) DialContext(ctx context.Context, address string) (net.Conn, error) {
+	return (raknet.Dialer{ErrorLog: n.logger}).DialContext(ctx, address)
+}
+
+func (n rakNetNetwork) PingContext(ctx context.Context, address string) ([]byte, error) {
+	return (raknet.Dialer{ErrorLog: n.logger}).PingContext(ctx, address)
+}
+
+func (n rakNetNetwork) Listen(address string) (minecraft.NetworkListener, error) {
+	return (raknet.ListenConfig{ErrorLog: n.logger}).Listen(address)
 }
 
 func (n Network) wrap(conn net.Conn) (net.Conn, error) {
@@ -74,7 +120,7 @@ func (n Network) recordConnection(kind string, conn net.Conn, operationErr error
 		Severity:     capture.SeverityInfo,
 		Direction:    capture.DirectionInternal,
 		Channel:      n.Channel,
-		Stage:        "post_raknet_connection",
+		Stage:        "post_transport_connection",
 	}
 	if conn != nil {
 		event.Source = endpoint(conn.LocalAddr())
@@ -92,16 +138,32 @@ func (n Network) recordConnection(kind string, conn net.Conn, operationErr error
 }
 
 type observedListener struct {
-	*raknet.Listener
-	network Network
+	listener minecraft.NetworkListener
+	network  Network
 }
 
 func (l *observedListener) Accept() (net.Conn, error) {
-	conn, err := l.Listener.Accept()
+	conn, err := l.listener.Accept()
 	if err != nil {
 		return nil, err
 	}
 	return l.network.wrap(conn)
+}
+
+func (l *observedListener) Close() error {
+	return l.listener.Close()
+}
+
+func (l *observedListener) Addr() net.Addr {
+	return l.listener.Addr()
+}
+
+func (l *observedListener) ID() int64 {
+	return l.listener.ID()
+}
+
+func (l *observedListener) PongData(data []byte) {
+	l.listener.PongData(data)
 }
 
 type observedConn struct {
@@ -131,6 +193,20 @@ func (c *observedConn) ReadPacket() ([]byte, error) {
 		return nil, captureErr
 	}
 	return payload, err
+}
+
+func (c *observedConn) BatchHeader() []byte {
+	if source, ok := c.Conn.(interface{ BatchHeader() []byte }); ok {
+		return source.BatchHeader()
+	}
+	return []byte{0xfe}
+}
+
+func (c *observedConn) DisableEncryption() bool {
+	if source, ok := c.Conn.(interface{ DisableEncryption() bool }); ok {
+		return source.DisableEncryption()
+	}
+	return false
 }
 
 func (c *observedConn) Write(payload []byte) (int, error) {
@@ -186,7 +262,7 @@ func (c *observedConn) recordPayload(operation string, payload []byte, attempted
 		Severity:     capture.SeverityDebug,
 		Direction:    direction,
 		Channel:      c.network.Channel,
-		Stage:        "post_raknet_application_payload",
+		Stage:        "post_transport_application_payload",
 		Source:       endpoint(source),
 		Destination:  endpoint(destination),
 		Data:         data,

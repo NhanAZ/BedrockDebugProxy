@@ -84,6 +84,7 @@ func (r *Runner) Run(ctx context.Context) error {
 		WriteDirection: capture.DirectionServerToClient,
 	}
 	upstreamNetwork := bedrock.Network{
+		Transport:      r.config.UpstreamNetwork,
 		Recorder:       r.config.Recorder,
 		Observer:       observer,
 		Failures:       failures,

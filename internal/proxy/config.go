@@ -8,12 +8,14 @@ import (
 	"strings"
 
 	"github.com/NhanAZ/BedrockDebugProxy/internal/capture"
+	"github.com/sandertv/gophertunnel/minecraft"
 	"golang.org/x/oauth2"
 )
 
 type Config struct {
 	ListenAddress              string
 	UpstreamAddress            string
+	UpstreamNetwork            minecraft.Network
 	AllowUnauthenticatedClient bool
 	TokenSource                oauth2.TokenSource
 	Recorder                   *capture.Recorder
@@ -37,8 +39,14 @@ func (c *Config) normalize() error {
 	if err := validateAddress(c.ListenAddress); err != nil {
 		return fmt.Errorf("invalid listen address: %w", err)
 	}
-	if err := validateAddress(c.UpstreamAddress); err != nil {
-		return fmt.Errorf("invalid upstream address: %w", err)
+	if c.UpstreamNetwork == nil {
+		if err := validateAddress(c.UpstreamAddress); err != nil {
+			return fmt.Errorf("invalid upstream address: %w", err)
+		}
+	} else if strings.TrimSpace(c.UpstreamAddress) == "" {
+		return errors.New("invalid upstream address: address is empty")
+	} else if strings.ContainsAny(c.UpstreamAddress, "\r\n") {
+		return errors.New("invalid upstream address: address contains a line break")
 	}
 	if c.Output == nil {
 		c.Output = io.Discard

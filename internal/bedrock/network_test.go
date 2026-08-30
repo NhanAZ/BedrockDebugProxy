@@ -77,6 +77,16 @@ func TestObservedConnPreservesPacketReadsContextAndLatency(t *testing.T) {
 	}
 }
 
+func TestObservedConnPreservesTransportCapabilities(t *testing.T) {
+	conn := &observedConn{Conn: &fakeCapabilityConn{fakePacketConn: fakePacketConn{}}}
+	if got := conn.BatchHeader(); got != nil {
+		t.Fatalf("BatchHeader() = %x, want nil", got)
+	}
+	if !conn.DisableEncryption() {
+		t.Fatal("DisableEncryption() = false")
+	}
+}
+
 func TestObservedConnReportsTransferredBytesWhenCaptureFails(t *testing.T) {
 	recorder, err := capture.New(filepath.Join(t.TempDir(), "capture"), capture.Options{})
 	if err != nil {
@@ -120,6 +130,13 @@ type fakePacketConn struct {
 	latency     time.Duration
 	closed      bool
 }
+
+type fakeCapabilityConn struct {
+	fakePacketConn
+}
+
+func (*fakeCapabilityConn) BatchHeader() []byte     { return nil }
+func (*fakeCapabilityConn) DisableEncryption() bool { return true }
 
 func (c *fakePacketConn) Read(buffer []byte) (int, error) {
 	if c.closed {

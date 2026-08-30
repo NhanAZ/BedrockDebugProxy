@@ -5,6 +5,10 @@ go 1.25.0
 toolchain go1.26.6
 
 require (
+	github.com/coder/websocket v1.8.14
+	github.com/df-mc/go-nethernet v1.0.20
+	github.com/df-mc/go-playfab/v2 v2.0.2
+	github.com/df-mc/go-xsapi/v2 v2.0.3
 	github.com/go-gl/mathgl v1.1.0
 	github.com/google/uuid v1.6.0
 	github.com/sandertv/go-raknet v1.15.2-0.20260705184311-0d1fd09e2cf6
@@ -13,11 +17,7 @@ require (
 )
 
 require (
-	github.com/coder/websocket v1.8.14 // indirect
 	github.com/coreos/go-oidc/v3 v3.17.0 // indirect
-	github.com/df-mc/go-nethernet v1.0.20 // indirect
-	github.com/df-mc/go-playfab/v2 v2.0.2 // indirect
-	github.com/df-mc/go-xsapi/v2 v2.0.3 // indirect
 	github.com/df-mc/jsonc v1.0.5 // indirect
 	github.com/go-jose/go-jose/v4 v4.1.4 // indirect
 	github.com/klauspost/compress v1.18.4 // indirect
