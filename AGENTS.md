@@ -47,6 +47,8 @@ Never infer packet IDs, field types, serialization order, version gates, or requ
 
 Record important protocol findings in `docs/research/`. Include source URLs, revision identifiers, access dates when useful, relevant license information, and the impact on this project. Do not let important findings exist only in a chat, commit message, or code comment.
 
+Before adding or relying on an external citation, verify that the exact URL exists and that its current content supports the stated claim. Prefer official sources and immutable commit or tag permalinks for revision-specific behavior. Record the repository, file path, revision, and evidence summary when the claim is important. A successful HTTP response alone is insufficient. If the original evidence cannot be recovered, mark the claim unverified instead of substituting a nearby URL or inference.
+
 Protocol-specific behavior must not leak into generic capture storage without a documented reason. Keep protocol versions explicit. Unknown packet IDs and partially decoded payloads are valid evidence and must remain representable.
 
 ## Capture integrity

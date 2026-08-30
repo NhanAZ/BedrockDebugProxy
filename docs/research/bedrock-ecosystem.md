@@ -23,6 +23,7 @@ The canonical capture will be an append-only directory containing a manifest, an
 - License is MIT
 - Current packet constants at this revision are protocol `2169` and game version `1.26.45`
 - The module requires Go 1.25 or newer
+- Exact implementation evidence is in [`minecraft/dial.go`](https://github.com/Sandertv/gophertunnel/blob/283a5a97dfe65da94bcc0b401807f6aefa9e72ee/minecraft/dial.go), [`minecraft/listener.go`](https://github.com/Sandertv/gophertunnel/blob/283a5a97dfe65da94bcc0b401807f6aefa9e72ee/minecraft/listener.go), [`minecraft/packet.go`](https://github.com/Sandertv/gophertunnel/blob/283a5a97dfe65da94bcc0b401807f6aefa9e72ee/minecraft/packet.go), [`minecraft/conn.go`](https://github.com/Sandertv/gophertunnel/blob/283a5a97dfe65da94bcc0b401807f6aefa9e72ee/minecraft/conn.go), and [`minecraft/network.go`](https://github.com/Sandertv/gophertunnel/blob/283a5a97dfe65da94bcc0b401807f6aefa9e72ee/minecraft/network.go)
 
 Gophertunnel performs Bedrock login, Xbox authentication, encryption, compression, batching, packet framing, protocol conversion, resource-pack download, and spawn sequencing. Its included proxy demonstrates the standard pair of terminating connections and two forwarding loops.
 
@@ -38,6 +39,7 @@ The `Network` interface warns that wrappers must preserve optional packet transp
 
 - Source reviewed at [`ea813dc668b5a2a2767cc5577bf77869c965f27a`](https://github.com/Sandertv/go-raknet/tree/ea813dc668b5a2a2767cc5577bf77869c965f27a)
 - License is MIT
+- Connection and latency evidence is in [`conn.go`](https://github.com/Sandertv/go-raknet/blob/ea813dc668b5a2a2767cc5577bf77869c965f27a/conn.go)
 
 Go-raknet provides the reliable ordered connection below gophertunnel. Using it through the gophertunnel `Network` boundary keeps the dependency replaceable. Its connection exposes useful latency information, but the ordinary `net.Conn` stream is already above UDP datagrams and RakNet recovery behavior.
 
@@ -65,27 +67,35 @@ The upstream project is a broad Bedrock tooling suite rather than a narrow captu
 
 - Source reviewed at [`6011e261c1b028f92d732348dc91339fb12275dd`](https://github.com/PrismarineJS/bedrock-protocol/tree/6011e261c1b028f92d732348dc91339fb12275dd)
 - License is MIT
+- Layering evidence is in [`src/rak.js`](https://github.com/PrismarineJS/bedrock-protocol/blob/6011e261c1b028f92d732348dc91339fb12275dd/src/rak.js), [`src/transforms/framer.js`](https://github.com/PrismarineJS/bedrock-protocol/blob/6011e261c1b028f92d732348dc91339fb12275dd/src/transforms/framer.js), [`src/transforms/encryption.js`](https://github.com/PrismarineJS/bedrock-protocol/blob/6011e261c1b028f92d732348dc91339fb12275dd/src/transforms/encryption.js), and [`src/relay.js`](https://github.com/PrismarineJS/bedrock-protocol/blob/6011e261c1b028f92d732348dc91339fb12275dd/src/relay.js)
 
 This project separates RakNet, framing, compression, encryption, generated protocol codecs, client and server sessions, and relay behavior. Its generated schemas and multi-version ecosystem are valuable comparison points for packet definitions and differential decode tests.
 
 The JavaScript runtime is not required for the initial proxy. BedrockDebugProxy should later use it as an independent decoder in compatibility tests rather than coupling the main capture path to two protocol stacks.
 
-### Kas-tle ProxyPass and CloudburstMC ProxyPass
+### Kas-tle ProxyPass
 
 - Kas-tle source reviewed at [`baa6d9a565c58f5f2306c5646fc833704253109f`](https://github.com/Kas-tle/ProxyPass/tree/baa6d9a565c58f5f2306c5646fc833704253109f)
-- CloudburstMC repository metadata reviewed on 2026-08-30
-- Both repositories are AGPL-3.0
+- License is AGPL-3.0
 
-ProxyPass shows a mature terminating-proxy feature surface that includes online authentication, transfer following, featured experiences, Realms, friend sessions, RakNet, NetherNet, packet inspection, protocol testing, and resource-pack download and decryption.
+This fork shows a mature terminating-proxy feature surface that includes online authentication, transfer following, featured experiences, Realms, friend sessions, RakNet, NetherNet, packet inspection, protocol testing, and resource-pack download and decryption. Its README and [`PackDownloader.java`](https://github.com/Kas-tle/ProxyPass/blob/baa6d9a565c58f5f2306c5646fc833704253109f/src/main/java/org/cloudburstmc/proxypass/network/bedrock/session/PackDownloader.java) support those specific research claims.
 
 The fork maintains modified protocol and network submodules. That improves its ability to debug those libraries but also demonstrates the maintenance cost of deep stack forks. BedrockDebugProxy will begin with public gophertunnel extension points and add a narrow adapter or fork only when a documented fidelity requirement cannot be met otherwise.
 
 No ProxyPass source will be copied without an explicit decision to accept the additional AGPL network-use obligations and record the resulting provenance. The current implementation uses ProxyPass only as a research reference.
 
+### CloudburstMC ProxyPass
+
+- Current source reviewed at [`b92c4d4f88ee18643df2e5df26a15f8ef4a7db00`](https://github.com/CloudburstMC/ProxyPass/tree/b92c4d4f88ee18643df2e5df26a15f8ef4a7db00)
+- License is AGPL-3.0
+
+The original CloudburstMC project remains evidence for the basic terminating-proxy lineage. Its current tree does not contain the Kas-tle `PackDownloader.java` path and is not used as evidence for resource-pack decryption behavior. Treat the two repositories as separate revisions with different feature surfaces.
+
 ### EndstoneMC spyglass
 
 - Source reviewed at [`b4f5f7f879ec0089d353093ee15e6770caf7c1b0`](https://github.com/EndstoneMC/spyglass/tree/b4f5f7f879ec0089d353093ee15e6770caf7c1b0)
 - License is MIT
+- Capture evidence is in [`network.cpp`](https://github.com/EndstoneMC/spyglass/blob/b4f5f7f879ec0089d353093ee15e6770caf7c1b0/src/spyglass/network.cpp), [`capture.cpp`](https://github.com/EndstoneMC/spyglass/blob/b4f5f7f879ec0089d353093ee15e6770caf7c1b0/src/spyglass/overlay/capture.cpp), [`store.cpp`](https://github.com/EndstoneMC/spyglass/blob/b4f5f7f879ec0089d353093ee15e6770caf7c1b0/src/spyglass/overlay/store.cpp), and [`packet_details.cpp`](https://github.com/EndstoneMC/spyglass/blob/b4f5f7f879ec0089d353093ee15e6770caf7c1b0/src/spyglass/overlay/pane/packet_details.cpp)
 
 Spyglass hooks the Bedrock client at packet send and packet read boundaries. It retains raw packet bodies, unread byte counts, decode success, detailed error trees, packet names, sub-client information, and timing. Its UI is backed by a disk stream plus an index rather than an unbounded in-memory packet list.
 
@@ -95,6 +105,7 @@ The bounded writer queue and visible rejected or dropped counters are strong des
 
 - Source reviewed at [`ea87a290a8154d850f41fef8aaffa0bbe7ebfbd4`](https://github.com/EndstoneMC/protocol-dumper/tree/ea87a290a8154d850f41fef8aaffa0bbe7ebfbd4)
 - GitHub reports no repository-level license at this revision
+- Schema extraction evidence is in [`src/main.cpp`](https://github.com/EndstoneMC/protocol-dumper/blob/ea87a290a8154d850f41fef8aaffa0bbe7ebfbd4/src/main.cpp), [`src/visitor.cpp`](https://github.com/EndstoneMC/protocol-dumper/blob/ea87a290a8154d850f41fef8aaffa0bbe7ebfbd4/src/visitor.cpp), and [`src/models.h`](https://github.com/EndstoneMC/protocol-dumper/blob/ea87a290a8154d850f41fef8aaffa0bbe7ebfbd4/src/models.h)
 
 The project extracts packet, struct, enum, and serialization schemas from a running Bedrock Dedicated Server. Runtime schema extraction is a valuable future input for update validation and field-name enrichment.
 
@@ -104,6 +115,7 @@ Because the repository-level license is absent, BedrockDebugProxy will use only 
 
 - Source reviewed at [`fd933b85c3672b368df6fd674f5842d7507d338a`](https://github.com/MrSterdy/bedrock-packet-interceptor/tree/fd933b85c3672b368df6fd674f5842d7507d338a)
 - GitHub reports no license
+- Relay and UI event evidence is in [`src/lib/server/proxy.ts`](https://github.com/MrSterdy/bedrock-packet-interceptor/blob/fd933b85c3672b368df6fd674f5842d7507d338a/src/lib/server/proxy.ts), [`src/lib/server/emitter.ts`](https://github.com/MrSterdy/bedrock-packet-interceptor/blob/fd933b85c3672b368df6fd674f5842d7507d338a/src/lib/server/emitter.ts), and [`src/routes/api/events/+server.ts`](https://github.com/MrSterdy/bedrock-packet-interceptor/blob/fd933b85c3672b368df6fd674f5842d7507d338a/src/routes/api/events/%2Bserver.ts)
 
 This project combines a PrismarineJS relay with a Svelte web interface and streams packet events to the UI. It is useful evidence that interactive filtering and readable decoded fields matter, but an in-memory event emitter and browser view are not a durable canonical capture.
 
@@ -111,7 +123,7 @@ No source will be copied without a compatible license.
 
 ### Endermanbugzjfc PacketLoggerGophertunnel
 
-- Repository metadata and source layout reviewed on 2026-08-30
+- Source reviewed at [`e718c1432397bb66fa95c5188ca239617a2c7298`](https://github.com/Endermanbugzjfc/PacketLoggerGophertunnel/tree/e718c1432397bb66fa95c5188ca239617a2c7298)
 - License is Apache-2.0
 - The last source push reported by GitHub was 2023-08-29
 
@@ -121,6 +133,7 @@ This project is a small example of logging packets around a gophertunnel proxy. 
 
 - Source reviewed at [`a36ed0edb548298ab482939e1c653e39f9683719`](https://github.com/df-mc/dragonfly/tree/a36ed0edb548298ab482939e1c653e39f9683719), tagged `v0.11.4`
 - License is MIT
+- Server fixture evidence is in [`server/server.go`](https://github.com/df-mc/dragonfly/blob/a36ed0edb548298ab482939e1c653e39f9683719/server/server.go) and [`server/player/player.go`](https://github.com/df-mc/dragonfly/blob/a36ed0edb548298ab482939e1c653e39f9683719/server/player/player.go)
 
 Dragonfly is a server implementation built around gophertunnel rather than a packet proxy. It is useful for local integration fixtures and for understanding how the protocol library is exercised by a complete server. BedrockDebugProxy does not need the full server dependency in its capture core.
 
@@ -142,3 +155,5 @@ Dragonfly is a server implementation built around gophertunnel rather than a pac
 - Measure disk-write backpressure during chunk-heavy sessions and choose an explicit overflow policy.
 - Verify encrypted resource-pack variants with synthetic fixtures and owner-authorized live captures.
 - Decide whether old protocol adapters belong in this repository or separate versioned modules.
+
+The external source audit and the correction of the stale CloudburstMC reference are recorded in [`reference-audit.md`](reference-audit.md).
