@@ -2,14 +2,45 @@ package capture
 
 import (
 	"context"
+	"encoding/binary"
 	"encoding/json"
 	"errors"
+	"fmt"
 	"os"
 	"path/filepath"
 	"strings"
 	"testing"
 	"time"
 )
+
+func BenchmarkRecorderDurability(b *testing.B) {
+	for _, syncEachEvent := range []bool{false, true} {
+		b.Run(fmt.Sprintf("sync_each_event=%t", syncEachEvent), func(b *testing.B) {
+			root := filepath.Join(b.TempDir(), "capture")
+			recorder, err := New(root, Options{SyncEachEvent: syncEachEvent})
+			if err != nil {
+				b.Fatal(err)
+			}
+			defer func() {
+				if err := recorder.Close("closed", nil); err != nil {
+					b.Error(err)
+				}
+			}()
+			payload := make([]byte, 256)
+			b.ResetTimer()
+			for i := 0; i < b.N; i++ {
+				binary.LittleEndian.PutUint64(payload, uint64(i))
+				if _, err := recorder.Record(context.Background(), Record{
+					Event: Event{Kind: "packet.raw"},
+					Raw:   payload,
+				}); err != nil {
+					b.Fatal(err)
+				}
+			}
+			b.StopTimer()
+		})
+	}
+}
 
 func TestRecorderWritesOrderedEventsAndDeduplicatedBlobs(t *testing.T) {
 	root := filepath.Join(t.TempDir(), "capture")
