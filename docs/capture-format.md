@@ -60,7 +60,7 @@ This policy may add latency during very high traffic. A future buffered mode mus
 
 Readers must select behavior from the schema string instead of assuming the newest layout. Existing captures are immutable evidence. Schema migrations create a new capture or export and retain provenance to the source.
 
-The capture verifier checks sequence continuity, capture identity, event counts, blob counts, canonical paths, byte lengths, and SHA-256 digests.
+The capture verifier checks sequence continuity, capture identity, event counts, unique blob counts and bytes, every repeated blob reference, canonical paths, resolved path containment, regular-file type, byte lengths, and SHA-256 digests.
 
 ## Portable archive
 

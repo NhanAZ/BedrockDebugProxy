@@ -70,9 +70,14 @@ func Verify(root string) (Verification, error) {
 	if err != nil {
 		return Verification{}, err
 	}
+	resolvedRoot, err := filepath.EvalSymlinks(root)
+	if err != nil {
+		return Verification{}, fmt.Errorf("resolve capture root: %w", err)
+	}
 	result := Verification{Manifest: manifest}
-	seenBlobs := map[string]struct{}{}
+	seenBlobs := map[string]BlobRef{}
 	var previousSequence uint64
+	var blobBytes uint64
 	err = ScanEvents(root, func(event Event) error {
 		result.Events++
 		if event.Schema != SchemaVersion {
@@ -88,12 +93,28 @@ func Verify(root string) (Verification, error) {
 		if event.Blob == nil {
 			return nil
 		}
-		if _, ok := seenBlobs[event.Blob.SHA256]; ok {
+		ref := *event.Blob
+		cleanRelative, err := validateBlobRef(ref)
+		if err != nil {
+			result.Issues = append(result.Issues, fmt.Sprintf("event %d blob is invalid - %v", event.Sequence, err))
 			return nil
 		}
-		seenBlobs[event.Blob.SHA256] = struct{}{}
+		if previous, ok := seenBlobs[ref.SHA256]; ok {
+			if ref.Size != previous.Size {
+				result.Issues = append(result.Issues, fmt.Sprintf("event %d blob size %d conflicts with earlier size %d for SHA-256 %s", event.Sequence, ref.Size, previous.Size, ref.SHA256))
+			}
+			return nil
+		}
+		seenBlobs[ref.SHA256] = ref
 		result.Blobs++
-		if err := verifyBlob(root, *event.Blob); err != nil {
+		// #nosec G115 -- validateBlobRef rejected negative sizes before this conversion.
+		nextBlobBytes := blobBytes + uint64(ref.Size)
+		if nextBlobBytes < blobBytes {
+			result.Issues = append(result.Issues, fmt.Sprintf("event %d makes the unique blob byte count overflow", event.Sequence))
+		} else {
+			blobBytes = nextBlobBytes
+		}
+		if err := verifyBlob(root, resolvedRoot, cleanRelative, ref); err != nil {
 			result.Issues = append(result.Issues, fmt.Sprintf("event %d blob is invalid - %v", event.Sequence, err))
 		}
 		return nil
@@ -110,29 +131,61 @@ func Verify(root string) (Verification, error) {
 	if manifest.Counts.Blobs != result.Blobs {
 		result.Issues = append(result.Issues, fmt.Sprintf("manifest counts %d blobs but events reference %d unique blobs", manifest.Counts.Blobs, result.Blobs))
 	}
+	if manifest.Counts.BlobBytes != blobBytes {
+		result.Issues = append(result.Issues, fmt.Sprintf("manifest counts %d unique blob bytes but events reference %d", manifest.Counts.BlobBytes, blobBytes))
+	}
 	return result, nil
 }
 
-func verifyBlob(root string, ref BlobRef) error {
+func validateBlobRef(ref BlobRef) (string, error) {
 	if len(ref.SHA256) != sha256.Size*2 {
-		return fmt.Errorf("invalid SHA-256 length %d", len(ref.SHA256))
+		return "", fmt.Errorf("invalid SHA-256 length %d", len(ref.SHA256))
 	}
 	if _, err := hex.DecodeString(ref.SHA256); err != nil {
-		return fmt.Errorf("invalid SHA-256 text: %w", err)
+		return "", fmt.Errorf("invalid SHA-256 text: %w", err)
+	}
+	if ref.SHA256 != strings.ToLower(ref.SHA256) {
+		return "", errors.New("SHA-256 text is not lowercase")
+	}
+	if ref.Size < 0 {
+		return "", fmt.Errorf("invalid negative size %d", ref.Size)
 	}
 	cleanRelative := filepath.Clean(filepath.FromSlash(ref.Path))
 	if filepath.IsAbs(cleanRelative) || cleanRelative == ".." || strings.HasPrefix(cleanRelative, ".."+string(filepath.Separator)) {
-		return fmt.Errorf("unsafe relative path %q", ref.Path)
+		return "", fmt.Errorf("unsafe relative path %q", ref.Path)
 	}
 	expectedRelative := filepath.Clean(filepath.FromSlash(filepath.ToSlash(filepath.Join(blobRoot, ref.SHA256[:2], ref.SHA256+".bin"))))
 	if cleanRelative != expectedRelative {
-		return fmt.Errorf("non-canonical path %q", ref.Path)
+		return "", fmt.Errorf("non-canonical path %q", ref.Path)
 	}
-	f, err := os.Open(filepath.Join(root, cleanRelative))
+	return cleanRelative, nil
+}
+
+func verifyBlob(root, resolvedRoot, cleanRelative string, ref BlobRef) error {
+	blobPath := filepath.Join(root, cleanRelative)
+	resolvedPath, err := filepath.EvalSymlinks(blobPath)
+	if err != nil {
+		return fmt.Errorf("resolve path: %w", err)
+	}
+	relative, err := filepath.Rel(resolvedRoot, resolvedPath)
+	if err != nil {
+		return fmt.Errorf("compare resolved path: %w", err)
+	}
+	if relative == ".." || strings.HasPrefix(relative, ".."+string(filepath.Separator)) {
+		return errors.New("path resolves outside the capture directory")
+	}
+	f, err := os.Open(blobPath)
 	if err != nil {
 		return fmt.Errorf("open: %w", err)
 	}
 	defer func() { _ = f.Close() }()
+	info, err := f.Stat()
+	if err != nil {
+		return fmt.Errorf("inspect: %w", err)
+	}
+	if !info.Mode().IsRegular() {
+		return errors.New("path is not a regular file")
+	}
 	hash := sha256.New()
 	n, err := io.Copy(hash, f)
 	if err != nil {
