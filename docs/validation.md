@@ -2,6 +2,8 @@
 
 Automated tests establish that the implementation matches local expectations. They do not establish that those expectations match live Minecraft Bedrock clients and servers. Runtime, networking, protocol, authentication, session, resource-pack, capture, encoding, and decoding changes remain awaiting manual validation until this workflow is complete.
 
+The automated suite includes a loopback integration session over RakNet. It exercises offline login, resource-pack negotiation with no packs, StartGame and spawn, typed packet forwarding in both directions, clean shutdown, raw packet capture, decoded events, connection metadata, and GameData snapshots. This catches local forwarding and capture regressions without accounts or public infrastructure. It does not exercise Microsoft authentication, the retail Minecraft client, public-server routing, transfers, live resource packs, or server-specific behavior and therefore does not replace the gates below.
+
 ## Development and pull requests
 
 The Hive is the minimum baseline for every runtime-affecting change and every pull request that changes code or observable behavior. A short session is sufficient only when it demonstrates successful authentication and connection, spawn, normal client interaction, traffic in both directions, packet decoding, stable shutdown, and no unexplained decode or protocol errors.

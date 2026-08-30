@@ -14,7 +14,7 @@ Its first priority is to preserve enough structured evidence for AI agents to re
 
 The repository has an initial single-client terminating proxy for the current protocol shipped by gophertunnel `v1.61.0`. It records transport payloads, raw packet payloads, decoded packet views, decoded login and game-state snapshots, library failures, and lifecycle events in a durable capture directory.
 
-Automated tests, `go vet`, module verification, and local builds pass. Real Minecraft client and cross-server validation is still pending. The proxy is not ready for production use.
+Automated tests, static analysis, module verification, and local builds pass. The suite includes a full local RakNet session that completes offline login and spawn, forwards typed packets in both directions, and verifies the resulting raw and decoded capture evidence. Real Minecraft client and cross-server validation is still pending. The proxy is not ready for production use.
 
 ## Run
 
