@@ -3,6 +3,7 @@ package proxy
 import (
 	"bytes"
 	"context"
+	"encoding/base64"
 	"encoding/json"
 	"fmt"
 	"io"
@@ -13,7 +14,10 @@ import (
 	"time"
 
 	"github.com/NhanAZ/BedrockDebugProxy/internal/capture"
+	"github.com/go-gl/mathgl/mgl32"
+	"github.com/google/uuid"
 	"github.com/sandertv/gophertunnel/minecraft"
+	"github.com/sandertv/gophertunnel/minecraft/protocol"
 	"github.com/sandertv/gophertunnel/minecraft/protocol/login"
 	"github.com/sandertv/gophertunnel/minecraft/protocol/packet"
 )
@@ -27,6 +31,51 @@ type listeningAddressWriter struct {
 
 func newListeningAddressWriter() *listeningAddressWriter {
 	return &listeningAddressWriter{address: make(chan string, 1)}
+}
+
+func integrationPlayerSkin() *packet.PlayerSkin {
+	return &packet.PlayerSkin{
+		UUID: uuid.MustParse("11111111-1111-1111-1111-111111111111"),
+		Skin: protocol.Skin{
+			SkinID:             "integration-skin",
+			SkinImageWidth:     1,
+			SkinImageHeight:    1,
+			SkinData:           []byte{1, 2, 3, 4},
+			CapeImageWidth:     1,
+			CapeImageHeight:    1,
+			CapeData:           []byte{5, 6, 7, 8},
+			SkinGeometry:       []byte(`{"geometry":{"default":"integration"}}`),
+			CapeID:             "integration-cape",
+			OverrideAppearance: true,
+		},
+	}
+}
+
+func isIntegrationPlayerSkin(skin *packet.PlayerSkin) bool {
+	if skin == nil {
+		return false
+	}
+	want := integrationPlayerSkin()
+	return skin.UUID == want.UUID &&
+		skin.Skin.SkinID == want.Skin.SkinID &&
+		bytes.Equal(skin.Skin.SkinData, want.Skin.SkinData) &&
+		bytes.Equal(skin.Skin.CapeData, want.Skin.CapeData) &&
+		bytes.Equal(skin.Skin.SkinGeometry, want.Skin.SkinGeometry) &&
+		skin.Skin.CapeID == want.Skin.CapeID
+}
+
+func integrationClientData() login.ClientData {
+	return login.ClientData{
+		SkinID:          "integration-login-skin",
+		SkinImageWidth:  1,
+		SkinImageHeight: 1,
+		SkinData:        base64.StdEncoding.EncodeToString([]byte{1, 2, 3, 4}),
+		CapeID:          "integration-login-cape",
+		CapeImageWidth:  1,
+		CapeImageHeight: 1,
+		CapeData:        base64.StdEncoding.EncodeToString([]byte{5, 6, 7, 8}),
+		SkinGeometry:    base64.StdEncoding.EncodeToString([]byte(`{"geometry":{"default":"integration"}}`)),
+	}
 }
 
 func (w *listeningAddressWriter) Write(p []byte) (int, error) {
@@ -126,22 +175,89 @@ func TestRunnerForwardsBidirectionalPacketsAndCapturesSession(t *testing.T) {
 			serverErrors <- fmt.Errorf("start upstream game: %w", startErr)
 			return
 		}
+		expectedClientPackets := map[string]bool{
+			"Emote":                false,
+			"PlayerSkin":           false,
+			"MovePlayer":           false,
+			"SubChunkRequest":      false,
+			"InventoryTransaction": false,
+		}
+		var observedEmote *packet.Emote
 		for {
 			received, readErr := serverConn.ReadPacket()
 			if readErr != nil {
 				serverErrors <- fmt.Errorf("read client packet: %w", readErr)
 				return
 			}
-			emote, ok := received.(*packet.Emote)
-			if !ok {
-				continue
+			switch typed := received.(type) {
+			case *packet.Emote:
+				expectedClientPackets["Emote"] = true
+				observedEmote = typed
+			case *packet.PlayerSkin:
+				if !isIntegrationPlayerSkin(typed) {
+					serverErrors <- fmt.Errorf("upstream received unexpected player skin: %#v", typed)
+					return
+				}
+				expectedClientPackets["PlayerSkin"] = true
+			case *packet.MovePlayer:
+				expectedClientPackets["MovePlayer"] = true
+			case *packet.SubChunkRequest:
+				expectedClientPackets["SubChunkRequest"] = true
+			case *packet.InventoryTransaction:
+				expectedClientPackets["InventoryTransaction"] = true
 			}
-			serverObserved <- emote
-			break
+			complete := true
+			for _, seen := range expectedClientPackets {
+				complete = complete && seen
+			}
+			if complete {
+				break
+			}
 		}
+		if observedEmote == nil || observedEmote.EmoteID != "client-to-server" {
+			serverErrors <- fmt.Errorf("upstream did not observe expected emote: %#v", observedEmote)
+			return
+		}
+		serverObserved <- observedEmote
 		if writeErr := serverConn.WritePacket(&packet.Text{TextType: packet.TextTypeRaw, Message: "server-to-client"}); writeErr != nil {
 			serverErrors <- fmt.Errorf("write server packet: %w", writeErr)
 			return
+		}
+		for _, outgoing := range []packet.Packet{
+			integrationPlayerSkin(),
+			&packet.AddActor{
+				EntityUniqueID:  2,
+				EntityRuntimeID: 2,
+				EntityType:      "minecraft:pig",
+				Position:        mgl32.Vec3{1, 2, 3},
+				EntityMetadata:  protocol.NewEntityMetadata(),
+			},
+			&packet.LevelChunk{
+				Position:      protocol.ChunkPos{1, 2},
+				Dimension:     0,
+				SubChunkCount: 0,
+				RawPayload:    []byte{0x01, 0x02, 0x03},
+			},
+			&packet.UpdateBlock{
+				Position:          protocol.BlockPos{1, 64, 2},
+				NewBlockRuntimeID: 42,
+				Flags:             packet.BlockUpdateNetwork,
+			},
+			&packet.InventoryContent{
+				WindowID: 0,
+				Content: []protocol.ItemInstance{{
+					StackNetworkID: 7,
+					Stack: protocol.ItemStack{
+						ItemType: protocol.ItemType{NetworkID: 1},
+						Count:    2,
+					},
+				}},
+			},
+		} {
+			if writeErr := serverConn.WritePacket(outgoing); writeErr != nil {
+				serverErrors <- fmt.Errorf("write representative server packet %T: %w", outgoing, writeErr)
+				return
+			}
 		}
 		if flushErr := serverConn.Flush(); flushErr != nil {
 			serverErrors <- fmt.Errorf("flush server packet: %w", flushErr)
@@ -198,6 +314,7 @@ func TestRunnerForwardsBidirectionalPacketsAndCapturesSession(t *testing.T) {
 			Identity:    "11111111-1111-1111-1111-111111111111",
 			DisplayName: "Integration",
 		},
+		ClientData: integrationClientData(),
 	}).DialContext(ctx, "raknet", proxyAddress)
 	if err != nil {
 		t.Fatal(err)
@@ -206,12 +323,29 @@ func TestRunnerForwardsBidirectionalPacketsAndCapturesSession(t *testing.T) {
 		_ = client.Close()
 		t.Fatal(err)
 	}
-	if err := client.WritePacket(&packet.Emote{
-		EntityRuntimeID: client.GameData().EntityRuntimeID,
-		EmoteID:         "client-to-server",
-	}); err != nil {
-		_ = client.Close()
-		t.Fatal(err)
+	for _, outgoing := range []packet.Packet{
+		integrationPlayerSkin(),
+		&packet.MovePlayer{
+			EntityRuntimeID: client.GameData().EntityRuntimeID,
+			Position:        mgl32.Vec3{4, 5, 6},
+			Mode:            packet.MoveModeNormal,
+			OnGround:        true,
+		},
+		&packet.SubChunkRequest{
+			Dimension: 0,
+			Offsets:   []protocol.SubChunkOffset{{0, 0, 0}},
+			Position:  protocol.SubChunkPos{0, 0, 0},
+		},
+		&packet.InventoryTransaction{TransactionData: &protocol.NormalTransactionData{}},
+		&packet.Emote{
+			EntityRuntimeID: client.GameData().EntityRuntimeID,
+			EmoteID:         "client-to-server",
+		},
+	} {
+		if err := client.WritePacket(outgoing); err != nil {
+			_ = client.Close()
+			t.Fatalf("write representative client packet %T: %v", outgoing, err)
+		}
 	}
 	if err := client.Flush(); err != nil {
 		_ = client.Close()
@@ -230,21 +364,65 @@ func TestRunnerForwardsBidirectionalPacketsAndCapturesSession(t *testing.T) {
 		_ = client.Close()
 		t.Fatal(err)
 	}
+	expectedServerPackets := map[string]bool{
+		"Text":             false,
+		"PlayerSkin":       false,
+		"AddActor":         false,
+		"LevelChunk":       false,
+		"UpdateBlock":      false,
+		"InventoryContent": false,
+	}
 	for {
 		received, readErr := client.ReadPacket()
 		if readErr != nil {
 			_ = client.Close()
 			t.Fatal(readErr)
 		}
-		textPacket, ok := received.(*packet.Text)
-		if !ok {
-			continue
+		switch typed := received.(type) {
+		case *packet.Text:
+			if typed.Message != "server-to-client" {
+				_ = client.Close()
+				t.Fatalf("downstream text = %q", typed.Message)
+			}
+			expectedServerPackets["Text"] = true
+		case *packet.PlayerSkin:
+			if !isIntegrationPlayerSkin(typed) {
+				_ = client.Close()
+				t.Fatalf("downstream player skin did not preserve skin/cape payload: %#v", typed)
+			}
+			expectedServerPackets["PlayerSkin"] = true
+		case *packet.AddActor:
+			if typed.EntityRuntimeID != 2 || typed.EntityType != "minecraft:pig" || typed.Position != (mgl32.Vec3{1, 2, 3}) {
+				_ = client.Close()
+				t.Fatalf("downstream entity was changed: %#v", typed)
+			}
+			expectedServerPackets["AddActor"] = true
+		case *packet.LevelChunk:
+			if typed.Position != (protocol.ChunkPos{1, 2}) || !bytes.Equal(typed.RawPayload, []byte{0x01, 0x02, 0x03}) {
+				_ = client.Close()
+				t.Fatalf("downstream chunk payload was changed: %#v", typed)
+			}
+			expectedServerPackets["LevelChunk"] = true
+		case *packet.UpdateBlock:
+			if typed.Position != (protocol.BlockPos{1, 64, 2}) || typed.NewBlockRuntimeID != 42 || typed.Flags != packet.BlockUpdateNetwork {
+				_ = client.Close()
+				t.Fatalf("downstream block update was changed: %#v", typed)
+			}
+			expectedServerPackets["UpdateBlock"] = true
+		case *packet.InventoryContent:
+			if typed.WindowID != 0 || len(typed.Content) != 1 || typed.Content[0].StackNetworkID != 7 || typed.Content[0].Stack.Count != 2 {
+				_ = client.Close()
+				t.Fatalf("downstream inventory content was changed: %#v", typed)
+			}
+			expectedServerPackets["InventoryContent"] = true
 		}
-		if textPacket.Message != "server-to-client" {
-			_ = client.Close()
-			t.Fatalf("downstream text = %q", textPacket.Message)
+		complete := true
+		for _, seen := range expectedServerPackets {
+			complete = complete && seen
 		}
-		break
+		if complete {
+			break
+		}
 	}
 	close(clientReceived)
 	if err := client.Close(); err != nil {
@@ -278,15 +456,52 @@ func TestRunnerForwardsBidirectionalPacketsAndCapturesSession(t *testing.T) {
 		t.Fatalf("capture issues = %v", verification.Issues)
 	}
 	var negotiated, spawned, closed bool
-	var connectionViews, gameDataViews int
+	var connectionViews, loginSkinMetadataViews, gameDataViews int
 	var decodedClientToServer, decodedServerToClient bool
 	var rawClientToServer, rawServerToClient bool
+	expectedDecoded := map[capture.Direction]map[string]bool{
+		capture.DirectionClientToServer: {
+			"Emote":                false,
+			"PlayerSkin":           false,
+			"MovePlayer":           false,
+			"SubChunkRequest":      false,
+			"InventoryTransaction": false,
+		},
+		capture.DirectionServerToClient: {
+			"Text":             false,
+			"PlayerSkin":       false,
+			"AddActor":         false,
+			"LevelChunk":       false,
+			"UpdateBlock":      false,
+			"InventoryContent": false,
+		},
+	}
+	expectedRaw := map[capture.Direction]map[uint32]bool{
+		capture.DirectionClientToServer: {
+			packet.IDEmote:                false,
+			packet.IDPlayerSkin:           false,
+			packet.IDMovePlayer:           false,
+			packet.IDSubChunkRequest:      false,
+			packet.IDInventoryTransaction: false,
+		},
+		capture.DirectionServerToClient: {
+			packet.IDText:             false,
+			packet.IDPlayerSkin:       false,
+			packet.IDAddActor:         false,
+			packet.IDLevelChunk:       false,
+			packet.IDUpdateBlock:      false,
+			packet.IDInventoryContent: false,
+		},
+	}
 	if err := capture.ScanEvents(root, func(event capture.Event) error {
 		switch event.Kind {
 		case "session.negotiated":
 			negotiated = true
 		case "session.connection_metadata":
 			connectionViews++
+			if bytes.Contains(event.Data, []byte("integration-login-skin")) && bytes.Contains(event.Data, []byte("integration-login-cape")) {
+				loginSkinMetadataViews++
+			}
 		case "session.game_data":
 			gameDataViews++
 		case "session.spawned":
@@ -296,7 +511,24 @@ func TestRunnerForwardsBidirectionalPacketsAndCapturesSession(t *testing.T) {
 		case "packet.raw":
 			rawClientToServer = rawClientToServer || event.Direction == capture.DirectionClientToServer
 			rawServerToClient = rawServerToClient || event.Direction == capture.DirectionServerToClient
+			if event.Packet != nil {
+				if packets := expectedRaw[event.Direction]; packets != nil {
+					if _, ok := packets[event.Packet.ID]; ok {
+						if event.Blob == nil || event.Blob.Size == 0 {
+							return fmt.Errorf("representative raw packet %d has no payload blob", event.Packet.ID)
+						}
+						packets[event.Packet.ID] = true
+					}
+				}
+			}
 		case "packet.decoded":
+			if event.Packet != nil {
+				if packets := expectedDecoded[event.Direction]; packets != nil {
+					if _, ok := packets[event.Packet.Name]; ok {
+						packets[event.Packet.Name] = true
+					}
+				}
+			}
 			if event.Packet != nil && event.Packet.Name == "Emote" && event.Direction == capture.DirectionClientToServer {
 				decodedClientToServer = true
 			}
@@ -310,11 +542,25 @@ func TestRunnerForwardsBidirectionalPacketsAndCapturesSession(t *testing.T) {
 	}); err != nil {
 		t.Fatal(err)
 	}
-	if !negotiated || !spawned || !closed || connectionViews != 2 || gameDataViews != 1 {
-		t.Fatalf("session evidence negotiated=%t spawned=%t closed=%t connection_views=%d game_data_views=%d", negotiated, spawned, closed, connectionViews, gameDataViews)
+	if !negotiated || !spawned || !closed || connectionViews != 2 || loginSkinMetadataViews != 2 || gameDataViews != 1 {
+		t.Fatalf("session evidence negotiated=%t spawned=%t closed=%t connection_views=%d login_skin_metadata_views=%d game_data_views=%d", negotiated, spawned, closed, connectionViews, loginSkinMetadataViews, gameDataViews)
 	}
 	if !decodedClientToServer || !decodedServerToClient || !rawClientToServer || !rawServerToClient {
 		t.Fatalf("traffic evidence decoded_c2s=%t decoded_s2c=%t raw_c2s=%t raw_s2c=%t", decodedClientToServer, decodedServerToClient, rawClientToServer, rawServerToClient)
+	}
+	for direction, packets := range expectedDecoded {
+		for name, seen := range packets {
+			if !seen {
+				t.Errorf("decoded representative packet %s in %s direction was not captured", name, direction)
+			}
+		}
+	}
+	for direction, packets := range expectedRaw {
+		for id, seen := range packets {
+			if !seen {
+				t.Errorf("raw representative packet %d in %s direction was not captured", id, direction)
+			}
+		}
 	}
 }
 

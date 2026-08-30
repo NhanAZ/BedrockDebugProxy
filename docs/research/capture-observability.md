@@ -23,6 +23,20 @@ BedrockDebugProxy already retains the raw packet payload and decoded view for ev
 
 The clear local capture gaps were decoded connection metadata and upstream GameData. The implementation now records them as bounded derived views while preserving the exact Login and StartGame packet payloads as authoritative raw blobs. Large collections may be truncated according to the existing decoded-view limit. Spawn-time latency, cache state, and chunk radius are also retained because the current connections already expose them.
 
+## Representative packet-family coverage
+
+The loopback regression test `TestRunnerForwardsBidirectionalPacketsAndCapturesSession` sends representative packets through both sides of the proxy and checks both forwarding and capture. It covers `PlayerSkin` with skin and cape bytes, `AddActor`, `LevelChunk`, `SubChunkRequest`, `UpdateBlock`, `InventoryContent`, `InventoryTransaction`, `MovePlayer`, and `Emote`.
+
+| Observable data | Current preservation |
+| --- | --- |
+| Skin and cape | Login client metadata and `PlayerSkin` are captured. Binary fields in the structured view have size, SHA-256, and preview metadata; the complete encoded packet remains in the raw payload blob. |
+| Entities | Entity spawn and movement packets are retained as raw payloads and decoded views, including metadata exposed by the active protocol model. |
+| Chunks and world data | `LevelChunk` and sub-chunk request traffic is retained, including the complete chunk payload bytes. The view does not reconstruct a semantic world model. |
+| Block updates | `UpdateBlock` and related packet traffic use the same raw plus decoded capture path. |
+| Inventory | Inventory content, slot, and transaction packets retain raw payloads and decoded item fields, including fields exposed by the active protocol model. |
+
+This coverage does not add specialized commands or a second capture subsystem. It verifies the existing canonical session path. Packet families that gophertunnel does not decode still retain their raw payload when the packet header is available.
+
 ## Remaining limits
 
 - Transfer packets are retained but automatic hop following is not implemented.
