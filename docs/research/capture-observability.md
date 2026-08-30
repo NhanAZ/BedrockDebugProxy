@@ -4,7 +4,7 @@
 
 This review was performed on 2026-08-30 to answer one narrow question. Does the current one-session proxy discard useful evidence that its existing connection and capture architecture can already observe?
 
-The review covered BedrockDebugProxy call sites, gophertunnel `v1.61.0` at commit `283a5a97dfe65da94bcc0b401807f6aefa9e72ee`, and an owner-controlled local bedrocktool checkout at commit `c947abe1dbb334b27466da51642d9d4e7b6f88f5`. No source was copied from bedrocktool or any external project.
+The review covered BedrockDebugProxy call sites, gophertunnel `v1.61.0` at commit `283a5a97dfe65da94bcc0b401807f6aefa9e72ee`, and the original [`bedrock-tool/bedrocktool`](https://github.com/bedrock-tool/bedrocktool/tree/d7788b57acbdd3eb93ac1efdd4f1107b78aea9b0) repository at commit `d7788b57acbdd3eb93ac1efdd4f1107b78aea9b0`. No source was copied from bedrocktool or any external project for this observability change.
 
 ## Gophertunnel observation boundaries
 
@@ -15,9 +15,9 @@ The pinned gophertunnel source establishes the following boundaries.
 - [`minecraft/conn.go`](https://github.com/Sandertv/gophertunnel/blob/283a5a97dfe65da94bcc0b401807f6aefa9e72ee/minecraft/conn.go) exposes `IdentityData`, `ClientData`, authentication state, `GameData`, latency, client-cache state, and chunk radius. Login and StartGame are partly consumed before normal forwarding, so these decoded values were observable but not previously indexed as structured session evidence.
 - [`minecraft/network.go`](https://github.com/Sandertv/gophertunnel/blob/283a5a97dfe65da94bcc0b401807f6aefa9e72ee/minecraft/network.go) confirms that the current network wrapper is above the reliable transport connection. It cannot prove UDP datagrams, RakNet acknowledgements, fragmentation, loss, or retransmission behavior.
 
-## Local bedrocktool comparison
+## Public bedrocktool comparison
 
-The local checkout was used for use-case comparison, not protocol authority. Its `handlers/capture.go` retains raw packet records and downloaded resource-pack archives, while `utils/proxy/session.go` handles pre-play packets, StartGame state, cache blobs, transfers, and gameplay packets. It also contains specialized world, skin, and utility handlers.
+The original public repository was used for use-case comparison, not protocol authority. Its [`handlers/capture.go`](https://github.com/bedrock-tool/bedrocktool/blob/d7788b57acbdd3eb93ac1efdd4f1107b78aea9b0/handlers/capture.go) retains raw packet records and downloaded resource-pack archives, while [`utils/proxy/session.go`](https://github.com/bedrock-tool/bedrocktool/blob/d7788b57acbdd3eb93ac1efdd4f1107b78aea9b0/utils/proxy/session.go) handles pre-play packets, StartGame state, cache blobs, transfers, and gameplay packets. It also contains specialized world, skin, and utility handlers.
 
 BedrockDebugProxy retains the raw packet payload for every packet visible through the gophertunnel hook, including traffic that broad tools may filter as noisy. Packets that reach the forwarding bridge also receive decoded views. Packets consumed by gophertunnel during connection setup remain available as raw evidence, with decoded connection metadata and GameData recorded as selected session snapshots. The capture also retains transport payloads, resource-pack archives, cache-related packets, errors, unknown packets, and Transfer packets. Copying the specialized command surface would not improve the canonical session and would conflict with the project's narrow CLI.
 

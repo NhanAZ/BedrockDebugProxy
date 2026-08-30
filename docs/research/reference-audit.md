@@ -11,12 +11,16 @@ HTTP success alone was not treated as evidence. GitHub repository metadata, comm
 
 One stale reference was found. `docs/research/resource-pack-encryption.md` attributed commit `baa6d9a565c58f5f2306c5646fc833704253109f` and `PackDownloader.java` to `CloudburstMC/ProxyPass`. GitHub rejects that ref and path in the CloudburstMC repository. The exact commit and file exist in [`Kas-tle/ProxyPass`](https://github.com/Kas-tle/ProxyPass/blob/baa6d9a565c58f5f2306c5646fc833704253109f/src/main/java/org/cloudburstmc/proxypass/network/bedrock/session/PackDownloader.java), and the file supports the cited AES-CFB8 behavior. The citation was corrected without changing code.
 
+A follow-up audit standardized every bedrocktool citation on the original public `bedrock-tool/bedrocktool` repository at commit `d7788b57acbdd3eb93ac1efdd4f1107b78aea9b0`. The selector, Gatherings, legacy signaling, capture, and session claims were rechecked against their exact files. JSON-RPC signaling is not attributed to that repository because its public revision does not contain the implementation. Independent public evidence for that path is recorded from `lactyy2/pia` instead.
+
 ## Protocol and implementation references
 
 | Source | Revision | Evidence rechecked | Result |
 | --- | --- | --- | --- |
 | Sandertv/gophertunnel | `283a5a97dfe65da94bcc0b401807f6aefa9e72ee`, tag `v1.61.0` | `minecraft/dial.go`, `listener.go`, `packet.go`, `conn.go`, `network.go` | Packet hooks, pre-play visibility, decoded connection state, and network-wrapper boundaries support the architecture and observability claims. |
 | Sandertv/go-raknet | `ea813dc668b5a2a2767cc5577bf77869c965f27a` | `conn.go` | Reliable connection and latency behavior support the transport-boundary claim. |
+| bedrock-tool/bedrocktool | `d7788b57acbdd3eb93ac1efdd4f1107b78aea9b0` | `utils/connectinfo/connect_info.go`, Gatherings, legacy signaling, capture, and session files | Supports Experience selection, RakNet join discovery, legacy signaling, and broad capture use-case comparisons. It is not cited as JSON-RPC signaling evidence. |
+| lactyy2/pia | `91a85ff9f353c01eb1571aae0238c233a2f8a015` | `signaling/messaging/conn.go`, `dial.go`, and `realms/network_protocol.go` | Independent MIT-licensed evidence for JSON-RPC signaling methods, envelopes, endpoint, and protocol constants. No source is reused. |
 | PrismarineJS/bedrock-protocol | `6011e261c1b028f92d732348dc91339fb12275dd` | `src/rak.js`, `src/relay.js`, and transform files | The files support the independent layered-codec and relay comparison. |
 | Kas-tle/ProxyPass | `baa6d9a565c58f5f2306c5646fc833704253109f` | README and `PackDownloader.java` | Feature-surface and resource-pack decryption claims are supported. |
 | CloudburstMC/ProxyPass | `b92c4d4f88ee18643df2e5df26a15f8ef4a7db00` | Current tree and README | Supports the basic proxy lineage only. It is not evidence for the Kas-tle pack downloader. |

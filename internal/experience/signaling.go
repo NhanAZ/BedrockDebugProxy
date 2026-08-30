@@ -1,9 +1,11 @@
+// SPDX-FileCopyrightText: 2026 NhanAZ
 // SPDX-FileCopyrightText: bedrocktool contributors
 // SPDX-License-Identifier: GPL-3.0-only
 //
-// Portions of this file are substantially adapted from NhanAZ-Tools/bedrocktool
-// commit acbe0cf671928131112e91da982a5c42aa70b498 under GPL-3.0. See
-// THIRD_PARTY_NOTICES.md and docs/research/experience-routing.md.
+// Portions of the legacy signaling path are substantially adapted from
+// bedrock-tool/bedrocktool commit d7788b57acbdd3eb93ac1efdd4f1107b78aea9b0
+// under GPL-3.0. The JSON-RPC path and integration changes are project-owner
+// code. See THIRD_PARTY_NOTICES.md and docs/research/experience-routing.md.
 package experience
 
 import (

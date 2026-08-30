@@ -45,23 +45,12 @@ Go-raknet provides the reliable ordered connection below gophertunnel. Using it 
 
 BedrockDebugProxy will record application-batch bytes at this boundary in the first version. Detailed RakNet frame capture is a separate layer and must not be implied by the initial event names or documentation.
 
-### NhanAZ-Tools bedrocktool
+### bedrock-tool/bedrocktool
 
-- Private owner-controlled source reviewed locally at `c947abe1dbb334b27466da51642d9d4e7b6f88f5`
-- Upstream project license is GPL-3.0
-
-The fork demonstrates practical requirements that are easy to miss in a minimal proxy. It keeps hooks for pre-play packets, resource-pack handling, packet timing, transfers, and raw capture. Its resource-pack work shows that downstream pack announcements must remain sequential and that large packs need bounded queues and explicit completion handling.
-
-The fork also keeps a detailed resource-pack decryption investigation. BedrockDebugProxy will independently implement and test the protocol behavior it needs. No source from the fork was copied into the initial implementation. Any future reuse must be deliberate, compatible with `GPL-3.0-or-later`, and recorded with exact provenance.
-
-The local fork pins a patched Go toolchain for a Windows asynchronous `WSARecvFrom` stability issue. BedrockDebugProxy will use `toolchain go1.26.6` while the development host reports Go 1.26.1, then re-evaluate the pin when the project has its own long-running Windows tests.
-
-### bedrock-tool bedrocktool
-
-- Repository reviewed at the current owner fork lineage and upstream metadata
+- Original public repository reviewed at [`d7788b57acbdd3eb93ac1efdd4f1107b78aea9b0`](https://github.com/bedrock-tool/bedrocktool/tree/d7788b57acbdd3eb93ac1efdd4f1107b78aea9b0)
 - License is GPL-3.0
 
-The upstream project is a broad Bedrock tooling suite rather than a narrow capture engine. Its breadth is useful for use-case discovery, especially authentication, transfer handling, downloads, and world data. Its architecture and scope are not a fit for direct reuse in the initial core. Its GPL-3.0 license is compatible with the selected project direction, but no source was copied.
+The upstream project is a broad Bedrock tooling suite rather than a narrow capture engine. Its breadth is useful for use-case discovery, especially authentication, Experience selection, transfer handling, downloads, and world data. Its architecture and scope are not a fit for direct reuse in the initial core. Its GPL-3.0 license is compatible with the selected project direction. No source was copied during the initial architecture implementation. Later adaptation of its legacy signaling code is recorded separately in `THIRD_PARTY_NOTICES.md` and `experience-routing.md`.
 
 ### PrismarineJS bedrock-protocol
 
