@@ -14,22 +14,26 @@ type flow struct {
 	remote string
 }
 
+type RawObserver func(channel string, direction capture.Direction, header packet.Header)
+
 type Observer struct {
 	recorder  *capture.Recorder
 	failures  *FailureSink
 	sessionID string
 	hop       int
+	raw       RawObserver
 
 	mu    sync.Mutex
 	flows map[string]flow
 }
 
-func NewObserver(recorder *capture.Recorder, failures *FailureSink, sessionID string, hop int) *Observer {
+func NewObserver(recorder *capture.Recorder, failures *FailureSink, sessionID string, hop int, raw RawObserver) *Observer {
 	return &Observer{
 		recorder:  recorder,
 		failures:  failures,
 		sessionID: sessionID,
 		hop:       hop,
+		raw:       raw,
 		flows:     make(map[string]flow),
 	}
 }
@@ -46,6 +50,9 @@ func (o *Observer) SetFlow(channel string, local, remote net.Addr) {
 func (o *Observer) PacketFunc(channel, connectionID string) func(packet.Header, []byte, net.Addr, net.Addr) {
 	return func(header packet.Header, payload []byte, source, destination net.Addr) {
 		direction := o.classify(channel, source, destination)
+		if o.raw != nil {
+			o.raw(channel, direction, header)
+		}
 		_, err := o.recorder.Record(context.Background(), capture.Record{
 			Event: capture.Event{
 				SessionID:    o.sessionID,

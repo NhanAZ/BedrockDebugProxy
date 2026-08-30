@@ -4,21 +4,33 @@ import (
 	"fmt"
 	"io"
 	"log/slog"
+	"os"
 	"sort"
 	"strings"
 	"sync"
+	"sync/atomic"
 	"time"
 
 	"github.com/NhanAZ/BedrockDebugProxy/internal/capture"
+	"github.com/sandertv/gophertunnel/minecraft"
 	"github.com/sandertv/gophertunnel/minecraft/protocol/packet"
 )
 
 const (
 	liveSummaryInterval = time.Second
-	liveSummaryPerSide  = 6
+	liveSummaryPerSide  = 4
+	ansiReset           = "\x1b[0m"
+	ansiDim             = "\x1b[2m"
+	ansiBlue            = "\x1b[94m"
+	ansiCyan            = "\x1b[96m"
+	ansiGreen           = "\x1b[92m"
+	ansiYellow          = "\x1b[93m"
+	ansiMagenta         = "\x1b[95m"
+	ansiRed             = "\x1b[91m"
 )
 
 type livePacketKey struct {
+	channel   string
 	direction capture.Direction
 	name      string
 }
@@ -35,6 +47,10 @@ type liveReporter struct {
 	lastFlush time.Time
 	counts    map[livePacketKey]int
 	hints     map[string]struct{}
+	spawned   atomic.Bool
+	color     bool
+	clientRaw map[uint32]string
+	serverRaw map[uint32]string
 }
 
 func newLiveReporter(output io.Writer) *liveReporter {
@@ -54,6 +70,9 @@ func newLiveReporterWithClock(output io.Writer, now func() time.Time) *liveRepor
 		lastFlush: now(),
 		counts:    make(map[livePacketKey]int),
 		hints:     make(map[string]struct{}),
+		color:     supportsColor(output),
+		clientRaw: rawPacketNames(true),
+		serverRaw: rawPacketNames(false),
 	}
 }
 
@@ -62,7 +81,30 @@ func (r *liveReporter) Info(format string, args ...any) {
 	defer r.mu.Unlock()
 	now := r.now()
 	r.flushLocked(now)
-	r.writeLocked(now, fmt.Sprintf(format, args...))
+	r.writeLocked(now, "INFO", ansiBlue, fmt.Sprintf(format, args...))
+}
+
+func (r *liveReporter) RawPacket(channel string, direction capture.Direction, header packet.Header) {
+	if r.spawned.Load() {
+		return
+	}
+	now := r.now()
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	if r.spawned.Load() {
+		return
+	}
+	r.counts[livePacketKey{channel: channel, direction: direction, name: r.rawPacketName(direction, header.PacketID)}]++
+	if now.Sub(r.lastFlush) >= liveSummaryInterval {
+		r.flushLocked(now)
+	}
+}
+
+func (r *liveReporter) SetSpawned() {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	r.flushLocked(r.now())
+	r.spawned.Store(true)
 }
 
 func (r *liveReporter) Packet(direction capture.Direction, decoded packet.Packet) {
@@ -77,7 +119,7 @@ func (r *liveReporter) Packet(direction capture.Direction, decoded packet.Packet
 	r.counts[livePacketKey{direction: direction, name: name}]++
 	if transfer, ok := decoded.(*packet.Transfer); ok {
 		r.flushLocked(now)
-		r.writeLocked(now, fmt.Sprintf(
+		r.writeLocked(now, "TRANSFER", ansiMagenta, fmt.Sprintf(
 			"Transfer observed %s - target %s:%d; automatic hop following is not implemented",
 			liveDirection(direction), transfer.Address, transfer.Port,
 		))
@@ -103,10 +145,14 @@ func (r *liveReporter) LibraryLog(channel string, level slog.Level, message stri
 			return
 		}
 		r.hints[hint] = struct{}{}
-		r.writeLocked(now, "Downstream login rejected - the client used self-signed LAN authentication. On a trusted LAN, restart with --allow-unauthenticated-client; otherwise add the proxy in the Servers tab for Xbox-authenticated login")
+		r.writeLocked(now, "WARN", ansiYellow, "Downstream login rejected - the client used self-signed LAN authentication. On a trusted LAN, restart with --allow-unauthenticated-client; otherwise add the proxy in the Servers tab for Xbox-authenticated login")
 		return
 	}
-	r.writeLocked(now, fmt.Sprintf("Library %s [%s] - %s", strings.ToLower(level.String()), channel, message))
+	color := ansiYellow
+	if level >= slog.LevelError {
+		color = ansiRed
+	}
+	r.writeLocked(now, strings.ToUpper(level.String()), color, fmt.Sprintf("Library [%s] - %s", channel, message))
 }
 
 func (r *liveReporter) Close() {
@@ -120,12 +166,32 @@ func (r *liveReporter) flushLocked(now time.Time) {
 		r.lastFlush = now
 		return
 	}
-	sections := make([]string, 0, 2)
-	for _, direction := range []capture.Direction{capture.DirectionClientToServer, capture.DirectionServerToClient} {
+	type liveGroup struct {
+		channel   string
+		direction capture.Direction
+	}
+	groups := make([]liveGroup, 0, 4)
+	seen := make(map[liveGroup]struct{})
+	for key := range r.counts {
+		group := liveGroup{channel: key.channel, direction: key.direction}
+		if _, ok := seen[group]; !ok {
+			seen[group] = struct{}{}
+			groups = append(groups, group)
+		}
+	}
+	sort.Slice(groups, func(i, j int) bool {
+		if groups[i].channel != groups[j].channel {
+			return groups[i].channel < groups[j].channel
+		}
+		return groups[i].direction < groups[j].direction
+	})
+	for _, group := range groups {
 		counts := make([]livePacketCount, 0)
+		total := 0
 		for key, count := range r.counts {
-			if key.direction == direction {
+			if key.channel == group.channel && key.direction == group.direction {
 				counts = append(counts, livePacketCount{name: key.name, count: count})
+				total += count
 			}
 		}
 		if len(counts) == 0 {
@@ -152,19 +218,62 @@ func (r *liveReporter) flushLocked(now time.Time) {
 			}
 			parts = append(parts, fmt.Sprintf("other x%d (%d types)", otherPackets, len(counts)-len(visible)))
 		}
-		sections = append(sections, liveDirection(direction)+" "+strings.Join(parts, ", "))
+		label := liveDirection(group.direction)
+		if group.channel != "" {
+			label = strings.ToUpper(group.channel) + " " + label
+		}
+		color := ansiCyan
+		if group.direction == capture.DirectionServerToClient {
+			color = ansiGreen
+		}
+		r.writeLocked(now, label, color, fmt.Sprintf("%d packets | %s", total, strings.Join(parts, " | ")))
 	}
 	for key := range r.counts {
 		delete(r.counts, key)
 	}
 	r.lastFlush = now
-	if len(sections) != 0 {
-		r.writeLocked(now, "Traffic - "+strings.Join(sections, " | "))
-	}
 }
 
-func (r *liveReporter) writeLocked(now time.Time, message string) {
-	_, _ = fmt.Fprintf(r.output, "[%s] %s\n", now.Format("15:04:05.000"), message)
+func (r *liveReporter) writeLocked(now time.Time, label, color, message string) {
+	timestamp := "[" + now.Format("15:04:05.000") + "]"
+	label = fmt.Sprintf("%-17s", label)
+	if r.color {
+		timestamp = ansiDim + timestamp + ansiReset
+		label = color + label + ansiReset
+	}
+	_, _ = fmt.Fprintf(r.output, "%s %s %s\n", timestamp, label, message)
+}
+
+func supportsColor(output io.Writer) bool {
+	if _, disabled := os.LookupEnv("NO_COLOR"); disabled {
+		return false
+	}
+	file, ok := output.(*os.File)
+	if !ok {
+		return false
+	}
+	info, err := file.Stat()
+	return err == nil && info.Mode()&os.ModeCharDevice != 0
+}
+
+func rawPacketNames(listener bool) map[uint32]string {
+	names := make(map[uint32]string)
+	for id, factory := range minecraft.DefaultProtocol.Packets(listener) {
+		name, _ := packetNames(factory())
+		names[id] = name
+	}
+	return names
+}
+
+func (r *liveReporter) rawPacketName(direction capture.Direction, id uint32) string {
+	names := r.serverRaw
+	if direction == capture.DirectionClientToServer {
+		names = r.clientRaw
+	}
+	if name, ok := names[id]; ok {
+		return name
+	}
+	return fmt.Sprintf("Unknown(0x%x)", id)
 }
 
 func liveDirection(direction capture.Direction) string {

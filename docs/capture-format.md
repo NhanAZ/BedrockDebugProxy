@@ -40,6 +40,8 @@ These snapshots use the same bounded structured encoder as decoded packet views.
 
 A `resource_pack.archive` event references the exact archive retained by the adapter after download. Its data includes the pack UUID, version, manifest, byte length, computed checksum, delivery mechanism, feature flags, download URL when present, and content key when supplied by the server. The archive is stored before any decryption or extraction.
 
+Skin, cape, entity, chunk, block-update, and inventory evidence follows the same canonical model. It remains in ordered packet events and raw blobs rather than being expanded into parallel feature-specific directories. The `inspect --packet NAME` filter locates decoded packet views such as `PlayerSkin`, `LevelChunk`, `AddActor`, `UpdateBlock`, and `InventoryContent`. Exact encoded bytes remain in the corresponding `packet.raw` blob evidence.
+
 When opt-in decryption succeeds, `resource_pack.contents_manifest` and `resource_pack.decrypted_archive` events link to that raw archive through `parent_sequence`. A failed derivation produces `resource_pack.decrypt_error` with the same parent. Derived blobs never replace or mutate the original archive. Decrypted contents manifests contain per-file keys and are sensitive even though those keys are intentionally omitted from derived event metadata.
 
 ## Raw blobs

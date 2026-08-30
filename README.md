@@ -44,7 +44,7 @@ That capture directory is the debug result. Keep it local because it may contain
 
 `0.0.0.0` exposes the listener to reachable network interfaces. Use it only on a trusted network with an appropriate firewall. Use `127.0.0.1:19132` when only local software needs to connect.
 
-By default, the downstream Minecraft connection must use Xbox authentication. Add the proxy address in Minecraft's Servers tab for this secure path. A LAN World entry uses a self-signed client login instead. To accept that login on a trusted LAN, add the existing opt-in flag below.
+By default, the downstream Minecraft connection must use Xbox authentication. Add the proxy address in Minecraft's Servers tab for this secure path. A LAN World entry uses a self-signed client login instead. To make one proxy run joinable from either Worlds > LAN or the Servers tab on a trusted LAN, add the existing opt-in flag below.
 
 ```powershell
 # Trusted LAN only. Replace <UPSTREAM> before running.
@@ -56,7 +56,7 @@ By default, the downstream Minecraft connection must use Xbox authentication. Ad
     --allow-unauthenticated-client
 ```
 
-This flag does not disable upstream authentication. It does allow any client that can reach the listener to use the proxy's authenticated upstream session, so it is intentionally not the default.
+This flag does not disable upstream authentication. The same running listener continues to accept a Servers-tab connection, but it no longer verifies whether the connecting client used Xbox authentication. Any client that can reach the listener may use the proxy's authenticated upstream session, so this is intentionally not the default.
 
 On Windows, the Microsoft token cache is `%AppData%\BedrockDebugProxy\auth-token.json`. It contains authentication secrets, remains outside the repository, and must not be shared or committed. To change accounts, stop the proxy, delete this file, and start the proxy again.
 
@@ -91,7 +91,7 @@ The canonical capture retains ordered evidence from both directions, including t
 
 Representative packet coverage includes skin and cape data, entities, chunks and subchunk requests, block updates, inventory content and transactions, movement, emotes, and other decoded packets that pass through the proxy. Binary fields are summarized in decoded views while their exact packet payload remains in content-addressed raw blobs.
 
-Resource-pack archives, metadata, checksums, download information, and content keys supplied by the current upstream session are retained. Decryption is opt-in because it creates additional sensitive plaintext artifacts.
+Resource-pack archives, metadata, checksums, download information, and content keys supplied by the current upstream session are retained. When packs are offered, the downstream client must choose to download them or leave. The current gophertunnel adapter does not expose whether the upstream server made its packs optional, so the proxy cannot mirror that policy exactly. Decryption is opt-in because it creates additional sensitive plaintext artifacts.
 
 ```powershell
 # Replace <UPSTREAM> with an Experience selector or direct HOST:PORT.
@@ -112,6 +112,22 @@ The quick-start capture can be verified, filtered, summarized, explained, or pac
 .\bin\bedrock-debug-proxy.exe export C:\path\to\capture C:\path\to\session.bdpcap
 ```
 
+The canonical capture is an event stream plus content-addressed blobs. It deliberately does not create separate `skins`, `entities`, or reconstructed `world` directories. Use packet-name filtering to locate the underlying evidence without duplicating it.
+
+```powershell
+# Resource-pack archives and their blob paths.
+.\bin\bedrock-debug-proxy.exe inspect --kind resource_pack.archive --limit 5 C:\path\to\capture
+
+# Representative skin, world, entity, block, and inventory evidence.
+.\bin\bedrock-debug-proxy.exe inspect --kind packet.decoded --packet PlayerSkin --limit 5 C:\path\to\capture
+.\bin\bedrock-debug-proxy.exe inspect --kind packet.decoded --packet LevelChunk --limit 5 C:\path\to\capture
+.\bin\bedrock-debug-proxy.exe inspect --kind packet.decoded --packet AddActor --limit 5 C:\path\to\capture
+.\bin\bedrock-debug-proxy.exe inspect --kind packet.decoded --packet UpdateBlock --limit 5 C:\path\to\capture
+.\bin\bedrock-debug-proxy.exe inspect --kind packet.decoded --packet InventoryContent --limit 5 C:\path\to\capture
+```
+
+Each event's `blob.path` points to the exact retained bytes under the capture directory. Encrypted resource-pack archives are retained during a normal run, but plaintext derived archives exist only when `--decrypt-resource-packs` was selected before the session.
+
 An exported `.bdpcap` is a portable copy, not a redacted copy. It can contain all sensitive evidence present in the source capture.
 
 ## Status and limitations
@@ -126,7 +142,7 @@ Current known boundaries include the following.
 - The default capture path applies blocking backpressure and closes each content-addressed blob before forwarding continues. It avoids a durable disk flush per event for normal responsiveness. `--sync-each-event` provides stronger crash and power-loss durability at a substantial latency cost.
 - Raw UDP datagrams and RakNet acknowledgement, fragmentation, retransmission, and loss details are outside the current capture boundary.
 - Transport payloads are captured at the post-transport application boundary.
-- The upstream resource-pack-required flag is not mirrored to the downstream listener.
+- Downstream clients must accept offered resource packs. The current adapter cannot mirror an upstream optional-pack policy.
 - Opt-in resource-pack decryption supports only the documented AES-256-CFB8 contents format and does not extract pack files to the filesystem.
 
 ## Developer path

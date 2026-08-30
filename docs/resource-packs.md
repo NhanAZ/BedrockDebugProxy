@@ -4,6 +4,8 @@
 
 The gophertunnel `v1.61.0` dialer downloads every upstream resource pack accepted by `DownloadResourcePack`. BedrockDebugProxy records the raw packet payloads involved in negotiation and transfer. After gophertunnel completes each download, the proxy also stores the full reconstructed archive as a content-addressed blob.
 
+The downstream listener marks offered resource packs as required. Minecraft therefore gives the player the normal choice to download and join or leave. This is a downstream proxy policy, not a claim that every upstream server requires its packs. Gophertunnel exposes `ListenConfig.TexturePacksRequired` for the listener but does not expose the negotiated upstream `ResourcePacksInfo.TexturePackRequired` value through the public connection API, so BedrockDebugProxy cannot mirror an optional upstream policy exactly. The limitation remains explicit in the capture manifest.
+
 Each `resource_pack.archive` event records the following evidence.
 
 - Parsed UUID, version, name, description, and manifest plus any retained download URL and content key
@@ -40,5 +42,7 @@ The GPL license for BedrockDebugProxy source does not relicense captured packs o
 ## Evidence and validation
 
 The implementation follows the `ResourcePacksInfo`, pack download, `FetchResourcePacks`, `Pack.ReadAt`, `Pack.Checksum`, and sequential listener delivery behavior reviewed in Sandertv gophertunnel `v1.61.0` at commit `283a5a97dfe65da94bcc0b401807f6aefa9e72ee`. Its current upstream dial path requests `ResourcePackChunkData` over RakNet even when `ResourcePacksInfo` advertises an HTTP URL. That URL remains observable in the raw packet event, but `resource.Read` does not copy it into the reconstructed `resource.Pack`, so the structured archive event must not be treated as proof that the server advertised no URL.
+
+At the same pinned revision, `minecraft/listener.go` copies `ListenConfig.TexturePacksRequired` into the downstream connection before `FetchResourcePacks` dynamically returns the upstream archives. `minecraft/protocol/packet/resource_packs_info.go` documents and serializes that flag before the pack list. This supports the player prompt policy above. It does not provide evidence for the unavailable upstream value.
 
 Synthetic archive tests verify byte equality, content-key retention, metadata, endpoint context, stream sizing, deduplication, encryption vectors, root and subpack decryption, failure retention, derived event ancestry, and final capture integrity. Live validation with a real client and owner-controlled servers that use no pack, one pack, multiple packs, an advertised HTTP URL, RakNet delivery, and encrypted entries remains required. For an advertised HTTP URL, verify that the raw `ResourcePacksInfo` retains the URL and that the current upstream connection still requests pack chunks over RakNet.

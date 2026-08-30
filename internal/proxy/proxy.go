@@ -70,7 +70,7 @@ func (r *Runner) Run(ctx context.Context) error {
 	live := newLiveReporter(r.config.Output)
 	defer live.Close()
 	failures := bedrock.NewFailureSink(cancelRun)
-	observer := bedrock.NewObserver(r.config.Recorder, failures, sessionID, 1)
+	observer := bedrock.NewObserver(r.config.Recorder, failures, sessionID, 1, live.RawPacket)
 	downstreamLogger := slog.New(bedrock.NewCaptureLogHandler(r.config.Recorder, failures, sessionID, downstreamConnectionID, "downstream", live.LibraryLog))
 	upstreamLogger := slog.New(bedrock.NewCaptureLogHandler(r.config.Recorder, failures, sessionID, upstreamConnectionID, "upstream", live.LibraryLog))
 	downstreamNetwork := bedrock.Network{
@@ -113,6 +113,7 @@ func (r *Runner) Run(ctx context.Context) error {
 		ErrorLog:               downstreamLogger,
 		AuthenticationDisabled: r.config.AllowUnauthenticatedClient,
 		MaximumPlayers:         1,
+		TexturePacksRequired:   true,
 		AllowUnknownPackets:    true,
 		AllowInvalidPackets:    true,
 		StatusProvider:         minecraft.NewStatusProvider("BedrockDebugProxy", r.config.UpstreamAddress),
@@ -216,6 +217,7 @@ func (r *Runner) Run(ctx context.Context) error {
 		_ = r.record("session.spawn_error", capture.SeverityError, map[string]any{"error": err.Error(), "type": fmt.Sprintf("%T", err)})
 		return err
 	}
+	live.SetSpawned()
 	if err := r.record("session.spawned", capture.SeverityInfo, map[string]any{
 		"downstream_latency":              clientConn.Latency().String(),
 		"upstream_latency":                serverConn.Latency().String(),
@@ -278,6 +280,13 @@ func (r *Runner) connectUpstream(ctx context.Context, network bedrock.Network, o
 	}); err != nil {
 		_ = conn.Close()
 		return nil, err
+	}
+	if count := len(conn.ResourcePacks()); count != 0 {
+		derivation := "disabled; encrypted originals remain available"
+		if r.config.DecryptResourcePacks {
+			derivation = "enabled for supported encrypted archives"
+		}
+		live.Info("Resource packs retained - %d archives in %s; plaintext derivation %s", count, r.config.Recorder.Root(), derivation)
 	}
 	if err := r.record("upstream.connected", capture.SeverityInfo, map[string]any{
 		"local_address":       conn.LocalAddr().String(),

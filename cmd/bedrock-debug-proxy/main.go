@@ -145,7 +145,7 @@ func runProxy(args []string, stdout, stderr io.Writer) int {
 		"Raw UDP datagrams and RakNet acknowledgement or retransmission frames are not captured",
 		"This version accepts one client and records one upstream hop per process",
 		"Transfer packets are recorded but automatic hop following is not implemented",
-		"The upstream resource-pack-required flag is not mirrored to the downstream listener",
+		"Downstream clients must accept offered resource packs; the current adapter cannot mirror an upstream optional-pack policy",
 		"Transport payload encryption and compression state is not yet classified per event",
 	}
 	if *decryptResourcePacks {
@@ -273,6 +273,7 @@ func runInspect(args []string, stdout, stderr io.Writer) int {
 	flags := flag.NewFlagSet("inspect", flag.ContinueOnError)
 	flags.SetOutput(stderr)
 	kind := flags.String("kind", "", "exact event kind")
+	packetName := flags.String("packet", "", "exact decoded packet name")
 	direction := flags.String("direction", "", "exact event direction")
 	channel := flags.String("channel", "", "exact event channel")
 	fromSequence := flags.Uint64("from-sequence", 0, "minimum event sequence")
@@ -301,7 +302,8 @@ func runInspect(args []string, stdout, stderr io.Writer) int {
 	var matched uint64
 	err = capture.ScanEvents(flags.Arg(0), func(event capture.Event) error {
 		if event.Sequence < *fromSequence || *kind != "" && event.Kind != *kind ||
-			*direction != "" && string(event.Direction) != *direction || *channel != "" && event.Channel != *channel {
+			*direction != "" && string(event.Direction) != *direction || *channel != "" && event.Channel != *channel ||
+			*packetName != "" && (event.Packet == nil || event.Packet.Name != *packetName) {
 			return nil
 		}
 		if *limit != 0 && matched >= *limit {

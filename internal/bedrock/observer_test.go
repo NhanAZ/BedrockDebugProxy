@@ -22,7 +22,10 @@ func TestObserverRecordsRawPacketsWithObservedDirection(t *testing.T) {
 		t.Fatal(err)
 	}
 	failures := &FailureSink{}
-	observer := NewObserver(recorder, failures, "session-test", 1)
+	var observed []capture.Direction
+	observer := NewObserver(recorder, failures, "session-test", 1, func(_ string, direction capture.Direction, _ packet.Header) {
+		observed = append(observed, direction)
+	})
 	local := &net.UDPAddr{IP: net.ParseIP("127.0.0.1"), Port: 19132}
 	client := &net.UDPAddr{IP: net.ParseIP("127.0.0.1"), Port: 50000}
 	server := &net.UDPAddr{IP: net.ParseIP("192.0.2.10"), Port: 19132}
@@ -48,6 +51,9 @@ func TestObserverRecordsRawPacketsWithObservedDirection(t *testing.T) {
 	}
 	if len(events) != 2 {
 		t.Fatalf("event count = %d, want 2", len(events))
+	}
+	if len(observed) != 2 || observed[0] != capture.DirectionClientToServer || observed[1] != capture.DirectionServerToClient {
+		t.Fatalf("observed directions = %v", observed)
 	}
 	for index, event := range events {
 		if event.Kind != "packet.raw" || event.Stage != "post_decrypt_decompress_frame" {

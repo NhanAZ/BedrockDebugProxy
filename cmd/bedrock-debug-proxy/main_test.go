@@ -98,11 +98,20 @@ func TestCaptureInspectionAnalysisExplanationAndExportCommands(t *testing.T) {
 	}
 
 	var stdout, stderr bytes.Buffer
-	if code := run([]string{"inspect", "--kind", "packet.decoded", root}, &stdout, &stderr); code != 0 {
+	if code := run([]string{"inspect", "--kind", "packet.decoded", "--packet", "Text", root}, &stdout, &stderr); code != 0 {
 		t.Fatalf("inspect code = %d, stderr = %s", code, stderr.String())
 	}
 	if !strings.Contains(stdout.String(), `"kind":"packet.decoded"`) {
 		t.Fatalf("inspect stdout = %s", stdout.String())
+	}
+
+	stdout.Reset()
+	stderr.Reset()
+	if code := run([]string{"inspect", "--packet", "LevelChunk", root}, &stdout, &stderr); code != 0 {
+		t.Fatalf("inspect absent packet code = %d, stderr = %s", code, stderr.String())
+	}
+	if stdout.Len() != 0 {
+		t.Fatalf("inspect absent packet stdout = %s", stdout.String())
 	}
 
 	stdout.Reset()

@@ -24,13 +24,37 @@ func TestLiveReporterSummarisesPacketsAndHighlightsTransfer(t *testing.T) {
 
 	text := output.String()
 	for _, expected := range []string{
-		"C->S PlayerAuthInput x2",
-		"S->C LevelChunk x1",
+		"C->S              2 packets | PlayerAuthInput x2",
+		"S->C              1 packets | LevelChunk x1",
 		"Transfer observed S->C - target next.example.org:19133",
 	} {
 		if !strings.Contains(text, expected) {
 			t.Fatalf("output does not contain %q: %s", expected, text)
 		}
+	}
+}
+
+func TestLiveReporterSummarisesPreSpawnRawPacketsByChannel(t *testing.T) {
+	current := time.Date(2026, time.August, 30, 15, 0, 0, 0, time.UTC)
+	var output bytes.Buffer
+	reporter := newLiveReporterWithClock(&output, func() time.Time { return current })
+	reporter.RawPacket("upstream", capture.DirectionServerToClient, packet.Header{PacketID: packet.IDResourcePacksInfo})
+	reporter.RawPacket("downstream", capture.DirectionClientToServer, packet.Header{PacketID: packet.IDResourcePackClientResponse})
+	reporter.SetSpawned()
+	reporter.RawPacket("upstream", capture.DirectionServerToClient, packet.Header{PacketID: packet.IDLevelChunk})
+	reporter.Close()
+
+	text := output.String()
+	for _, expected := range []string{
+		"DOWNSTREAM C->S   1 packets | ResourcePackClientResponse x1",
+		"UPSTREAM S->C     1 packets | ResourcePacksInfo x1",
+	} {
+		if !strings.Contains(text, expected) {
+			t.Fatalf("output does not contain %q: %s", expected, text)
+		}
+	}
+	if strings.Contains(text, "LevelChunk") {
+		t.Fatalf("post-spawn raw packet was reported: %s", text)
 	}
 }
 

@@ -7,6 +7,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
+	"os"
 	"path/filepath"
 	"reflect"
 	"strings"
@@ -539,6 +540,7 @@ func TestRunnerForwardsBidirectionalPacketsAndCapturesSession(t *testing.T) {
 		{capture.DirectionServerToClient, packet.IDInventoryContent}:     {},
 	}
 	rawHashes := make(map[rawPacketKey]map[string]map[string]struct{}, len(expectedRaw))
+	var downstreamPacksRequired bool
 	expectedClientData := integrationClientData()
 	if err := capture.ScanEvents(root, func(event capture.Event) error {
 		switch event.Kind {
@@ -559,6 +561,19 @@ func TestRunnerForwardsBidirectionalPacketsAndCapturesSession(t *testing.T) {
 			closed = true
 		case "packet.raw":
 			if event.Packet != nil {
+				if event.Channel == "downstream" && event.Direction == capture.DirectionServerToClient && event.Packet.ID == packet.IDResourcePacksInfo {
+					if event.Blob == nil {
+						return fmt.Errorf("downstream ResourcePacksInfo has no raw payload")
+					}
+					payload, err := os.ReadFile(filepath.Join(root, filepath.FromSlash(event.Blob.Path)))
+					if err != nil {
+						return err
+					}
+					if len(payload) == 0 || payload[0] != 1 {
+						return fmt.Errorf("downstream ResourcePacksInfo does not require offered packs: %x", payload)
+					}
+					downstreamPacksRequired = true
+				}
 				key := rawPacketKey{event.Direction, event.Packet.ID}
 				if _, ok := expectedRaw[key]; ok {
 					if event.Blob == nil || event.Blob.Size == 0 || event.Blob.Representation != "bedrock_packet_payload" {
@@ -596,6 +611,9 @@ func TestRunnerForwardsBidirectionalPacketsAndCapturesSession(t *testing.T) {
 	}
 	if !negotiated || !spawned || !closed || connectionViews != 2 || loginSkinMetadataViews != 2 || gameDataViews != 1 {
 		t.Fatalf("session evidence negotiated=%t spawned=%t closed=%t connection_views=%d login_skin_metadata_views=%d game_data_views=%d", negotiated, spawned, closed, connectionViews, loginSkinMetadataViews, gameDataViews)
+	}
+	if !downstreamPacksRequired {
+		t.Error("downstream resource-pack acceptance policy was not captured")
 	}
 	for key := range expectedDecoded {
 		if !decodedObserved[key] {
