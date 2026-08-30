@@ -52,9 +52,13 @@ Blob paths are always relative and derived from the digest. Readers must reject 
 
 ## Durability
 
-The initial recorder writes each event synchronously under one ordering lock. Raw blobs are synced and renamed before their referencing event is appended. The CLI enables per-event sync by default for maximum recoverability.
+The recorder writes each event under one ordering lock. A new raw blob is written to a temporary file, closed, and renamed to its content-addressed path before its referencing event is appended. Repeated in-memory payloads reuse an already published blob without another temporary file. Capture writes provide blocking backpressure and never silently drop evidence.
 
-This policy may add latency during very high traffic. A future buffered mode must expose its queue limits and loss policy in the manifest. It must never silently discard evidence.
+Normal CLI operation does not request a durable disk flush after every blob and event. The event stream is synced when the recorder closes, before the final manifest is published. This default avoids the severe forwarding latency observed when high-volume packet and chunk traffic waits for thousands of individual disk flushes. An operating-system or power failure may therefore lose the most recent unsynced filesystem writes even though an orderly `Ctrl+C` shutdown retains and verifies them.
+
+`--sync-each-event` opts into syncing every new blob before rename and every event before forwarding continues. The manifest records this choice as `options.sync_each_event`. Use it only when maximum recovery from sudden power loss is more important than live session responsiveness.
+
+Any future asynchronous or buffered mode must expose its queue bounds, memory use, backpressure, and loss policy in the manifest. It must never silently discard evidence.
 
 ## Compatibility
 

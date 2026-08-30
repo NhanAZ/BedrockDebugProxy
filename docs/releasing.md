@@ -46,6 +46,8 @@ The printed binary commit must equal `$revision`. Keep this exact binary for all
 
 Use a real Minecraft Bedrock client. For each server, start the same stamped binary, complete a normal session, exercise the named flow, stop with `Ctrl+C`, and wait for the capture verification message.
 
+The first successful device login creates a per-user token cache, so later server runs normally do not require another device code. Wait for `Listening on` before connecting Minecraft. Use the default Xbox-authenticated downstream path for the required release reports, normally through the Servers tab. Do not add `--allow-unauthenticated-client` to the release command unless the release is separately validating the trusted-LAN opt-in flow.
+
 | Report label | Upstream target | Required manual flow |
 | --- | --- | --- |
 | `The Hive` | `experience:The Hive` | Connect, spawn, move, interact, and observe normal traffic |

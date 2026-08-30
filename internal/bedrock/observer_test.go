@@ -79,7 +79,7 @@ func TestCaptureLogHandlerPreservesAttributeGroupsAndIntegerPrecision(t *testing
 		t.Fatal(err)
 	}
 	failures := &FailureSink{}
-	logger := NewCaptureLogHandler(recorder, failures, "session-test", "upstream-test", "upstream")
+	logger := NewCaptureLogHandler(recorder, failures, "session-test", "upstream-test", "upstream", nil)
 	handler := logger.WithAttrs([]slog.Attr{slog.Int("root", 1)}).WithGroup("nested").WithAttrs([]slog.Attr{slog.Int("bound", 2)})
 	record := slog.NewRecord(time.Unix(0, 0), slog.LevelError, "decode batch failed", 0)
 	record.AddAttrs(slog.Group("details", slog.Uint64("count", math.MaxUint64)))

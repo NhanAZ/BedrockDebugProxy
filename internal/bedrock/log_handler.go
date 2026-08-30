@@ -14,6 +14,7 @@ import (
 type CaptureLogHandler struct {
 	recorder     *capture.Recorder
 	failures     *FailureSink
+	observer     LogObserver
 	sessionID    string
 	connectionID string
 	channel      string
@@ -21,16 +22,19 @@ type CaptureLogHandler struct {
 	groups       []string
 }
 
+type LogObserver func(channel string, level slog.Level, message string)
+
 type boundAttribute struct {
 	groups []string
 	value  slog.Attr
 }
 
-func NewCaptureLogHandler(recorder *capture.Recorder, failures *FailureSink, sessionID, connectionID, channel string) *CaptureLogHandler {
-	return &CaptureLogHandler{
+func NewCaptureLogHandler(recorder *capture.Recorder, failures *FailureSink, sessionID, connectionID, channel string, observer LogObserver) *CaptureLogHandler {
+	handler := &CaptureLogHandler{
 		recorder: recorder, failures: failures, sessionID: sessionID,
-		connectionID: connectionID, channel: channel,
+		connectionID: connectionID, channel: channel, observer: observer,
 	}
+	return handler
 }
 
 func (h *CaptureLogHandler) Enabled(context.Context, slog.Level) bool {
@@ -38,6 +42,9 @@ func (h *CaptureLogHandler) Enabled(context.Context, slog.Level) bool {
 }
 
 func (h *CaptureLogHandler) Handle(ctx context.Context, record slog.Record) error {
+	if h.observer != nil {
+		h.observer(h.channel, record.Level, record.Message)
+	}
 	attributes := make(map[string]any)
 	for _, attribute := range h.attrs {
 		putSlogAttribute(attributes, attribute.groups, attribute.value)

@@ -67,10 +67,12 @@ func (r *Runner) Run(ctx context.Context) error {
 	}
 	runCtx, cancelRun := context.WithCancel(ctx)
 	defer cancelRun()
+	live := newLiveReporter(r.config.Output)
+	defer live.Close()
 	failures := bedrock.NewFailureSink(cancelRun)
 	observer := bedrock.NewObserver(r.config.Recorder, failures, sessionID, 1)
-	downstreamLogger := slog.New(bedrock.NewCaptureLogHandler(r.config.Recorder, failures, sessionID, downstreamConnectionID, "downstream"))
-	upstreamLogger := slog.New(bedrock.NewCaptureLogHandler(r.config.Recorder, failures, sessionID, upstreamConnectionID, "upstream"))
+	downstreamLogger := slog.New(bedrock.NewCaptureLogHandler(r.config.Recorder, failures, sessionID, downstreamConnectionID, "downstream", live.LibraryLog))
+	upstreamLogger := slog.New(bedrock.NewCaptureLogHandler(r.config.Recorder, failures, sessionID, upstreamConnectionID, "upstream", live.LibraryLog))
 	downstreamNetwork := bedrock.Network{
 		Recorder:       r.config.Recorder,
 		Observer:       observer,
@@ -118,7 +120,7 @@ func (r *Runner) Run(ctx context.Context) error {
 		PacketFunc:             observer.PacketFunc("downstream", downstreamConnectionID),
 		FetchResourcePacks: func(_ login.IdentityData, clientData login.ClientData, _ []*resource.Pack) []*resource.Pack {
 			slot.once.Do(func() {
-				slot.conn, slot.err = r.connectUpstream(runCtx, upstreamNetwork, observer, upstreamLogger, clientData)
+				slot.conn, slot.err = r.connectUpstream(runCtx, upstreamNetwork, observer, upstreamLogger, live, clientData)
 			})
 			if slot.err != nil || slot.conn == nil {
 				return nil
@@ -156,6 +158,11 @@ func (r *Runner) Run(ctx context.Context) error {
 		return fmt.Errorf("accepted unexpected connection type %T", accepted)
 	}
 	defer func() { _ = clientConn.Close() }()
+	authentication := "Xbox-authenticated"
+	if !clientConn.Authenticated() {
+		authentication = "self-signed client accepted by explicit configuration"
+	}
+	live.Info("Client connected - %s, Bedrock %s protocol %d", authentication, clientConn.Proto().Ver(), clientConn.Proto().ID())
 	if slot.err != nil {
 		_ = listener.Disconnect(clientConn, "BedrockDebugProxy could not connect to the destination server")
 		return slot.err
@@ -183,6 +190,7 @@ func (r *Runner) Run(ctx context.Context) error {
 	}); err != nil {
 		return err
 	}
+	live.Info("Session negotiated - downstream protocol %d, upstream protocol %d, %d resource packs", clientConn.Proto().ID(), serverConn.Proto().ID(), len(serverConn.ResourcePacks()))
 	if err := r.recordStructuredView(
 		"session.connection_metadata", newConnectionMetadata("downstream", clientConn),
 		capture.DirectionInternal, downstreamConnectionID, "downstream", "decoded_login_state",
@@ -218,13 +226,14 @@ func (r *Runner) Run(ctx context.Context) error {
 	}); err != nil {
 		return err
 	}
+	live.Info("Session spawned - downstream latency %s, upstream latency %s", clientConn.Latency(), serverConn.Latency())
 
 	first := make(chan error, 2)
 	go func() {
-		first <- r.forward(clientConn, serverConn, failures, capture.DirectionClientToServer, "downstream", downstreamConnectionID)
+		first <- r.forward(clientConn, serverConn, failures, live, capture.DirectionClientToServer, "downstream", downstreamConnectionID)
 	}()
 	go func() {
-		first <- r.forward(serverConn, clientConn, failures, capture.DirectionServerToClient, "upstream", upstreamConnectionID)
+		first <- r.forward(serverConn, clientConn, failures, live, capture.DirectionServerToClient, "upstream", upstreamConnectionID)
 	}()
 	bridgeErr := <-first
 	_ = clientConn.Close()
@@ -239,13 +248,15 @@ func (r *Runner) Run(ctx context.Context) error {
 	}); err != nil {
 		return err
 	}
+	live.Info("Session ended - first loop: %s; second loop: %s", errorString(bridgeErr), errorString(secondErr))
 	return nil
 }
 
-func (r *Runner) connectUpstream(ctx context.Context, network bedrock.Network, observer *bedrock.Observer, logger *slog.Logger, clientData login.ClientData) (*minecraft.Conn, error) {
+func (r *Runner) connectUpstream(ctx context.Context, network bedrock.Network, observer *bedrock.Observer, logger *slog.Logger, live *liveReporter, clientData login.ClientData) (*minecraft.Conn, error) {
 	if err := r.record("upstream.dial_start", capture.SeverityInfo, map[string]any{"address": r.config.UpstreamAddress}); err != nil {
 		return nil, err
 	}
+	live.Info("Connecting upstream - %s", r.config.UpstreamAddress)
 	dialer := minecraft.Dialer{
 		TokenSource:                r.config.TokenSource,
 		ClientData:                 clientData,
@@ -278,6 +289,7 @@ func (r *Runner) connectUpstream(ctx context.Context, network bedrock.Network, o
 		_ = conn.Close()
 		return nil, err
 	}
+	live.Info("Upstream connected - %s, Bedrock %s protocol %d", conn.RemoteAddr(), conn.Proto().Ver(), conn.Proto().ID())
 	return conn, nil
 }
 
@@ -311,7 +323,7 @@ func newConnectionMetadata(role string, conn *minecraft.Conn) connectionMetadata
 	}
 }
 
-func (r *Runner) forward(source, destination *minecraft.Conn, failures *bedrock.FailureSink, direction capture.Direction, sourceChannel, connectionID string) error {
+func (r *Runner) forward(source, destination *minecraft.Conn, failures *bedrock.FailureSink, live *liveReporter, direction capture.Direction, sourceChannel, connectionID string) error {
 	for {
 		if err := failures.Err(); err != nil {
 			return err
@@ -321,6 +333,7 @@ func (r *Runner) forward(source, destination *minecraft.Conn, failures *bedrock.
 			captureErr := r.recordNetworkError("bridge.read_error", direction, sourceChannel, connectionID, "read packet", err)
 			return errors.Join(err, captureErr)
 		}
+		live.Packet(direction, decoded)
 		if err := r.recordDecoded(decoded, direction, connectionID); err != nil {
 			return err
 		}

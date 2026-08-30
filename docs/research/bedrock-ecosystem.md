@@ -145,7 +145,7 @@ Dragonfly is a server implementation built around gophertunnel rather than a pac
 - Add optional raw UDP and PCAPNG capture without requiring elevated privileges for normal operation.
 - Compare decoded fixtures against PrismarineJS and future runtime schemas.
 - Determine how Transfer packets should start a new hop while keeping one logical session timeline.
-- Measure disk-write backpressure during chunk-heavy sessions and choose an explicit overflow policy.
+- Continue measuring disk-write backpressure during chunk-heavy sessions before considering any asynchronous queue or overflow policy. The current recorder uses blocking, lossless writes and avoids per-event durable flushes by default.
 - Verify encrypted resource-pack variants with synthetic fixtures and owner-authorized live captures.
 - Decide whether old protocol adapters belong in this repository or separate versioned modules.
 

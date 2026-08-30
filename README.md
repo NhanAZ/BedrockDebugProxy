@@ -33,15 +33,32 @@ For example, the following command selects The Hive by its current Featured Expe
 
 Then follow these steps.
 
-1. Complete the Microsoft device login shown in the terminal.
-2. In Minecraft Bedrock, connect to port `19132` on the computer running the proxy. Use that computer's LAN address from another device. Do not enter `0.0.0.0` as the Minecraft server address.
-3. Join the server and reproduce the behavior you want to debug.
-4. Press `Ctrl+C` in the proxy terminal when finished.
-5. Wait for the capture verification result. The exact output path is printed when the proxy starts and is normally `captures\session-<UTC timestamp>`.
+1. Complete the Microsoft device login the first time. Later runs reuse the cached login until Microsoft requires authentication again.
+2. Wait until the terminal prints `Listening on`. The proxy cannot accept Minecraft connections while authentication and Experience resolution are still in progress.
+3. In Minecraft Bedrock, connect to port `19132` on the computer running the proxy. Use that computer's LAN address from another device. Do not enter `0.0.0.0` as the Minecraft server address.
+4. Join the server and reproduce the behavior you want to debug. The terminal prints connection transitions and compact one-second packet summaries while the full evidence is written to the capture.
+5. Press `Ctrl+C` in the proxy terminal when finished.
+6. Wait for the capture verification result. The exact output path is printed when the proxy starts and is normally `captures\session-<UTC timestamp>`.
 
 That capture directory is the debug result. Keep it local because it may contain identifiers, chat, server data, resource packs, and other sensitive content.
 
 `0.0.0.0` exposes the listener to reachable network interfaces. Use it only on a trusted network with an appropriate firewall. Use `127.0.0.1:19132` when only local software needs to connect.
+
+By default, the downstream Minecraft connection must use Xbox authentication. Add the proxy address in Minecraft's Servers tab for this secure path. A LAN World entry uses a self-signed client login instead. To accept that login on a trusted LAN, add the existing opt-in flag below.
+
+```powershell
+# Trusted LAN only. Replace <UPSTREAM> before running.
+.\bin\bedrock-debug-proxy.exe `
+    run `
+    --listen 0.0.0.0:19132 `
+    --upstream "<UPSTREAM>" `
+    --auth device `
+    --allow-unauthenticated-client
+```
+
+This flag does not disable upstream authentication. It does allow any client that can reach the listener to use the proxy's authenticated upstream session, so it is intentionally not the default.
+
+On Windows, the Microsoft token cache is `%AppData%\BedrockDebugProxy\auth-token.json`. It contains authentication secrets, remains outside the repository, and must not be shared or committed. To change accounts, stop the proxy, delete this file, and start the proxy again.
 
 If the binary does not exist yet, install the Go version declared in `go.mod`, keep the working tree clean, and build it once.
 
@@ -106,6 +123,7 @@ Automated success does not prove live Minecraft compatibility. Runtime changes r
 Current known boundaries include the following.
 
 - Transfer packets are recorded but not followed automatically.
+- The default capture path applies blocking backpressure and closes each content-addressed blob before forwarding continues. It avoids a durable disk flush per event for normal responsiveness. `--sync-each-event` provides stronger crash and power-loss durability at a substantial latency cost.
 - Raw UDP datagrams and RakNet acknowledgement, fragmentation, retransmission, and loss details are outside the current capture boundary.
 - Transport payloads are captured at the post-transport application boundary.
 - The upstream resource-pack-required flag is not mirrored to the downstream listener.

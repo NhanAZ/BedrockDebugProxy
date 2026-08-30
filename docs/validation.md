@@ -45,6 +45,8 @@ Run the stamped binary and complete the required live session. Stop it cleanly, 
     -Output .\validation\local\<REVISION>\the-hive.json
 ```
 
+Device authentication is cached after the first successful login. Wait for `Listening on` before connecting the client. Required baseline reports use the default Xbox-authenticated downstream path, normally through an entry in Minecraft's Servers tab. A LAN World entry uses self-signed client authentication and requires `--allow-unauthenticated-client` on a trusted LAN. Validate that opt-in separately when the LAN flow changes rather than using it as a substitute for the default authentication gate.
+
 Use public server labels rather than addresses in `-Server`. A manual check uses `lowercase_name=pass`, `lowercase_name=fail`, or `lowercase_name=not_observed`. Add one for each flow reviewed, such as `resource_pack_transfer=pass` or `resource_pack_decryption=pass`.
 
 A report cannot claim `pass` unless `normal_session=pass`, every other manual check passes, and capture-derived evidence proves all of the following facts.
