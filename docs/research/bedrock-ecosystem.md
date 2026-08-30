@@ -27,6 +27,8 @@ The canonical capture will be an append-only directory containing a manifest, an
 
 Gophertunnel performs Bedrock login, Xbox authentication, encryption, compression, batching, packet framing, protocol conversion, resource-pack download, and spawn sequencing. Its included proxy demonstrates the standard pair of terminating connections and two forwarding loops.
 
+Its [`minecraft/auth/live.go`](https://github.com/Sandertv/gophertunnel/blob/283a5a97dfe65da94bcc0b401807f6aefa9e72ee/minecraft/auth/live.go) exposes `RefreshTokenSourceWriter`, which constructs a refresh-capable source from a previously issued Microsoft OAuth token and sends any interactive authentication instructions to the supplied writer. BedrockDebugProxy persists the token returned by that public API in its per-user cache and falls back to device authentication when refresh fails.
+
 The public `Protocol` interface separates packet pools, readers, writers, and conversion from the current protocol. The project README states that one protocol is shipped at a time, while the API can host more. BedrockDebugProxy must therefore record the concrete protocol ID and version and must not assume a capture can always be decoded by a future default protocol.
 
 `PacketFunc` receives packet headers and raw payloads on reads and writes. Unknown packet IDs can be represented by `packet.Unknown` when the listener and dialer are configured not to disconnect. Invalid packet decode errors are logged and the read loop may skip the packet. BedrockDebugProxy must record the pre-decode hook independently so skipped packets remain present.
@@ -51,6 +53,8 @@ BedrockDebugProxy will record application-batch bytes at this boundary in the fi
 - License is GPL-3.0
 
 The upstream project is a broad Bedrock tooling suite rather than a narrow capture engine. Its breadth is useful for use-case discovery, especially authentication, Experience selection, transfer handling, downloads, and world data. Its architecture and scope are not a fit for direct reuse in the initial core. Its GPL-3.0 license is compatible with the selected project direction. No source was copied during the initial architecture implementation. Later adaptation of its legacy signaling code is recorded separately in `THIRD_PARTY_NOTICES.md` and `experience-routing.md`.
+
+The repository persists an OAuth token and reconstructs a refresh source in [`utils/auth/auth.go`](https://github.com/bedrock-tool/bedrocktool/blob/d7788b57acbdd3eb93ac1efdd4f1107b78aea9b0/utils/auth/auth.go), [`utils/auth/account.go`](https://github.com/bedrock-tool/bedrocktool/blob/d7788b57acbdd3eb93ac1efdd4f1107b78aea9b0/utils/auth/account.go), and [`utils/auth/files.go`](https://github.com/bedrock-tool/bedrocktool/blob/d7788b57acbdd3eb93ac1efdd4f1107b78aea9b0/utils/auth/files.go). These files were reviewed on 2026-08-31 as evidence that persistent device authentication is established practice in this ecosystem. BedrockDebugProxy's cache was implemented independently around gophertunnel's public refresh API, with a project-specific path, size bound, replacement behavior, tests, and operator warnings.
 
 ### PrismarineJS bedrock-protocol
 

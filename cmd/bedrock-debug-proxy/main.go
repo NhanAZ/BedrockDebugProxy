@@ -16,12 +16,12 @@ import (
 	"time"
 
 	"github.com/NhanAZ/BedrockDebugProxy/internal/analysis"
+	"github.com/NhanAZ/BedrockDebugProxy/internal/authcache"
 	"github.com/NhanAZ/BedrockDebugProxy/internal/buildinfo"
 	"github.com/NhanAZ/BedrockDebugProxy/internal/capture"
 	"github.com/NhanAZ/BedrockDebugProxy/internal/capturearchive"
 	"github.com/NhanAZ/BedrockDebugProxy/internal/experience"
 	"github.com/NhanAZ/BedrockDebugProxy/internal/proxy"
-	"github.com/sandertv/gophertunnel/minecraft/auth"
 	"github.com/sandertv/gophertunnel/minecraft/protocol"
 	"golang.org/x/oauth2"
 )
@@ -97,7 +97,16 @@ func runProxy(args []string, stdout, stderr io.Writer) int {
 	var tokenSource oauth2.TokenSource
 	switch *authMode {
 	case "device":
-		tokenSource = auth.WriterTokenSource(stderr)
+		cachePath, err := authcache.DefaultPath()
+		if err != nil {
+			_, _ = fmt.Fprintf(stderr, "Configure authentication - %v\n", err)
+			return 1
+		}
+		tokenSource, err = authcache.New(cachePath, stderr)
+		if err != nil {
+			_, _ = fmt.Fprintf(stderr, "Configure authentication - %v\n", err)
+			return 1
+		}
 	case "none":
 	case "":
 		_, _ = fmt.Fprintln(stderr, "--auth cannot be empty.")
