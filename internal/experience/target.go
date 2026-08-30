@@ -33,6 +33,7 @@ const (
 	transportRakNet     = "raknet"
 	transportNetherNet  = "nethernet"
 	transportJSONRPC    = "nethernet-jsonrpc"
+	protocolDefaultName = "Default"
 	protocolJSONRPCName = "NetherNet_JsonRpc"
 )
 
@@ -205,6 +206,7 @@ func (s *serviceSession) resolve(ctx context.Context, selector, name string) (*T
 
 	experienceID := name
 	displayName := name
+	defaultAddress := ""
 	if _, err := uuid.Parse(experienceID); err != nil {
 		servers, listErr := listFeaturedServers(ctx, s.httpClient, gatherings.ServiceURI, token)
 		if listErr != nil {
@@ -216,6 +218,7 @@ func (s *serviceSession) resolve(ctx context.Context, selector, name string) (*T
 		}
 		displayName = server.Name
 		experienceID = server.ExperienceID
+		defaultAddress = server.Address
 		if experienceID == "" {
 			if server.Address == "" {
 				return nil, fmt.Errorf("experience %q has no experience ID or server address", server.Name)
@@ -227,7 +230,7 @@ func (s *serviceSession) resolve(ctx context.Context, selector, name string) (*T
 	if err != nil {
 		return nil, fmt.Errorf("experience %q returned invalid ID %q: %w", displayName, experienceID, err)
 	}
-	destination, err := joinExperience(ctx, s.httpClient, gatherings.ServiceURI, token, id)
+	destination, err := joinExperience(ctx, s.httpClient, gatherings.ServiceURI, token, id, defaultAddress)
 	if err != nil {
 		return nil, fmt.Errorf("join experience %q: %w", displayName, err)
 	}
@@ -333,7 +336,7 @@ func findFeaturedServer(servers []featuredServer, name string) (featuredServer, 
 	return featuredServer{}, false
 }
 
-func joinExperience(ctx context.Context, client *http.Client, baseURI string, token *service.Token, id uuid.UUID) (resolvedDestination, error) {
+func joinExperience(ctx context.Context, client *http.Client, baseURI string, token *service.Token, id uuid.UUID, defaultAddress string) (resolvedDestination, error) {
 	endpoint, err := serviceURL(baseURI, "/api/v2.0/join/experience")
 	if err != nil {
 		return resolvedDestination{}, err
@@ -359,13 +362,16 @@ func joinExperience(ctx context.Context, client *http.Client, baseURI string, to
 		}
 		return resolvedDestination{Address: networkID.String(), Transport: transport}, nil
 	}
-	if net.ParseIP(result.IPv4Address) == nil {
-		return resolvedDestination{}, fmt.Errorf("no usable destination returned for network protocol %q", result.NetworkProtocol)
+	if net.ParseIP(result.IPv4Address) != nil {
+		if !validPort(result.Port) {
+			return resolvedDestination{}, fmt.Errorf("invalid port %d", result.Port)
+		}
+		return resolvedDestination{Address: net.JoinHostPort(result.IPv4Address, strconv.Itoa(result.Port)), Transport: transportRakNet}, nil
 	}
-	if !validPort(result.Port) {
-		return resolvedDestination{}, fmt.Errorf("invalid port %d", result.Port)
+	if strings.EqualFold(strings.TrimSpace(result.NetworkProtocol), protocolDefaultName) && defaultAddress != "" {
+		return resolvedDestination{Address: defaultAddress, Transport: transportRakNet}, nil
 	}
-	return resolvedDestination{Address: net.JoinHostPort(result.IPv4Address, strconv.Itoa(result.Port)), Transport: transportRakNet}, nil
+	return resolvedDestination{}, fmt.Errorf("no usable destination returned for network protocol %q", result.NetworkProtocol)
 }
 
 type resultEnvelope[T any] struct {

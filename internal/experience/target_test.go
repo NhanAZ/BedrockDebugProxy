@@ -64,10 +64,11 @@ func TestJoinExperienceDestinations(t *testing.T) {
 	experienceID := uuid.MustParse("11111111-1111-1111-1111-111111111111")
 	netherNetID := "22222222-2222-2222-2222-222222222222"
 	tests := []struct {
-		name     string
-		response string
-		want     resolvedDestination
-		wantErr  string
+		name           string
+		response       string
+		defaultAddress string
+		want           resolvedDestination
+		wantErr        string
 	}{
 		{
 			name:     "raknet",
@@ -83,6 +84,23 @@ func TestJoinExperienceDestinations(t *testing.T) {
 			name:     "json rpc nethernet",
 			response: `{"result":{"networkProtocol":"NetherNet_JsonRpc","netherNetId":"` + netherNetID + `"}}`,
 			want:     resolvedDestination{Address: netherNetID, Transport: transportJSONRPC},
+		},
+		{
+			name:           "default uses discovery address",
+			response:       `{"result":{"networkProtocol":"Default"}}`,
+			defaultAddress: "hive.example:19132",
+			want:           resolvedDestination{Address: "hive.example:19132", Transport: transportRakNet},
+		},
+		{
+			name:           "default prefers join address",
+			response:       `{"result":{"networkProtocol":"Default","ipV4Address":"192.0.2.11","port":19133}}`,
+			defaultAddress: "hive.example:19132",
+			want:           resolvedDestination{Address: "192.0.2.11:19133", Transport: transportRakNet},
+		},
+		{
+			name:     "default without discovery address",
+			response: `{"result":{"networkProtocol":"Default"}}`,
+			wantErr:  "no usable destination",
 		},
 		{
 			name:     "missing destination",
@@ -107,7 +125,7 @@ func TestJoinExperienceDestinations(t *testing.T) {
 				}
 				_, _ = w.Write([]byte(test.response))
 			})
-			got, err := joinExperience(context.Background(), server.Client(), server.URL, &service.Token{}, experienceID)
+			got, err := joinExperience(context.Background(), server.Client(), server.URL, &service.Token{}, experienceID, test.defaultAddress)
 			if test.wantErr != "" {
 				if err == nil || !strings.Contains(err.Error(), test.wantErr) {
 					t.Fatalf("joinExperience() error = %v", err)
