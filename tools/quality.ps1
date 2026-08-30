@@ -46,6 +46,24 @@ try {
         throw "Go source is not formatted. Run tools/format.ps1."
     }
 
+    Write-Host "==> PowerShell syntax"
+    $powerShellFiles = @(Get-ChildItem -LiteralPath $projectRoot -Recurse -File -Filter "*.ps1" |
+        Where-Object { $_.FullName -notmatch "[\\/]\.git[\\/]" } |
+        ForEach-Object { $_.FullName })
+    $parseFailures = @()
+    foreach ($file in $powerShellFiles) {
+        $tokens = $null
+        $parseErrors = $null
+        [System.Management.Automation.Language.Parser]::ParseFile($file, [ref]$tokens, [ref]$parseErrors) | Out-Null
+        foreach ($parseError in @($parseErrors)) {
+            $parseFailures += "$file`:$($parseError.Extent.StartLineNumber) $($parseError.Message)"
+        }
+    }
+    if ($parseFailures.Count -ne 0) {
+        $parseFailures | ForEach-Object { Write-Host $_ }
+        throw "PowerShell source contains syntax errors."
+    }
+
     Invoke-QualityCommand "module tidiness" "go" @("mod", "tidy", "-diff")
     Invoke-QualityCommand "module integrity" "go" @("mod", "verify")
 

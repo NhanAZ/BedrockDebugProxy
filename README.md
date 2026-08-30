@@ -12,7 +12,7 @@ Its first priority is to preserve enough structured evidence for AI agents to re
 
 ## Status
 
-The repository has an initial single-client terminating proxy for the current protocol shipped by gophertunnel `v1.61.0`. It records transport payloads, raw packet payloads, decoded packet views, library failures, and lifecycle events in a durable capture directory.
+The repository has an initial single-client terminating proxy for the current protocol shipped by gophertunnel `v1.61.0`. It records transport payloads, raw packet payloads, decoded packet views, decoded login and game-state snapshots, library failures, and lifecycle events in a durable capture directory.
 
 Automated tests, `go vet`, module verification, and local builds pass. Real Minecraft client and cross-server validation is still pending. The proxy is not ready for production use.
 
@@ -70,13 +70,15 @@ The gate checks deterministic `gofmt` formatting, module tidiness and checksums,
 
 Use `.\tools\format.ps1` to format every Go source file. CI runs the same quality gate with the race detector on Linux and repeats tests and builds on Windows. A local Windows environment with `CGO_ENABLED=0` should use the normal command because Go's race detector requires cgo.
 
+Runtime behavior also requires a stamped real-client session and a structured validation report. The Hive is the minimum development and pull-request baseline. Releases require all six project baselines. See [`docs/validation.md`](docs/validation.md) for the exact workflow.
+
 ## Initial scope
 
 The proxy will observe both client-to-server and server-to-client traffic. It will preserve raw data where the networking layer exposes it, decode packets when possible, record unknown and malformed input, and make encryption, compression, batching, framing, timing, and protocol metadata visible.
 
 Resource-pack collection, reconstruction, integrity validation, and opt-in decryption are implemented when a connection exposes the required archive and keys.
 
-Packet mutation, dropping, injection, replay, cheat behavior, and exploit tooling are not initial goals.
+Packet mutation, dropping, injection, replay, cheat behavior, exploit tooling, and a growing set of one-purpose download commands are not initial goals. The preferred workflow is one high-fidelity session that can support many later analyses.
 
 ## Repository layout
 
@@ -91,7 +93,7 @@ Packet mutation, dropping, injection, replay, cheat behavior, and exploit toolin
 - `docs/decisions` records material architecture choices.
 - `docs/research` records source revisions, licenses, evidence, and open questions.
 
-Project-wide working principles are in `AGENTS.md`. The capture layout, analysis contract, protocol update workflow, and observation boundaries are documented in `docs/capture-format.md`, `docs/analysis-and-export.md`, `docs/protocol-updates.md`, and `docs/decisions/0001-capture-first-terminating-proxy.md`.
+Project-wide working principles are in `AGENTS.md`. The capture layout, analysis contract, validation workflow, protocol update workflow, and observation boundaries are documented in `docs/capture-format.md`, `docs/analysis-and-export.md`, `docs/validation.md`, `docs/protocol-updates.md`, and `docs/decisions/0001-capture-first-terminating-proxy.md`.
 
 ## Current limitations
 

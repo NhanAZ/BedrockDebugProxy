@@ -25,6 +25,8 @@ Maintain the project conservatively. Prefer the smallest focused change that fix
 
 Do not add a feature, public API, abstraction, helper, framework, compatibility layer, subsystem, or dependency because it may be useful later. Require a current use case and evidence that existing project mechanisms cannot address it cleanly. Feature additions and removals are material decisions and must not be hidden inside unrelated fixes.
 
+Keep the product CLI small. Do not add specialized download, extraction, logging, or one-purpose commands merely because a reference project has them. Prefer retaining observable evidence in the canonical session so existing inspect, analyze, explain, and export workflows can derive later views from one capture.
+
 Before editing code, trace the relevant data path and inspect call sites, shared helpers, interfaces, similar implementations, tests, documentation, and useful Git history. Search for existing functionality before creating another implementation. Reuse or improve the established path when it fits rather than introducing duplicate or competing logic.
 
 When uncertainty remains between adding code and investigating further, investigate further. When both a small and a large patch solve the verified root cause, prefer the small patch.
@@ -96,6 +98,10 @@ Run formatting, unit tests, static analysis, build checks, and `git diff --check
 Use `tools/quality.ps1` as the project-wide pre-commit quality gate and `tools/format.ps1` as the canonical formatting command. Do not replace, bypass, or duplicate this workflow in an issue-specific script. Add a linter only when it provides actionable signal for this codebase, and prefer resolving valid findings over broad exclusions. Keep tool versions pinned and review version changes separately from unrelated behavior changes.
 
 After a commit changes protocol handling, networking, resource packs, or observable behavior, provide a short human validation plan. Name the server or server category, the flow to exercise, the packets or behavior to observe, the expected result, and the capture or log needed if it fails. Automated checks and real-world validation must be reported separately.
+
+The Hive is the minimum live baseline for every runtime-affecting development change and pull request. Require a machine-readable report generated from a stamped binary and closed capture for the exact revision. A specific flow must be exercised directly. A report that says `not_observed` remains incomplete. Do not approve or merge a runtime-affecting change while required validation is pending.
+
+Every official release requires revision-matched reports for The Hive, CubeCraft, Galaxite, Lifeboat, Mineville Zeqa, and Enchanted. Record external outages or unavailable tests explicitly. A failed server starts root-cause investigation and does not authorize a server-specific workaround. Follow `docs/validation.md` for the report workflow and sensitive-data boundary.
 
 Fuzz parsers and decoders that consume untrusted network or capture data when practical. Bound memory, disk, and goroutine growth without hiding the fact that a limit was reached.
 
