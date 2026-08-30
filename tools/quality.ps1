@@ -66,6 +66,7 @@ try {
 
     Invoke-QualityCommand "module tidiness" "go" @("mod", "tidy", "-diff")
     Invoke-QualityCommand "module integrity" "go" @("mod", "verify")
+    Invoke-QualityCommand "third-party license inventory" "pwsh" @("-NoProfile", "-File", (Join-Path $PSScriptRoot "collect-third-party-licenses.ps1"))
 
     $testArguments = @("test", "-count=1")
     if ($Race) {

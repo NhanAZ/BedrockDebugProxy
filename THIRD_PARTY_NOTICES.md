@@ -20,12 +20,13 @@ The Go module uses the following direct dependencies. Their source remains under
 | [`github.com/df-mc/go-nethernet`](https://github.com/df-mc/go-nethernet) | `v1.0.20` | MIT | NetherNet and WebRTC upstream transport |
 | [`github.com/df-mc/go-playfab/v2`](https://github.com/df-mc/go-playfab) | `v2.0.2` | MIT | Minecraft services authentication |
 | [`github.com/df-mc/go-xsapi/v2`](https://github.com/df-mc/go-xsapi) | `v2.0.3` | MIT | Xbox Live session used for service authentication |
+| [`github.com/go-gl/mathgl`](https://github.com/go-gl/mathgl) | `v1.1.0` | BSD-3-Clause | Vector and matrix types used by the Bedrock protocol model |
 | [`github.com/google/uuid`](https://github.com/google/uuid) | `v1.6.0` | BSD-3-Clause | UUID parsing and values |
 | [`github.com/sandertv/go-raknet`](https://github.com/Sandertv/go-raknet) | `v1.15.2-0.20260705184311-0d1fd09e2cf6` | MIT | RakNet transport |
 | [`github.com/sandertv/gophertunnel`](https://github.com/Sandertv/gophertunnel) | `v1.61.0` | MIT | Bedrock sessions, protocol, authentication, and resource packs |
 | [`golang.org/x/oauth2`](https://github.com/golang/oauth2) | `v0.36.0` | BSD-3-Clause | Authentication token source API |
 
-The complete direct and transitive module graph and exact checksums are recorded in `go.mod` and `go.sum`. Distributions that include dependency source or compiled dependency code must preserve the license and notice material required by those dependencies.
+The complete direct and transitive module graph and exact checksums are recorded in `go.mod` and `go.sum`. `tools/collect-third-party-licenses.ps1` verifies that every module compiled into the product has root license material and creates the deterministic license bundle used by binary releases. Distributions that include dependency source or compiled dependency code must preserve the license and notice material required by those dependencies.
 
 ## Development tools
 

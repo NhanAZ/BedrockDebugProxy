@@ -117,7 +117,7 @@ git push origin "v$version"
 
 Use a signed annotated tag when signing is configured. If it is not configured, stop and make an explicit maintainer decision before using an unsigned annotated tag.
 
-Create a checksum for the exact tested Windows binary, then create the GitHub release from that exact tag. Include concise release notes, the supported Bedrock and protocol version, important limitations, automated check status, the six-server validation result, the tested binary and checksum, and the sanitized JSON reports as small release assets. Do not attach raw captures or captured third-party content.
+Create a checksum and third-party license bundle for the exact tested Windows binary, then create the GitHub release from that exact tag. Include concise release notes, the supported Bedrock and protocol version, important limitations, automated check status, the six-server validation result, the tested binary and checksum, the project license and notices, the generated dependency license bundle, and the sanitized JSON reports as small release assets. Do not attach raw captures or captured third-party content.
 
 ```powershell
 $binary = (Resolve-Path .\bin\bedrock-debug-proxy.exe).Path
@@ -126,8 +126,16 @@ $hashLine = "{0}  {1}" -f `
     ((Get-FileHash -Algorithm SHA256 -LiteralPath $binary).Hash.ToLowerInvariant()), `
     (Split-Path -Leaf $binary)
 [System.IO.File]::WriteAllText($checksumFile, $hashLine, [System.Text.Encoding]::ASCII)
+$licenseBundle = ".\validation\local\$revision\THIRD_PARTY_LICENSES.txt"
+.\tools\collect-third-party-licenses.ps1 -Output $licenseBundle
 $reportAssets = @(Get-ChildItem ".\validation\local\$revision" -File -Filter "*.json" | ForEach-Object FullName)
-$releaseAssets = @($binary, $checksumFile) + $reportAssets
+$releaseAssets = @(
+    $binary
+    $checksumFile
+    (Resolve-Path .\LICENSE).Path
+    (Resolve-Path .\THIRD_PARTY_NOTICES.md).Path
+    (Resolve-Path $licenseBundle).Path
+) + $reportAssets
 gh release create "v$version" `
     @releaseAssets `
     --repo NhanAZ/BedrockDebugProxy `
