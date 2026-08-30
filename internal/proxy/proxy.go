@@ -36,6 +36,24 @@ type Runner struct {
 	config Config
 }
 
+type connectionMetadata struct {
+	Role          string           `json:"role"`
+	Authenticated bool             `json:"authenticated"`
+	ProtocolID    int32            `json:"protocol_id"`
+	GameVersion   string           `json:"game_version"`
+	Identity      identityMetadata `json:"identity"`
+	ClientData    login.ClientData `json:"client_data"`
+}
+
+type identityMetadata struct {
+	XUID           string `json:"xuid"`
+	Identity       string `json:"identity"`
+	DisplayName    string `json:"display_name"`
+	TitleID        string `json:"title_id,omitempty"`
+	PlayFabTitleID string `json:"playfab_title_id,omitempty"`
+	PlayFabID      string `json:"playfab_id,omitempty"`
+}
+
 func New(config Config) (*Runner, error) {
 	if err := config.normalize(); err != nil {
 		return nil, err
@@ -155,7 +173,6 @@ func (r *Runner) Run(ctx context.Context) error {
 	if err := failures.Err(); err != nil {
 		return fmt.Errorf("capture hook failed during login: %w", err)
 	}
-
 	if err := r.record("session.negotiated", capture.SeverityInfo, map[string]any{
 		"downstream_protocol_id":  clientConn.Proto().ID(),
 		"downstream_game_version": clientConn.Proto().Ver(),
@@ -165,11 +182,39 @@ func (r *Runner) Run(ctx context.Context) error {
 	}); err != nil {
 		return err
 	}
-	if err := startGame(clientConn, serverConn); err != nil {
+	if err := r.recordStructuredView(
+		"session.connection_metadata", newConnectionMetadata("downstream", clientConn),
+		capture.DirectionInternal, downstreamConnectionID, "downstream", "decoded_login_state",
+		[]string{"Exact Login packet bytes remain in packet.raw; binary fields in this structured view use size, SHA-256, and preview metadata"},
+	); err != nil {
+		return err
+	}
+	if err := r.recordStructuredView(
+		"session.connection_metadata", newConnectionMetadata("upstream", serverConn),
+		capture.DirectionInternal, upstreamConnectionID, "upstream", "decoded_login_state",
+		[]string{"Exact Login packet bytes remain in packet.raw; binary fields in this structured view use size, SHA-256, and preview metadata"},
+	); err != nil {
+		return err
+	}
+	gameData := serverConn.GameData()
+	if err := r.recordStructuredView(
+		"session.game_data", gameData, capture.DirectionServerToClient, upstreamConnectionID, "upstream", "decoded_upstream_game_data",
+		[]string{"This is a bounded GameData view exposed by gophertunnel; collections may be truncated and the exact StartGame packet remains in packet.raw"},
+	); err != nil {
+		return err
+	}
+	if err := startGame(clientConn, serverConn, gameData); err != nil {
 		_ = r.record("session.spawn_error", capture.SeverityError, map[string]any{"error": err.Error(), "type": fmt.Sprintf("%T", err)})
 		return err
 	}
-	if err := r.record("session.spawned", capture.SeverityInfo, nil); err != nil {
+	if err := r.record("session.spawned", capture.SeverityInfo, map[string]any{
+		"downstream_latency":              clientConn.Latency().String(),
+		"upstream_latency":                serverConn.Latency().String(),
+		"downstream_client_cache_enabled": clientConn.ClientCacheEnabled(),
+		"upstream_client_cache_enabled":   serverConn.ClientCacheEnabled(),
+		"downstream_chunk_radius":         clientConn.ChunkRadius(),
+		"upstream_chunk_radius":           serverConn.ChunkRadius(),
+	}); err != nil {
 		return err
 	}
 
@@ -235,9 +280,9 @@ func (r *Runner) connectUpstream(ctx context.Context, network bedrock.Network, o
 	return conn, nil
 }
 
-func startGame(client, server *minecraft.Conn) error {
+func startGame(client, server *minecraft.Conn, gameData minecraft.GameData) error {
 	errorsChannel := make(chan error, 2)
-	go func() { errorsChannel <- client.StartGame(server.GameData()) }()
+	go func() { errorsChannel <- client.StartGame(gameData) }()
 	go func() { errorsChannel <- server.DoSpawn() }()
 	first := <-errorsChannel
 	if first != nil {
@@ -251,6 +296,18 @@ func startGame(client, server *minecraft.Conn) error {
 		return errors.Join(first, second)
 	}
 	return nil
+}
+
+func newConnectionMetadata(role string, conn *minecraft.Conn) connectionMetadata {
+	identity := conn.IdentityData()
+	return connectionMetadata{
+		Role: role, Authenticated: conn.Authenticated(), ProtocolID: conn.Proto().ID(), GameVersion: conn.Proto().Ver(),
+		Identity: identityMetadata{
+			XUID: identity.XUID, Identity: identity.Identity, DisplayName: identity.DisplayName,
+			TitleID: identity.TitleID, PlayFabTitleID: identity.PlayFabTitleID, PlayFabID: identity.PlayFabID,
+		},
+		ClientData: conn.ClientData(),
+	}
 }
 
 func (r *Runner) forward(source, destination *minecraft.Conn, failures *bedrock.FailureSink, direction capture.Direction, sourceChannel, connectionID string) error {
@@ -281,10 +338,7 @@ func (r *Runner) recordDecoded(decoded packet.Packet, direction capture.Directio
 		status = "unknown"
 		kind = "packet.unknown"
 	}
-	fields, notices, encodeErr := packetview.Encode(decoded, packetview.Options{
-		MaxCollectionItems: r.config.MaxDecodedCollectionItems,
-		BinaryPreviewBytes: r.config.DecodedBinaryPreviewBytes,
-	})
+	data, encodeErr := r.structuredView(decoded)
 	if encodeErr != nil {
 		_, recordErr := r.config.Recorder.Record(context.Background(), capture.Record{Event: capture.Event{
 			SessionID:    sessionID,
@@ -300,15 +354,11 @@ func (r *Runner) recordDecoded(decoded packet.Packet, direction capture.Directio
 		}})
 		return recordErr
 	}
-	data, err := json.Marshal(map[string]any{"fields": json.RawMessage(fields), "notices": notices})
-	if err != nil {
-		return fmt.Errorf("encode decoded packet envelope: %w", err)
-	}
 	annotations := make([]string, 0, 1)
 	if _, transfer := decoded.(*packet.Transfer); transfer {
 		annotations = append(annotations, "Transfer is recorded but automatic hop following is not implemented")
 	}
-	_, err = r.config.Recorder.Record(context.Background(), capture.Record{Event: capture.Event{
+	_, err := r.config.Recorder.Record(context.Background(), capture.Record{Event: capture.Event{
 		SessionID:    sessionID,
 		ConnectionID: connectionID,
 		Hop:          1,
@@ -322,6 +372,40 @@ func (r *Runner) recordDecoded(decoded packet.Packet, direction capture.Directio
 		Annotations:  annotations,
 	}})
 	return err
+}
+
+func (r *Runner) recordStructuredView(kind string, value any, direction capture.Direction, connectionID, channel, stage string, annotations []string) error {
+	data, encodeErr := r.structuredView(value)
+	if encodeErr != nil {
+		_, recordErr := r.config.Recorder.Record(context.Background(), capture.Record{Event: capture.Event{
+			SessionID: sessionID, ConnectionID: connectionID, Hop: 1,
+			Kind: "capture.view_error", Severity: capture.SeverityError, Direction: direction,
+			Channel: channel, Stage: stage,
+			Error: &capture.ErrorInfo{Operation: "encode " + kind, Message: encodeErr.Error(), Type: fmt.Sprintf("%T", encodeErr)},
+		}})
+		return recordErr
+	}
+	_, err := r.config.Recorder.Record(context.Background(), capture.Record{Event: capture.Event{
+		SessionID: sessionID, ConnectionID: connectionID, Hop: 1,
+		Kind: kind, Severity: capture.SeverityInfo, Direction: direction,
+		Channel: channel, Stage: stage, Data: data, Annotations: annotations,
+	}})
+	return err
+}
+
+func (r *Runner) structuredView(value any) ([]byte, error) {
+	fields, notices, err := packetview.Encode(value, packetview.Options{
+		MaxCollectionItems: r.config.MaxDecodedCollectionItems,
+		BinaryPreviewBytes: r.config.DecodedBinaryPreviewBytes,
+	})
+	if err != nil {
+		return nil, err
+	}
+	data, err := json.Marshal(map[string]any{"fields": json.RawMessage(fields), "notices": notices})
+	if err != nil {
+		return nil, fmt.Errorf("encode structured view envelope: %w", err)
+	}
+	return data, nil
 }
 
 func (r *Runner) recordNetworkError(kind string, direction capture.Direction, channel, connectionID, operation string, operationErr error) error {

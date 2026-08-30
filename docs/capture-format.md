@@ -24,11 +24,19 @@ A capture with `completeness.complete` set to `false` is still useful. The adjac
 
 `events.jsonl` contains one JSON object per newline-terminated line. Sequence numbers start at one and define the canonical order. Each event also has UTC wall time, Unix nanoseconds, and elapsed monotonic nanoseconds from capture start. Nanosecond fields are decimal JSON strings so JavaScript and other limited-number readers do not lose precision.
 
-Event kinds are namespaced strings such as `session.open`, `transport.payload`, `packet.raw`, `packet.decoded`, `packet.decode_error`, `resource_pack.archive`, and `capture.limit`.
+Event kinds are namespaced strings such as `session.open`, `session.connection_metadata`, `session.game_data`, `session.spawned`, `transport.payload`, `packet.raw`, `packet.decoded`, `packet.decode_error`, `resource_pack.archive`, and `capture.limit`.
 
 Connection and protocol context remains explicit through session ID, connection ID, hop, channel, logical direction, stage, source, and destination fields. A parent sequence can link a derived event to an earlier observation when the adapter can prove the relationship.
 
 Decoded packet fields are stored in the optional `data` object. Each struct carries its Go type. Binary fields are summarized with their size, SHA-256 digest, and an optional short preview. The exact packet payload remains available through the raw packet event and blob reference.
+
+Gophertunnel consumes some login and spawn packets before the normal forwarding loops can return them. The packet hook still retains their exact payloads as `packet.raw`. BedrockDebugProxy also records derived snapshots so later analysis does not have to decode every pre-play packet again.
+
+- `session.connection_metadata` records the downstream or upstream role, authentication state, negotiated protocol, identity data, and decoded `ClientData` fields exposed by the active gophertunnel connection.
+- `session.game_data` records a bounded decoded view of the `GameData` structure obtained from the upstream connection immediately before the same in-memory value is passed to downstream `StartGame`.
+- `session.spawned` records the latency, client-cache state, and chunk radius exposed for both connections when the spawn handshake completes.
+
+These snapshots use the same bounded structured encoder as decoded packet views. Binary login fields such as skin, cape, and geometry data become size, digest, and preview metadata rather than a second full copy. The authoritative Login and StartGame payloads remain their `packet.raw` blobs. Connection snapshots contain player and device identifiers and are sensitive even without full binary fields.
 
 A `resource_pack.archive` event references the exact archive retained by the adapter after download. Its data includes the pack UUID, version, manifest, byte length, computed checksum, delivery mechanism, feature flags, download URL when present, and content key when supplied by the server. The archive is stored before any decryption or extraction.
 
