@@ -1,5 +1,27 @@
 # Capture analysis and export
 
+## Live output and saved data
+
+One `run` invocation writes `events.jsonl` and content-addressed blobs throughout the session. It does not hold the complete capture in memory until shutdown. `Ctrl+C` closes and synchronizes the files, finalizes the manifest, and runs integrity verification. Analysis and export commands are optional consumers of that evidence, not required save steps.
+
+The current output is not a ready-to-browse asset collection. Resource-pack archive blobs contain ZIP bytes even though the blob filename ends in `.bin`. Skin and cape image bytes, entity state, observed chunks, block changes, and inventory data remain in packet evidence rather than dedicated PNGs, categorized folders, or a reconstructed world. No current command performs those asset extractions. A complete playable world cannot be assumed from the chunks and updates that happened to reach one client.
+
+Counts such as `PlayerSkin`, `PlayerList`, `AddActor`, `LevelChunk`, and `InventoryContent` count packet events. One packet can describe multiple objects, and an object can appear in many packets. These counts are not unique asset or object totals. `resource_pack.archive` counts recorded archive events. The event's blob reference locates the retained archive.
+
+Live packet summaries are only operator navigation. Labels, channels, directions, totals, and selected packet names remain readable without color. On a truecolor terminal the labels use the following Minecraft RGB palette. Message text keeps the terminal's default foreground.
+
+| Output | Minecraft color | Hex |
+| --- | --- | --- |
+| Timestamp | Gray | `#AAAAAA` |
+| INFO | Gold | `#FFAA00` |
+| Client to server | Aqua | `#55FFFF` |
+| Server to client | Green | `#55FF55` |
+| TRANSFER | Light purple | `#FF55FF` |
+| WARN | Yellow | `#FFFF55` |
+| ERROR | Red | `#FF5555` |
+
+These classic RGB values were cross-checked against [Adventure's named Minecraft text colors at v4.24.0](https://raw.githubusercontent.com/KyoriPowered/adventure/v4.24.0/api/src/main/java/net/kyori/adventure/text/format/NamedTextColor.java) on 2026-08-31. This is a palette reference, not a dependency or source-code import. Output redirection disables generated color escapes, as does a present `NO_COLOR` environment variable. A terminal without truecolor support may approximate the palette. Color does not carry information missing from the text labels.
+
 ## Analysis contract
 
 `bedrock-debug-proxy analyze CAPTURE_DIRECTORY` verifies the capture and then emits one deterministic JSON object. The summary contains generator build identity, configured and negotiated protocol values, session milestones, capture status and completeness, manifest and observed counts, sorted event dimensions, packet combinations, content-addressed artifact totals, resource-pack metadata, grouped errors, and every verifier issue.

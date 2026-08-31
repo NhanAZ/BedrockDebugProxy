@@ -2,7 +2,10 @@ package proxy
 
 import (
 	"bytes"
+	"fmt"
 	"log/slog"
+	"os"
+	"path/filepath"
 	"strings"
 	"testing"
 	"time"
@@ -68,5 +71,80 @@ func TestLiveReporterExplainsSelfSignedLANLoginOnce(t *testing.T) {
 	text := output.String()
 	if strings.Count(text, "--allow-unauthenticated-client") != 1 {
 		t.Fatalf("output = %s", text)
+	}
+}
+
+func TestLiveReporterUsesMinecraftRGBPalette(t *testing.T) {
+	tests := []struct {
+		name  string
+		label string
+		color string
+		emit  func(*liveReporter)
+	}{
+		{"info", "INFO", "\x1b[38;2;255;170;0m", func(r *liveReporter) { r.Info("Connected") }},
+		{"client", "C->S", "\x1b[38;2;85;255;255m", func(r *liveReporter) {
+			r.Packet(capture.DirectionClientToServer, &packet.PlayerAuthInput{})
+		}},
+		{"server", "S->C", "\x1b[38;2;85;255;85m", func(r *liveReporter) {
+			r.Packet(capture.DirectionServerToClient, &packet.LevelChunk{})
+		}},
+		{"transfer", "TRANSFER", "\x1b[38;2;255;85;255m", func(r *liveReporter) {
+			r.Packet(capture.DirectionServerToClient, &packet.Transfer{Address: "next.example.org", Port: 19132})
+		}},
+		{"warning", "WARN", "\x1b[38;2;255;255;85m", func(r *liveReporter) {
+			r.LibraryLog("upstream", slog.LevelWarn, "Warning")
+		}},
+		{"error", "ERROR", "\x1b[38;2;255;85;85m", func(r *liveReporter) {
+			r.LibraryLog("upstream", slog.LevelError, "Error")
+		}},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			var output bytes.Buffer
+			r := newLiveReporterWithClock(&output, func() time.Time {
+				return time.Date(2026, time.August, 31, 12, 0, 0, 0, time.UTC)
+			})
+			r.color = true
+			tt.emit(r)
+			r.Close()
+
+			prefix := "\x1b[38;2;170;170;170m[12:00:00.000]\x1b[0m " + tt.color + fmt.Sprintf("%-17s", tt.label) + "\x1b[0m "
+			if !strings.Contains(output.String(), prefix) {
+				t.Fatalf("missing Minecraft color prefix %q in %q", prefix, output.String())
+			}
+			if !strings.HasSuffix(output.String(), "\n") {
+				t.Fatalf("output has no final newline: %q", output.String())
+			}
+		})
+	}
+}
+
+func TestLiveReporterLeavesRedirectedOutputUncolored(t *testing.T) {
+	var output bytes.Buffer
+	r := newLiveReporter(&output)
+	r.Info("Connected")
+	r.Packet(capture.DirectionClientToServer, &packet.PlayerAuthInput{})
+	r.LibraryLog("upstream", slog.LevelError, "Error")
+	r.Close()
+	if strings.Contains(output.String(), "\x1b") {
+		t.Fatalf("redirected output contains terminal escapes: %q", output.String())
+	}
+
+	file, err := os.Create(filepath.Join(t.TempDir(), "console.log"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer func() { _ = file.Close() }()
+	if supportsColor(file) {
+		t.Fatal("regular file output must not enable colors")
+	}
+}
+
+func TestLiveReporterRespectsNoColor(t *testing.T) {
+	for _, value := range []string{"", "1"} {
+		t.Setenv("NO_COLOR", value)
+		if supportsColor(os.Stdout) {
+			t.Fatal("NO_COLOR must disable colors, including when present but empty")
+		}
 	}
 }

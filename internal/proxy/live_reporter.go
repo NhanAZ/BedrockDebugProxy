@@ -20,13 +20,15 @@ const (
 	liveSummaryInterval = time.Second
 	liveSummaryPerSide  = 4
 	ansiReset           = "\x1b[0m"
-	ansiDim             = "\x1b[2m"
-	ansiBlue            = "\x1b[94m"
-	ansiCyan            = "\x1b[96m"
-	ansiGreen           = "\x1b[92m"
-	ansiYellow          = "\x1b[93m"
-	ansiMagenta         = "\x1b[95m"
-	ansiRed             = "\x1b[91m"
+	// Minecraft RGB values keep labels independent of the terminal's 16-color theme.
+	// The palette and reference are documented in docs/analysis-and-export.md.
+	ansiGray    = "\x1b[38;2;170;170;170m" // #AAAAAA
+	ansiGold    = "\x1b[38;2;255;170;0m"   // #FFAA00
+	ansiCyan    = "\x1b[38;2;85;255;255m"  // #55FFFF
+	ansiGreen   = "\x1b[38;2;85;255;85m"   // #55FF55
+	ansiYellow  = "\x1b[38;2;255;255;85m"  // #FFFF55
+	ansiMagenta = "\x1b[38;2;255;85;255m"  // #FF55FF
+	ansiRed     = "\x1b[38;2;255;85;85m"   // #FF5555
 )
 
 type livePacketKey struct {
@@ -81,7 +83,7 @@ func (r *liveReporter) Info(format string, args ...any) {
 	defer r.mu.Unlock()
 	now := r.now()
 	r.flushLocked(now)
-	r.writeLocked(now, "INFO", ansiBlue, fmt.Sprintf(format, args...))
+	r.writeLocked(now, "INFO", ansiGold, fmt.Sprintf(format, args...))
 }
 
 func (r *liveReporter) RawPacket(channel string, direction capture.Direction, header packet.Header) {
@@ -238,7 +240,7 @@ func (r *liveReporter) writeLocked(now time.Time, label, color, message string) 
 	timestamp := "[" + now.Format("15:04:05.000") + "]"
 	label = fmt.Sprintf("%-17s", label)
 	if r.color {
-		timestamp = ansiDim + timestamp + ansiReset
+		timestamp = ansiGray + timestamp + ansiReset
 		label = color + label + ansiReset
 	}
 	_, _ = fmt.Fprintf(r.output, "%s %s %s\n", timestamp, label, message)
