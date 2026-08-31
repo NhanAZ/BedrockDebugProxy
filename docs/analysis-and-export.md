@@ -4,7 +4,7 @@
 
 One `run` invocation writes `events.jsonl` and content-addressed blobs throughout the session. It does not hold the complete capture in memory until shutdown. `Ctrl+C` closes and synchronizes the files, finalizes the manifest, and runs integrity verification. Analysis and export commands are optional consumers of that evidence, not required save steps.
 
-The current output is not a ready-to-browse asset collection. Resource-pack archive blobs contain ZIP bytes even though the blob filename ends in `.bin`. Skin and cape image bytes, entity state, observed chunks, block changes, and inventory data remain in packet evidence rather than dedicated PNGs, categorized folders, or a reconstructed world. No current command performs those asset extractions. A complete playable world cannot be assumed from the chunks and updates that happened to reach one client.
+Alongside canonical blobs, every new `run` automatically creates named pack ZIPs, skin/cape PNGs, and categorized JSONL under `artifacts/`. No extra extraction command is needed. The [folder guide](session-artifacts.md) explains source references, completion status, privacy, limits, and failure behavior. A complete playable world cannot be assumed from the chunks and updates that happened to reach one client.
 
 Counts such as `PlayerSkin`, `PlayerList`, `AddActor`, `LevelChunk`, and `InventoryContent` count packet events. One packet can describe multiple objects, and an object can appear in many packets. These counts are not unique asset or object totals. `resource_pack.archive` counts recorded archive events. The event's blob reference locates the retained archive.
 
@@ -55,5 +55,7 @@ The command verifies referenced blobs before streaming and exits with status 1 i
 ## Portable export
 
 `export` accepts only a closed capture with no verifier issues. It creates a deterministic, uncompressed ZIP-compatible `.bdpcap` file outside the source directory without replacing any existing file. The CLI returns the absolute output path, archive SHA-256, byte length, entry count, and whether decrypted resource-pack artifacts are present as JSON. When they are present, it also writes a warning to standard error that the project license grants no ownership or redistribution rights for those assets.
+
+Automatic `artifacts/` folders are disposable convenience views and are not included in `.bdpcap`. Their source events and blobs remain part of the canonical export.
 
 Uncompressed entries preserve exact bytes and avoid wasting CPU on already-compressed or encrypted payloads. Fixed archive metadata makes the digest reproducible for the same capture. Consumers must still run `verify` after extraction rather than trusting the container alone. An export is a local copy, not a publication permission or a change to the ownership of captured content.

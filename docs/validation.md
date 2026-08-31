@@ -56,6 +56,7 @@ A report cannot claim `pass` unless `normal_session=pass`, every other manual ch
 - Client-to-server and server-to-client events were observed.
 - Decoded packet events were observed.
 - No packet decode, structured snapshot, resource-pack decryption, or other blocking error event was recorded.
+- Sessions declaring automatic artifact folders have an error-free completed `artifacts/status.json` matching the capture ID, build revision, and final event sequence. See [session artifacts](session-artifacts.md) for the output and its limits.
 
 The manifest `complete` flag remains in the report but is not by itself a pass gate. The current capture schema sets it to `false` whenever a known observation boundary is declared, including the intentional absence of raw UDP and RakNet acknowledgement frames. The stricter pass gate uses the verifier plus explicit write, dropped, and truncated counters so a documented scope boundary is not confused with data loss inside the supported boundary.
 

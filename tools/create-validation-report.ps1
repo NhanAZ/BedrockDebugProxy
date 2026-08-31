@@ -158,6 +158,30 @@ try {
         no_blocking_error_events = $blockingErrorEvents -eq 0
         no_resource_pack_decrypt_errors = $packDecryptErrorCount -eq 0
     }
+    $captureManifest = Get-Content -LiteralPath (Join-Path $capturePath "manifest.json") -Raw | ConvertFrom-Json
+    $captureOptions = Get-ObjectProperty $captureManifest "options" @{}
+    $captureValues = Get-ObjectProperty $captureOptions "values" @{}
+    $artifactFormat = [string](Get-ObjectProperty $captureValues "automatic_artifacts" "")
+    if ($artifactFormat -ne "") {
+        $artifactComplete = $false
+        $artifactStatusPath = Join-Path $capturePath "artifacts/status.json"
+        if (Test-Path -LiteralPath $artifactStatusPath -PathType Leaf) {
+            try {
+                $artifactStatus = Get-Content -LiteralPath $artifactStatusPath -Raw | ConvertFrom-Json
+                $artifactBuild = Get-ObjectProperty $artifactStatus "generator" @{}
+                $artifactComplete = $artifactFormat -eq "bedrockdebugproxy.artifacts.v1" -and
+                    [string](Get-ObjectProperty $artifactStatus "schema" "") -eq $artifactFormat -and
+                    [string](Get-ObjectProperty $artifactStatus "state" "") -eq "complete" -and
+                    [string](Get-ObjectProperty $artifactStatus "capture_id" "") -eq [string](Get-ObjectProperty $analysis "capture_id" "") -and
+                    [string](Get-ObjectProperty $artifactBuild "commit" "") -eq $commit -and
+                    [uint64](Get-ObjectProperty $artifactStatus "errors" 1) -eq 0 -and
+                    [uint64](Get-ObjectProperty $artifactStatus "last_source_sequence" 0) -eq [uint64](Get-ObjectProperty $analysis "observed_events" 0)
+            } catch {
+                Write-Warning "Automatic artifact status is unreadable. This capture cannot receive a passing validation report."
+            }
+        }
+        $automaticRequirements["artifact_folders_complete"] = $artifactComplete
+    }
     $automaticChecksPassed = -not ($automaticRequirements.Values -contains $false)
     $manualChecksPassed = $manualChecks.Count -gt 0 -and $manualChecksByName.ContainsKey("normal_session") -and
         $manualChecksByName["normal_session"] -eq "pass" -and -not ($manualChecksByName.Values -contains "fail") -and

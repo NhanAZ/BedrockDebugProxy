@@ -16,6 +16,7 @@ import (
 	"time"
 
 	"github.com/NhanAZ/BedrockDebugProxy/internal/analysis"
+	"github.com/NhanAZ/BedrockDebugProxy/internal/artifacts"
 	"github.com/NhanAZ/BedrockDebugProxy/internal/authcache"
 	"github.com/NhanAZ/BedrockDebugProxy/internal/buildinfo"
 	"github.com/NhanAZ/BedrockDebugProxy/internal/capture"
@@ -170,6 +171,7 @@ func runProxy(args []string, stdout, stderr io.Writer) int {
 			"protocol_id":            strconv.FormatInt(int64(protocol.CurrentProtocol), 10),
 			"game_version":           protocol.CurrentVersion,
 			"decrypt_resource_packs": strconv.FormatBool(*decryptResourcePacks),
+			"automatic_artifacts":    artifacts.Schema,
 		},
 		Limitations: limitations,
 	})
@@ -199,6 +201,17 @@ func runProxy(args []string, stdout, stderr io.Writer) int {
 		_, _ = fmt.Fprintf(stderr, "Configure proxy - %v\n", err)
 		return 2
 	}
+	views, err := artifacts.Start(recorder.Root(), protocol.CurrentProtocol, func() {
+		_, _ = fmt.Fprintln(stderr, "Automatic artifact output encountered an error. The original capture is unchanged. See artifacts/status.json and artifacts/errors.jsonl.")
+		_ = recorder.AddLimitation("Automatic artifact output encountered an error; inspect artifacts/status.json and artifacts/errors.jsonl. Original capture evidence is retained")
+	})
+	if err != nil {
+		_ = target.Close()
+		_ = recorder.Close("failed", err)
+		_, _ = fmt.Fprintf(stderr, "Create automatic artifact folders - %v\n", err)
+		return 1
+	}
+	_, _ = fmt.Fprintf(stdout, "Automatic artifact folders %s\n", filepath.Join(recorder.Root(), "artifacts"))
 	runErr := runner.Run(ctx)
 	runErr = errors.Join(runErr, target.Close())
 	status := "closed"
@@ -209,6 +222,10 @@ func runProxy(args []string, stdout, stderr io.Writer) int {
 	if closeErr != nil {
 		runErr = errors.Join(runErr, closeErr)
 	}
+	_, _ = fmt.Fprintln(stdout, "Finishing automatic artifact folders...")
+	artifactStatus, artifactErr := views.Finish()
+	runErr = errors.Join(runErr, artifactErr)
+	_, _ = fmt.Fprintf(stdout, "Automatic artifacts %s through event %d.\n", artifactStatus.State, artifactStatus.LastSequence)
 	verification, verifyErr := capture.Verify(recorder.Root())
 	if verifyErr != nil {
 		runErr = errors.Join(runErr, verifyErr)

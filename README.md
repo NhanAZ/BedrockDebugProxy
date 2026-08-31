@@ -40,7 +40,7 @@ Then follow these steps.
 5. Press `Ctrl+C` in the proxy terminal when finished.
 6. Wait for the capture verification result. The exact output path is printed when the proxy starts and is normally `captures\session-<UTC timestamp>`.
 
-That capture directory is the debug result. Events and blobs are written during play. `Ctrl+C` closes and verifies the session. No additional command is needed to save the capture. This is structured evidence, not an extracted asset folder or a playable world. Keep it local because it may contain identifiers, chat, server data, resource packs, and other sensitive content.
+That capture directory is the debug result. During play, `artifacts/` also fills with named pack ZIPs, skin/cape PNGs, and JSONL grouped by entities, world/chunks, blocks, inventory, and skins. No extra export command is needed. `Ctrl+C` finishes the folders and verifies the original capture. These are observed data, not a complete playable world. Keep them local because they may contain identifiers, chat, server data, resource packs, and other sensitive content. See the [folder guide](docs/session-artifacts.md).
 
 `0.0.0.0` exposes the listener to reachable network interfaces. Use it only on a trusted network with an appropriate firewall. Use `127.0.0.1:19132` when only local software needs to connect.
 
@@ -112,7 +112,7 @@ The following commands are optional analysis and packaging tools, not extra step
 .\bin\bedrock-debug-proxy.exe export C:\path\to\capture C:\path\to\session.bdpcap
 ```
 
-The canonical capture is an event stream plus content-addressed blobs. Automatic asset folders are not implemented. `inspect` locates evidence and `export` packages the same capture. Neither extracts skin PNGs, pack directories, or a playable world. Packet counts are event counts, not counts of unique players, assets, or chunks. See [capture output and live colors](docs/analysis-and-export.md#live-output-and-saved-data) for the distinction.
+The canonical capture is an event stream plus content-addressed blobs. Automatic convenience folders are described in the [folder guide](docs/session-artifacts.md). `inspect` locates original evidence and `export` packages the canonical capture, not the convenience folders. Packet counts are event counts, not counts of unique players, assets, or chunks. See [capture output and live colors](docs/analysis-and-export.md#live-output-and-saved-data) for the distinction.
 
 ```powershell
 # Resource-pack archives and their blob paths.
@@ -143,7 +143,8 @@ Current known boundaries include the following.
 - Raw UDP datagrams and RakNet acknowledgement, fragmentation, retransmission, and loss details are outside the current capture boundary.
 - Transport payloads are captured at the post-transport application boundary.
 - Downstream clients must accept offered resource packs. The current adapter cannot mirror an upstream optional-pack policy.
-- Opt-in resource-pack decryption supports only the documented AES-256-CFB8 contents format and does not extract pack files to the filesystem.
+- Opt-in resource-pack decryption supports only the documented AES-256-CFB8 contents format. Original and supported plaintext ZIPs appear under `artifacts/packs/`, without unpacking their entries.
+- Automatic artifact folders add background CPU and disk work. They can lag during play and have explicit view limits. Check `artifacts/status.json` after shutdown.
 
 ## Developer path
 

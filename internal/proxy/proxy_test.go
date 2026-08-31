@@ -15,6 +15,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/NhanAZ/BedrockDebugProxy/internal/artifacts"
 	"github.com/NhanAZ/BedrockDebugProxy/internal/capture"
 	"github.com/go-gl/mathgl/mgl32"
 	"github.com/google/uuid"
@@ -317,6 +318,11 @@ func TestRunnerForwardsBidirectionalPacketsAndCapturesSession(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
+	views, err := artifacts.Start(root, protocol.CurrentProtocol, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() { _ = recorder.Close("closed", nil); _, _ = views.Finish() })
 	output := newListeningAddressWriter()
 	runner, err := New(Config{
 		ListenAddress:              "127.0.0.1:0",
@@ -501,6 +507,17 @@ func TestRunnerForwardsBidirectionalPacketsAndCapturesSession(t *testing.T) {
 	}
 	if len(verification.Issues) != 0 {
 		t.Fatalf("capture issues = %v", verification.Issues)
+	}
+	viewStatus, viewErr := views.Finish()
+	if viewErr != nil || viewStatus.State != "complete" || viewStatus.LastSequence != verification.Events {
+		viewErrors, _ := os.ReadFile(filepath.Join(root, "artifacts/errors.jsonl"))
+		t.Fatalf("artifact view = %+v, error = %v, details = %s", viewStatus, viewErr, viewErrors)
+	}
+	for _, path := range []string{"skins/index.jsonl", "observations/entities.jsonl", "observations/world.jsonl", "observations/blocks.jsonl", "observations/inventory.jsonl"} {
+		info, err := os.Stat(filepath.Join(root, "artifacts", path))
+		if err != nil || info.Size() == 0 {
+			t.Fatalf("missing live artifact %s: %v", path, err)
+		}
 	}
 	var negotiated, spawned, closed bool
 	var connectionViews, loginSkinMetadataViews, gameDataViews int

@@ -17,7 +17,7 @@ Each `resource_pack.archive` event records the following evidence.
 
 The recorder streams the archive to disk and hashes it in one pass. This avoids allocating a second full copy of a large pack. The resulting digest is checked against the checksum computed by gophertunnel from the downloaded archive.
 
-Archives are saved during the session, not by a later `export` command. Each archive event's `blob.path` locates ZIP bytes under `blobs/sha256/`, with a content-addressed `.bin` filename. The current version does not create named `.zip` copies or extracted asset folders. `export` only packages the capture into a portable `.bdpcap` container.
+Archives are saved during the session, not by a later `export` command. Each archive event's `blob.path` locates ZIP bytes under `blobs/sha256/`, with a content-addressed `.bin` filename. A background reader also creates named ZIP copies and an index under `artifacts/packs/`. It does not unpack archive entries. `export` only packages the canonical capture into a portable `.bdpcap` container. See [session artifacts](session-artifacts.md).
 
 ## Ordering evidence
 
@@ -27,7 +27,7 @@ The current gophertunnel listener handles requested resource packs sequentially.
 
 The server-supplied content key is preserved because it is required to analyze encrypted pack entries. The archive itself is never overwritten. Decryption is disabled by default and can be requested with `--decrypt-resource-packs`.
 
-Select that flag on the initial `run` command. Supported plaintext archives are derived and stored during the same session, but remain ZIP blobs rather than extracted folders. The flag does not change skin, chunk, entity, or inventory capture. It only enables the resource-pack derivation described below.
+Select that flag on the initial `run` command. Supported plaintext archives are derived and stored during the same session, with independent ZIP copies under `artifacts/packs/decrypted/`. They are not unpacked into individual pack files. The flag does not change skin, chunk, entity, or inventory capture. It only enables the resource-pack derivation described below.
 
 For the documented 32-byte-key AES-256-CFB8 format, an enabled run writes the following derived events with the original `resource_pack.archive` sequence as their parent.
 

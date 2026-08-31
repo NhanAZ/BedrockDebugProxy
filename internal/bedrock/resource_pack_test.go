@@ -13,7 +13,9 @@ import (
 	"path/filepath"
 	"testing"
 
+	"github.com/NhanAZ/BedrockDebugProxy/internal/artifacts"
 	"github.com/NhanAZ/BedrockDebugProxy/internal/capture"
+	"github.com/sandertv/gophertunnel/minecraft/protocol"
 	"github.com/sandertv/gophertunnel/minecraft/resource"
 )
 
@@ -30,6 +32,7 @@ func TestRecordResourcePacksPreservesArchiveMetadataAndContentKey(t *testing.T) 
 		t.Fatal(err)
 	}
 	server := &net.UDPAddr{IP: net.ParseIP("192.0.2.10"), Port: 19132}
+	startPackArtifactCheck(t, root, recorder, 1)
 	proxy := &net.UDPAddr{IP: net.ParseIP("127.0.0.1"), Port: 50000}
 	if err := RecordResourcePacks(context.Background(), recorder, "session-test", "upstream-test", 1, server, proxy, []*resource.Pack{pack}, ResourcePackCaptureOptions{}); err != nil {
 		t.Fatal(err)
@@ -90,6 +93,7 @@ func TestRecordResourcePacksStoresDerivedDecryptionArtifacts(t *testing.T) {
 		t.Fatal(err)
 	}
 	server := &net.UDPAddr{IP: net.ParseIP("192.0.2.10"), Port: 19132}
+	startPackArtifactCheck(t, root, recorder, 2)
 	proxy := &net.UDPAddr{IP: net.ParseIP("127.0.0.1"), Port: 50000}
 	if err := RecordResourcePacks(context.Background(), recorder, "session-test", "upstream-test", 1, server, proxy, []*resource.Pack{pack}, ResourcePackCaptureOptions{Decrypt: true}); err != nil {
 		t.Fatal(err)
@@ -183,6 +187,51 @@ func TestRecordResourcePacksKeepsRawArchiveWhenDecryptionFails(t *testing.T) {
 	if !bytes.Equal(stored, archive) {
 		t.Fatal("failed decryption changed or discarded the raw archive")
 	}
+}
+
+func startPackArtifactCheck(t *testing.T, root string, recorder *capture.Recorder, archives int) {
+	t.Helper()
+	views, err := artifacts.Start(root, protocol.CurrentProtocol, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() {
+		_ = recorder.Close("closed", nil)
+		status, err := views.Finish()
+		if err != nil || status.State != "complete" {
+			t.Errorf("pack view = %+v, %v", status, err)
+			return
+		}
+		data, err := os.ReadFile(filepath.Join(root, "artifacts/packs/index.jsonl"))
+		if err != nil {
+			t.Error(err)
+			return
+		}
+		lines := bytes.Split(bytes.TrimSpace(data), []byte{'\n'})
+		if len(lines) != archives {
+			t.Errorf("pack views = %d, want %d", len(lines), archives)
+		}
+		for _, line := range lines {
+			var entry struct {
+				Path   string          `json:"path"`
+				Source capture.BlobRef `json:"source_blob"`
+			}
+			if err := json.Unmarshal(line, &entry); err != nil {
+				t.Error(err)
+				continue
+			}
+			original, err := os.ReadFile(filepath.Join(root, entry.Source.Path))
+			if err != nil {
+				t.Error(err)
+				continue
+			}
+			copyData, err := os.ReadFile(filepath.Join(root, entry.Path))
+			if err != nil || !bytes.Equal(original, copyData) {
+				t.Errorf("pack copy differs: %v", err)
+			}
+			_ = readTestZip(t, copyData)
+		}
+	})
 }
 
 func testResourcePackArchive(t *testing.T) []byte {
