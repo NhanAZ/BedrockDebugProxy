@@ -81,7 +81,7 @@ Every official release requires a full client session and a revision-matched rep
 - Galaxite
 - Lifeboat
 - Mineville Zeqa (`experience:Mineville Zeqa`)
-- Enchanted
+- Enchanted (`experience:Enchanted`)
 
 For each server, check connection, authentication, resource packs when offered, spawn, both traffic directions, packet decoding, stability, and unexplained protocol or decode errors. Do not assume the six servers use the same packet order, timing, optional packets, software, or infrastructure.
 
