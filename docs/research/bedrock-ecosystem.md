@@ -56,6 +56,12 @@ The upstream project is a broad Bedrock tooling suite rather than a narrow captu
 
 The repository persists an OAuth token and reconstructs a refresh source in [`utils/auth/auth.go`](https://github.com/bedrock-tool/bedrocktool/blob/d7788b57acbdd3eb93ac1efdd4f1107b78aea9b0/utils/auth/auth.go), [`utils/auth/account.go`](https://github.com/bedrock-tool/bedrocktool/blob/d7788b57acbdd3eb93ac1efdd4f1107b78aea9b0/utils/auth/account.go), and [`utils/auth/files.go`](https://github.com/bedrock-tool/bedrocktool/blob/d7788b57acbdd3eb93ac1efdd4f1107b78aea9b0/utils/auth/files.go). These files were reviewed on 2026-08-31 as evidence that persistent device authentication is established practice in this ecosystem. BedrockDebugProxy's cache was implemented independently around gophertunnel's public refresh API, with a project-specific path, size bound, replacement behavior, tests, and operator warnings.
 
+### Follow-up authentication review
+
+The current `bedrocktool` source was reviewed on 2026-09-13 at [`fcc057c418a28f1429411f0cd2d0c2a2bd3df7ba`](https://github.com/bedrock-tool/bedrocktool/tree/fcc057c418a28f1429411f0cd2d0c2a2bd3df7ba). Its GUI displays the verification URI and user code through an [`AuthCodeHandler`](https://github.com/bedrock-tool/bedrocktool/blob/fcc057c418a28f1429411f0cd2d0c2a2bd3df7ba/ui/messages/events.go), then opens `https://login.live.com/oauth20_remoteconnect.srf?otc=<code>` when the displayed URI is clicked in [`authpopup.go`](https://github.com/bedrock-tool/bedrocktool/blob/fcc057c418a28f1429411f0cd2d0c2a2bd3df7ba/ui/gui/popups/authpopup.go). That handler API comes from bedrocktool's pinned [`olebeck/gophertunnel` submodule at `b614cb65d41267941c29b2e0041e8cf6a7384271`](https://github.com/olebeck/gophertunnel/blob/b614cb65d41267941c29b2e0041e8cf6a7384271/minecraft/auth/live.go), not the Sandertv gophertunnel version used by this project.
+
+BedrockDebugProxy keeps Sandertv gophertunnel unchanged and adapts its existing device-auth writer to print the same direct login URL, while retaining the original verification URI and code as a fallback. This is an independently implemented output adaptation, not copied bedrocktool source, and it does not alter the authentication protocol or packet path.
+
 ### PrismarineJS bedrock-protocol
 
 - Source reviewed at [`6011e261c1b028f92d732348dc91339fb12275dd`](https://github.com/PrismarineJS/bedrock-protocol/tree/6011e261c1b028f92d732348dc91339fb12275dd)

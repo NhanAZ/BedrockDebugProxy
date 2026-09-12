@@ -33,7 +33,7 @@ For example, the following command selects The Hive by its current Featured Expe
 
 Then follow these steps.
 
-1. Complete the Microsoft device login the first time. Later runs reuse the cached login until Microsoft requires authentication again.
+1. Complete the Microsoft device login the first time. The terminal prints a direct `login.live.com` URL that can be opened with Ctrl+click in Windows Terminal. If the direct URL is unavailable, use the displayed `https://www.microsoft.com/link` address and code. Later runs reuse the cached login until Microsoft requires authentication again.
 2. Wait until the terminal prints `Listening on`. The proxy cannot accept Minecraft connections while authentication and Experience resolution are still in progress.
 3. In Minecraft Bedrock, connect to port `19132` on the computer running the proxy. Use that computer's LAN address from another device. Do not enter `0.0.0.0` as the Minecraft server address.
 4. Join the server and reproduce the behavior you want to debug. The terminal prints connection transitions and compact one-second packet summaries while the full evidence is written to the capture.
