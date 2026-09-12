@@ -66,8 +66,12 @@ func Remove(path string) (bool, error) {
 // available. The cache contains a refresh token and must be treated as a secret.
 func New(path string, output io.Writer) (*Source, error) {
 	return newSource(path, output, sourceFactory{
-		device:  auth.WriterTokenSource,
-		refresh: auth.RefreshTokenSourceWriter,
+		device: func(w io.Writer) oauth2.TokenSource {
+			return auth.WriterTokenSource(newClickableAuthWriter(w))
+		},
+		refresh: func(token *oauth2.Token, w io.Writer) oauth2.TokenSource {
+			return auth.RefreshTokenSourceWriter(token, newClickableAuthWriter(w))
+		},
 	})
 }
 

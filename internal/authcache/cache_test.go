@@ -145,3 +145,42 @@ func TestRemoveRejectsNonRegularPath(t *testing.T) {
 		t.Fatalf("Remove() error = %v", err)
 	}
 }
+
+func TestRewriteDeviceAuthPromptProvidesClickableLoginURL(t *testing.T) {
+	got, ok := rewriteDeviceAuthPrompt("Authenticate at https://www.microsoft.com/link using the code MQR5BATV.\n")
+	if !ok {
+		t.Fatal("rewriteDeviceAuthPrompt() did not recognize the gophertunnel prompt")
+	}
+	want := "Authenticate at https://login.live.com/oauth20_remoteconnect.srf?otc=MQR5BATV (fallback: https://www.microsoft.com/link with code MQR5BATV)\n"
+	if got != want {
+		t.Fatalf("rewritten prompt = %q, want %q", got, want)
+	}
+}
+
+func TestRewriteDeviceAuthPromptLeavesOtherOutputUnchanged(t *testing.T) {
+	for _, input := range []string{
+		"Authentication successful.\n",
+		"Authenticate at https://www.microsoft.com/link without a code.\n",
+		"Authenticate at https://www.microsoft.com/link using the code .\n",
+	} {
+		if got, ok := rewriteDeviceAuthPrompt(input); ok || got != "" {
+			t.Fatalf("rewriteDeviceAuthPrompt(%q) = %q, %v; want no rewrite", input, got, ok)
+		}
+	}
+}
+
+func TestClickableAuthWriterRewritesPrompt(t *testing.T) {
+	var output bytes.Buffer
+	writer := newClickableAuthWriter(&output)
+	input := []byte("Authenticate at https://www.microsoft.com/link using the code MQR5BATV.\n")
+	n, err := writer.Write(input)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if n != len(input) {
+		t.Fatalf("Write() bytes = %d, want %d", n, len(input))
+	}
+	if !strings.Contains(output.String(), "https://login.live.com/oauth20_remoteconnect.srf?otc=MQR5BATV") {
+		t.Fatalf("writer output = %q", output.String())
+	}
+}
