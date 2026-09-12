@@ -39,6 +39,8 @@ func run(args []string, stdout, stderr io.Writer) int {
 	switch args[0] {
 	case "run":
 		return runProxy(args[1:], stdout, stderr)
+	case "logout":
+		return runLogout(args[1:], stdout, stderr)
 	case "verify":
 		return runVerify(args[1:], stdout, stderr)
 	case "inspect":
@@ -64,6 +66,37 @@ func run(args []string, stdout, stderr io.Writer) int {
 		printUsage(stderr)
 		return 2
 	}
+}
+
+func runLogout(args []string, stdout, stderr io.Writer) int {
+	flags := flag.NewFlagSet("logout", flag.ContinueOnError)
+	flags.SetOutput(stderr)
+	flags.Usage = func() {
+		_, _ = fmt.Fprintln(stderr, "Usage - bedrock-debug-proxy logout")
+	}
+	if err := flags.Parse(args); err != nil {
+		return 2
+	}
+	if flags.NArg() != 0 {
+		_, _ = fmt.Fprintf(stderr, "Unexpected positional arguments - %s\n", strings.Join(flags.Args(), " "))
+		return 2
+	}
+	cachePath, err := authcache.DefaultPath()
+	if err != nil {
+		_, _ = fmt.Fprintf(stderr, "Locate authentication cache - %v\n", err)
+		return 1
+	}
+	removed, err := authcache.Remove(cachePath)
+	if err != nil {
+		_, _ = fmt.Fprintf(stderr, "Logout - %v\n", err)
+		return 1
+	}
+	if removed {
+		_, _ = fmt.Fprintf(stdout, "Removed cached Microsoft authentication from %s.\n", cachePath)
+	} else {
+		_, _ = fmt.Fprintf(stdout, "No cached Microsoft authentication found at %s.\n", cachePath)
+	}
+	return 0
 }
 
 func runProxy(args []string, stdout, stderr io.Writer) int {
@@ -447,6 +480,7 @@ func printUsage(writer io.Writer) {
 	_, _ = fmt.Fprintln(writer)
 	_, _ = fmt.Fprintln(writer, "Usage")
 	_, _ = fmt.Fprintln(writer, "  bedrock-debug-proxy run --upstream HOST:PORT|experience:NAME [options]")
+	_, _ = fmt.Fprintln(writer, "  bedrock-debug-proxy logout")
 	_, _ = fmt.Fprintln(writer, "  bedrock-debug-proxy verify CAPTURE_DIRECTORY")
 	_, _ = fmt.Fprintln(writer, "  bedrock-debug-proxy inspect [filters] CAPTURE_DIRECTORY")
 	_, _ = fmt.Fprintln(writer, "  bedrock-debug-proxy analyze CAPTURE_DIRECTORY")

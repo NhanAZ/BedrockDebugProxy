@@ -39,6 +39,28 @@ func DefaultPath() (string, error) {
 	return filepath.Join(root, "BedrockDebugProxy", "auth-token.json"), nil
 }
 
+// Remove deletes the local Microsoft OAuth token cache. It does not revoke the
+// Microsoft session or sign out any other application using the account.
+func Remove(path string) (bool, error) {
+	if path == "" {
+		return false, errors.New("authentication cache path is empty")
+	}
+	info, err := os.Lstat(path)
+	if errors.Is(err, os.ErrNotExist) {
+		return false, nil
+	}
+	if err != nil {
+		return false, fmt.Errorf("inspect authentication cache: %w", err)
+	}
+	if !info.Mode().IsRegular() {
+		return false, fmt.Errorf("authentication cache %q is not a regular file", path)
+	}
+	if err := os.Remove(path); err != nil {
+		return false, fmt.Errorf("remove authentication cache: %w", err)
+	}
+	return true, nil
+}
+
 // New returns a token source that reuses and refreshes a cached Microsoft OAuth
 // token. Device authentication is requested only when no usable cached token is
 // available. The cache contains a refresh token and must be treated as a secret.

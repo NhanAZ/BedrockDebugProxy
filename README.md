@@ -58,7 +58,7 @@ By default, the downstream Minecraft connection must use Xbox authentication. Ad
 
 This flag does not disable upstream authentication. The same running listener continues to accept a Servers-tab connection, but it no longer verifies whether the connecting client used Xbox authentication. Any client that can reach the listener may use the proxy's authenticated upstream session, so this is intentionally not the default.
 
-On Windows, the Microsoft token cache is `%AppData%\BedrockDebugProxy\auth-token.json`. It contains authentication secrets, remains outside the repository, and must not be shared or committed. To change accounts, stop the proxy, delete this file, and start the proxy again.
+On Windows, the Microsoft token cache is `%AppData%\BedrockDebugProxy\auth-token.json`. It contains authentication secrets, remains outside the repository, and must not be shared or committed. To change accounts, stop the proxy and run `.\bin\bedrock-debug-proxy.exe logout`, then start the proxy again. This removes only the local cache; it does not revoke the Microsoft session or sign out other applications.
 
 If the binary does not exist yet, install the Go version declared in `go.mod`, keep the working tree clean, and build it once.
 
