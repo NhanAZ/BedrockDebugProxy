@@ -28,9 +28,10 @@ const (
 )
 
 type upstreamSlot struct {
-	once sync.Once
-	conn *minecraft.Conn
-	err  error
+	once          sync.Once
+	conn          *minecraft.Conn
+	resourcePacks []*resource.Pack
+	err           error
 }
 
 type Runner struct {
@@ -122,10 +123,13 @@ func (r *Runner) Run(ctx context.Context) error {
 		PacketFunc:             observer.PacketFunc("downstream", downstreamConnectionID),
 		FetchResourcePacks: func(_ login.IdentityData, clientData login.ClientData, _ []*resource.Pack) []*resource.Pack {
 			slot.once.Do(func() {
-				slot.conn, slot.err = r.connectUpstream(runCtx, upstreamNetwork, observer, upstreamLogger, live, clientData)
+				slot.conn, slot.resourcePacks, slot.err = r.connectUpstream(runCtx, upstreamNetwork, observer, upstreamLogger, live, clientData)
 			})
 			if slot.err != nil || slot.conn == nil {
 				return nil
+			}
+			if len(slot.resourcePacks) != 0 {
+				return slot.resourcePacks
 			}
 			return slot.conn.ResourcePacks()
 		},
@@ -258,16 +262,22 @@ func (r *Runner) Run(ctx context.Context) error {
 	return nil
 }
 
-func (r *Runner) connectUpstream(ctx context.Context, network bedrock.Network, observer *bedrock.Observer, logger *slog.Logger, live *liveReporter, clientData login.ClientData) (*minecraft.Conn, error) {
+func (r *Runner) connectUpstream(ctx context.Context, network bedrock.Network, observer *bedrock.Observer, logger *slog.Logger, live *liveReporter, clientData login.ClientData) (*minecraft.Conn, []*resource.Pack, error) {
 	if err := r.record("upstream.dial_start", capture.SeverityInfo, map[string]any{"address": r.config.UpstreamAddress}); err != nil {
-		return nil, err
+		return nil, nil, err
 	}
 	live.Info("Connecting upstream - %s", r.config.UpstreamAddress)
+	urlResourcePacks := newURLResourcePackCache(ctx)
+	recordPacket := observer.PacketFunc("upstream", upstreamConnectionID)
 	dialer := minecraft.Dialer{
-		TokenSource:                r.config.TokenSource,
-		ClientData:                 clientData,
-		ErrorLog:                   logger,
-		PacketFunc:                 observer.PacketFunc("upstream", upstreamConnectionID),
+		TokenSource: r.config.TokenSource,
+		ClientData:  clientData,
+		ErrorLog:    logger,
+		PacketFunc: func(header packet.Header, payload []byte, src, dst net.Addr) {
+			recordPacket(header, payload, src, dst)
+			urlResourcePacks.Observe(header, payload)
+		},
+		ResourcePackCache:          urlResourcePacks,
 		DisconnectOnUnknownPackets: false,
 		DisconnectOnInvalidPackets: false,
 		DownloadResourcePack: func(_ uuid.UUID, _ string, _, _ int) bool {
@@ -277,15 +287,20 @@ func (r *Runner) connectUpstream(ctx context.Context, network bedrock.Network, o
 	conn, err := dialer.DialContextNetwork(ctx, network, r.config.UpstreamAddress)
 	if err != nil {
 		_ = r.record("upstream.dial_error", capture.SeverityError, map[string]any{"error": err.Error(), "type": fmt.Sprintf("%T", err)})
-		return nil, fmt.Errorf("connect to upstream server: %w", err)
+		return nil, nil, fmt.Errorf("connect to upstream server: %w", err)
 	}
-	if err := bedrock.RecordResourcePacks(ctx, r.config.Recorder, sessionID, upstreamConnectionID, 1, conn.RemoteAddr(), conn.LocalAddr(), conn.ResourcePacks(), bedrock.ResourcePackCaptureOptions{
+	urlResourcePacks.WaitForOffer(ctx)
+	resourcePacks := conn.ResourcePacks()
+	if prefetched := urlResourcePacks.Packs(); len(prefetched) != 0 {
+		resourcePacks = prefetched
+	}
+	if err := bedrock.RecordResourcePacks(ctx, r.config.Recorder, sessionID, upstreamConnectionID, 1, conn.RemoteAddr(), conn.LocalAddr(), resourcePacks, bedrock.ResourcePackCaptureOptions{
 		Decrypt: r.config.DecryptResourcePacks,
 	}); err != nil {
 		_ = conn.Close()
-		return nil, err
+		return nil, nil, err
 	}
-	if count := len(conn.ResourcePacks()); count != 0 {
+	if count := len(resourcePacks); count != 0 {
 		derivation := "disabled; encrypted originals remain available"
 		if r.config.DecryptResourcePacks {
 			derivation = "enabled for supported encrypted archives"
@@ -297,13 +312,13 @@ func (r *Runner) connectUpstream(ctx context.Context, network bedrock.Network, o
 		"remote_address":      conn.RemoteAddr().String(),
 		"protocol_id":         conn.Proto().ID(),
 		"game_version":        conn.Proto().Ver(),
-		"resource_pack_count": len(conn.ResourcePacks()),
+		"resource_pack_count": len(resourcePacks),
 	}); err != nil {
 		_ = conn.Close()
-		return nil, err
+		return nil, nil, err
 	}
 	live.Info("Upstream connected - %s, Bedrock %s protocol %d", conn.RemoteAddr(), conn.Proto().Ver(), conn.Proto().ID())
-	return conn, nil
+	return conn, resourcePacks, nil
 }
 
 func startGame(client, server *minecraft.Conn, gameData minecraft.GameData) error {

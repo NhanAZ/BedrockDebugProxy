@@ -62,6 +62,12 @@ The current `bedrocktool` source was reviewed on 2026-09-13 at [`fcc057c418a28f1
 
 BedrockDebugProxy keeps Sandertv gophertunnel unchanged and adapts its existing device-auth writer to print the same direct login URL, while retaining the original verification URI and code as a fallback. This is an independently implemented output adaptation, not copied bedrocktool source, and it does not alter the authentication protocol or packet path.
 
+### Resource-pack URL behavior review
+
+The current upstream `bedrocktool` source was reviewed on 2026-09-13 at [`85d5cfe1545c8d853be2859144a8357539ffc0f2`](https://github.com/bedrock-tool/bedrocktool/tree/85d5cfe1545c8d853be2859144a8357539ffc0f2), with the corresponding fork reviewed at [`6754869bac3214e7f7c30e86c382ecac57a516c1`](https://github.com/NhanAZ-Tools/bedrocktool/tree/6754869bac3214e7f7c30e86c382ecac57a516c1). Both revisions contain URL-aware resource-pack handling in [`utils/proxy/resourcepacks/resourcepacks.go`](https://github.com/bedrock-tool/bedrocktool/blob/85d5cfe1545c8d853be2859144a8357539ffc0f2/utils/proxy/resourcepacks/resourcepacks.go). The handler separates packs with `DownloadURL`, downloads them, applies the advertised content key, and sends `PackResponseAllPacksDownloaded` after URL and chunk downloads complete. This explains why bedrocktool can join Enchanted where a plain gophertunnel dialer requests chunks instead.
+
+BedrockDebugProxy implements the same protocol-level outcome independently. Its per-connection `ResourcePackCache` observes the already-captured `ResourcePacksInfo` through gophertunnel's public `PacketFunc`, prefetches only the advertised HTTP(S) URL, validates UUID, version, and compressed size, and lets the unchanged gophertunnel state machine send its normal completion response. No bedrocktool source was copied or adapted. The URL remains in the reconstructed pack and in the raw capture, while failures remain visible through gophertunnel's cache warning and its normal chunk fallback. URL retrieval is limited to the current accepted connection and is not an offline pack downloader.
+
 ### PrismarineJS bedrock-protocol
 
 - Source reviewed at [`6011e261c1b028f92d732348dc91339fb12275dd`](https://github.com/PrismarineJS/bedrock-protocol/tree/6011e261c1b028f92d732348dc91339fb12275dd)
