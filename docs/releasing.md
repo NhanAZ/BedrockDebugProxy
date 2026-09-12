@@ -54,7 +54,7 @@ The first successful device login creates a per-user token cache, so later serve
 | `CubeCraft` | `experience:CubeCraft` | Connect, spawn, move, interact, and observe normal traffic |
 | `Galaxite` | `experience:Galaxite` | Connect, spawn, move, interact, and observe normal traffic |
 | `Lifeboat` | `experience:Lifeboat` | Connect, spawn, move, interact, and observe normal traffic |
-| `Mineville Zeqa` | `experience:Mineville` | Enter the Zeqa flow and observe it directly |
+| `Mineville Zeqa` | `experience:Mineville Zeqa` | Enter the Zeqa flow and observe it directly |
 | `Enchanted` | The maintainer-approved `HOST:PORT` | Connect, spawn, move, interact, and observe normal traffic |
 
 Use this command for an Experience target. Replace only the value after `--upstream` for each run.
