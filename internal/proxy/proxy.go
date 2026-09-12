@@ -9,6 +9,7 @@ import (
 	"net"
 	"reflect"
 	"sync"
+	"sync/atomic"
 
 	"github.com/NhanAZ/BedrockDebugProxy/internal/bedrock"
 	"github.com/NhanAZ/BedrockDebugProxy/internal/capture"
@@ -174,7 +175,9 @@ func (r *Runner) Run(ctx context.Context) error {
 	}
 	serverConn := slot.conn
 	defer func() { _ = serverConn.Close() }()
+	var shuttingDown atomic.Bool
 	stopConnections := context.AfterFunc(runCtx, func() {
+		shuttingDown.Store(true)
 		_ = clientConn.Close()
 		_ = serverConn.Close()
 	})
@@ -232,12 +235,13 @@ func (r *Runner) Run(ctx context.Context) error {
 
 	first := make(chan error, 2)
 	go func() {
-		first <- r.forward(clientConn, serverConn, failures, live, capture.DirectionClientToServer, "downstream", downstreamConnectionID)
+		first <- r.forward(clientConn, serverConn, failures, live, &shuttingDown, capture.DirectionClientToServer, "downstream", downstreamConnectionID)
 	}()
 	go func() {
-		first <- r.forward(serverConn, clientConn, failures, live, capture.DirectionServerToClient, "upstream", upstreamConnectionID)
+		first <- r.forward(serverConn, clientConn, failures, live, &shuttingDown, capture.DirectionServerToClient, "upstream", upstreamConnectionID)
 	}()
 	bridgeErr := <-first
+	shuttingDown.Store(true)
 	_ = clientConn.Close()
 	_ = serverConn.Close()
 	secondErr := <-first
@@ -332,25 +336,38 @@ func newConnectionMetadata(role string, conn *minecraft.Conn) connectionMetadata
 	}
 }
 
-func (r *Runner) forward(source, destination *minecraft.Conn, failures *bedrock.FailureSink, live *liveReporter, direction capture.Direction, sourceChannel, connectionID string) error {
+func (r *Runner) forward(source, destination *minecraft.Conn, failures *bedrock.FailureSink, live *liveReporter, shuttingDown *atomic.Bool, direction capture.Direction, sourceChannel, connectionID string) error {
 	for {
 		if err := failures.Err(); err != nil {
 			return err
 		}
 		decoded, err := source.ReadPacket()
 		if err != nil {
-			captureErr := r.recordNetworkError("bridge.read_error", direction, sourceChannel, connectionID, "read packet", err)
-			return errors.Join(err, captureErr)
+			return r.finishForward("bridge.read_error", direction, sourceChannel, connectionID, "read packet", err, shuttingDown)
 		}
 		live.Packet(direction, decoded)
 		if err := r.recordDecoded(decoded, direction, connectionID); err != nil {
 			return err
 		}
 		if err := destination.WritePacket(decoded); err != nil {
-			captureErr := r.recordNetworkError("bridge.write_error", direction, sourceChannel, connectionID, "write packet", err)
-			return errors.Join(err, captureErr)
+			return r.finishForward("bridge.write_error", direction, sourceChannel, connectionID, "write packet", err, shuttingDown)
 		}
 	}
+}
+
+func (r *Runner) finishForward(kind string, direction capture.Direction, sourceChannel, connectionID, operation string, operationErr error, shuttingDown *atomic.Bool) error {
+	if !expectedShutdownError(operationErr, shuttingDown) {
+		captureErr := r.recordNetworkError(kind, direction, sourceChannel, connectionID, operation, operationErr)
+		return errors.Join(operationErr, captureErr)
+	}
+	return operationErr
+}
+
+func expectedShutdownError(err error, shuttingDown *atomic.Bool) bool {
+	if err == nil || shuttingDown == nil || !shuttingDown.Load() {
+		return false
+	}
+	return errors.Is(err, context.Canceled) || errors.Is(err, net.ErrClosed)
 }
 
 func (r *Runner) recordDecoded(decoded packet.Packet, direction capture.Direction, connectionID string) error {
