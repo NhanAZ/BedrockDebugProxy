@@ -117,3 +117,31 @@ func TestReadTokenRejectsOversizedCache(t *testing.T) {
 		t.Fatalf("readToken() error = %v", err)
 	}
 }
+
+func TestRemoveDeletesCacheAndHandlesMissingPath(t *testing.T) {
+	path := filepath.Join(t.TempDir(), "auth-token.json")
+	if err := writeToken(path, &oauth2.Token{RefreshToken: "refresh"}); err != nil {
+		t.Fatal(err)
+	}
+	removed, err := Remove(path)
+	if err != nil || !removed {
+		t.Fatalf("Remove() = %v, %v", removed, err)
+	}
+	if _, err := os.Stat(path); !errors.Is(err, os.ErrNotExist) {
+		t.Fatalf("cache stat error = %v", err)
+	}
+	removed, err = Remove(path)
+	if err != nil || removed {
+		t.Fatalf("Remove() missing = %v, %v", removed, err)
+	}
+}
+
+func TestRemoveRejectsNonRegularPath(t *testing.T) {
+	path := filepath.Join(t.TempDir(), "auth-token.json")
+	if err := os.Mkdir(path, 0o700); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := Remove(path); err == nil || !strings.Contains(err.Error(), "not a regular file") {
+		t.Fatalf("Remove() error = %v", err)
+	}
+}
