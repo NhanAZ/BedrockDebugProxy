@@ -12,6 +12,8 @@ The Hive is the minimum baseline for every runtime-affecting change and every pu
 
 A change to a specific flow also requires direct validation of that flow. For example, resource-pack decryption requires both a The Hive baseline report and an owner-controlled encrypted-pack report that observes the supported decryption path. If the target does not exercise the changed flow, record `not_observed` and an `incomplete` result rather than treating a general connection as sufficient.
 
+For transfer-following changes, the direct check must observe the `Transfer` rewrite, a successful next-hop transport and upstream connection, the next hop's resource-pack exchange when offered, and a later spawn. When the route probe exposes it, inspect `client_guid_preserved: true` as evidence that the RakNet identity was carried into the next-hop handshake. A first-hop connection alone is not sufficient evidence for a transfer fix.
+
 Do not approve or merge a runtime-affecting pull request without reports for the exact revision. Documentation, comments, formatting, and changes proven not to affect runtime may be exempt. When impact is uncertain, require validation.
 
 ## Stamped test build
