@@ -39,7 +39,7 @@ This coverage does not add specialized commands or a second capture subsystem. I
 
 ## Remaining limits
 
-- Transfer packets are retained but automatic hop following is not implemented.
+- Transfer packets are retained. Automatic hop following is opt-in through `--follow-transfers`; the original transfer remains authoritative and each followed hop is captured with its own hop and connection identifiers.
 - Raw UDP and RakNet recovery evidence requires a lower observation boundary.
 - The transport payload event does not yet classify encryption or compression state per event.
 - Decoded snapshots reflect gophertunnel's active protocol model. Future analysis must prefer raw packet blobs when checking a changed or disputed definition.

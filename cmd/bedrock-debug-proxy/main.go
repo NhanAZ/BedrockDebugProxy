@@ -108,6 +108,7 @@ func runProxy(args []string, stdout, stderr io.Writer) int {
 	captureRoot := flags.String("capture-root", "captures", "parent for generated capture directories")
 	authMode := flags.String("auth", "device", "upstream authentication mode - device (cached) or none")
 	allowUnauthenticated := flags.Bool("allow-unauthenticated-client", false, "disable Xbox authentication for the connecting client")
+	followTransfers := flags.Bool("follow-transfers", false, "rewrite server transfers to the local listener and follow subsequent hops")
 	syncEachEvent := flags.Bool("sync-each-event", false, "durably sync every blob and event before forwarding continues")
 	maxDecompressed := flags.Int("max-decompressed-bytes", 64<<20, "downstream decompressed batch limit")
 	binaryPreview := flags.Int("decoded-binary-preview", 32, "decoded binary preview bytes")
@@ -177,10 +178,13 @@ func runProxy(args []string, stdout, stderr io.Writer) int {
 	}
 	limitations := []string{
 		"Raw UDP datagrams and RakNet acknowledgement or retransmission frames are not captured",
-		"This version accepts one client and records one upstream hop per process",
-		"Transfer packets are recorded but automatic hop following is not implemented",
 		"Downstream clients must accept offered resource packs; the current adapter cannot mirror an upstream optional-pack policy",
 		"Transport payload encryption and compression state is not yet classified per event",
+	}
+	if *followTransfers {
+		limitations = append(limitations, "Transfer following is opt-in; server Transfer packets are rewritten to the local listener and each subsequent hop is captured in the same session")
+	} else {
+		limitations = append(limitations, "Transfer packets are recorded but automatic hop following is disabled")
 	}
 	if *decryptResourcePacks {
 		limitations = append(limitations, "Resource pack decryption supports only the documented AES-256-CFB8 contents format; unsupported variants are retained with a decrypt error")
@@ -194,17 +198,19 @@ func runProxy(args []string, stdout, stderr io.Writer) int {
 		SyncEachEvent: *syncEachEvent,
 		RawLayers:     []string{"bedrock_transport_payload", "bedrock_packet_payload"},
 		Values: map[string]string{
-			"listen_address":         *listen,
-			"upstream_selector":      target.Selector,
-			"upstream_address":       target.Address,
-			"upstream_transport":     target.Transport,
-			"upstream_name":          target.Name,
-			"upstream_experience_id": target.ExperienceID,
-			"auth_mode":              *authMode,
-			"protocol_id":            strconv.FormatInt(int64(protocol.CurrentProtocol), 10),
-			"game_version":           protocol.CurrentVersion,
-			"decrypt_resource_packs": strconv.FormatBool(*decryptResourcePacks),
-			"automatic_artifacts":    artifacts.Schema,
+			"listen_address":               *listen,
+			"upstream_selector":            target.Selector,
+			"upstream_address":             target.Address,
+			"upstream_transport":           target.Transport,
+			"upstream_name":                target.Name,
+			"upstream_experience_id":       target.ExperienceID,
+			"auth_mode":                    *authMode,
+			"allow_unauthenticated_client": strconv.FormatBool(*allowUnauthenticated),
+			"follow_transfers":             strconv.FormatBool(*followTransfers),
+			"protocol_id":                  strconv.FormatInt(int64(protocol.CurrentProtocol), 10),
+			"game_version":                 protocol.CurrentVersion,
+			"decrypt_resource_packs":       strconv.FormatBool(*decryptResourcePacks),
+			"automatic_artifacts":          artifacts.Schema,
 		},
 		Limitations: limitations,
 	})
@@ -220,6 +226,7 @@ func runProxy(args []string, stdout, stderr io.Writer) int {
 		UpstreamAddress:            target.Address,
 		UpstreamNetwork:            target.Network,
 		AllowUnauthenticatedClient: *allowUnauthenticated,
+		FollowTransfers:            *followTransfers,
 		TokenSource:                target.TokenSource,
 		Recorder:                   recorder,
 		Output:                     stdout,

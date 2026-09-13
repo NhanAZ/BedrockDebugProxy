@@ -43,16 +43,17 @@ type livePacketCount struct {
 }
 
 type liveReporter struct {
-	mu        sync.Mutex
-	output    io.Writer
-	now       func() time.Time
-	lastFlush time.Time
-	counts    map[livePacketKey]int
-	hints     map[string]struct{}
-	spawned   atomic.Bool
-	color     bool
-	clientRaw map[uint32]string
-	serverRaw map[uint32]string
+	mu              sync.Mutex
+	output          io.Writer
+	now             func() time.Time
+	lastFlush       time.Time
+	counts          map[livePacketKey]int
+	hints           map[string]struct{}
+	spawned         atomic.Bool
+	color           bool
+	clientRaw       map[uint32]string
+	serverRaw       map[uint32]string
+	followTransfers bool
 }
 
 func newLiveReporter(output io.Writer) *liveReporter {
@@ -109,6 +110,12 @@ func (r *liveReporter) SetSpawned() {
 	r.spawned.Store(true)
 }
 
+func (r *liveReporter) SetFollowTransfers(enabled bool) {
+	r.mu.Lock()
+	r.followTransfers = enabled
+	r.mu.Unlock()
+}
+
 func (r *liveReporter) Packet(direction capture.Direction, decoded packet.Packet) {
 	if decoded == nil {
 		return
@@ -121,9 +128,14 @@ func (r *liveReporter) Packet(direction capture.Direction, decoded packet.Packet
 	r.counts[livePacketKey{direction: direction, name: name}]++
 	if transfer, ok := decoded.(*packet.Transfer); ok {
 		r.flushLocked(now)
+		message := "automatic hop following is disabled"
+		if r.followTransfers {
+			message = "hop following is enabled"
+		}
 		r.writeLocked(now, "TRANSFER", ansiMagenta, fmt.Sprintf(
-			"Transfer observed %s - target %s:%d; automatic hop following is not implemented",
+			"Transfer observed %s - target %s:%d; %s",
 			liveDirection(direction), transfer.Address, transfer.Port,
+			message,
 		))
 		return
 	}

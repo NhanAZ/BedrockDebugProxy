@@ -48,6 +48,8 @@ Use a real Minecraft Bedrock client. For each server, start the same stamped bin
 
 The first successful device login creates a per-user token cache, so later server runs normally do not require another device code. Wait for `Listening on` before connecting Minecraft. Use the default Xbox-authenticated downstream path for the required release reports, normally through the Servers tab. Do not add `--allow-unauthenticated-client` to the release command unless the release is separately validating the trusted-LAN opt-in flow.
 
+Include `--follow-transfers` in the release command when the server's flow can send a `Transfer` packet. This keeps subsequent hops in the same capture. Use a concrete reachable address in `--listen` for that mode; a wildcard listener address cannot be sent back to the client.
+
 | Report label | Upstream target | Required manual flow |
 | --- | --- | --- |
 | `The Hive` | `experience:The Hive` | Connect, spawn, move, interact, and observe normal traffic |
@@ -57,14 +59,15 @@ The first successful device login creates a per-user token cache, so later serve
 | `Mineville Zeqa` | `experience:Mineville Zeqa` | Enter the Zeqa flow and observe it directly |
 | `Enchanted` | `experience:Enchanted` | Connect, spawn, move, interact, and observe normal traffic |
 
-Use this command for an Experience target. Replace only the value after `--upstream` for each run.
+Use this command for an Experience target. Replace `192.168.1.10` with the concrete LAN address used by the Minecraft client, and replace only the value after `--upstream` for each run.
 
 ```powershell
 .\bin\bedrock-debug-proxy.exe `
     run `
-    --listen 0.0.0.0:19132 `
+    --listen 192.168.1.10:19132 `
     --upstream "experience:The Hive" `
-    --auth device
+    --auth device `
+    --follow-transfers
 ```
 
 For every server, confirm all of the following before recording `pass`.

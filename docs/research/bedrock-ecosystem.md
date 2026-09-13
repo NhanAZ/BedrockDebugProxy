@@ -24,6 +24,7 @@ The canonical capture will be an append-only directory containing a manifest, an
 - Current packet constants at this revision are protocol `2169` and game version `1.26.45`
 - The module requires Go 1.25 or newer
 - Exact implementation evidence is in [`minecraft/dial.go`](https://github.com/Sandertv/gophertunnel/blob/283a5a97dfe65da94bcc0b401807f6aefa9e72ee/minecraft/dial.go), [`minecraft/listener.go`](https://github.com/Sandertv/gophertunnel/blob/283a5a97dfe65da94bcc0b401807f6aefa9e72ee/minecraft/listener.go), [`minecraft/packet.go`](https://github.com/Sandertv/gophertunnel/blob/283a5a97dfe65da94bcc0b401807f6aefa9e72ee/minecraft/packet.go), [`minecraft/conn.go`](https://github.com/Sandertv/gophertunnel/blob/283a5a97dfe65da94bcc0b401807f6aefa9e72ee/minecraft/conn.go), and [`minecraft/network.go`](https://github.com/Sandertv/gophertunnel/blob/283a5a97dfe65da94bcc0b401807f6aefa9e72ee/minecraft/network.go)
+- The `Transfer` packet contract is defined in [`minecraft/protocol/packet/transfer.go`](https://github.com/Sandertv/gophertunnel/blob/283a5a97dfe65da94bcc0b401807f6aefa9e72ee/minecraft/protocol/packet/transfer.go). It carries a hostname, UDP port, `ReloadWorld`, and optional gathering information; the client normally disconnects and joins the target.
 
 Gophertunnel performs Bedrock login, Xbox authentication, encryption, compression, batching, packet framing, protocol conversion, resource-pack download, and spawn sequencing. Its included proxy demonstrates the standard pair of terminating connections and two forwarding loops.
 
@@ -156,7 +157,7 @@ Dragonfly is a server implementation built around gophertunnel rather than a pac
 - Preserve NetherNet transport capabilities while observing its message boundary.
 - Add optional raw UDP and PCAPNG capture without requiring elevated privileges for normal operation.
 - Compare decoded fixtures against PrismarineJS and future runtime schemas.
-- Determine how Transfer packets should start a new hop while keeping one logical session timeline.
+- `--follow-transfers` starts a new hop after a server `Transfer` by rewriting the client destination to the local listener. The original target is then dialled after client reconnect, while the capture keeps one logical session timeline. See ADR 0003 for the trust boundary and concrete-listener requirement.
 - Continue measuring disk-write backpressure during chunk-heavy sessions before considering any asynchronous queue or overflow policy. The current recorder uses blocking, lossless writes and avoids per-event durable flushes by default.
 - Verify encrypted resource-pack variants with synthetic fixtures and owner-authorized live captures.
 - Decide whether old protocol adapters belong in this repository or separate versioned modules.

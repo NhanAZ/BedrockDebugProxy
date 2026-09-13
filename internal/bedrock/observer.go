@@ -48,6 +48,14 @@ func (o *Observer) SetFlow(channel string, local, remote net.Addr) {
 }
 
 func (o *Observer) PacketFunc(channel, connectionID string) func(packet.Header, []byte, net.Addr, net.Addr) {
+	return o.PacketFuncDynamic(channel, func() string { return connectionID })
+}
+
+// PacketFuncDynamic is the packet callback variant used by a long-lived
+// listener that accepts more than one physical connection over a session.
+// The callback is evaluated for each packet so capture events retain the
+// current hop and connection identity after a server transfer.
+func (o *Observer) PacketFuncDynamic(channel string, connectionID func() string) func(packet.Header, []byte, net.Addr, net.Addr) {
 	return func(header packet.Header, payload []byte, source, destination net.Addr) {
 		direction := o.classify(channel, source, destination)
 		if o.raw != nil {
@@ -56,8 +64,8 @@ func (o *Observer) PacketFunc(channel, connectionID string) func(packet.Header, 
 		_, err := o.recorder.Record(context.Background(), capture.Record{
 			Event: capture.Event{
 				SessionID:    o.sessionID,
-				ConnectionID: connectionID,
-				Hop:          o.hop,
+				ConnectionID: connectionID(),
+				Hop:          o.currentHop(),
 				Kind:         "packet.raw",
 				Direction:    direction,
 				Channel:      channel,
@@ -79,6 +87,19 @@ func (o *Observer) PacketFunc(channel, connectionID string) func(packet.Header, 
 			o.failures.Set(err)
 		}
 	}
+}
+
+func (o *Observer) SetHop(hop int) {
+	o.mu.Lock()
+	o.hop = hop
+	o.mu.Unlock()
+}
+
+func (o *Observer) currentHop() int {
+	o.mu.Lock()
+	hop := o.hop
+	o.mu.Unlock()
+	return hop
 }
 
 func (o *Observer) classify(channel string, source, destination net.Addr) capture.Direction {

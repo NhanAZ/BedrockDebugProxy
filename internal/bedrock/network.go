@@ -17,17 +17,33 @@ import (
 )
 
 type Network struct {
-	Transport      minecraft.Network
-	Recorder       *capture.Recorder
-	Observer       *Observer
-	Failures       *FailureSink
-	Logger         *slog.Logger
-	SessionID      string
-	ConnectionID   string
-	Channel        string
-	Hop            int
-	ReadDirection  capture.Direction
-	WriteDirection capture.Direction
+	Transport        minecraft.Network
+	Recorder         *capture.Recorder
+	Observer         *Observer
+	Failures         *FailureSink
+	Logger           *slog.Logger
+	SessionID        string
+	ConnectionID     string
+	ConnectionIDFunc func() string
+	Channel          string
+	Hop              int
+	HopFunc          func() int
+	ReadDirection    capture.Direction
+	WriteDirection   capture.Direction
+}
+
+func (n Network) connectionID() string {
+	if n.ConnectionIDFunc != nil {
+		return n.ConnectionIDFunc()
+	}
+	return n.ConnectionID
+}
+
+func (n Network) hop() int {
+	if n.HopFunc != nil {
+		return n.HopFunc()
+	}
+	return n.Hop
 }
 
 func (n Network) DialContext(ctx context.Context, address string) (net.Conn, error) {
@@ -114,8 +130,8 @@ func (n Network) wrap(conn net.Conn) (net.Conn, error) {
 func (n Network) recordConnection(kind string, conn net.Conn, operationErr error) error {
 	event := capture.Event{
 		SessionID:    n.SessionID,
-		ConnectionID: n.ConnectionID,
-		Hop:          n.Hop,
+		ConnectionID: n.connectionID(),
+		Hop:          n.hop(),
 		Kind:         kind,
 		Severity:     capture.SeverityInfo,
 		Direction:    capture.DirectionInternal,
@@ -256,8 +272,8 @@ func (c *observedConn) recordPayload(operation string, payload []byte, attempted
 	})
 	event := capture.Event{
 		SessionID:    c.network.SessionID,
-		ConnectionID: c.network.ConnectionID,
-		Hop:          c.network.Hop,
+		ConnectionID: c.network.connectionID(),
+		Hop:          c.network.hop(),
 		Kind:         "transport.payload",
 		Severity:     capture.SeverityDebug,
 		Direction:    direction,
