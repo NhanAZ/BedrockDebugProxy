@@ -66,6 +66,60 @@ type Runner struct {
 	config Config
 }
 
+// connectionContext tracks the transport lifecycle for the physical client
+// connection currently entering the listener. The listener's resource-pack
+// callback does not receive a *minecraft.Conn, so the transport hook supplies
+// the context that is canceled when that client disconnects.
+type connectionContext struct {
+	mu         sync.RWMutex
+	ctx        context.Context
+	generation uint64
+}
+
+func (c *connectionContext) Set(ctx context.Context) uint64 {
+	if ctx == nil {
+		return 0
+	}
+	c.mu.Lock()
+	c.generation++
+	c.ctx = ctx
+	generation := c.generation
+	c.mu.Unlock()
+	return generation
+}
+
+func (c *connectionContext) Get() (context.Context, uint64) {
+	c.mu.RLock()
+	ctx := c.ctx
+	generation := c.generation
+	c.mu.RUnlock()
+	return ctx, generation
+}
+
+func (c *connectionContext) Clear() {
+	c.mu.Lock()
+	c.generation++
+	c.ctx = nil
+	c.mu.Unlock()
+}
+
+// linkedConnectionContext cancels work when either the proxy run or the
+// physical downstream connection ends.
+func linkedConnectionContext(parent, connection context.Context) (context.Context, func()) {
+	if parent == nil {
+		parent = context.Background()
+	}
+	ctx, cancel := context.WithCancel(parent)
+	if connection == nil {
+		return ctx, cancel
+	}
+	stop := context.AfterFunc(connection, cancel)
+	return ctx, func() {
+		stop()
+		cancel()
+	}
+}
+
 type connectionMetadata struct {
 	Role          string           `json:"role"`
 	Authenticated bool             `json:"authenticated"`
@@ -102,6 +156,8 @@ func (r *Runner) Run(ctx context.Context) error {
 	failures := bedrock.NewFailureSink(cancelRun)
 	observer := bedrock.NewObserver(r.config.Recorder, failures, sessionID, 1, live.RawPacket)
 	live.SetFollowTransfers(r.config.FollowTransfers)
+	downstreamContext := new(connectionContext)
+	downstreamDisconnect := make(chan uint64, 1)
 	stateMu := &sync.RWMutex{}
 	current := &hopState{hop: 1, target: r.config.UpstreamAddress, downstreamID: "downstream-1", upstreamID: "upstream-1"}
 	var pending *hopState
@@ -140,6 +196,15 @@ func (r *Runner) Run(ctx context.Context) error {
 		HopFunc:          func() int { return getAcceptState().hop },
 		ReadDirection:    capture.DirectionClientToServer,
 		WriteDirection:   capture.DirectionServerToClient,
+		ConnectionContextFunc: func(ctx context.Context) {
+			generation := downstreamContext.Set(ctx)
+			context.AfterFunc(ctx, func() {
+				select {
+				case downstreamDisconnect <- generation:
+				default:
+				}
+			})
+		},
 	}
 
 	if err := r.record("proxy.start", capture.SeverityInfo, map[string]any{
@@ -166,6 +231,9 @@ func (r *Runner) Run(ctx context.Context) error {
 		FetchResourcePacks: func(_ login.IdentityData, clientData login.ClientData, _ []*resource.Pack) []*resource.Pack {
 			state := getAcceptState()
 			state.slot.once.Do(func() {
+				clientContext, _ := downstreamContext.Get()
+				connectCtx, releaseContext := linkedConnectionContext(runCtx, clientContext)
+				defer releaseContext()
 				state.upstreamLogger = slog.New(bedrock.NewCaptureLogHandler(r.config.Recorder, failures, sessionID, state.upstreamID, "upstream", live.LibraryLog))
 				state.upstreamNetwork = bedrock.Network{
 					Transport: r.config.UpstreamNetwork, Recorder: r.config.Recorder, Observer: observer, Failures: failures,
@@ -173,7 +241,7 @@ func (r *Runner) Run(ctx context.Context) error {
 					Channel: "upstream", Hop: state.hop, ReadDirection: capture.DirectionServerToClient,
 					WriteDirection: capture.DirectionClientToServer,
 				}
-				state.slot.conn, state.slot.resourcePacks, state.slot.err = r.connectUpstream(runCtx, state.target, state.upstreamNetwork, observer, state.upstreamID, state.hop, state.upstreamLogger, live, clientData)
+				state.slot.conn, state.slot.resourcePacks, state.slot.err = r.connectUpstream(connectCtx, state.target, state.upstreamNetwork, observer, state.upstreamID, state.hop, state.upstreamLogger, live, clientData)
 			})
 			if state.slot.err != nil || state.slot.conn == nil {
 				return nil
@@ -205,9 +273,77 @@ func (r *Runner) Run(ctx context.Context) error {
 	}
 
 	for {
+		// A transport context may have completed while the previous accepted
+		// connection was being released. Discard that notification before
+		// waiting for the next physical client connection.
+		draining := true
+		for draining {
+			select {
+			case generation := <-downstreamDisconnect:
+				clientContext, currentGeneration := downstreamContext.Get()
+				if generation == currentGeneration && clientContext != nil {
+					select {
+					case <-clientContext.Done():
+						downstreamContext.Clear()
+						return nil
+					default:
+					}
+				}
+			default:
+				draining = false
+			}
+		}
+		clientContext, _ := downstreamContext.Get()
+		if clientContext != nil {
+			select {
+			case <-clientContext.Done():
+				downstreamContext.Clear()
+				return nil
+			default:
+			}
+		}
 		state := getAcceptState()
 		observer.SetHop(state.hop)
-		accepted, err := listener.Accept()
+		type acceptResult struct {
+			conn net.Conn
+			err  error
+		}
+		acceptedResult := make(chan acceptResult, 1)
+		go func() {
+			accepted, err := listener.Accept()
+			acceptedResult <- acceptResult{conn: accepted, err: err}
+		}()
+		var accepted net.Conn
+		var err error
+		waitingForAccept := true
+		for waitingForAccept {
+			select {
+			case result := <-acceptedResult:
+				accepted, err = result.conn, result.err
+				waitingForAccept = false
+			case generation := <-downstreamDisconnect:
+				currentContext, currentGeneration := downstreamContext.Get()
+				if generation != currentGeneration || currentContext == nil {
+					// A previous physical connection closed after a new one had
+					// already taken its place. Keep waiting for the current client.
+					continue
+				}
+				_ = listener.Close()
+				result := <-acceptedResult
+				if result.conn != nil {
+					_ = result.conn.Close()
+				}
+				downstreamContext.Clear()
+				return nil
+			case <-runCtx.Done():
+				_ = listener.Close()
+				result := <-acceptedResult
+				if result.conn != nil {
+					_ = result.conn.Close()
+				}
+				return nil
+			}
+		}
 		if err != nil {
 			if failure := failures.Err(); failure != nil {
 				return fmt.Errorf("capture hook failed during login: %w", failure)
@@ -222,6 +358,7 @@ func (r *Runner) Run(ctx context.Context) error {
 			_ = accepted.Close()
 			return fmt.Errorf("accepted unexpected connection type %T", accepted)
 		}
+		downstreamContext.Clear()
 		authentication := "Xbox-authenticated"
 		if !clientConn.Authenticated() {
 			authentication = "self-signed client accepted by explicit configuration"
