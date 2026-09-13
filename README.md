@@ -150,6 +150,8 @@ The project currently uses gophertunnel `v1.61.0` with a documented featured-exp
 
 Automated success does not prove live Minecraft compatibility. Runtime changes require a stamped real-client session on The Hive, and releases require the six-server validation matrix. Until the current candidate completes that process, treat it as development software rather than a production-ready proxy.
 
+The Enchanted featured-experience transfer investigation, including the pre-fix failure signature and revision-matched live result, is recorded in the [research note](docs/research/enchanted-transfer-handshake.md).
+
 Current known boundaries include the following.
 
 - Transfer following is opt-in. Without `--follow-transfers`, Transfer packets are recorded and the current process ends after that hop. With it, the transfer is rewritten to the local listener and the next hop is captured in the same session. A session follows at most 64 hops to prevent transfer loops from creating unbounded output.
