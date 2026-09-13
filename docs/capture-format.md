@@ -24,7 +24,9 @@ A capture with `completeness.complete` set to `false` is still useful. The adjac
 
 `events.jsonl` contains one JSON object per newline-terminated line. Sequence numbers start at one and define the canonical order. Each event also has UTC wall time, Unix nanoseconds, and elapsed monotonic nanoseconds from capture start. Nanosecond fields are decimal JSON strings so JavaScript and other limited-number readers do not lose precision.
 
-Event kinds are namespaced strings such as `session.open`, `session.connection_metadata`, `session.game_data`, `session.spawned`, `transport.payload`, `packet.raw`, `packet.decoded`, `packet.decode_error`, `resource_pack.archive`, and `capture.limit`.
+Event kinds are namespaced strings such as `session.open`, `session.connection_metadata`, `session.game_data`, `session.spawned`, `transport.payload`, `packet.raw`, `packet.decoded`, `bridge.forward_timing`, `packet.decode_error`, `resource_pack.archive`, and `capture.limit`.
+
+`bridge.forward_timing` is emitted for chunk, block-update, movement-correction, chunk-radius, motion, and transfer packets after the bridge calls `WritePacket`. Its `parent_sequence` points to the corresponding `packet.decoded` or `packet.unknown` event. The data object records the durations of `ReadPacket`, decoded-view capture, and `WritePacket` in nanoseconds. Transfer packets also record the explicit `Flush` duration. Ordinary packets use gophertunnel's automatic flush and report `flush_mode` as `automatic`; the later `transport.payload` event is the evidence that an automatic flush reached the observed transport boundary. These measurements describe proxy operations, not client-side chunk application or raw UDP delivery.
 
 Connection and protocol context remains explicit through session ID, connection ID, hop, channel, logical direction, stage, source, and destination fields. A parent sequence can link a derived event to an earlier observation when the adapter can prove the relationship.
 

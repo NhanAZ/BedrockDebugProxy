@@ -21,6 +21,12 @@ The original public repository was used for use-case comparison, not protocol au
 
 BedrockDebugProxy retains the raw packet payload for every packet visible through the gophertunnel hook, including traffic that broad tools may filter as noisy. Packets that reach the forwarding bridge also receive decoded views. Packets consumed by gophertunnel during connection setup remain available as raw evidence, with decoded connection metadata and GameData recorded as selected session snapshots. The capture also retains transport payloads, resource-pack archives, cache-related packets, errors, unknown packets, and Transfer packets. Copying the specialized command surface would not improve the canonical session and would conflict with the project's narrow CLI.
 
+## Forward-path timing
+
+The bridge now records `bridge.forward_timing` for packets that can affect world collision and spawn state: `LevelChunk`, block updates, `NetworkChunkPublisherUpdate`, `ChunkRadiusUpdated`, `MovePlayer`, `SetActorMotion`, and `Transfer`. Each timing event references its decoded packet with `parent_sequence` and measures the blocking `ReadPacket`, decoded-view recording, and `WritePacket` calls. A transfer also measures its explicit flush. The normal gophertunnel flush runs asynchronously at the configured flush rate, so its completion is represented by the subsequent `transport.payload` event rather than by forcing a per-packet flush that would change the wire behavior under investigation.
+
+These timings distinguish proxy-side queuing or serialization delay from client-side chunk application. They do not expose raw UDP datagrams, RakNet acknowledgements, or a client acknowledgement that collision data was applied. A suspected missing cage or void spawn still requires comparison with a direct-client capture and inspection of the corresponding `LevelChunk` and block-update payloads.
+
 The clear local capture gaps were decoded connection metadata and upstream GameData. The implementation now records them as bounded derived views while preserving the exact Login and StartGame packet payloads as authoritative raw blobs. Large collections may be truncated according to the existing decoded-view limit. Spawn-time latency, cache state, and chunk radius are also retained because the current connections already expose them.
 
 ## Representative packet-family coverage

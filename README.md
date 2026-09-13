@@ -137,6 +137,7 @@ The canonical capture is an event stream plus content-addressed blobs. Automatic
 .\bin\bedrock-debug-proxy.exe inspect --kind packet.decoded --packet LevelChunk --limit 5 C:\path\to\capture
 .\bin\bedrock-debug-proxy.exe inspect --kind packet.decoded --packet AddActor --limit 5 C:\path\to\capture
 .\bin\bedrock-debug-proxy.exe inspect --kind packet.decoded --packet UpdateBlock --limit 5 C:\path\to\capture
+.\bin\bedrock-debug-proxy.exe inspect --kind bridge.forward_timing --direction server_to_client --limit 50 C:\path\to\capture
 .\bin\bedrock-debug-proxy.exe inspect --kind packet.decoded --packet InventoryContent --limit 5 C:\path\to\capture
 ```
 
