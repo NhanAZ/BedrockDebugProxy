@@ -17,7 +17,10 @@ import (
 )
 
 const (
-	liveSummaryInterval = time.Second
+	// Live output is an operator aid only. Keep the canonical packet-by-packet
+	// evidence in the capture while using a slower console cadence so that a
+	// resource-pack exchange or a busy world does not flood the terminal.
+	liveSummaryInterval = 3 * time.Second
 	liveSummaryPerSide  = 4
 	ansiReset           = "\x1b[0m"
 	// Minecraft RGB values keep labels independent of the terminal's 16-color theme.

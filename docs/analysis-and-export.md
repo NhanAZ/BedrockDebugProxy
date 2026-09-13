@@ -8,7 +8,7 @@ Alongside canonical blobs, every new `run` automatically creates named pack ZIPs
 
 Counts such as `PlayerSkin`, `PlayerList`, `AddActor`, `LevelChunk`, and `InventoryContent` count packet events. One packet can describe multiple objects, and an object can appear in many packets. These counts are not unique asset or object totals. `resource_pack.archive` counts recorded archive events. The event's blob reference locates the retained archive.
 
-Live packet summaries are only operator navigation. Labels, channels, directions, totals, and selected packet names remain readable without color. On a truecolor terminal the labels use the following Minecraft RGB palette. Message text keeps the terminal's default foreground.
+Live packet summaries are only operator navigation. They are emitted in three-second buckets so a busy session or a resource-pack exchange does not flood the terminal. The complete packet event stream remains in the capture. During upstream login, the console explicitly reports that the resource-pack exchange is intentionally buffered, then reports its elapsed duration before downstream delivery can begin. Labels, channels, directions, totals, and selected packet names remain readable without color. On a truecolor terminal the labels use the following Minecraft RGB palette. Message text keeps the terminal's default foreground.
 
 | Output | Minecraft color | Hex |
 | --- | --- | --- |
