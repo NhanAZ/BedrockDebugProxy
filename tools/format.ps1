@@ -6,7 +6,7 @@ Set-StrictMode -Version Latest
 
 $projectRoot = (Resolve-Path (Join-Path $PSScriptRoot "..")).Path
 $goFiles = @(Get-ChildItem -LiteralPath $projectRoot -Recurse -File -Filter "*.go" |
-    Where-Object { $_.FullName -notmatch "[\\/]\.git[\\/]" -and $_.FullName -notmatch "[\\/]vendor[\\/]" } |
+    Where-Object { $_.FullName -notmatch "[\\/]\.git[\\/]" -and $_.FullName -notmatch "[\\/]vendor[\\/]" -and $_.FullName -notmatch "[\\/]\.local[\\/]" } |
     ForEach-Object { $_.FullName })
 
 if ($goFiles.Count -eq 0) {

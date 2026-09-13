@@ -30,7 +30,7 @@ function Invoke-QualityCommand {
 Push-Location $projectRoot
 try {
     $goFiles = @(Get-ChildItem -LiteralPath $projectRoot -Recurse -File -Filter "*.go" |
-        Where-Object { $_.FullName -notmatch "[\\/]\.git[\\/]" -and $_.FullName -notmatch "[\\/]vendor[\\/]" } |
+        Where-Object { $_.FullName -notmatch "[\\/]\.git[\\/]" -and $_.FullName -notmatch "[\\/]vendor[\\/]" -and $_.FullName -notmatch "[\\/]\.local[\\/]" } |
         ForEach-Object { $_.FullName })
     if ($goFiles.Count -eq 0) {
         throw "No Go source files were found."
