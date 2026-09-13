@@ -38,7 +38,7 @@ The only intentional packet rewrite is the documented transfer-destination rewri
 
 A real-client Enchanted run using the stamped `d1929d4` binary produced a closed capture and a passing sanitized report at `validation/local/d1929d40ddc0aac85317877ecd3b158f279d463c/enchanted.json`. The local report is ignored by Git because it is derived validation evidence and must not change the tested revision.
 
-The same stamped binary also passed the The Hive trusted-LAN opt-in path at `validation/local/d1929d40ddc0aac85317877ecd3b158f279d463c/the-hive-lan.json`. That session completed its resource-pack flow and normal spawn path without exercising a server transfer. Because it used `--allow-unauthenticated-client`, it does not replace the required Xbox-authenticated baseline through Minecraft's Servers tab.
+The same stamped binary also passed the required Xbox-authenticated The Hive baseline at `validation/local/d1929d40ddc0aac85317877ecd3b158f279d463c/the-hive.json`. That session completed its 24-pack resource-pack flow, normal spawn path, and clean closure without exercising a server transfer. The earlier trusted-LAN opt-in run remains at `validation/local/d1929d40ddc0aac85317877ecd3b158f279d463c/the-hive-lan.json` as separate evidence for the `--allow-unauthenticated-client` path.
 
 The capture-derived facts were:
 
@@ -55,5 +55,5 @@ The manual checks were `normal_session=pass`, `resource_pack_transfer=pass`, and
 
 - The capture boundary does not include raw UDP datagrams, RakNet acknowledgements, fragmentation, retransmission, or loss details. A future transport diagnostic can add those observations without changing the canonical Bedrock event stream.
 - The successful run does not identify the private edge behavior that made the earlier handshake fail. The GUID, source-address, MTU, and cookie changes are a supported explanation that fits the before and after event order, not a server-side confirmation.
-- The Hive now has a revision-matched passing trusted-LAN opt-in report for `d1929d4`. The required Xbox-authenticated baseline and older reports for other revisions are not interchangeable with the current candidate.
-- An official release still needs a revision-matched Xbox-authenticated The Hive report plus reports for CubeCraft, Galaxite, Lifeboat, and Mineville Zeqa. The Enchanted report and The Hive opt-in report are not a complete release matrix.
+- The Hive now has a revision-matched passing Xbox-authenticated baseline report for `d1929d4`. The separate trusted-LAN report and older reports for other revisions are not interchangeable with the current candidate.
+- An official release still needs reports for CubeCraft, Galaxite, Lifeboat, and Mineville Zeqa. The Enchanted and The Hive reports cover two members of the six-server release matrix.
