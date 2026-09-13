@@ -13,6 +13,8 @@ One stale reference was found. `docs/research/resource-pack-encryption.md` attri
 
 A follow-up audit standardized every bedrocktool citation on the original public `bedrock-tool/bedrocktool` repository at commit `d7788b57acbdd3eb93ac1efdd4f1107b78aea9b0`. The selector, Gatherings, legacy signaling, capture, and session claims were rechecked against their exact files. JSON-RPC signaling is not attributed to that repository because its public revision does not contain the implementation. Independent public evidence for that path is recorded from `lactyy2/pia` instead.
 
+On 2026-09-13, provenance was reviewed again. All remaining bedrocktool URLs in this repository point to the public upstream project. Code that exists in that upstream revision is attributed there. Owner-specific changes are treated as project-owner code or owner-controlled observations and are not cited as a separate external source.
+
 ## Protocol and implementation references
 
 | Source | Revision | Evidence rechecked | Result |
