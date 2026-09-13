@@ -119,3 +119,5 @@ Ask gophertunnel maintainers about compatibility and supported identity semantic
 ## Bottom line
 
 The channel history confirms a persistent, multi-year CubeCraft/gophertunnel compatibility problem. It makes the current ban technically plausible as a consequence of the proxy's observable session differences, but it does not identify Sentinel's exact detector or prove a single gophertunnel bug. The next productive step is to resolve identity/authentication and fidelity questions with gophertunnel maintainers and reproduce the differences on authorized infrastructure, while preserving the CubeCraft capture as evidence rather than running another live test during the punishment.
+
+The later Oomph source review adds a separate clue: Oomph's public configuration explicitly names proxy detections, while its public detector registration does not expose their implementation. See [`oomph-proxy-detection.md`](oomph-proxy-detection.md) for the revision, deployment model, and the comparison with the local CubeCraft capture.
