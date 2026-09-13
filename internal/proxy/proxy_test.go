@@ -5,6 +5,7 @@ import (
 	"context"
 	"encoding/base64"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
 	"os"
@@ -24,6 +25,16 @@ import (
 	"github.com/sandertv/gophertunnel/minecraft/protocol/login"
 	"github.com/sandertv/gophertunnel/minecraft/protocol/packet"
 )
+
+func TestUpstreamDialTimeoutErrorPreservesCause(t *testing.T) {
+	err := &upstreamDialTimeoutError{timeout: time.Minute, err: context.DeadlineExceeded}
+	if !errors.Is(err, context.DeadlineExceeded) {
+		t.Fatal("timeout error did not preserve context deadline cause")
+	}
+	if !strings.Contains(err.Error(), "upstream login and resource-pack exchange timed out after 1m0s") {
+		t.Fatalf("timeout error = %q", err)
+	}
+}
 
 type listeningAddressWriter struct {
 	mu      sync.Mutex

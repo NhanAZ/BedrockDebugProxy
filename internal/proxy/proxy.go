@@ -28,6 +28,10 @@ const (
 	sessionID                 = "session-1"
 	transferGracePeriod       = 5 * time.Second
 	transferRouteProbeTimeout = 750 * time.Millisecond
+	// A resource-pack exchange can legitimately take tens of seconds on a
+	// featured experience. Keep the wait bounded so a missing transfer backend
+	// cannot leave the listener and client blocked forever.
+	upstreamDialTimeout = time.Minute
 	// Enchanted's featured-experience edge can drop fragmented 1492-byte
 	// handshake probes on the transfer target. Keep transfer probes within a
 	// single common UDP datagram while leaving initial connections unchanged.
@@ -74,6 +78,17 @@ type transferRewriteError struct {
 
 func (e *transferRewriteError) Error() string { return "rewrite Transfer: " + e.err.Error() }
 func (e *transferRewriteError) Unwrap() error { return e.err }
+
+type upstreamDialTimeoutError struct {
+	timeout time.Duration
+	err     error
+}
+
+func (e *upstreamDialTimeoutError) Error() string {
+	return fmt.Sprintf("upstream login and resource-pack exchange timed out after %s: %v", e.timeout, e.err)
+}
+
+func (e *upstreamDialTimeoutError) Unwrap() error { return e.err }
 
 func udpAddress(address net.Addr) *net.UDPAddr {
 	if address == nil {
@@ -402,7 +417,12 @@ func (r *Runner) Run(ctx context.Context) error {
 		}
 		live.Info("Client connected - %s, Bedrock %s protocol %d (hop %d)", authentication, clientConn.Proto().Ver(), clientConn.Proto().ID(), state.hop)
 		if state.slot.err != nil {
-			_ = listener.Disconnect(clientConn, "BedrockDebugProxy could not connect to the destination server")
+			reason := "BedrockDebugProxy could not connect to the destination server"
+			var timeoutErr *upstreamDialTimeoutError
+			if errors.As(state.slot.err, &timeoutErr) {
+				reason = fmt.Sprintf("The destination server did not respond within %s", timeoutErr.timeout)
+			}
+			_ = listener.Disconnect(clientConn, reason)
 			_ = clientConn.Close()
 			return state.slot.err
 		}
@@ -609,7 +629,9 @@ func (r *Runner) connectUpstream(ctx context.Context, target string, network bed
 		return nil, nil, err
 	}
 	live.Info("Connecting upstream - %s (hop %d) - waiting for upstream login and resource-pack exchange (buffered by design)", target, hop)
-	urlResourcePacks := newURLResourcePackCache(ctx)
+	dialCtx, cancelDial := context.WithTimeout(ctx, upstreamDialTimeout)
+	defer cancelDial()
+	urlResourcePacks := newURLResourcePackCache(dialCtx)
 	recordPacket := observer.PacketFunc("upstream", connectionID)
 	dialer := minecraft.Dialer{
 		TokenSource: r.config.TokenSource,
@@ -637,14 +659,30 @@ func (r *Runner) connectUpstream(ctx context.Context, target string, network bed
 		},
 	}
 	waitStarted := time.Now()
-	conn, err := dialer.DialContextNetwork(ctx, network, target)
+	conn, err := dialer.DialContextNetwork(dialCtx, network, target)
 	waitDuration := time.Since(waitStarted).Round(time.Millisecond)
 	if waitDuration < time.Millisecond {
 		waitDuration = time.Millisecond
 	}
 	if err != nil {
-		live.Info("Upstream login and resource-pack exchange failed after %s", waitDuration)
-		_ = r.recordAtHop("upstream.dial_error", capture.SeverityError, map[string]any{"error": err.Error(), "type": fmt.Sprintf("%T", err)}, hop)
+		dialErr := err
+		timedOut := errors.Is(dialCtx.Err(), context.DeadlineExceeded) || errors.Is(err, context.DeadlineExceeded)
+		message := "Upstream login and resource-pack exchange failed after %s"
+		if timedOut {
+			message = "Upstream login and resource-pack exchange timed out after %s"
+			err = &upstreamDialTimeoutError{timeout: upstreamDialTimeout, err: err}
+		}
+		live.Info(message, waitDuration)
+		fields := map[string]any{
+			"error":         err.Error(),
+			"type":          fmt.Sprintf("%T", dialErr),
+			"timeout":       timedOut,
+			"wait_duration": waitDuration.String(),
+		}
+		if timedOut {
+			fields["timeout_duration"] = upstreamDialTimeout.String()
+		}
+		_ = r.recordAtHop("upstream.dial_error", capture.SeverityError, fields, hop)
 		return nil, nil, fmt.Errorf("connect to upstream server: %w", err)
 	}
 	live.Info("Upstream login and resource-pack exchange completed in %s - downstream pack delivery can begin (sequential buffered mode)", waitDuration)
