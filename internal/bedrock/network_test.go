@@ -77,6 +77,47 @@ func TestObservedConnPreservesPacketReadsContextAndLatency(t *testing.T) {
 	}
 }
 
+func TestNetworkWrapReportsTransportContext(t *testing.T) {
+	root := filepath.Join(t.TempDir(), "capture")
+	recorder, err := capture.New(root, capture.Options{})
+	if err != nil {
+		t.Fatal(err)
+	}
+	transportContext, cancel := context.WithCancel(context.Background())
+	defer cancel()
+	source := &fakePacketConn{ctx: transportContext}
+	failures := &FailureSink{}
+	observer := NewObserver(recorder, failures, "session-test", 1, nil)
+	reported := make(chan context.Context, 1)
+	network := Network{
+		Recorder:              recorder,
+		Observer:              observer,
+		Failures:              failures,
+		SessionID:             "session-test",
+		ConnectionID:          "connection-test",
+		Channel:               "downstream",
+		ConnectionContextFunc: func(ctx context.Context) { reported <- ctx },
+	}
+	wrapped, err := network.wrap(source)
+	if err != nil {
+		t.Fatal(err)
+	}
+	select {
+	case got := <-reported:
+		if got != transportContext {
+			t.Fatal("ConnectionContextFunc received a different context")
+		}
+	case <-time.After(time.Second):
+		t.Fatal("ConnectionContextFunc was not called")
+	}
+	if err := wrapped.Close(); err != nil {
+		t.Fatal(err)
+	}
+	if err := recorder.Close("closed", nil); err != nil {
+		t.Fatal(err)
+	}
+}
+
 func TestObservedConnPreservesTransportCapabilities(t *testing.T) {
 	conn := &observedConn{Conn: &fakeCapabilityConn{fakePacketConn: fakePacketConn{}}}
 	if got := conn.BatchHeader(); got != nil {

@@ -30,6 +30,10 @@ type Network struct {
 	HopFunc          func() int
 	ReadDirection    capture.Direction
 	WriteDirection   capture.Direction
+	// ConnectionContextFunc is called after a transport connection is opened.
+	// It exposes the transport lifecycle context so callers can cancel work
+	// that is waiting on the corresponding Minecraft connection.
+	ConnectionContextFunc func(context.Context)
 }
 
 func (n Network) connectionID() string {
@@ -124,7 +128,11 @@ func (n Network) wrap(conn net.Conn) (net.Conn, error) {
 		_ = conn.Close()
 		return nil, err
 	}
-	return &observedConn{Conn: conn, network: n}, nil
+	observed := &observedConn{Conn: conn, network: n}
+	if n.ConnectionContextFunc != nil {
+		n.ConnectionContextFunc(observed.Context())
+	}
+	return observed, nil
 }
 
 func (n Network) recordConnection(kind string, conn net.Conn, operationErr error) error {

@@ -36,6 +36,24 @@ func newListeningAddressWriter() *listeningAddressWriter {
 	return &listeningAddressWriter{address: make(chan string, 1)}
 }
 
+func TestLinkedConnectionContextCancelsWhenClientDisconnects(t *testing.T) {
+	parent, cancelParent := context.WithCancel(context.Background())
+	defer cancelParent()
+	connection, cancelConnection := context.WithCancel(context.Background())
+	linked, release := linkedConnectionContext(parent, connection)
+	defer release()
+
+	cancelConnection()
+	select {
+	case <-linked.Done():
+	case <-time.After(time.Second):
+		t.Fatal("linked context was not canceled after downstream disconnect")
+	}
+	if err := linked.Err(); err != context.Canceled {
+		t.Fatalf("linked context error = %v, want context.Canceled", err)
+	}
+}
+
 func integrationPlayerSkin() *packet.PlayerSkin {
 	return &packet.PlayerSkin{
 		UUID: uuid.MustParse("11111111-1111-1111-1111-111111111111"),
