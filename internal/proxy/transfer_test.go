@@ -40,6 +40,12 @@ func TestTransferForProxyAddressRejectsWildcardListener(t *testing.T) {
 	}
 }
 
+func TestTransferRakNetHandshakeMTUIsCapped(t *testing.T) {
+	if transferRakNetMaxMTU != 1200 {
+		t.Fatalf("transfer RakNet max MTU = %d, want 1200", transferRakNetMaxMTU)
+	}
+}
+
 func TestRunnerFollowsTransferAndAcceptsNextHop(t *testing.T) {
 	ctx, cancel := context.WithTimeout(context.Background(), 20*time.Second)
 	defer cancel()

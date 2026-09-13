@@ -567,6 +567,17 @@ func (conn *Conn) LocalAddr() net.Addr {
 	return conn.conn.LocalAddr()
 }
 
+// RakNetClientGUID returns the client GUID used by a dialled RakNet
+// connection. The second return value is false for other transports.
+func (conn *Conn) RakNetClientGUID() (int64, bool) {
+	raknetConn, ok := conn.conn.(interface{ ClientGUID() int64 })
+	if !ok {
+		return 0, false
+	}
+	guid := raknetConn.ClientGUID()
+	return guid, guid != 0
+}
+
 // RemoteAddr returns the remote address of the underlying connection.
 func (conn *Conn) RemoteAddr() net.Addr {
 	return conn.conn.RemoteAddr()

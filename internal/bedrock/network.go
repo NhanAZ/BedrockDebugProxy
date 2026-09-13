@@ -257,6 +257,15 @@ func (c *observedConn) Latency() time.Duration {
 	return 0
 }
 
+// ClientGUID preserves the optional RakNet identity hook through the capture
+// wrapper. Other transports simply do not implement this method.
+func (c *observedConn) ClientGUID() int64 {
+	if source, ok := c.Conn.(interface{ ClientGUID() int64 }); ok {
+		return source.ClientGUID()
+	}
+	return 0
+}
+
 func (c *observedConn) Context() context.Context {
 	if source, ok := c.Conn.(interface{ Context() context.Context }); ok {
 		return source.Context()

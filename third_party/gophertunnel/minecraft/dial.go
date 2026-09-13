@@ -143,6 +143,9 @@ type Dialer struct {
 	PingTimeout time.Duration
 	// RakNetLocalAddr optionally pins the UDP source address for a RakNet dial.
 	RakNetLocalAddr *net.UDPAddr
+	// RakNetClientGUID optionally preserves the RakNet client identity across a
+	// featured-experience Transfer.
+	RakNetClientGUID int64
 	// RakNetMaxMTU optionally caps MTU discovery for a RakNet dial.
 	RakNetMaxMTU uint16
 }
@@ -389,11 +392,12 @@ func (d Dialer) networkForDial(network string) (Network, bool) {
 	if !ok || network != "raknet" {
 		return n, ok
 	}
-	if d.RakNetLocalAddr == nil && d.RakNetMaxMTU == 0 {
+	if d.RakNetLocalAddr == nil && d.RakNetClientGUID == 0 && d.RakNetMaxMTU == 0 {
 		return n, ok
 	}
 	raknetNetwork := NewRakNet(d.ErrorLog)
 	raknetNetwork.LocalAddr = d.RakNetLocalAddr
+	raknetNetwork.ClientGUID = d.RakNetClientGUID
 	raknetNetwork.MaxMTU = d.RakNetMaxMTU
 	return raknetNetwork, true
 }
