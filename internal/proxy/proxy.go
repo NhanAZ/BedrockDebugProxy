@@ -28,7 +28,11 @@ const (
 	sessionID                 = "session-1"
 	transferGracePeriod       = 5 * time.Second
 	transferRouteProbeTimeout = 750 * time.Millisecond
-	maxFollowedHops           = 64
+	// Enchanted's featured-experience edge can drop fragmented 1492-byte
+	// handshake probes on the transfer target. Keep transfer probes within a
+	// single common UDP datagram while leaving initial connections unchanged.
+	transferRakNetMaxMTU = 1200
+	maxFollowedHops      = 64
 )
 
 type upstreamSlot struct {
@@ -47,6 +51,7 @@ type hopState struct {
 	// Featured-experience transfer frontends may select a backend by the
 	// source flow, so the next RakNet dial must be able to reuse it.
 	transferLocalAddr   *net.UDPAddr
+	transferClientGUID  int64
 	transferRouteProbed bool
 	upstreamNetwork     bedrock.Network
 	upstreamLogger      *slog.Logger
@@ -54,8 +59,9 @@ type hopState struct {
 }
 
 type transferError struct {
-	target    string
-	localAddr *net.UDPAddr
+	target     string
+	localAddr  *net.UDPAddr
+	clientGUID int64
 }
 
 func (e *transferError) Error() string {
@@ -259,9 +265,11 @@ func (r *Runner) Run(ctx context.Context) error {
 				defer releaseContext()
 				state.upstreamLogger = slog.New(bedrock.NewCaptureLogHandler(r.config.Recorder, failures, sessionID, state.upstreamID, "upstream", live.LibraryLog))
 				transport := r.config.UpstreamNetwork
-				if transport == nil && state.transferLocalAddr != nil {
+				if transport == nil && (state.transferLocalAddr != nil || state.transferClientGUID != 0) {
 					raknetTransport := minecraft.NewRakNet(state.upstreamLogger)
 					raknetTransport.LocalAddr = state.transferLocalAddr
+					raknetTransport.ClientGUID = state.transferClientGUID
+					raknetTransport.MaxMTU = transferRakNetMaxMTU
 					transport = raknetTransport
 				}
 				state.upstreamNetwork = bedrock.Network{
@@ -414,10 +422,11 @@ func (r *Runner) Run(ctx context.Context) error {
 			stateMu.Lock()
 			if pending != nil {
 				pending.transferLocalAddr = followed.localAddr
+				pending.transferClientGUID = followed.clientGUID
 			}
 			stateMu.Unlock()
 			if followed.localAddr != nil && r.config.UpstreamNetwork == nil {
-				if err := r.probeTransferRoute(runCtx, followed.target, followed.localAddr, state.hop+1, state.upstreamLogger, live); err != nil {
+				if err := r.probeTransferRoute(runCtx, followed.target, followed.localAddr, followed.clientGUID, state.hop+1, state.upstreamLogger, live); err != nil {
 					live.Info("Transfer route probe failed - %s", err)
 				}
 				stateMu.Lock()
@@ -571,16 +580,18 @@ func (r *Runner) runHop(runCtx context.Context, localAddress string, state *hopS
 	return nil
 }
 
-func (r *Runner) probeTransferRoute(ctx context.Context, target string, localAddr *net.UDPAddr, hop int, logger *slog.Logger, live *liveReporter) error {
+func (r *Runner) probeTransferRoute(ctx context.Context, target string, localAddr *net.UDPAddr, clientGUID int64, hop int, logger *slog.Logger, live *liveReporter) error {
 	probeCtx, cancel := context.WithTimeout(ctx, transferRouteProbeTimeout)
 	defer cancel()
 	transport := minecraft.NewRakNet(logger)
 	transport.LocalAddr = localAddr
+	transport.ClientGUID = clientGUID
 	_, err := transport.PingContext(probeCtx, target)
 	fields := map[string]any{
-		"address":       target,
-		"local_address": localAddr.String(),
-		"timeout":       transferRouteProbeTimeout.String(),
+		"address":               target,
+		"local_address":         localAddr.String(),
+		"timeout":               transferRouteProbeTimeout.String(),
+		"client_guid_preserved": clientGUID != 0,
 	}
 	if err != nil {
 		fields["error"] = err.Error()
@@ -604,9 +615,12 @@ func (r *Runner) connectUpstream(ctx context.Context, target string, network bed
 		TokenSource: r.config.TokenSource,
 		ClientData:  clientData,
 		ErrorLog:    logger,
-		SkipPing:    routeProbed,
+		// A pre-probe can happen several seconds before Minecraft reconnects.
+		// Always perform a fresh bounded ping on the actual hop-2 dial so the
+		// featured-experience route is active when RakNet starts its handshake.
+		SkipPing: false,
 		PingTimeout: func() time.Duration {
-			if transferRoute && !routeProbed {
+			if transferRoute {
 				return transferRouteProbeTimeout
 			}
 			return 0
@@ -765,7 +779,8 @@ func (r *Runner) forward(source, destination *minecraft.Conn, failures *bedrock.
 				if onTransfer != nil {
 					onTransfer(target)
 				}
-				return &transferError{target: target, localAddr: udpAddress(source.LocalAddr())}
+				clientGUID, _ := source.RakNetClientGUID()
+				return &transferError{target: target, localAddr: udpAddress(source.LocalAddr()), clientGUID: clientGUID}
 			}
 		}
 	}

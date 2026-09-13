@@ -17,6 +17,9 @@ type RakNet struct {
 	LocalAddr *net.UDPAddr
 	// MaxMTU optionally caps MTU discovery for this connection.
 	MaxMTU uint16
+	// ClientGUID optionally preserves the RakNet client identity used by a
+	// preceding connection, such as when following a server Transfer.
+	ClientGUID int64
 }
 
 // NewRakNet returns a RakNet network using l for transport diagnostics.
@@ -27,7 +30,7 @@ func NewRakNet(l *slog.Logger) RakNet {
 }
 
 func (r RakNet) dialer() raknet.Dialer {
-	dialer := raknet.Dialer{ErrorLog: r.l, MaxMTU: r.MaxMTU}
+	dialer := raknet.Dialer{ErrorLog: r.l, MaxMTU: r.MaxMTU, ClientGUID: r.ClientGUID}
 	if r.LocalAddr != nil {
 		dialer.UpstreamDialer = &net.Dialer{LocalAddr: r.LocalAddr}
 	}

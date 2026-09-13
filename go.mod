@@ -21,6 +21,11 @@ require (
 // until it is available in the selected upstream gophertunnel release.
 replace github.com/sandertv/gophertunnel => ./third_party/gophertunnel
 
+// Keep the RakNet client GUID observable and reusable across featured-experience
+// transfers. The local copy is a narrow MIT-compatible patch over the selected
+// upstream revision; see third_party/go-raknet/BEDROCKDEBUGPROXY_PATCH.md.
+replace github.com/sandertv/go-raknet => ./third_party/go-raknet
+
 require (
 	github.com/coreos/go-oidc/v3 v3.17.0 // indirect
 	github.com/df-mc/jsonc v1.0.5 // indirect

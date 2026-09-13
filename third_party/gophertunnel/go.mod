@@ -2,6 +2,8 @@ module github.com/sandertv/gophertunnel
 
 go 1.25.0
 
+replace github.com/sandertv/go-raknet => ../go-raknet
+
 require (
 	github.com/coreos/go-oidc/v3 v3.17.0
 	github.com/df-mc/go-nethernet v1.0.20
