@@ -13,9 +13,11 @@ if ($goFiles.Count -eq 0) {
     throw "No Go source files were found."
 }
 
-& gofmt -w @goFiles
-if ($LASTEXITCODE -ne 0) {
-    throw "gofmt failed with exit code $LASTEXITCODE."
+foreach ($file in $goFiles) {
+    & gofmt -w $file
+    if ($LASTEXITCODE -ne 0) {
+        throw "gofmt failed for $file with exit code $LASTEXITCODE."
+    }
 }
 
 Write-Host "Formatted $($goFiles.Count) Go source files."
