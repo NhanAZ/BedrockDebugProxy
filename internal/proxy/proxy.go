@@ -742,15 +742,20 @@ func newConnectionMetadata(role string, conn *minecraft.Conn) connectionMetadata
 
 func (r *Runner) forward(source, destination *minecraft.Conn, failures *bedrock.FailureSink, live *liveReporter, shuttingDown *atomic.Bool, localAddress string, direction capture.Direction, sourceChannel, connectionID string, hop int, onTransfer func(string)) error {
 	for {
+		readStarted := time.Now()
 		if err := failures.Err(); err != nil {
 			return err
 		}
 		decoded, err := source.ReadPacket()
+		readDuration := time.Since(readStarted)
 		if err != nil {
 			return r.finishForwardAtHop("bridge.read_error", direction, sourceChannel, connectionID, hop, "read packet", err, shuttingDown)
 		}
 		live.Packet(direction, decoded)
-		if err := r.recordDecoded(decoded, direction, connectionID, hop); err != nil {
+		recordStarted := time.Now()
+		decodedEvent, err := r.recordDecoded(decoded, direction, connectionID, hop)
+		recordDuration := time.Since(recordStarted)
+		if err != nil {
 			return err
 		}
 		outgoing := decoded
@@ -767,13 +772,27 @@ func (r *Runner) forward(source, destination *minecraft.Conn, failures *bedrock.
 				}
 			}
 		}
+		writeStarted := time.Now()
 		if err := destination.WritePacket(outgoing); err != nil {
 			return r.finishForwardAtHop("bridge.write_error", direction, sourceChannel, connectionID, hop, "write packet", err, shuttingDown)
 		}
+		writeDuration := time.Since(writeStarted)
+		flushMode := "automatic"
+		var flushDuration time.Duration
 		if outgoing != decoded {
+			flushMode = "explicit"
+			flushStarted := time.Now()
 			if err := destination.Flush(); err != nil {
 				return r.finishForwardAtHop("bridge.flush_error", direction, sourceChannel, connectionID, hop, "flush transfer", err, shuttingDown)
 			}
+			flushDuration = time.Since(flushStarted)
+		}
+		if shouldRecordForwardTiming(decoded) && decodedEvent.Sequence != 0 {
+			if err := r.recordForwardTiming(decodedEvent, direction, connectionID, hop, readDuration, recordDuration, writeDuration, flushDuration, flushMode); err != nil {
+				return err
+			}
+		}
+		if outgoing != decoded {
 			if transfer, ok := decoded.(*packet.Transfer); ok {
 				_, target, _ := transferForProxyAddress(transfer, localAddress)
 				if onTransfer != nil {
@@ -805,7 +824,7 @@ func expectedShutdownError(err error, shuttingDown *atomic.Bool) bool {
 	return errors.Is(err, context.Canceled) || errors.Is(err, net.ErrClosed)
 }
 
-func (r *Runner) recordDecoded(decoded packet.Packet, direction capture.Direction, connectionID string, hop int) error {
+func (r *Runner) recordDecoded(decoded packet.Packet, direction capture.Direction, connectionID string, hop int) (capture.Event, error) {
 	name, goType := packetNames(decoded)
 	status := "decoded"
 	kind := "packet.decoded"
@@ -827,7 +846,7 @@ func (r *Runner) recordDecoded(decoded packet.Packet, direction capture.Directio
 			Packet:       &capture.PacketInfo{ID: decoded.ID(), Name: name, GoType: goType, DecodeStatus: "view_error"},
 			Error:        &capture.ErrorInfo{Operation: "encode decoded view", Message: encodeErr.Error(), Type: fmt.Sprintf("%T", encodeErr)},
 		}})
-		return recordErr
+		return capture.Event{}, recordErr
 	}
 	annotations := make([]string, 0, 1)
 	if _, transfer := decoded.(*packet.Transfer); transfer {
@@ -837,7 +856,7 @@ func (r *Runner) recordDecoded(decoded packet.Packet, direction capture.Directio
 			annotations = append(annotations, "Transfer is recorded but automatic hop following is disabled")
 		}
 	}
-	_, err := r.config.Recorder.Record(context.Background(), capture.Record{Event: capture.Event{
+	event, err := r.config.Recorder.Record(context.Background(), capture.Record{Event: capture.Event{
 		SessionID:    sessionID,
 		ConnectionID: connectionID,
 		Hop:          hop,
@@ -849,6 +868,65 @@ func (r *Runner) recordDecoded(decoded packet.Packet, direction capture.Directio
 		Packet:       &capture.PacketInfo{ID: decoded.ID(), Name: name, GoType: goType, DecodeStatus: status},
 		Data:         data,
 		Annotations:  annotations,
+	}})
+	return event, err
+}
+
+// shouldRecordForwardTiming selects packets whose ordering and delivery path
+// are useful when diagnosing world collision, spawn, and transfer behavior.
+// Ordinary movement input is already retained as decoded evidence and is not
+// repeated here to avoid doubling the event volume of a busy session.
+func shouldRecordForwardTiming(decoded packet.Packet) bool {
+	name, _ := packetNames(decoded)
+	switch name {
+	case "LevelChunk", "UpdateBlock", "UpdateSubChunkBlocks", "BlockActorData",
+		"NetworkChunkPublisherUpdate", "ChunkRadiusUpdated", "MovePlayer", "SetActorMotion", "Transfer":
+		return true
+	default:
+		return false
+	}
+}
+
+type forwardTimingData struct {
+	ReadPacketDurationNano    int64  `json:"read_packet_duration_nano,string"`
+	RecordDecodedDurationNano int64  `json:"record_decoded_duration_nano,string"`
+	WritePacketDurationNano   int64  `json:"write_packet_duration_nano,string"`
+	FlushMode                 string `json:"flush_mode"`
+	FlushDurationNano         int64  `json:"flush_duration_nano,string"`
+	Measurement               string `json:"measurement"`
+}
+
+func (r *Runner) recordForwardTiming(decodedEvent capture.Event, direction capture.Direction, connectionID string, hop int, readDuration, recordDuration, writeDuration, flushDuration time.Duration, flushMode string) error {
+	name := ""
+	if decodedEvent.Packet != nil {
+		name = decodedEvent.Packet.Name
+	}
+	data, err := json.Marshal(forwardTimingData{
+		ReadPacketDurationNano:    readDuration.Nanoseconds(),
+		RecordDecodedDurationNano: recordDuration.Nanoseconds(),
+		WritePacketDurationNano:   writeDuration.Nanoseconds(),
+		FlushMode:                 flushMode,
+		FlushDurationNano:         flushDuration.Nanoseconds(),
+		Measurement:               "bridge operation durations; automatic flush completion is represented by subsequent transport.payload events",
+	})
+	if err != nil {
+		return fmt.Errorf("encode forward timing for %s: %w", name, err)
+	}
+	_, err = r.config.Recorder.Record(context.Background(), capture.Record{Event: capture.Event{
+		SessionID:    sessionID,
+		ConnectionID: connectionID,
+		Hop:          hop,
+		Kind:         "bridge.forward_timing",
+		Severity:     capture.SeverityDebug,
+		Direction:    direction,
+		Channel:      "bridge",
+		Stage:        "post_forward_write",
+		ParentSequence: func() *uint64 {
+			sequence := decodedEvent.Sequence
+			return &sequence
+		}(),
+		Packet: decodedEvent.Packet,
+		Data:   data,
 	}})
 	return err
 }

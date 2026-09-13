@@ -557,6 +557,7 @@ func TestRunnerForwardsBidirectionalPacketsAndCapturesSession(t *testing.T) {
 		{capture.DirectionServerToClient, "InventoryContent"}:     {[]byte("integration-inventory"), []byte("minecraft:stone"), []byte("minecraft:dirt")},
 	}
 	decodedObserved := make(map[decodedPacketKey]bool, len(expectedDecoded))
+	timingObserved := make(map[decodedPacketKey]bool)
 	type rawPacketKey struct {
 		direction capture.Direction
 		id        uint32
@@ -637,6 +638,11 @@ func TestRunnerForwardsBidirectionalPacketsAndCapturesSession(t *testing.T) {
 					decodedObserved[key] = decodedObserved[key] || matches
 				}
 			}
+		case "bridge.forward_timing":
+			if event.Packet == nil || event.ParentSequence == nil || !json.Valid(event.Data) {
+				return fmt.Errorf("forward timing event has incomplete ancestry or data: %#v", event)
+			}
+			timingObserved[decodedPacketKey{event.Direction, event.Packet.Name}] = true
 		case "packet.decode_error", "capture.view_error":
 			return fmt.Errorf("unexpected %s event", event.Kind)
 		}
@@ -653,6 +659,15 @@ func TestRunnerForwardsBidirectionalPacketsAndCapturesSession(t *testing.T) {
 	for key := range expectedDecoded {
 		if !decodedObserved[key] {
 			t.Errorf("decoded representative packet %s in %s direction did not preserve its expected fields", key.name, key.direction)
+		}
+	}
+	for _, key := range []decodedPacketKey{
+		{capture.DirectionClientToServer, "MovePlayer"},
+		{capture.DirectionServerToClient, "LevelChunk"},
+		{capture.DirectionServerToClient, "UpdateBlock"},
+	} {
+		if !timingObserved[key] {
+			t.Errorf("forward timing was not recorded for %s in %s direction", key.name, key.direction)
 		}
 	}
 	for key := range expectedRaw {
