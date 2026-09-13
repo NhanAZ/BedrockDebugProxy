@@ -133,6 +133,18 @@ type Dialer struct {
 	// (pre-1.21.90) when connecting to the server. This should only be used for outdated
 	// servers, as enabling it will cause compatibility issues with updated servers.
 	EnableLegacyAuth bool
+
+	// SkipPing connects to the exact address passed without an initial
+	// unconnected RakNet ping. This is useful for transfer targets where the
+	// route is prepared before the downstream client reconnects.
+	SkipPing bool
+	// PingTimeout bounds the optional unconnected RakNet ping. A zero value
+	// preserves the normal behaviour and uses the dial context deadline.
+	PingTimeout time.Duration
+	// RakNetLocalAddr optionally pins the UDP source address for a RakNet dial.
+	RakNetLocalAddr *net.UDPAddr
+	// RakNetMaxMTU optionally caps MTU discovery for a RakNet dial.
+	RakNetMaxMTU uint16
 }
 
 // Dial dials a Minecraft connection to the address passed over the network passed. The network is typically
@@ -273,11 +285,9 @@ func (d Dialer) DialContextNetwork(ctx context.Context, network Network, address
 		d.IdentityData = identityData
 	}
 
-	var pong []byte
-	if pong, err = network.PingContext(ctx, address); err == nil {
-		address = addressWithPongPort(pong, address)
+	if address, err = d.prepareDialAddress(ctx, network, address); err != nil {
+		return nil, err
 	}
-
 	var netConn net.Conn
 	if i, ok := network.(identityDialer); ok && token != "" {
 		netConn, err = i.DialContextIdentity(ctx, address, token, key)
@@ -367,11 +377,41 @@ func (d Dialer) DialContext(ctx context.Context, network, address string) (conn 
 		d.ErrorLog = slog.New(internal.DiscardHandler{})
 	}
 	d.ErrorLog = d.ErrorLog.With("src", "dialer")
-	n, ok := networkByID(network, d.ErrorLog)
+	n, ok := d.networkForDial(network)
 	if !ok {
 		return nil, &net.OpError{Op: "dial", Net: "minecraft", Err: fmt.Errorf("dial: no network under id %v", network)}
 	}
 	return d.DialContextNetwork(ctx, n, address)
+}
+
+func (d Dialer) networkForDial(network string) (Network, bool) {
+	n, ok := networkByID(network, d.ErrorLog)
+	if !ok || network != "raknet" {
+		return n, ok
+	}
+	if d.RakNetLocalAddr == nil && d.RakNetMaxMTU == 0 {
+		return n, ok
+	}
+	raknetNetwork := NewRakNet(d.ErrorLog)
+	raknetNetwork.LocalAddr = d.RakNetLocalAddr
+	raknetNetwork.MaxMTU = d.RakNetMaxMTU
+	return raknetNetwork, true
+}
+
+func (d Dialer) prepareDialAddress(ctx context.Context, network Network, address string) (string, error) {
+	if d.SkipPing {
+		return address, nil
+	}
+	pingCtx := ctx
+	pingCancel := func() {}
+	if d.PingTimeout > 0 {
+		pingCtx, pingCancel = context.WithTimeout(ctx, d.PingTimeout)
+	}
+	defer pingCancel()
+	if pong, err := network.PingContext(pingCtx, address); err == nil {
+		address = addressWithPongPort(pong, address)
+	}
+	return address, nil
 }
 
 // readChainIdentityData reads a login.IdentityData from the Mojang chain

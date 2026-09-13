@@ -25,9 +25,10 @@ import (
 )
 
 const (
-	sessionID           = "session-1"
-	transferGracePeriod = 5 * time.Second
-	maxFollowedHops     = 64
+	sessionID                 = "session-1"
+	transferGracePeriod       = 5 * time.Second
+	transferRouteProbeTimeout = 750 * time.Millisecond
+	maxFollowedHops           = 64
 )
 
 type upstreamSlot struct {
@@ -38,17 +39,23 @@ type upstreamSlot struct {
 }
 
 type hopState struct {
-	hop             int
-	target          string
-	downstreamID    string
-	upstreamID      string
-	upstreamNetwork bedrock.Network
-	upstreamLogger  *slog.Logger
-	slot            upstreamSlot
+	hop          int
+	target       string
+	downstreamID string
+	upstreamID   string
+	// transferLocalAddr is the UDP source address used by the preceding hop.
+	// Featured-experience transfer frontends may select a backend by the
+	// source flow, so the next RakNet dial must be able to reuse it.
+	transferLocalAddr   *net.UDPAddr
+	transferRouteProbed bool
+	upstreamNetwork     bedrock.Network
+	upstreamLogger      *slog.Logger
+	slot                upstreamSlot
 }
 
 type transferError struct {
-	target string
+	target    string
+	localAddr *net.UDPAddr
 }
 
 func (e *transferError) Error() string {
@@ -61,6 +68,22 @@ type transferRewriteError struct {
 
 func (e *transferRewriteError) Error() string { return "rewrite Transfer: " + e.err.Error() }
 func (e *transferRewriteError) Unwrap() error { return e.err }
+
+func udpAddress(address net.Addr) *net.UDPAddr {
+	if address == nil {
+		return nil
+	}
+	if udp, ok := address.(*net.UDPAddr); ok {
+		copy := *udp
+		copy.IP = append(net.IP(nil), udp.IP...)
+		return &copy
+	}
+	udp, err := net.ResolveUDPAddr("udp", address.String())
+	if err != nil {
+		return nil
+	}
+	return udp
+}
 
 type Runner struct {
 	config Config
@@ -235,13 +258,19 @@ func (r *Runner) Run(ctx context.Context) error {
 				connectCtx, releaseContext := linkedConnectionContext(runCtx, clientContext)
 				defer releaseContext()
 				state.upstreamLogger = slog.New(bedrock.NewCaptureLogHandler(r.config.Recorder, failures, sessionID, state.upstreamID, "upstream", live.LibraryLog))
+				transport := r.config.UpstreamNetwork
+				if transport == nil && state.transferLocalAddr != nil {
+					raknetTransport := minecraft.NewRakNet(state.upstreamLogger)
+					raknetTransport.LocalAddr = state.transferLocalAddr
+					transport = raknetTransport
+				}
 				state.upstreamNetwork = bedrock.Network{
-					Transport: r.config.UpstreamNetwork, Recorder: r.config.Recorder, Observer: observer, Failures: failures,
+					Transport: transport, Recorder: r.config.Recorder, Observer: observer, Failures: failures,
 					Logger: state.upstreamLogger, SessionID: sessionID, ConnectionID: state.upstreamID,
 					Channel: "upstream", Hop: state.hop, ReadDirection: capture.DirectionServerToClient,
 					WriteDirection: capture.DirectionClientToServer,
 				}
-				state.slot.conn, state.slot.resourcePacks, state.slot.err = r.connectUpstream(connectCtx, state.target, state.upstreamNetwork, observer, state.upstreamID, state.hop, state.upstreamLogger, live, clientData)
+				state.slot.conn, state.slot.resourcePacks, state.slot.err = r.connectUpstream(connectCtx, state.target, state.upstreamNetwork, observer, state.upstreamID, state.hop, state.upstreamLogger, live, clientData, state.transferLocalAddr != nil, state.transferRouteProbed)
 			})
 			if state.slot.err != nil || state.slot.conn == nil {
 				return nil
@@ -381,6 +410,21 @@ func (r *Runner) Run(ctx context.Context) error {
 		if r.config.FollowTransfers && errors.As(bridgeErr, &followed) {
 			if state.hop >= maxFollowedHops {
 				return fmt.Errorf("transfer hop limit %d reached at %s", maxFollowedHops, followed.target)
+			}
+			stateMu.Lock()
+			if pending != nil {
+				pending.transferLocalAddr = followed.localAddr
+			}
+			stateMu.Unlock()
+			if followed.localAddr != nil && r.config.UpstreamNetwork == nil {
+				if err := r.probeTransferRoute(runCtx, followed.target, followed.localAddr, state.hop+1, state.upstreamLogger, live); err != nil {
+					live.Info("Transfer route probe failed - %s", err)
+				}
+				stateMu.Lock()
+				if pending != nil {
+					pending.transferRouteProbed = true
+				}
+				stateMu.Unlock()
 			}
 			live.Info("Following transfer to %s; waiting for the client to reconnect", followed.target)
 			select {
@@ -527,7 +571,29 @@ func (r *Runner) runHop(runCtx context.Context, localAddress string, state *hopS
 	return nil
 }
 
-func (r *Runner) connectUpstream(ctx context.Context, target string, network bedrock.Network, observer *bedrock.Observer, connectionID string, hop int, logger *slog.Logger, live *liveReporter, clientData login.ClientData) (*minecraft.Conn, []*resource.Pack, error) {
+func (r *Runner) probeTransferRoute(ctx context.Context, target string, localAddr *net.UDPAddr, hop int, logger *slog.Logger, live *liveReporter) error {
+	probeCtx, cancel := context.WithTimeout(ctx, transferRouteProbeTimeout)
+	defer cancel()
+	transport := minecraft.NewRakNet(logger)
+	transport.LocalAddr = localAddr
+	_, err := transport.PingContext(probeCtx, target)
+	fields := map[string]any{
+		"address":       target,
+		"local_address": localAddr.String(),
+		"timeout":       transferRouteProbeTimeout.String(),
+	}
+	if err != nil {
+		fields["error"] = err.Error()
+		fields["type"] = fmt.Sprintf("%T", err)
+		_ = r.recordAtHop("transfer.route_probe", capture.SeverityWarn, fields, hop)
+		return err
+	}
+	_ = r.recordAtHop("transfer.route_probe", capture.SeverityInfo, fields, hop)
+	live.Info("Transfer route probe completed - %s (local %s)", target, localAddr)
+	return nil
+}
+
+func (r *Runner) connectUpstream(ctx context.Context, target string, network bedrock.Network, observer *bedrock.Observer, connectionID string, hop int, logger *slog.Logger, live *liveReporter, clientData login.ClientData, transferRoute, routeProbed bool) (*minecraft.Conn, []*resource.Pack, error) {
 	if err := r.recordAtHop("upstream.dial_start", capture.SeverityInfo, map[string]any{"address": target}, hop); err != nil {
 		return nil, nil, err
 	}
@@ -538,6 +604,13 @@ func (r *Runner) connectUpstream(ctx context.Context, target string, network bed
 		TokenSource: r.config.TokenSource,
 		ClientData:  clientData,
 		ErrorLog:    logger,
+		SkipPing:    routeProbed,
+		PingTimeout: func() time.Duration {
+			if transferRoute && !routeProbed {
+				return transferRouteProbeTimeout
+			}
+			return 0
+		}(),
 		PacketFunc: func(header packet.Header, payload []byte, src, dst net.Addr) {
 			recordPacket(header, payload, src, dst)
 			urlResourcePacks.Observe(header, payload)
@@ -692,7 +765,7 @@ func (r *Runner) forward(source, destination *minecraft.Conn, failures *bedrock.
 				if onTransfer != nil {
 					onTransfer(target)
 				}
-				return &transferError{target: target}
+				return &transferError{target: target, localAddr: udpAddress(source.LocalAddr())}
 			}
 		}
 	}
