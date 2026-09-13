@@ -32,7 +32,11 @@ try {
         $fileName = "bedrock-debug-proxy$goExecutableSuffix"
         $Output = Join-Path $projectRoot (Join-Path "bin" $fileName)
     }
-    $outputPath = [System.IO.Path]::GetFullPath($Output, $projectRoot)
+    if ([System.IO.Path]::IsPathRooted($Output)) {
+        $outputPath = [System.IO.Path]::GetFullPath($Output)
+    } else {
+        $outputPath = [System.IO.Path]::GetFullPath((Join-Path $projectRoot $Output))
+    }
     $outputDirectory = Split-Path -Parent $outputPath
     [System.IO.Directory]::CreateDirectory($outputDirectory) | Out-Null
     $ldflags = "-X github.com/NhanAZ/BedrockDebugProxy/internal/buildinfo.Version=$Version -X github.com/NhanAZ/BedrockDebugProxy/internal/buildinfo.Commit=$commit"
