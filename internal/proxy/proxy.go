@@ -608,7 +608,7 @@ func (r *Runner) connectUpstream(ctx context.Context, target string, network bed
 	if err := r.recordAtHop("upstream.dial_start", capture.SeverityInfo, map[string]any{"address": target}, hop); err != nil {
 		return nil, nil, err
 	}
-	live.Info("Connecting upstream - %s (hop %d)", target, hop)
+	live.Info("Connecting upstream - %s (hop %d) - waiting for upstream login and resource-pack exchange (buffered by design)", target, hop)
 	urlResourcePacks := newURLResourcePackCache(ctx)
 	recordPacket := observer.PacketFunc("upstream", connectionID)
 	dialer := minecraft.Dialer{
@@ -636,11 +636,18 @@ func (r *Runner) connectUpstream(ctx context.Context, target string, network bed
 			return true
 		},
 	}
+	waitStarted := time.Now()
 	conn, err := dialer.DialContextNetwork(ctx, network, target)
+	waitDuration := time.Since(waitStarted).Round(time.Millisecond)
+	if waitDuration < time.Millisecond {
+		waitDuration = time.Millisecond
+	}
 	if err != nil {
+		live.Info("Upstream login and resource-pack exchange failed after %s", waitDuration)
 		_ = r.recordAtHop("upstream.dial_error", capture.SeverityError, map[string]any{"error": err.Error(), "type": fmt.Sprintf("%T", err)}, hop)
 		return nil, nil, fmt.Errorf("connect to upstream server: %w", err)
 	}
+	live.Info("Upstream login and resource-pack exchange completed in %s - downstream pack delivery can begin (sequential buffered mode)", waitDuration)
 	// Dialer returns only after the upstream login and resource-pack exchange has
 	// completed. Waiting on a second cache barrier here can deadlock the listener
 	// login path because the URL offer is observed on the same decoder goroutine.

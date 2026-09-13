@@ -27,6 +27,8 @@ Archives are saved during the session, not by a later `export` command. Each arc
 
 The current gophertunnel listener handles requested resource packs sequentially. It sends one `ResourcePackDataInfo`, services the chunk requests for that pack, and then advances to the next pack. BedrockDebugProxy uses that public listener path when offering the downloaded upstream packs to the client. It does not add a second transfer scheduler or assume a fixed ordering between independent server implementations.
 
+The upstream connection is established before the downstream listener receives the pack list. This upstream-first buffering is intentional because the proxy must retain the exact archives and server-supplied content keys before it can offer an archive-backed copy to the real client. The console labels this wait as buffered by design and reports its elapsed duration. Live packet summaries use three-second buckets, while every packet and resource-pack archive remains in the canonical capture.
+
 ## Opt-in decryption
 
 The server-supplied content key is preserved because it is required to analyze encrypted pack entries. The archive itself is never overwritten. Decryption is disabled by default and can be requested with `--decrypt-resource-packs`.

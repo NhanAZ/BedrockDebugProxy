@@ -20,7 +20,7 @@ func TestLiveReporterSummarisesPacketsAndHighlightsTransfer(t *testing.T) {
 	reporter := newLiveReporterWithClock(&output, func() time.Time { return current })
 	reporter.Packet(capture.DirectionClientToServer, &packet.PlayerAuthInput{})
 	reporter.Packet(capture.DirectionClientToServer, &packet.PlayerAuthInput{})
-	current = current.Add(time.Second)
+	current = current.Add(liveSummaryInterval)
 	reporter.Packet(capture.DirectionServerToClient, &packet.LevelChunk{})
 	reporter.Packet(capture.DirectionServerToClient, &packet.Transfer{Address: "next.example.org", Port: 19133})
 	reporter.Close()
@@ -59,6 +59,24 @@ func TestLiveReporterSummarisesPreSpawnRawPacketsByChannel(t *testing.T) {
 	if strings.Contains(text, "LevelChunk") {
 		t.Fatalf("post-spawn raw packet was reported: %s", text)
 	}
+}
+
+func TestLiveReporterUsesThreeSecondSummaryBuckets(t *testing.T) {
+	current := time.Date(2026, time.August, 30, 15, 0, 0, 0, time.UTC)
+	var output bytes.Buffer
+	reporter := newLiveReporterWithClock(&output, func() time.Time { return current })
+	reporter.Packet(capture.DirectionClientToServer, &packet.PlayerAuthInput{})
+	current = current.Add(2 * time.Second)
+	reporter.Packet(capture.DirectionClientToServer, &packet.PlayerAuthInput{})
+	if output.Len() != 0 {
+		t.Fatalf("summary flushed before three-second interval: %s", output.String())
+	}
+	current = current.Add(time.Second)
+	reporter.Packet(capture.DirectionClientToServer, &packet.PlayerAuthInput{})
+	if !strings.Contains(output.String(), "C->S              3 packets | PlayerAuthInput x3") {
+		t.Fatalf("summary was not flushed at three-second interval: %s", output.String())
+	}
+	reporter.Close()
 }
 
 func TestLiveReporterExplainsSelfSignedLANLoginOnce(t *testing.T) {
