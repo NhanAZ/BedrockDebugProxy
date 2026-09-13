@@ -134,13 +134,16 @@ func TestRunnerFollowsTransferAndAcceptsNextHop(t *testing.T) {
 	if err != nil || len(verification.Issues) != 0 {
 		t.Fatalf("capture verification = %+v, error = %v", verification, err)
 	}
-	var transferSeen, rewriteSeen, hopTwo bool
+	var transferSeen, rewriteSeen, routeProbeSeen, hopTwo bool
 	if err := capture.ScanEvents(root, func(event capture.Event) error {
 		if event.Kind == "packet.decoded" && event.Packet != nil && event.Packet.Name == "Transfer" && event.Hop == 1 {
 			transferSeen = true
 		}
 		if event.Kind == "packet.transfer_rewrite" {
 			rewriteSeen = true
+		}
+		if event.Kind == "transfer.route_probe" && event.Hop == 2 {
+			routeProbeSeen = true
 		}
 		if event.Hop == 2 && event.Kind == "session.spawned" {
 			hopTwo = true
@@ -149,8 +152,8 @@ func TestRunnerFollowsTransferAndAcceptsNextHop(t *testing.T) {
 	}); err != nil {
 		t.Fatal(err)
 	}
-	if !transferSeen || !rewriteSeen || !hopTwo {
-		t.Fatalf("transfer evidence = transfer %v, rewrite %v, hop2 %v", transferSeen, rewriteSeen, hopTwo)
+	if !transferSeen || !rewriteSeen || !routeProbeSeen || !hopTwo {
+		t.Fatalf("transfer evidence = transfer %v, rewrite %v, route probe %v, hop2 %v", transferSeen, rewriteSeen, routeProbeSeen, hopTwo)
 	}
 	for i := 0; i < 2; i++ {
 		select {
