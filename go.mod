@@ -16,6 +16,11 @@ require (
 	golang.org/x/oauth2 v0.36.0
 )
 
+// Enchanted and some other featured experiences omit ChunkRadiusUpdated during
+// the upstream spawn sequence. Keep the small compatibility patch in-tree
+// until it is available in the selected upstream gophertunnel release.
+replace github.com/sandertv/gophertunnel => ./third_party/gophertunnel
+
 require (
 	github.com/coreos/go-oidc/v3 v3.17.0 // indirect
 	github.com/df-mc/jsonc v1.0.5 // indirect

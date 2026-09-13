@@ -23,10 +23,12 @@ The Go module uses the following direct dependencies. Their source remains under
 | [`github.com/go-gl/mathgl`](https://github.com/go-gl/mathgl) | `v1.1.0` | BSD-3-Clause | Vector and matrix types used by the Bedrock protocol model |
 | [`github.com/google/uuid`](https://github.com/google/uuid) | `v1.6.0` | BSD-3-Clause | UUID parsing and values |
 | [`github.com/sandertv/go-raknet`](https://github.com/Sandertv/go-raknet) | `v1.15.2-0.20260705184311-0d1fd09e2cf6` | MIT | RakNet transport |
-| [`github.com/sandertv/gophertunnel`](https://github.com/Sandertv/gophertunnel) | `v1.61.0` | MIT | Bedrock sessions, protocol, authentication, and resource packs |
+| [`github.com/sandertv/gophertunnel`](https://github.com/Sandertv/gophertunnel) | `v1.61.0` plus the local compatibility patch described below | MIT | Bedrock sessions, protocol, authentication, and resource packs |
 | [`golang.org/x/oauth2`](https://github.com/golang/oauth2) | `v0.36.0` | BSD-3-Clause | Authentication token source API |
 
 The complete direct and transitive module graph and exact checksums are recorded in `go.mod` and `go.sum`. `tools/collect-third-party-licenses.ps1` verifies that every module compiled into the product has root license material and creates the deterministic license bundle used by binary releases. Distributions that include dependency source or compiled dependency code must preserve the license and notice material required by those dependencies.
+
+The in-tree copy under [`third_party/gophertunnel`](third_party/gophertunnel) is based on Sandertv gophertunnel `v1.61.0` at commit `283a5a97dfe65da94bcc0b401807f6aefa9e72ee`. It contains one project-specific compatibility change in `minecraft/conn.go`: featured experiences that send `PlayStatusPlayerSpawn` without `ChunkRadiusUpdated` are allowed to complete the dialer spawn handshake. The upstream source and its MIT license are retained unchanged otherwise.
 
 ## Development tools
 
