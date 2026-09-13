@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"io"
 	"log/slog"
 	"net"
 	"reflect"
@@ -289,7 +290,10 @@ func (r *Runner) connectUpstream(ctx context.Context, network bedrock.Network, o
 		_ = r.record("upstream.dial_error", capture.SeverityError, map[string]any{"error": err.Error(), "type": fmt.Sprintf("%T", err)})
 		return nil, nil, fmt.Errorf("connect to upstream server: %w", err)
 	}
-	urlResourcePacks.WaitForOffer(ctx)
+	// Dialer returns only after the upstream login and resource-pack exchange has
+	// completed. Waiting on a second cache barrier here can deadlock the listener
+	// login path because the URL offer is observed on the same decoder goroutine.
+	// The connection's pack list is therefore authoritative at this point.
 	resourcePacks := conn.ResourcePacks()
 	if prefetched := urlResourcePacks.Packs(); len(prefetched) != 0 {
 		resourcePacks = prefetched
@@ -307,6 +311,11 @@ func (r *Runner) connectUpstream(ctx context.Context, network bedrock.Network, o
 		}
 		live.Info("Resource packs retained - %d archives in %s; plaintext derivation %s", count, r.config.Recorder.Root(), derivation)
 	}
+	deliveryPacks, err := resourcePacksForDownstream(resourcePacks)
+	if err != nil {
+		_ = conn.Close()
+		return nil, nil, fmt.Errorf("prepare resource packs for downstream delivery: %w", err)
+	}
 	if err := r.record("upstream.connected", capture.SeverityInfo, map[string]any{
 		"local_address":       conn.LocalAddr().String(),
 		"remote_address":      conn.RemoteAddr().String(),
@@ -318,7 +327,36 @@ func (r *Runner) connectUpstream(ctx context.Context, network bedrock.Network, o
 		return nil, nil, err
 	}
 	live.Info("Upstream connected - %s, Bedrock %s protocol %d", conn.RemoteAddr(), conn.Proto().Ver(), conn.Proto().ID())
-	return conn, resourcePacks, nil
+	return conn, deliveryPacks, nil
+}
+
+// resourcePacksForDownstream prevents a server-advertised URL from being
+// forwarded to the real Bedrock client. The client must receive the pack over
+// the proxy's RakNet connection so that the listener can observe and preserve
+// the exact upstream URL while serving the same archive as chunk data.
+func resourcePacksForDownstream(packs []*resource.Pack) ([]*resource.Pack, error) {
+	if len(packs) == 0 {
+		return nil, nil
+	}
+	delivery := make([]*resource.Pack, 0, len(packs))
+	for _, pack := range packs {
+		if pack == nil {
+			return nil, errors.New("resource pack is nil")
+		}
+		if pack.DownloadURL() == "" {
+			delivery = append(delivery, pack)
+			continue
+		}
+		clone, err := resource.Read(io.NewSectionReader(pack, 0, int64(pack.Len())))
+		if err != nil {
+			return nil, fmt.Errorf("clone URL resource pack %s: %w", pack.UUID(), err)
+		}
+		if pack.Encrypted() {
+			clone = clone.WithContentKey(pack.ContentKey())
+		}
+		delivery = append(delivery, clone)
+	}
+	return delivery, nil
 }
 
 func startGame(client, server *minecraft.Conn, gameData minecraft.GameData) error {

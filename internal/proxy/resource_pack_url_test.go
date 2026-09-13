@@ -100,6 +100,42 @@ func TestURLResourcePackCacheReportsAdvertisedPackMismatch(t *testing.T) {
 	}
 }
 
+func TestResourcePacksForDownstreamClearsURL(t *testing.T) {
+	archive := testURLResourcePackArchive(t)
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		_, _ = w.Write(archive)
+	}))
+	defer server.Close()
+	packUUID := uuid.MustParse("11111111-1111-1111-1111-111111111111")
+	info := &packet.ResourcePacksInfo{TexturePacks: []protocol.TexturePackInfo{{
+		UUID:        packUUID,
+		Version:     "1.0.0",
+		Size:        uint64(len(archive)),
+		DownloadURL: server.URL + "/pack.zip",
+		ContentKey:  "synthetic-content-key",
+	}}}
+
+	cache := newURLResourcePackCache(context.Background())
+	cache.Observe(packet.Header{PacketID: packet.IDResourcePacksInfo}, encodeResourcePacksInfo(t, info))
+	packs, err := resourcePacksForDownstream(cache.Packs())
+	if err != nil {
+		t.Fatalf("resourcePacksForDownstream() error = %v", err)
+	}
+	if len(packs) != 1 {
+		t.Fatalf("downstream packs = %d, want 1", len(packs))
+	}
+	if got := packs[0].DownloadURL(); got != "" {
+		t.Fatalf("downstream DownloadURL = %q, want empty", got)
+	}
+	if got := packs[0].ContentKey(); got != info.TexturePacks[0].ContentKey {
+		t.Fatalf("downstream ContentKey = %q, want %q", got, info.TexturePacks[0].ContentKey)
+	}
+	key := minecraft.ResourcePackCacheKey{UUID: packUUID, Version: "1.0.0", Size: uint64(len(archive))}
+	if !key.Matches(packs[0]) {
+		t.Fatalf("downstream pack no longer matches advertised key")
+	}
+}
+
 func TestDecodeResourcePacksInfoMalformedPayloadDoesNotPanic(t *testing.T) {
 	if info, err := decodeResourcePacksInfo([]byte{0xff}); err == nil || info != nil {
 		t.Fatalf("decode result = %#v, err = %v", info, err)
