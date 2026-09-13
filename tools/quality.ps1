@@ -37,9 +37,15 @@ try {
     }
 
     Write-Host "==> gofmt"
-    $unformatted = @(& gofmt -l @goFiles)
-    if ($LASTEXITCODE -ne 0) {
-        throw "gofmt failed with exit code $LASTEXITCODE."
+    $unformatted = [System.Collections.Generic.List[string]]::new()
+    foreach ($file in $goFiles) {
+        $formattedOutput = @(& gofmt -l $file)
+        if ($LASTEXITCODE -ne 0) {
+            throw "gofmt failed for $file with exit code $LASTEXITCODE."
+        }
+        foreach ($entry in $formattedOutput) {
+            [void]$unformatted.Add([string]$entry)
+        }
     }
     if ($unformatted.Count -ne 0) {
         $unformatted | ForEach-Object { Write-Host $_ }
