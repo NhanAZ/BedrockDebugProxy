@@ -58,6 +58,20 @@ By default, the downstream Minecraft connection must use Xbox authentication. Ad
 
 This flag does not disable upstream authentication. The same running listener continues to accept a Servers-tab connection, but it no longer verifies whether the connecting client used Xbox authentication. Any client that can reach the listener may use the proxy's authenticated upstream session, so this is intentionally not the default.
 
+When the destination sends a Bedrock `Transfer` packet, add `--follow-transfers` to keep the proxy in the path. The proxy rewrites the transfer destination to its local listener, waits for the client to reconnect, and then opens the next upstream hop in the same capture. Without this opt-in flag, the original transfer is captured and the process ends after the current hop. A concrete, reachable LAN address is required in `--listen` when following transfers; a wildcard such as `0.0.0.0:19132` cannot be sent to the client.
+
+For a trusted-LAN run that accepts a LAN World connection and follows server transfers, use both opt-in flags explicitly.
+
+```powershell
+.\bin\bedrock-debug-proxy.exe `
+    run `
+    --listen 192.168.1.10:19132 `
+    --upstream "<UPSTREAM>" `
+    --auth device `
+    --allow-unauthenticated-client `
+    --follow-transfers
+```
+
 On Windows, the Microsoft token cache is `%AppData%\BedrockDebugProxy\auth-token.json`. It contains authentication secrets, remains outside the repository, and must not be shared or committed. To change accounts, stop the proxy and run `.\bin\bedrock-debug-proxy.exe logout`, then start the proxy again. This removes only the local cache; it does not revoke the Microsoft session or sign out other applications.
 
 If the binary does not exist yet, install the Go version declared in `go.mod`, keep the working tree clean, and build it once.
@@ -132,13 +146,13 @@ An exported `.bdpcap` is a portable copy, not a redacted copy. It can contain al
 
 ## Status and limitations
 
-The project currently uses gophertunnel `v1.61.0` and supports one downstream client with one upstream hop per process. Automated tests include a full local RakNet session and focused tests for capture integrity, representative packet preservation, Experience response parsing, and transport capability preservation.
+The project currently uses gophertunnel `v1.61.0` and supports one downstream client. With `--follow-transfers`, subsequent upstream hops remain in the same process and capture session. Automated tests include a full local RakNet session and focused tests for capture integrity, representative packet preservation, Experience response parsing, and transport capability preservation.
 
 Automated success does not prove live Minecraft compatibility. Runtime changes require a stamped real-client session on The Hive, and releases require the six-server validation matrix. Until the current candidate completes that process, treat it as development software rather than a production-ready proxy.
 
 Current known boundaries include the following.
 
-- Transfer packets are recorded but not followed automatically.
+- Transfer following is opt-in. Without `--follow-transfers`, Transfer packets are recorded and the current process ends after that hop. With it, the transfer is rewritten to the local listener and the next hop is captured in the same session. A session follows at most 64 hops to prevent transfer loops from creating unbounded output.
 - The default capture path applies blocking backpressure and closes each content-addressed blob before forwarding continues. It avoids a durable disk flush per event for normal responsiveness. `--sync-each-event` provides stronger crash and power-loss durability at a substantial latency cost.
 - Raw UDP datagrams and RakNet acknowledgement, fragmentation, retransmission, and loss details are outside the current capture boundary.
 - Transport payloads are captured at the post-transport application boundary.

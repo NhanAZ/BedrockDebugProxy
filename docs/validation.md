@@ -28,14 +28,15 @@ Commit the revision, ensure the working tree is clean, run the quality gate, and
 
 ## Capture and report
 
-Run the stamped binary and complete the required live session. Stop it cleanly, then generate the sanitized report with project tooling rather than adding another command to the product CLI.
+Run the stamped binary and complete the required live session. Replace `192.168.1.10` below with the concrete LAN address that the Minecraft client will use. Stop it cleanly, then generate the sanitized report with project tooling rather than adding another command to the product CLI.
 
 ```powershell
 .\bin\bedrock-debug-proxy.exe `
     run `
-    --listen 0.0.0.0:19132 `
+    --listen 192.168.1.10:19132 `
     --upstream "experience:The Hive" `
-    --auth device
+    --auth device `
+    --follow-transfers
 .\tools\create-validation-report.ps1 `
     -Binary .\bin\bedrock-debug-proxy.exe `
     -Capture .\captures\<SESSION> `
@@ -45,7 +46,7 @@ Run the stamped binary and complete the required live session. Stop it cleanly, 
     -Output .\validation\local\<REVISION>\the-hive.json
 ```
 
-Device authentication is cached after the first successful login. Wait for `Listening on` before connecting the client. Required baseline reports use the default Xbox-authenticated downstream path, normally through an entry in Minecraft's Servers tab. A LAN World entry uses self-signed client authentication and requires `--allow-unauthenticated-client` on a trusted LAN. Validate that opt-in separately when the LAN flow changes rather than using it as a substitute for the default authentication gate.
+Device authentication is cached after the first successful login. Wait for `Listening on` before connecting the client. Required baseline reports use the default Xbox-authenticated downstream path, normally through an entry in Minecraft's Servers tab. A LAN World entry uses self-signed client authentication and requires `--allow-unauthenticated-client` on a trusted LAN. Validate that opt-in separately when the LAN flow changes rather than using it as a substitute for the default authentication gate. `--follow-transfers` is recommended for server flows that send `Transfer`; use a concrete reachable LAN address in `--listen` when following transfers, and record `transfer_following=not_observed` if the server does not send one.
 
 Use public server labels rather than addresses in `-Server`. A manual check uses `lowercase_name=pass`, `lowercase_name=fail`, or `lowercase_name=not_observed`. Add one for each flow reviewed, such as `resource_pack_transfer=pass` or `resource_pack_decryption=pass`.
 

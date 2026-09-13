@@ -61,4 +61,4 @@ The first version cannot claim raw UDP or complete RakNet diagnostics. It also r
 
 Deep instrumentation remains possible through a narrow future fork, custom network adapter, or OS capture source. Those changes do not require replacing the event model.
 
-The proxy is intentionally observational. Packet mutation, dropping, injection, and replay do not belong in the initial bridge.
+The default proxy is intentionally observational. Packet dropping, injection, and replay do not belong in the bridge. The separately documented `--follow-transfers` mode is the narrow exception for routing a Bedrock `Transfer` back through the listener so that the next hop can remain observable; it preserves the original packet and is disabled by default.

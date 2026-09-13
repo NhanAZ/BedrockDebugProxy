@@ -17,6 +17,7 @@ type Config struct {
 	UpstreamAddress            string
 	UpstreamNetwork            minecraft.Network
 	AllowUnauthenticatedClient bool
+	FollowTransfers            bool
 	TokenSource                oauth2.TokenSource
 	Recorder                   *capture.Recorder
 	Output                     io.Writer

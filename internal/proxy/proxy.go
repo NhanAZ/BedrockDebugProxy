@@ -9,8 +9,10 @@ import (
 	"log/slog"
 	"net"
 	"reflect"
+	"strings"
 	"sync"
 	"sync/atomic"
+	"time"
 
 	"github.com/NhanAZ/BedrockDebugProxy/internal/bedrock"
 	"github.com/NhanAZ/BedrockDebugProxy/internal/capture"
@@ -23,9 +25,9 @@ import (
 )
 
 const (
-	sessionID              = "session-1"
-	downstreamConnectionID = "downstream-1"
-	upstreamConnectionID   = "upstream-1"
+	sessionID           = "session-1"
+	transferGracePeriod = 5 * time.Second
+	maxFollowedHops     = 64
 )
 
 type upstreamSlot struct {
@@ -34,6 +36,31 @@ type upstreamSlot struct {
 	resourcePacks []*resource.Pack
 	err           error
 }
+
+type hopState struct {
+	hop             int
+	target          string
+	downstreamID    string
+	upstreamID      string
+	upstreamNetwork bedrock.Network
+	upstreamLogger  *slog.Logger
+	slot            upstreamSlot
+}
+
+type transferError struct {
+	target string
+}
+
+func (e *transferError) Error() string {
+	return "server transfer to " + e.target
+}
+
+type transferRewriteError struct {
+	err error
+}
+
+func (e *transferRewriteError) Error() string { return "rewrite Transfer: " + e.err.Error() }
+func (e *transferRewriteError) Unwrap() error { return e.err }
 
 type Runner struct {
 	config Config
@@ -74,44 +101,58 @@ func (r *Runner) Run(ctx context.Context) error {
 	defer live.Close()
 	failures := bedrock.NewFailureSink(cancelRun)
 	observer := bedrock.NewObserver(r.config.Recorder, failures, sessionID, 1, live.RawPacket)
-	downstreamLogger := slog.New(bedrock.NewCaptureLogHandler(r.config.Recorder, failures, sessionID, downstreamConnectionID, "downstream", live.LibraryLog))
-	upstreamLogger := slog.New(bedrock.NewCaptureLogHandler(r.config.Recorder, failures, sessionID, upstreamConnectionID, "upstream", live.LibraryLog))
-	downstreamNetwork := bedrock.Network{
-		Recorder:       r.config.Recorder,
-		Observer:       observer,
-		Failures:       failures,
-		Logger:         downstreamLogger,
-		SessionID:      sessionID,
-		ConnectionID:   downstreamConnectionID,
-		Channel:        "downstream",
-		Hop:            1,
-		ReadDirection:  capture.DirectionClientToServer,
-		WriteDirection: capture.DirectionServerToClient,
+	live.SetFollowTransfers(r.config.FollowTransfers)
+	stateMu := &sync.RWMutex{}
+	current := &hopState{hop: 1, target: r.config.UpstreamAddress, downstreamID: "downstream-1", upstreamID: "upstream-1"}
+	var pending *hopState
+	getAcceptState := func() *hopState {
+		stateMu.RLock()
+		defer stateMu.RUnlock()
+		if pending != nil {
+			return pending
+		}
+		return current
 	}
-	upstreamNetwork := bedrock.Network{
-		Transport:      r.config.UpstreamNetwork,
-		Recorder:       r.config.Recorder,
-		Observer:       observer,
-		Failures:       failures,
-		Logger:         upstreamLogger,
-		SessionID:      sessionID,
-		ConnectionID:   upstreamConnectionID,
-		Channel:        "upstream",
-		Hop:            1,
-		ReadDirection:  capture.DirectionServerToClient,
-		WriteDirection: capture.DirectionClientToServer,
+	setPendingState := func(state *hopState) {
+		stateMu.Lock()
+		pending = state
+		stateMu.Unlock()
+	}
+	promotePendingState := func() {
+		stateMu.Lock()
+		if pending != nil {
+			current = pending
+			pending = nil
+		}
+		stateMu.Unlock()
+	}
+	downstreamLogger := slog.New(bedrock.NewCaptureLogHandler(r.config.Recorder, failures, sessionID, current.downstreamID, "downstream", live.LibraryLog))
+	downstreamNetwork := bedrock.Network{
+		Recorder:         r.config.Recorder,
+		Observer:         observer,
+		Failures:         failures,
+		Logger:           downstreamLogger,
+		SessionID:        sessionID,
+		ConnectionID:     current.downstreamID,
+		ConnectionIDFunc: func() string { return getAcceptState().downstreamID },
+		Channel:          "downstream",
+		Hop:              1,
+		HopFunc:          func() int { return getAcceptState().hop },
+		ReadDirection:    capture.DirectionClientToServer,
+		WriteDirection:   capture.DirectionServerToClient,
 	}
 
 	if err := r.record("proxy.start", capture.SeverityInfo, map[string]any{
-		"listen_address":   r.config.ListenAddress,
-		"upstream_address": r.config.UpstreamAddress,
-		"protocol_id":      minecraft.DefaultProtocol.ID(),
-		"game_version":     minecraft.DefaultProtocol.Ver(),
+		"listen_address":               r.config.ListenAddress,
+		"upstream_address":             r.config.UpstreamAddress,
+		"allow_unauthenticated_client": r.config.AllowUnauthenticatedClient,
+		"follow_transfers":             r.config.FollowTransfers,
+		"protocol_id":                  minecraft.DefaultProtocol.ID(),
+		"game_version":                 minecraft.DefaultProtocol.Ver(),
 	}); err != nil {
 		return err
 	}
 
-	var slot upstreamSlot
 	listenerConfig := minecraft.ListenConfig{
 		ErrorLog:               downstreamLogger,
 		AuthenticationDisabled: r.config.AllowUnauthenticatedClient,
@@ -121,19 +162,33 @@ func (r *Runner) Run(ctx context.Context) error {
 		AllowInvalidPackets:    true,
 		StatusProvider:         minecraft.NewStatusProvider("BedrockDebugProxy", r.config.UpstreamAddress),
 		MaxDecompressedLen:     r.config.MaxDecompressedBytes,
-		PacketFunc:             observer.PacketFunc("downstream", downstreamConnectionID),
+		PacketFunc:             observer.PacketFuncDynamic("downstream", func() string { return getAcceptState().downstreamID }),
 		FetchResourcePacks: func(_ login.IdentityData, clientData login.ClientData, _ []*resource.Pack) []*resource.Pack {
-			slot.once.Do(func() {
-				slot.conn, slot.resourcePacks, slot.err = r.connectUpstream(runCtx, upstreamNetwork, observer, upstreamLogger, live, clientData)
+			state := getAcceptState()
+			state.slot.once.Do(func() {
+				state.upstreamLogger = slog.New(bedrock.NewCaptureLogHandler(r.config.Recorder, failures, sessionID, state.upstreamID, "upstream", live.LibraryLog))
+				state.upstreamNetwork = bedrock.Network{
+					Transport: r.config.UpstreamNetwork, Recorder: r.config.Recorder, Observer: observer, Failures: failures,
+					Logger: state.upstreamLogger, SessionID: sessionID, ConnectionID: state.upstreamID,
+					Channel: "upstream", Hop: state.hop, ReadDirection: capture.DirectionServerToClient,
+					WriteDirection: capture.DirectionClientToServer,
+				}
+				state.slot.conn, state.slot.resourcePacks, state.slot.err = r.connectUpstream(runCtx, state.target, state.upstreamNetwork, observer, state.upstreamID, state.hop, state.upstreamLogger, live, clientData)
 			})
-			if slot.err != nil || slot.conn == nil {
+			if state.slot.err != nil || state.slot.conn == nil {
 				return nil
 			}
-			if len(slot.resourcePacks) != 0 {
-				return slot.resourcePacks
+			if len(state.slot.resourcePacks) != 0 {
+				return state.slot.resourcePacks
 			}
-			return slot.conn.ResourcePacks()
+			return state.slot.conn.ResourcePacks()
 		},
+	}
+	if r.config.FollowTransfers {
+		// A reconnect can overlap the listener's asynchronous player-count
+		// decrement by a few milliseconds after a Transfer. Allow the next
+		// login to reach Accept while the previous Conn is being released.
+		listenerConfig.MaximumPlayers = 0
 	}
 	listener, err := listenerConfig.ListenNetwork(downstreamNetwork, r.config.ListenAddress)
 	if err != nil {
@@ -149,37 +204,103 @@ func (r *Runner) Run(ctx context.Context) error {
 		return err
 	}
 
-	accepted, err := listener.Accept()
-	if err != nil {
-		if failure := failures.Err(); failure != nil {
-			return fmt.Errorf("capture hook failed during login: %w", failure)
+	for {
+		state := getAcceptState()
+		observer.SetHop(state.hop)
+		accepted, err := listener.Accept()
+		if err != nil {
+			if failure := failures.Err(); failure != nil {
+				return fmt.Errorf("capture hook failed during login: %w", failure)
+			}
+			if ctx.Err() != nil {
+				return nil
+			}
+			return fmt.Errorf("accept Bedrock client: %w", err)
 		}
-		if ctx.Err() != nil {
-			return nil
+		clientConn, ok := accepted.(*minecraft.Conn)
+		if !ok {
+			_ = accepted.Close()
+			return fmt.Errorf("accepted unexpected connection type %T", accepted)
 		}
-		return fmt.Errorf("accept Bedrock client: %w", err)
+		authentication := "Xbox-authenticated"
+		if !clientConn.Authenticated() {
+			authentication = "self-signed client accepted by explicit configuration"
+		}
+		live.Info("Client connected - %s, Bedrock %s protocol %d (hop %d)", authentication, clientConn.Proto().Ver(), clientConn.Proto().ID(), state.hop)
+		if state.slot.err != nil {
+			_ = listener.Disconnect(clientConn, "BedrockDebugProxy could not connect to the destination server")
+			_ = clientConn.Close()
+			return state.slot.err
+		}
+		if state.slot.conn == nil {
+			_ = listener.Disconnect(clientConn, "BedrockDebugProxy did not establish an upstream connection")
+			_ = clientConn.Close()
+			return errors.New("upstream connection was not established during resource-pack negotiation")
+		}
+		bridgeErr := r.runHop(runCtx, actualAddress, state, clientConn, state.slot.conn, observer, failures, live, func(target string) {
+			setPendingState(&hopState{hop: state.hop + 1, target: target, downstreamID: fmt.Sprintf("downstream-%d", state.hop+1), upstreamID: fmt.Sprintf("upstream-%d", state.hop+1)})
+		})
+		var followed *transferError
+		if r.config.FollowTransfers && errors.As(bridgeErr, &followed) {
+			if state.hop >= maxFollowedHops {
+				return fmt.Errorf("transfer hop limit %d reached at %s", maxFollowedHops, followed.target)
+			}
+			live.Info("Following transfer to %s; waiting for the client to reconnect", followed.target)
+			select {
+			case <-clientConn.Context().Done():
+			case <-time.After(transferGracePeriod):
+				_ = clientConn.Close()
+			case <-runCtx.Done():
+				_ = clientConn.Close()
+				return nil
+			}
+			promotePendingState()
+			// Release the listener's single-player slot before accepting the
+			// reconnect. The client normally closes this connection after
+			// receiving Transfer, but the server-side Conn may observe that close
+			// slightly later.
+			_ = clientConn.Close()
+			deadline := time.NewTimer(transferGracePeriod)
+			ticker := time.NewTicker(25 * time.Millisecond)
+			waitForSlot := true
+			for waitForSlot && listener.PlayerCount() != 0 {
+				select {
+				case <-ticker.C:
+				case <-deadline.C:
+					waitForSlot = false
+				case <-runCtx.Done():
+					ticker.Stop()
+					if !deadline.Stop() {
+						<-deadline.C
+					}
+					return nil
+				}
+			}
+			ticker.Stop()
+			if !deadline.Stop() {
+				select {
+				case <-deadline.C:
+				default:
+				}
+			}
+			continue
+		}
+		_ = clientConn.Close()
+		if bridgeErr != nil {
+			return bridgeErr
+		}
+		return nil
 	}
-	clientConn, ok := accepted.(*minecraft.Conn)
-	if !ok {
-		_ = accepted.Close()
-		return fmt.Errorf("accepted unexpected connection type %T", accepted)
-	}
-	defer func() { _ = clientConn.Close() }()
-	authentication := "Xbox-authenticated"
-	if !clientConn.Authenticated() {
-		authentication = "self-signed client accepted by explicit configuration"
-	}
-	live.Info("Client connected - %s, Bedrock %s protocol %d", authentication, clientConn.Proto().Ver(), clientConn.Proto().ID())
-	if slot.err != nil {
-		_ = listener.Disconnect(clientConn, "BedrockDebugProxy could not connect to the destination server")
-		return slot.err
-	}
-	if slot.conn == nil {
-		_ = listener.Disconnect(clientConn, "BedrockDebugProxy did not establish an upstream connection")
-		return errors.New("upstream connection was not established during resource-pack negotiation")
-	}
-	serverConn := slot.conn
+}
+
+func (r *Runner) runHop(runCtx context.Context, localAddress string, state *hopState, clientConn, serverConn *minecraft.Conn, observer *bedrock.Observer, failures *bedrock.FailureSink, live *liveReporter, onTransfer func(string)) (runErr error) {
 	defer func() { _ = serverConn.Close() }()
+	keepClientOpen := false
+	defer func() {
+		if !keepClientOpen {
+			_ = clientConn.Close()
+		}
+	}()
 	var shuttingDown atomic.Bool
 	stopConnections := context.AfterFunc(runCtx, func() {
 		shuttingDown.Store(true)
@@ -190,62 +311,69 @@ func (r *Runner) Run(ctx context.Context) error {
 	if err := failures.Err(); err != nil {
 		return fmt.Errorf("capture hook failed during login: %w", err)
 	}
-	if err := r.record("session.negotiated", capture.SeverityInfo, map[string]any{
-		"downstream_protocol_id":  clientConn.Proto().ID(),
-		"downstream_game_version": clientConn.Proto().Ver(),
-		"upstream_protocol_id":    serverConn.Proto().ID(),
-		"upstream_game_version":   serverConn.Proto().Ver(),
-		"resource_pack_count":     len(serverConn.ResourcePacks()),
-	}); err != nil {
+	if err := r.recordAtHop("session.negotiated", capture.SeverityInfo, map[string]any{
+		"downstream_protocol_id": clientConn.Proto().ID(), "downstream_game_version": clientConn.Proto().Ver(),
+		"upstream_protocol_id": serverConn.Proto().ID(), "upstream_game_version": serverConn.Proto().Ver(),
+		"resource_pack_count": len(serverConn.ResourcePacks()), "target": state.target,
+	}, state.hop); err != nil {
 		return err
 	}
-	live.Info("Session negotiated - downstream protocol %d, upstream protocol %d, %d resource packs", clientConn.Proto().ID(), serverConn.Proto().ID(), len(serverConn.ResourcePacks()))
-	if err := r.recordStructuredView(
-		"session.connection_metadata", newConnectionMetadata("downstream", clientConn),
-		capture.DirectionInternal, downstreamConnectionID, "downstream", "decoded_login_state",
-		[]string{"Exact Login packet bytes remain in packet.raw; binary fields in this structured view use size, SHA-256, and preview metadata"},
-	); err != nil {
+	live.Info("Session negotiated - downstream protocol %d, upstream protocol %d, %d resource packs (hop %d)", clientConn.Proto().ID(), serverConn.Proto().ID(), len(serverConn.ResourcePacks()), state.hop)
+	if err := r.recordStructuredViewAtHop("session.connection_metadata", newConnectionMetadata("downstream", clientConn), capture.DirectionInternal, state.downstreamID, "downstream", "decoded_login_state", state.hop,
+		[]string{"Exact Login packet bytes remain in packet.raw; binary fields in this structured view use size, SHA-256, and preview metadata"}); err != nil {
 		return err
 	}
-	if err := r.recordStructuredView(
-		"session.connection_metadata", newConnectionMetadata("upstream", serverConn),
-		capture.DirectionInternal, upstreamConnectionID, "upstream", "decoded_login_state",
-		[]string{"Exact Login packet bytes remain in packet.raw; binary fields in this structured view use size, SHA-256, and preview metadata"},
-	); err != nil {
+	if err := r.recordStructuredViewAtHop("session.connection_metadata", newConnectionMetadata("upstream", serverConn), capture.DirectionInternal, state.upstreamID, "upstream", "decoded_login_state", state.hop,
+		[]string{"Exact Login packet bytes remain in packet.raw; binary fields in this structured view use size, SHA-256, and preview metadata"}); err != nil {
 		return err
 	}
 	gameData := serverConn.GameData()
-	if err := r.recordStructuredView(
-		"session.game_data", gameData, capture.DirectionServerToClient, upstreamConnectionID, "upstream", "decoded_upstream_game_data",
-		[]string{"This is a bounded GameData view exposed by gophertunnel; collections may be truncated and the exact StartGame packet remains in packet.raw"},
-	); err != nil {
+	if err := r.recordStructuredViewAtHop("session.game_data", gameData, capture.DirectionServerToClient, state.upstreamID, "upstream", "decoded_upstream_game_data", state.hop,
+		[]string{"This is a bounded GameData view exposed by gophertunnel; collections may be truncated and the exact StartGame packet remains in packet.raw"}); err != nil {
 		return err
 	}
 	if err := startGame(clientConn, serverConn, gameData); err != nil {
-		_ = r.record("session.spawn_error", capture.SeverityError, map[string]any{"error": err.Error(), "type": fmt.Sprintf("%T", err)})
+		_ = r.recordAtHop("session.spawn_error", capture.SeverityError, map[string]any{"error": err.Error(), "type": fmt.Sprintf("%T", err)}, state.hop)
 		return err
 	}
 	live.SetSpawned()
-	if err := r.record("session.spawned", capture.SeverityInfo, map[string]any{
-		"downstream_latency":              clientConn.Latency().String(),
-		"upstream_latency":                serverConn.Latency().String(),
-		"downstream_client_cache_enabled": clientConn.ClientCacheEnabled(),
-		"upstream_client_cache_enabled":   serverConn.ClientCacheEnabled(),
-		"downstream_chunk_radius":         clientConn.ChunkRadius(),
-		"upstream_chunk_radius":           serverConn.ChunkRadius(),
-	}); err != nil {
+	if err := r.recordAtHop("session.spawned", capture.SeverityInfo, map[string]any{
+		"downstream_latency": clientConn.Latency().String(), "upstream_latency": serverConn.Latency().String(),
+		"downstream_client_cache_enabled": clientConn.ClientCacheEnabled(), "upstream_client_cache_enabled": serverConn.ClientCacheEnabled(),
+		"downstream_chunk_radius": clientConn.ChunkRadius(), "upstream_chunk_radius": serverConn.ChunkRadius(),
+	}, state.hop); err != nil {
 		return err
 	}
-	live.Info("Session spawned - downstream latency %s, upstream latency %s", clientConn.Latency(), serverConn.Latency())
-
+	live.Info("Session spawned - downstream latency %s, upstream latency %s (hop %d)", clientConn.Latency(), serverConn.Latency(), state.hop)
+	transferAddress := strings.TrimSpace(clientConn.ClientData().ServerAddress)
+	if transferAddress == "" {
+		transferAddress = localAddress
+	}
 	first := make(chan error, 2)
 	go func() {
-		first <- r.forward(clientConn, serverConn, failures, live, &shuttingDown, capture.DirectionClientToServer, "downstream", downstreamConnectionID)
+		first <- r.forward(clientConn, serverConn, failures, live, &shuttingDown, transferAddress, capture.DirectionClientToServer, "downstream", state.downstreamID, state.hop, onTransfer)
 	}()
 	go func() {
-		first <- r.forward(serverConn, clientConn, failures, live, &shuttingDown, capture.DirectionServerToClient, "upstream", upstreamConnectionID)
+		first <- r.forward(serverConn, clientConn, failures, live, &shuttingDown, transferAddress, capture.DirectionServerToClient, "upstream", state.upstreamID, state.hop, onTransfer)
 	}()
 	bridgeErr := <-first
+	var transfer *transferError
+	if r.config.FollowTransfers && errors.As(bridgeErr, &transfer) {
+		keepClientOpen = true
+		shuttingDown.Store(true)
+		_ = serverConn.Close()
+		secondErr := <-first
+		if err := failures.Err(); err != nil {
+			return fmt.Errorf("capture hook failed: %w", err)
+		}
+		if err := r.recordAtHop("session.close", capture.SeverityInfo, map[string]any{
+			"first_loop_error": errorString(bridgeErr), "second_loop_error": errorString(secondErr), "transfer_target": transfer.target,
+		}, state.hop); err != nil {
+			return err
+		}
+		live.Info("Session hop %d ended after transfer - target %s", state.hop, transfer.target)
+		return transfer
+	}
 	shuttingDown.Store(true)
 	_ = clientConn.Close()
 	_ = serverConn.Close()
@@ -253,23 +381,22 @@ func (r *Runner) Run(ctx context.Context) error {
 	if err := failures.Err(); err != nil {
 		return fmt.Errorf("capture hook failed: %w", err)
 	}
-	if err := r.record("session.close", severityForError(bridgeErr), map[string]any{
-		"first_loop_error":  errorString(bridgeErr),
-		"second_loop_error": errorString(secondErr),
-	}); err != nil {
+	if err := r.recordAtHop("session.close", severityForError(bridgeErr), map[string]any{
+		"first_loop_error": errorString(bridgeErr), "second_loop_error": errorString(secondErr),
+	}, state.hop); err != nil {
 		return err
 	}
-	live.Info("Session ended - first loop: %s; second loop: %s", errorString(bridgeErr), errorString(secondErr))
+	live.Info("Session ended - first loop: %s; second loop: %s (hop %d)", errorString(bridgeErr), errorString(secondErr), state.hop)
 	return nil
 }
 
-func (r *Runner) connectUpstream(ctx context.Context, network bedrock.Network, observer *bedrock.Observer, logger *slog.Logger, live *liveReporter, clientData login.ClientData) (*minecraft.Conn, []*resource.Pack, error) {
-	if err := r.record("upstream.dial_start", capture.SeverityInfo, map[string]any{"address": r.config.UpstreamAddress}); err != nil {
+func (r *Runner) connectUpstream(ctx context.Context, target string, network bedrock.Network, observer *bedrock.Observer, connectionID string, hop int, logger *slog.Logger, live *liveReporter, clientData login.ClientData) (*minecraft.Conn, []*resource.Pack, error) {
+	if err := r.recordAtHop("upstream.dial_start", capture.SeverityInfo, map[string]any{"address": target}, hop); err != nil {
 		return nil, nil, err
 	}
-	live.Info("Connecting upstream - %s", r.config.UpstreamAddress)
+	live.Info("Connecting upstream - %s (hop %d)", target, hop)
 	urlResourcePacks := newURLResourcePackCache(ctx)
-	recordPacket := observer.PacketFunc("upstream", upstreamConnectionID)
+	recordPacket := observer.PacketFunc("upstream", connectionID)
 	dialer := minecraft.Dialer{
 		TokenSource: r.config.TokenSource,
 		ClientData:  clientData,
@@ -285,9 +412,9 @@ func (r *Runner) connectUpstream(ctx context.Context, network bedrock.Network, o
 			return true
 		},
 	}
-	conn, err := dialer.DialContextNetwork(ctx, network, r.config.UpstreamAddress)
+	conn, err := dialer.DialContextNetwork(ctx, network, target)
 	if err != nil {
-		_ = r.record("upstream.dial_error", capture.SeverityError, map[string]any{"error": err.Error(), "type": fmt.Sprintf("%T", err)})
+		_ = r.recordAtHop("upstream.dial_error", capture.SeverityError, map[string]any{"error": err.Error(), "type": fmt.Sprintf("%T", err)}, hop)
 		return nil, nil, fmt.Errorf("connect to upstream server: %w", err)
 	}
 	// Dialer returns only after the upstream login and resource-pack exchange has
@@ -298,7 +425,7 @@ func (r *Runner) connectUpstream(ctx context.Context, network bedrock.Network, o
 	if prefetched := urlResourcePacks.Packs(); len(prefetched) != 0 {
 		resourcePacks = prefetched
 	}
-	if err := bedrock.RecordResourcePacks(ctx, r.config.Recorder, sessionID, upstreamConnectionID, 1, conn.RemoteAddr(), conn.LocalAddr(), resourcePacks, bedrock.ResourcePackCaptureOptions{
+	if err := bedrock.RecordResourcePacks(ctx, r.config.Recorder, sessionID, connectionID, hop, conn.RemoteAddr(), conn.LocalAddr(), resourcePacks, bedrock.ResourcePackCaptureOptions{
 		Decrypt: r.config.DecryptResourcePacks,
 	}); err != nil {
 		_ = conn.Close()
@@ -316,13 +443,13 @@ func (r *Runner) connectUpstream(ctx context.Context, network bedrock.Network, o
 		_ = conn.Close()
 		return nil, nil, fmt.Errorf("prepare resource packs for downstream delivery: %w", err)
 	}
-	if err := r.record("upstream.connected", capture.SeverityInfo, map[string]any{
+	if err := r.recordAtHop("upstream.connected", capture.SeverityInfo, map[string]any{
 		"local_address":       conn.LocalAddr().String(),
 		"remote_address":      conn.RemoteAddr().String(),
 		"protocol_id":         conn.Proto().ID(),
 		"game_version":        conn.Proto().Ver(),
 		"resource_pack_count": len(resourcePacks),
-	}); err != nil {
+	}, hop); err != nil {
 		_ = conn.Close()
 		return nil, nil, err
 	}
@@ -389,28 +516,58 @@ func newConnectionMetadata(role string, conn *minecraft.Conn) connectionMetadata
 	}
 }
 
-func (r *Runner) forward(source, destination *minecraft.Conn, failures *bedrock.FailureSink, live *liveReporter, shuttingDown *atomic.Bool, direction capture.Direction, sourceChannel, connectionID string) error {
+func (r *Runner) forward(source, destination *minecraft.Conn, failures *bedrock.FailureSink, live *liveReporter, shuttingDown *atomic.Bool, localAddress string, direction capture.Direction, sourceChannel, connectionID string, hop int, onTransfer func(string)) error {
 	for {
 		if err := failures.Err(); err != nil {
 			return err
 		}
 		decoded, err := source.ReadPacket()
 		if err != nil {
-			return r.finishForward("bridge.read_error", direction, sourceChannel, connectionID, "read packet", err, shuttingDown)
+			return r.finishForwardAtHop("bridge.read_error", direction, sourceChannel, connectionID, hop, "read packet", err, shuttingDown)
 		}
 		live.Packet(direction, decoded)
-		if err := r.recordDecoded(decoded, direction, connectionID); err != nil {
+		if err := r.recordDecoded(decoded, direction, connectionID, hop); err != nil {
 			return err
 		}
-		if err := destination.WritePacket(decoded); err != nil {
-			return r.finishForward("bridge.write_error", direction, sourceChannel, connectionID, "write packet", err, shuttingDown)
+		outgoing := decoded
+		if r.config.FollowTransfers && direction == capture.DirectionServerToClient {
+			if transfer, ok := decoded.(*packet.Transfer); ok {
+				rewritten, target, rewriteErr := transferForProxyAddress(transfer, localAddress)
+				if rewriteErr != nil {
+					captureErr := r.finishForwardAtHop("bridge.transfer_rewrite_error", direction, sourceChannel, connectionID, hop, "rewrite Transfer", rewriteErr, shuttingDown)
+					return errors.Join(&transferRewriteError{err: rewriteErr}, captureErr)
+				}
+				outgoing = rewritten
+				if err := r.recordTransferRewrite(transfer, rewritten, target, connectionID, hop); err != nil {
+					return err
+				}
+			}
+		}
+		if err := destination.WritePacket(outgoing); err != nil {
+			return r.finishForwardAtHop("bridge.write_error", direction, sourceChannel, connectionID, hop, "write packet", err, shuttingDown)
+		}
+		if outgoing != decoded {
+			if err := destination.Flush(); err != nil {
+				return r.finishForwardAtHop("bridge.flush_error", direction, sourceChannel, connectionID, hop, "flush transfer", err, shuttingDown)
+			}
+			if transfer, ok := decoded.(*packet.Transfer); ok {
+				_, target, _ := transferForProxyAddress(transfer, localAddress)
+				if onTransfer != nil {
+					onTransfer(target)
+				}
+				return &transferError{target: target}
+			}
 		}
 	}
 }
 
 func (r *Runner) finishForward(kind string, direction capture.Direction, sourceChannel, connectionID, operation string, operationErr error, shuttingDown *atomic.Bool) error {
+	return r.finishForwardAtHop(kind, direction, sourceChannel, connectionID, 1, operation, operationErr, shuttingDown)
+}
+
+func (r *Runner) finishForwardAtHop(kind string, direction capture.Direction, sourceChannel, connectionID string, hop int, operation string, operationErr error, shuttingDown *atomic.Bool) error {
 	if !expectedShutdownError(operationErr, shuttingDown) {
-		captureErr := r.recordNetworkError(kind, direction, sourceChannel, connectionID, operation, operationErr)
+		captureErr := r.recordNetworkErrorAtHop(kind, direction, sourceChannel, connectionID, hop, operation, operationErr)
 		return errors.Join(operationErr, captureErr)
 	}
 	return operationErr
@@ -423,7 +580,7 @@ func expectedShutdownError(err error, shuttingDown *atomic.Bool) bool {
 	return errors.Is(err, context.Canceled) || errors.Is(err, net.ErrClosed)
 }
 
-func (r *Runner) recordDecoded(decoded packet.Packet, direction capture.Direction, connectionID string) error {
+func (r *Runner) recordDecoded(decoded packet.Packet, direction capture.Direction, connectionID string, hop int) error {
 	name, goType := packetNames(decoded)
 	status := "decoded"
 	kind := "packet.decoded"
@@ -436,7 +593,7 @@ func (r *Runner) recordDecoded(decoded packet.Packet, direction capture.Directio
 		_, recordErr := r.config.Recorder.Record(context.Background(), capture.Record{Event: capture.Event{
 			SessionID:    sessionID,
 			ConnectionID: connectionID,
-			Hop:          1,
+			Hop:          hop,
 			Kind:         "packet.decode_error",
 			Severity:     capture.SeverityError,
 			Direction:    direction,
@@ -449,12 +606,16 @@ func (r *Runner) recordDecoded(decoded packet.Packet, direction capture.Directio
 	}
 	annotations := make([]string, 0, 1)
 	if _, transfer := decoded.(*packet.Transfer); transfer {
-		annotations = append(annotations, "Transfer is recorded but automatic hop following is not implemented")
+		if r.config.FollowTransfers {
+			annotations = append(annotations, "Transfer target is rewritten to the local listener and followed because --follow-transfers is enabled")
+		} else {
+			annotations = append(annotations, "Transfer is recorded but automatic hop following is disabled")
+		}
 	}
 	_, err := r.config.Recorder.Record(context.Background(), capture.Record{Event: capture.Event{
 		SessionID:    sessionID,
 		ConnectionID: connectionID,
-		Hop:          1,
+		Hop:          hop,
 		Kind:         kind,
 		Severity:     capture.SeverityInfo,
 		Direction:    direction,
@@ -467,11 +628,36 @@ func (r *Runner) recordDecoded(decoded packet.Packet, direction capture.Directio
 	return err
 }
 
+func (r *Runner) recordTransferRewrite(original, rewritten *packet.Transfer, target, connectionID string, hop int) error {
+	data, err := r.structuredView(map[string]any{
+		"original":        original,
+		"rewritten":       rewritten,
+		"upstream_target": target,
+		"listener_target": net.JoinHostPort(rewritten.Address, fmt.Sprintf("%d", rewritten.Port)),
+	})
+	if err != nil {
+		return fmt.Errorf("encode Transfer rewrite view: %w", err)
+	}
+	_, err = r.config.Recorder.Record(context.Background(), capture.Record{Event: capture.Event{
+		SessionID: sessionID, ConnectionID: connectionID, Hop: hop,
+		Kind: "packet.transfer_rewrite", Severity: capture.SeverityInfo,
+		Direction: capture.DirectionServerToClient, Channel: "bridge", Stage: "pre_forward_mutation",
+		Packet:      &capture.PacketInfo{ID: rewritten.ID(), Name: "Transfer", GoType: reflect.TypeOf(rewritten).String(), DecodeStatus: "decoded"},
+		Data:        data,
+		Annotations: []string{"The original Transfer remains in packet.raw; this opt-in rewrite routes the client back to the local listener"},
+	}})
+	return err
+}
+
 func (r *Runner) recordStructuredView(kind string, value any, direction capture.Direction, connectionID, channel, stage string, annotations []string) error {
+	return r.recordStructuredViewAtHop(kind, value, direction, connectionID, channel, stage, 1, annotations)
+}
+
+func (r *Runner) recordStructuredViewAtHop(kind string, value any, direction capture.Direction, connectionID, channel, stage string, hop int, annotations []string) error {
 	data, encodeErr := r.structuredView(value)
 	if encodeErr != nil {
 		_, recordErr := r.config.Recorder.Record(context.Background(), capture.Record{Event: capture.Event{
-			SessionID: sessionID, ConnectionID: connectionID, Hop: 1,
+			SessionID: sessionID, ConnectionID: connectionID, Hop: hop,
 			Kind: "capture.view_error", Severity: capture.SeverityError, Direction: direction,
 			Channel: channel, Stage: stage,
 			Error: &capture.ErrorInfo{Operation: "encode " + kind, Message: encodeErr.Error(), Type: fmt.Sprintf("%T", encodeErr)},
@@ -479,7 +665,7 @@ func (r *Runner) recordStructuredView(kind string, value any, direction capture.
 		return recordErr
 	}
 	_, err := r.config.Recorder.Record(context.Background(), capture.Record{Event: capture.Event{
-		SessionID: sessionID, ConnectionID: connectionID, Hop: 1,
+		SessionID: sessionID, ConnectionID: connectionID, Hop: hop,
 		Kind: kind, Severity: capture.SeverityInfo, Direction: direction,
 		Channel: channel, Stage: stage, Data: data, Annotations: annotations,
 	}})
@@ -501,11 +687,11 @@ func (r *Runner) structuredView(value any) ([]byte, error) {
 	return data, nil
 }
 
-func (r *Runner) recordNetworkError(kind string, direction capture.Direction, channel, connectionID, operation string, operationErr error) error {
+func (r *Runner) recordNetworkErrorAtHop(kind string, direction capture.Direction, channel, connectionID string, hop int, operation string, operationErr error) error {
 	_, err := r.config.Recorder.Record(context.Background(), capture.Record{Event: capture.Event{
 		SessionID:    sessionID,
 		ConnectionID: connectionID,
-		Hop:          1,
+		Hop:          hop,
 		Kind:         kind,
 		Severity:     capture.SeverityError,
 		Direction:    direction,
@@ -517,6 +703,10 @@ func (r *Runner) recordNetworkError(kind string, direction capture.Direction, ch
 }
 
 func (r *Runner) record(kind string, severity capture.Severity, value any) error {
+	return r.recordAtHop(kind, severity, value, 1)
+}
+
+func (r *Runner) recordAtHop(kind string, severity capture.Severity, value any, hop int) error {
 	var data []byte
 	var err error
 	if value != nil {
@@ -527,7 +717,7 @@ func (r *Runner) record(kind string, severity capture.Severity, value any) error
 	}
 	_, err = r.config.Recorder.Record(context.Background(), capture.Record{Event: capture.Event{
 		SessionID: sessionID,
-		Hop:       1,
+		Hop:       hop,
 		Kind:      kind,
 		Severity:  severity,
 		Direction: capture.DirectionInternal,
