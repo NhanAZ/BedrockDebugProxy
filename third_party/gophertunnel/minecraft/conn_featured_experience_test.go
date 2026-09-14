@@ -5,6 +5,7 @@ import (
 	"context"
 	"io"
 	"log/slog"
+	"strings"
 	"testing"
 
 	"github.com/sandertv/gophertunnel/minecraft/protocol/packet"
@@ -96,6 +97,53 @@ func TestHandleDrainsExpectedDeferredPacketBehindLaterStatePacket(t *testing.T) 
 	}
 	if !conn.isExpectedPacket(packet.IDDimensionData) || !conn.isExpectedPacket(packet.IDStartGame) {
 		t.Fatalf("login state did not advance through reordered packets: %#v", conn.expectedIDs.Load())
+	}
+}
+
+func TestHandleAcceptsResourcePackLoginPermutations(t *testing.T) {
+	packets := map[string]packet.Packet{
+		"play_status": &packet.PlayStatus{Status: packet.PlayStatusLoginSuccess},
+		"packs_info":  &packet.ResourcePacksInfo{},
+		"pack_stack":  &packet.ResourcePackStack{},
+	}
+	permutations := [][]string{
+		{"play_status", "packs_info", "pack_stack"},
+		{"play_status", "pack_stack", "packs_info"},
+		{"packs_info", "play_status", "pack_stack"},
+		{"packs_info", "pack_stack", "play_status"},
+		{"pack_stack", "play_status", "packs_info"},
+		{"pack_stack", "packs_info", "play_status"},
+	}
+
+	for _, order := range permutations {
+		order := order
+		t.Run(strings.Join(order, "_"), func(t *testing.T) {
+			conn := newLoginTestConn()
+			conn.expectedIDs.Store([]uint32{packet.IDPlayStatus})
+			for _, name := range order {
+				if err := conn.handle(wirePacketData(t, packets[name])); err != nil {
+					t.Fatalf("handle %s: %v", name, err)
+				}
+			}
+			if len(conn.deferredPackets) != 0 {
+				t.Fatalf("deferred packet count after order %v = %d, want 0", order, len(conn.deferredPackets))
+			}
+			if !conn.isExpectedPacket(packet.IDDimensionData) || !conn.isExpectedPacket(packet.IDStartGame) {
+				t.Fatalf("login state did not reach the world phase after order %v: %#v", order, conn.expectedIDs.Load())
+			}
+		})
+	}
+}
+
+func newLoginTestConn() *Conn {
+	return &Conn{
+		ctx:   context.Background(),
+		log:   slog.Default(),
+		proto: DefaultProtocol,
+		pool:  DefaultProtocol.Packets(false),
+		spawn: make(chan struct{}),
+		enc:   packet.NewEncoder(io.Discard),
+		hdr:   &packet.Header{},
 	}
 }
 
