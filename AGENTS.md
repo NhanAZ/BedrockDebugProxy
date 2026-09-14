@@ -157,6 +157,8 @@ Use short imperative commit subjects that describe the change. Do not rewrite sh
 
 Inspect `git status` and the staged diff before every commit. Never discard unrelated user changes. Never commit generated captures, secrets, build outputs, or local authentication state.
 
+After every push, inspect GitHub Actions for the exact pushed commit and wait for every required workflow job to finish. A local quality pass is not a CI result. If a job fails, open its logs, classify the failure, make a focused fix with a new audit record, push again, and repeat until the exact commit is green. Do not declare a pushed change complete while its required workflow is pending or failing.
+
 Every authored non-merge commit must include exactly one commit audit record under [`docs/audits/`](docs/audits/). Create the record before committing and stage it with the coherent change. Use a stable change ID and descriptive filename rather than a commit hash, because the final hash is not known until the commit is created. Git metadata remains authoritative for the hash, author, timestamp, and parent history. The record must state the intent, scope, affected files or interfaces, evidence and provenance, automated validation, live validation status, known limitations, and follow-up work. Documentation-only and formatting-only commits still get a short record that explicitly says they have no runtime impact. Do not rewrite older history to retrofit records; mark the policy start in the first audit record and use the existing Git history, research notes, decisions, and captures for earlier work.
 
 ## Change control
