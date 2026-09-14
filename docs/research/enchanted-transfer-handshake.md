@@ -1,13 +1,13 @@
 # Enchanted featured-experience transfer handshake
 
-This note records the evidence and current interpretation for Enchanted transfers. It is a research record, not a claim that the proxy is compatible with every featured experience or every future edge revision. The review and live validation were performed on 2026-09-13.
+This note records the evidence and current interpretation for Enchanted transfers. It is a research record, not a claim that the proxy is compatible with every featured experience or every future edge revision. The review and live validation were performed on 2026-09-14.
 
 ## Sources and provenance
 
 - Sandertv gophertunnel `v1.61.0`, source commit [`283a5a97dfe65da94bcc0b401807f6aefa9e72ee`](https://github.com/Sandertv/gophertunnel/tree/283a5a97dfe65da94bcc0b401807f6aefa9e72ee), MIT. The `Transfer` packet contract is in [`minecraft/protocol/packet/transfer.go`](https://github.com/Sandertv/gophertunnel/blob/283a5a97dfe65da94bcc0b401807f6aefa9e72ee/minecraft/protocol/packet/transfer.go).
 - The current `bedrock-tool/bedrocktool` source was reviewed at [`85d5cfe1545c8d853be2859144a8357539ffc0f2`](https://github.com/bedrock-tool/bedrocktool/tree/85d5cfe1545c8d853be2859144a8357539ffc0f2), GPL-3.0.
 - Transfer behavior in this note is based on owner-controlled captures and project code. It is not attributed to an external repository.
-- The validated BedrockDebugProxy revision is `d1929d40ddc0aac85317877ecd3b158f279d463c`. The local RakNet copy and its narrow changes are described in [`third_party/go-raknet/BEDROCKDEBUGPROXY_PATCH.md`](../../third_party/go-raknet/BEDROCKDEBUGPROXY_PATCH.md).
+- The validated BedrockDebugProxy revision for the deferred-packet fix is `a600bbff88334fc121a7163a35e8f1f5b8da02b6`. The local RakNet copy and its narrow changes are described in [`third_party/go-raknet/BEDROCKDEBUGPROXY_PATCH.md`](../../third_party/go-raknet/BEDROCKDEBUGPROXY_PATCH.md).
 
 The external repositories are references with separate licenses. The in-tree gophertunnel and go-raknet copies retain their MIT notices, and their project-specific changes are listed in [`THIRD_PARTY_NOTICES.md`](../../THIRD_PARTY_NOTICES.md).
 
@@ -34,8 +34,8 @@ also confirms that a transfer target must be negotiated and delivered with its o
 The in-tree gophertunnel patch now re-checks deferred packets whenever the expected login IDs advance. It drains
 the queue in arrival order, so an early `ResourcePacksInfo` is handled once `PlayStatus` moves the connection into
 the resource-pack phase. The implementation is independently written and follows the deferred-packet direction
-documented in [gophertunnel PR #406](https://github.com/Sandertv/gophertunnel/pull/406). A new stamped live run is
-required to confirm that hop 2 completes its separate resource-pack exchange.
+documented in [gophertunnel PR #406](https://github.com/Sandertv/gophertunnel/pull/406). The stamped live run below
+confirms that hop 2 completes its separate resource-pack exchange.
 
 ## Narrow compatibility changes
 
@@ -50,16 +50,22 @@ The only intentional packet rewrite is the documented transfer-destination rewri
 
 ## Revision-matched live result
 
-A real-client Enchanted run using the stamped `d1929d4` binary produced a closed capture and a passing sanitized report at `validation/local/d1929d40ddc0aac85317877ecd3b158f279d463c/enchanted.json`. The local report is ignored by Git because it is derived validation evidence and must not change the tested revision.
+A real-client Enchanted run using the stamped `a600bbf` binary produced the closed capture
+`captures/session-20260914T124716Z` and the passing sanitized report at
+`validation/local/a600bbff88334fc121a7163a35e8f1f5b8da02b6/enchanted.json`. The local report is ignored by Git
+because it is derived validation evidence and must not change the tested revision.
 
-The same stamped binary also passed the required Xbox-authenticated The Hive baseline at `validation/local/d1929d40ddc0aac85317877ecd3b158f279d463c/the-hive.json`. That session completed its 24-pack resource-pack flow, normal spawn path, and clean closure without exercising a server transfer. The earlier trusted-LAN opt-in run remains at `validation/local/d1929d40ddc0aac85317877ecd3b158f279d463c/the-hive-lan.json` as separate evidence for the `--allow-unauthenticated-client` path.
+The current capture recorded one resource-pack archive on hop 1 and ten archives on hop 2. Hop 2 reached transport
+open, upstream connection, session negotiation, spawn, and closure. It had zero capture write errors, dropped events,
+truncated events, decode errors, or blocking error events. The final termination diagnostics were limited to the
+expected coordinated-shutdown context and closed-network errors.
 
 The capture-derived facts were:
 
 - protocol `2169`, game version `1.26.45`, and the same protocol on both hops;
 - zero capture write errors, dropped events, truncated events, decode errors, or blocking error events;
 - traffic in both directions, decoded packets, connection metadata, and automatic artifact status complete;
-- one resource-pack archive on hop 1 and seven archives on hop 2;
+- one resource-pack archive on hop 1 and ten archives on hop 2;
 - a `Transfer` rewrite followed by `transfer.route_probe` with `client_guid_preserved: true`;
 - hop 2 transport open, upstream connected, session negotiated, session spawned, and session close.
 
@@ -69,5 +75,5 @@ The manual checks were `normal_session=pass`, `resource_pack_transfer=pass`, and
 
 - The capture boundary does not include raw UDP datagrams, RakNet acknowledgements, fragmentation, retransmission, or loss details. A future transport diagnostic can add those observations without changing the canonical Bedrock event stream.
 - The successful run does not identify the private edge behavior that made the earlier handshake fail. The GUID, source-address, MTU, and cookie changes are a supported explanation that fits the before and after event order, not a server-side confirmation.
-- The Hive now has a revision-matched passing Xbox-authenticated baseline report for `d1929d4`. The separate trusted-LAN report and older reports for other revisions are not interchangeable with the current candidate.
+- The earlier The Hive report for `d1929d4` is not interchangeable with the current `a600bbf` candidate. The exact-revision The Hive baseline remains the next required live check.
 - An official release still needs reports for CubeCraft, Galaxite, Lifeboat, and Mineville Zeqa. The Enchanted and The Hive reports cover two members of the six-server release matrix.
