@@ -43,7 +43,7 @@ func TestRecordForwardTimingPreservesPacketAncestry(t *testing.T) {
 		Sequence: 42,
 		Packet:   &capture.PacketInfo{ID: packet.IDLevelChunk, Name: "LevelChunk", DecodeStatus: "decoded"},
 	}
-	if err := runner.recordForwardTiming(parent, capture.DirectionServerToClient, "upstream-1", 2, 2*time.Millisecond, 3*time.Millisecond, 4*time.Millisecond, 5*time.Millisecond, "explicit"); err != nil {
+	if err := runner.recordForwardTiming(parent, capture.DirectionServerToClient, "upstream-1", 2, 2*time.Millisecond, 3*time.Millisecond, 4*time.Millisecond, 5*time.Millisecond, "explicit", "typed"); err != nil {
 		t.Fatal(err)
 	}
 	if err := recorder.Close("closed", nil); err != nil {
@@ -68,7 +68,7 @@ func TestRecordForwardTimingPreservesPacketAncestry(t *testing.T) {
 	if err := json.Unmarshal(timing.Data, &fields); err != nil {
 		t.Fatal(err)
 	}
-	if fields["flush_mode"] != "explicit" || fields["measurement"] == nil {
+	if fields["write_mode"] != "typed" || fields["flush_mode"] != "explicit" || fields["measurement"] == nil {
 		t.Fatalf("timing fields = %#v", fields)
 	}
 	if !bytes.Contains(timing.Data, []byte(`"write_packet_duration_nano":"4000000"`)) {
