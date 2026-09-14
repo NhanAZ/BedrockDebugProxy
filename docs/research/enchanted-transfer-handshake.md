@@ -31,9 +31,10 @@ pack archive was recorded and the upstream dial timed out after five minutes whi
 resource-pack loading screen. Hop 1 had already retained one distinct Enchanted Hub Pack archive, so this capture
 also confirms that a transfer target must be negotiated and delivered with its own pack set.
 
-The in-tree gophertunnel patch now re-checks deferred packets whenever the expected login IDs advance. It drains
-the queue in arrival order, so an early `ResourcePacksInfo` is handled once `PlayStatus` moves the connection into
-the resource-pack phase. The implementation is independently written and follows the deferred-packet direction
+The in-tree gophertunnel patch now re-checks deferred packets whenever the expected login IDs advance. It selects
+the earliest currently accepted packet from the deferred queue, so an early `ResourcePacksInfo` is handled once
+`PlayStatus` moves the connection into the resource-pack phase even if a later-phase packet was queued first. The
+implementation is independently written and follows the deferred-packet direction
 documented in [gophertunnel PR #406](https://github.com/Sandertv/gophertunnel/pull/406). The stamped live run below
 confirms that hop 2 completes its separate resource-pack exchange.
 

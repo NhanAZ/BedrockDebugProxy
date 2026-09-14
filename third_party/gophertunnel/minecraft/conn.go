@@ -729,10 +729,11 @@ func (conn *Conn) isExpectedPacket(packetID uint32) bool {
 	return false
 }
 
-// handleDeferredPackets drains the deferred login queue while its first packet is accepted by the current
-// state. Keeping the queue ordered is important: packets that arrived early must not overtake an earlier
-// packet that is still required by the login sequence. Draining after each handled packet lets the state
-// machine accept valid server-specific orderings, such as ResourcePacksInfo arriving before PlayStatus.
+// handleDeferredPackets drains the deferred login queue while packets are accepted by the current state.
+// It selects the earliest currently accepted packet, so an early packet for a later state cannot block a
+// packet that advances the state machine. Packets that are still invalid for the current state remain queued.
+// Draining after each handled packet lets the state machine accept server-specific orderings, such as
+// ResourcePacksInfo arriving before PlayStatus.
 func (conn *Conn) handleDeferredPackets() error {
 	for {
 		data, ok := conn.takeExpectedDeferredPacket()
@@ -749,22 +750,24 @@ func (conn *Conn) handleDeferredPackets() error {
 	}
 }
 
-// takeExpectedDeferredPacket removes and returns the first deferred packet when it is accepted by the current
-// login state. If the queue is empty or its first packet is not expected, it leaves the queue unchanged.
+// takeExpectedDeferredPacket removes and returns the earliest deferred packet accepted by the current login
+// state. If the queue is empty or no packet is currently expected, it leaves the queue unchanged. Scanning the
+// queue is intentional: a packet for a later login state must not block an earlier state transition.
 func (conn *Conn) takeExpectedDeferredPacket() (*packetData, bool) {
 	conn.deferredPacketMu.Lock()
 	defer conn.deferredPacketMu.Unlock()
 
-	if len(conn.deferredPackets) == 0 || !conn.isExpectedPacket(conn.deferredPackets[0].h.PacketID) {
-		return nil, false
+	for index, deferred := range conn.deferredPackets {
+		if !conn.isExpectedPacket(deferred.h.PacketID) {
+			continue
+		}
+		data := deferred
+		copy(conn.deferredPackets[index:], conn.deferredPackets[index+1:])
+		conn.deferredPackets[len(conn.deferredPackets)-1] = nil
+		conn.deferredPackets = conn.deferredPackets[:len(conn.deferredPackets)-1]
+		return data, true
 	}
-	data := conn.deferredPackets[0]
-	// Explicitly clear out the packet at offset 0. When we slice it to remove the first element, that element
-	// will not be garbage collectable, because the array it's in is still referenced by the slice. Doing this
-	// makes sure garbage collecting the packet is possible.
-	conn.deferredPackets[0] = nil
-	conn.deferredPackets = conn.deferredPackets[1:]
-	return data, true
+	return nil, false
 }
 
 // handleMultiple handles multiple packets and returns an error if at least one of those packets could not be handled

@@ -83,9 +83,10 @@ The Enchanted capture `session-20260914T105050Z` exposed a second gophertunnel b
 The proxy timed out the upstream login and resource-pack exchange after five minutes while the downstream client
 remained on the loading screen. The failure occurred before any hop 2 pack archive was reconstructed.
 
-The in-tree gophertunnel copy now re-checks the first deferred packet whenever `Conn.expect` advances the login
-state. The ordered drain preserves packet arrival order, processes a now-valid resource-pack offer, and closes
-on a deferred decode or handling error rather than leaving a blocked dial. This is an independent implementation
+The in-tree gophertunnel copy now re-checks deferred packets whenever `Conn.expect` advances the login state. The
+drain selects the earliest packet currently accepted by the new state, so a packet for a later phase cannot block a
+now-valid resource-pack offer. Packets that remain invalid stay deferred, and the connection closes on a deferred
+decode or handling error rather than leaving a blocked dial. This is an independent implementation
 of the problem described by [gophertunnel PR #406](https://github.com/Sandertv/gophertunnel/pull/406), not copied
 source. The regression test is `minecraft/conn_featured_experience_test.go` in the dependency copy. The
 revision-matched Enchanted capture `session-20260914T124716Z` from `a600bbff88334fc121a7163a35e8f1f5b8da02b6`
