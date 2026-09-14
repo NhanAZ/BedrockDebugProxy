@@ -7,7 +7,8 @@ This file is the shortest path from a local change to a merge-ready pull request
 1. Read `AGENTS.md` for the project boundaries.
 2. Trace the affected code path, its callers, existing helpers, tests, and relevant documentation.
 3. Keep the change focused. Do not combine a bug fix with unrelated cleanup or protocol updates.
-4. For protocol work, follow [`docs/protocol-updates.md`](docs/protocol-updates.md) and record evidence before coding.
+4. Search [`docs/fix-history.md`](docs/fix-history.md) for the reported symptom and inspect its linked evidence before coding. Classify the issue as a known fix, regression, limitation, duplicate, or new root cause.
+5. For protocol work, follow [`docs/protocol-updates.md`](docs/protocol-updates.md) and record evidence before coding.
 
 ## Before opening a pull request
 
