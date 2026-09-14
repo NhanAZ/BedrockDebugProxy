@@ -214,6 +214,16 @@ func serveTransferHop(ctx context.Context, listener *minecraft.Listener, target 
 	}
 	if err := conn.Flush(); err != nil {
 		errorsChannel <- fmt.Errorf("flush transfer: %w", err)
+		return
 	}
-	errorsChannel <- nil
+	// Keep the upstream hop alive until the proxy closes it after forwarding
+	// Transfer. Closing immediately after Flush races the transport flush on
+	// slower Windows runners and can make the downstream client lose the
+	// transfer packet before it is observed by the proxy.
+	for {
+		if _, err := conn.ReadPacket(); err != nil {
+			errorsChannel <- nil
+			return
+		}
+	}
 }
