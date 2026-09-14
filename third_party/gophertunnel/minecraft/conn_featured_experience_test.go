@@ -67,6 +67,38 @@ func TestHandleDrainsResourcePacksInfoDeferredBeforePlayStatus(t *testing.T) {
 	}
 }
 
+func TestHandleDrainsExpectedDeferredPacketBehindLaterStatePacket(t *testing.T) {
+	conn := &Conn{
+		ctx:   context.Background(),
+		log:   slog.Default(),
+		proto: DefaultProtocol,
+		pool:  DefaultProtocol.Packets(false),
+		spawn: make(chan struct{}),
+		enc:   packet.NewEncoder(io.Discard),
+		hdr:   &packet.Header{},
+	}
+	conn.expectedIDs.Store([]uint32{packet.IDPlayStatus})
+
+	// ResourcePackStack belongs after ResourcePacksInfo. If it arrives first, it must not
+	// prevent the earlier ResourcePacksInfo from advancing the login state.
+	if err := conn.handle(wirePacketData(t, &packet.ResourcePackStack{})); err != nil {
+		t.Fatalf("defer ResourcePackStack: %v", err)
+	}
+	if err := conn.handle(wirePacketData(t, &packet.ResourcePacksInfo{})); err != nil {
+		t.Fatalf("defer ResourcePacksInfo: %v", err)
+	}
+
+	if err := conn.handle(wirePacketData(t, &packet.PlayStatus{Status: packet.PlayStatusLoginSuccess})); err != nil {
+		t.Fatalf("handle PlayStatus: %v", err)
+	}
+	if len(conn.deferredPackets) != 0 {
+		t.Fatalf("deferred packet count after reordering = %d, want 0", len(conn.deferredPackets))
+	}
+	if !conn.isExpectedPacket(packet.IDDimensionData) || !conn.isExpectedPacket(packet.IDStartGame) {
+		t.Fatalf("login state did not advance through reordered packets: %#v", conn.expectedIDs.Load())
+	}
+}
+
 func wirePacketData(t *testing.T, pk packet.Packet) *packetData {
 	t.Helper()
 	var full bytes.Buffer
