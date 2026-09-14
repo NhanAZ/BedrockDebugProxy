@@ -23,15 +23,15 @@ const (
 	liveSummaryInterval = 3 * time.Second
 	liveSummaryPerSide  = 4
 	ansiReset           = "\x1b[0m"
-	// Minecraft RGB values keep labels independent of the terminal's 16-color theme.
-	// The palette and reference are documented in docs/analysis-and-export.md.
-	ansiGray    = "\x1b[38;2;170;170;170m" // #AAAAAA
-	ansiGold    = "\x1b[38;2;255;170;0m"   // #FFAA00
-	ansiCyan    = "\x1b[38;2;85;255;255m"  // #55FFFF
-	ansiGreen   = "\x1b[38;2;85;255;85m"   // #55FF55
-	ansiYellow  = "\x1b[38;2;255;255;85m"  // #FFFF55
-	ansiMagenta = "\x1b[38;2;255;85;255m"  // #FF55FF
-	ansiRed     = "\x1b[38;2;255;85;85m"   // #FF5555
+	// PocketMine-MP's MainLogger and Terminal use semantic Minecraft colors
+	// mapped to an xterm 256-color palette. Keep the same roles here while
+	// retaining packet-direction colors for operator navigation.
+	ansiCyan    = "\x1b[38;5;87m"  // #5FFFFF
+	ansiGreen   = "\x1b[38;5;83m"  // #5FFF5F
+	ansiYellow  = "\x1b[38;5;227m" // #FFFF5F
+	ansiMagenta = "\x1b[38;5;207m" // #FF5FFF
+	ansiDarkRed = "\x1b[38;5;124m" // #AF0000
+	ansiWhite   = "\x1b[38;5;231m" // #FFFFFF
 )
 
 type livePacketKey struct {
@@ -88,7 +88,7 @@ func (r *liveReporter) Info(format string, args ...any) {
 	defer r.mu.Unlock()
 	now := r.now()
 	r.flushLocked(now)
-	r.writeLocked(now, "INFO", ansiGold, fmt.Sprintf(format, args...))
+	r.writeLocked(now, "INFO", ansiWhite, fmt.Sprintf(format, args...))
 }
 
 func (r *liveReporter) RawPacket(channel string, direction capture.Direction, header packet.Header) {
@@ -177,11 +177,19 @@ func (r *liveReporter) LibraryLog(channel string, level slog.Level, message stri
 		r.writeLocked(now, "WARN", ansiYellow, fmt.Sprintf("Library [%s] - %s", channel, message))
 		return
 	}
-	color := ansiYellow
-	if level >= slog.LevelError {
-		color = ansiRed
-	}
+	color := libraryLogColor(level)
 	r.writeLocked(now, strings.ToUpper(level.String()), color, fmt.Sprintf("Library [%s] - %s", channel, message))
+}
+
+func libraryLogColor(level slog.Level) string {
+	switch {
+	case level >= slog.LevelError:
+		return ansiDarkRed
+	case level >= slog.LevelWarn:
+		return ansiYellow
+	default:
+		return ansiWhite
+	}
 }
 
 func (r *liveReporter) Close() {
@@ -267,7 +275,7 @@ func (r *liveReporter) writeLocked(now time.Time, label, color, message string) 
 	timestamp := "[" + now.Format("15:04:05.000") + "]"
 	label = fmt.Sprintf("%-17s", label)
 	if r.color {
-		timestamp = ansiGray + timestamp + ansiReset
+		timestamp = ansiCyan + timestamp + ansiReset
 		label = color + label + ansiReset
 	}
 	_, _ = fmt.Fprintf(r.output, "%s %s %s\n", timestamp, label, message)

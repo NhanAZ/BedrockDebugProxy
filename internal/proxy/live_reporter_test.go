@@ -119,27 +119,27 @@ func TestLiveReporterKeepsCaptureCloseAsErrorBeforeShutdown(t *testing.T) {
 	}
 }
 
-func TestLiveReporterUsesMinecraftRGBPalette(t *testing.T) {
+func TestLiveReporterUsesPocketMinePalette(t *testing.T) {
 	tests := []struct {
 		name  string
 		label string
 		color string
 		emit  func(*liveReporter)
 	}{
-		{"info", "INFO", "\x1b[38;2;255;170;0m", func(r *liveReporter) { r.Info("Connected") }},
-		{"client", "C->S", "\x1b[38;2;85;255;255m", func(r *liveReporter) {
+		{"info", "INFO", "\x1b[38;5;231m", func(r *liveReporter) { r.Info("Connected") }},
+		{"client", "C->S", "\x1b[38;5;87m", func(r *liveReporter) {
 			r.Packet(capture.DirectionClientToServer, &packet.PlayerAuthInput{})
 		}},
-		{"server", "S->C", "\x1b[38;2;85;255;85m", func(r *liveReporter) {
+		{"server", "S->C", "\x1b[38;5;83m", func(r *liveReporter) {
 			r.Packet(capture.DirectionServerToClient, &packet.LevelChunk{})
 		}},
-		{"transfer", "TRANSFER", "\x1b[38;2;255;85;255m", func(r *liveReporter) {
+		{"transfer", "TRANSFER", "\x1b[38;5;207m", func(r *liveReporter) {
 			r.Packet(capture.DirectionServerToClient, &packet.Transfer{Address: "next.example.org", Port: 19132})
 		}},
-		{"warning", "WARN", "\x1b[38;2;255;255;85m", func(r *liveReporter) {
+		{"warning", "WARN", "\x1b[38;5;227m", func(r *liveReporter) {
 			r.LibraryLog("upstream", slog.LevelWarn, "Warning")
 		}},
-		{"error", "ERROR", "\x1b[38;2;255;85;85m", func(r *liveReporter) {
+		{"error", "ERROR", "\x1b[38;5;124m", func(r *liveReporter) {
 			r.LibraryLog("upstream", slog.LevelError, "Error")
 		}},
 	}
@@ -153,7 +153,7 @@ func TestLiveReporterUsesMinecraftRGBPalette(t *testing.T) {
 			tt.emit(r)
 			r.Close()
 
-			prefix := "\x1b[38;2;170;170;170m[12:00:00.000]\x1b[0m " + tt.color + fmt.Sprintf("%-17s", tt.label) + "\x1b[0m "
+			prefix := "\x1b[38;5;87m[12:00:00.000]\x1b[0m " + tt.color + fmt.Sprintf("%-17s", tt.label) + "\x1b[0m "
 			if !strings.Contains(output.String(), prefix) {
 				t.Fatalf("missing Minecraft color prefix %q in %q", prefix, output.String())
 			}
