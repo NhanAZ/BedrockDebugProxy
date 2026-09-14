@@ -87,8 +87,9 @@ The in-tree gophertunnel copy now re-checks the first deferred packet whenever `
 state. The ordered drain preserves packet arrival order, processes a now-valid resource-pack offer, and closes
 on a deferred decode or handling error rather than leaving a blocked dial. This is an independent implementation
 of the problem described by [gophertunnel PR #406](https://github.com/Sandertv/gophertunnel/pull/406), not copied
-source. The regression test is `minecraft/conn_featured_experience_test.go` in the dependency copy. A new
-revision-matched Enchanted capture must confirm that hop 2 obtains and delivers its own pack set.
+source. The regression test is `minecraft/conn_featured_experience_test.go` in the dependency copy. The
+revision-matched Enchanted capture `session-20260914T124716Z` from `a600bbff88334fc121a7163a35e8f1f5b8da02b6`
+confirmed that hop 2 obtains and delivers its own pack set.
 
 ### Featured-experience transfer route behavior
 
@@ -96,7 +97,7 @@ Owner-controlled captures showed that featured-experience transfer paths can dep
 
 The current proxy records both the upstream source address and RakNet client GUID on `Transfer`. It probes the next RakNet target before waiting for the client reconnect, then performs a fresh bounded status ping on the actual hop dial so a flow-hashed featured-experience route is still active when the handshake starts. Transfer handshakes cap MTU discovery at 1200 bytes, matching the observed targeted workaround for edges that drop fragmented 1492-byte probes. The local go-raknet adapter exposes only the narrow GUID hook required for this identity preservation. Route-probe success or failure is recorded as `transfer.route_probe`; a failed probe does not discard the normal dial attempt. This behavior is limited to the default RakNet transport.
 
-The Enchanted capture `session-20260913T143415Z` demonstrated the failure that motivated this change: hop 1 completed `Transfer`, but hop 2 had no upstream transport-open or Bedrock packet before the downstream resource-pack login waited and disconnected. A revision-matched live run on `d1929d40ddc0aac85317877ecd3b158f279d463c` later passed the direct Enchanted transfer check. It recorded a successful route probe with `client_guid_preserved: true`, hop 2 transport open, upstream connection, seven hop 2 resource-pack archives, negotiation, spawn, and clean session closure. The sanitized report remains under the ignored `validation/local/<revision>/` directory. This validates the observed Enchanted flow for that revision only. The same stamped binary now also has a passing Xbox-authenticated The Hive baseline at `validation/local/d1929d40ddc0aac85317877ecd3b158f279d463c/the-hive.json`, including 24 resource-pack archives, normal spawn, and clean closure. The earlier trusted-LAN opt-in report remains separate evidence for that authentication path. The remaining four release servers still require reports.
+The Enchanted capture `session-20260913T143415Z` demonstrated the failure that motivated this change: hop 1 completed `Transfer`, but hop 2 had no upstream transport-open or Bedrock packet before the downstream resource-pack login waited and disconnected. The revision-matched live run `session-20260914T124716Z` on `a600bbff88334fc121a7163a35e8f1f5b8da02b6` passed the direct Enchanted transfer check. It recorded hop 2 transport open, upstream connection, ten hop 2 resource-pack archives, negotiation, spawn, and coordinated session closure. The sanitized report remains under the ignored `validation/local/<revision>/` directory. This validates the observed Enchanted flow for that revision only. The earlier The Hive report was generated for `d1929d4` and is not evidence for the current candidate. The exact-revision The Hive baseline is the next required check, and the remaining four release servers still require reports.
 
 ### PrismarineJS bedrock-protocol
 
