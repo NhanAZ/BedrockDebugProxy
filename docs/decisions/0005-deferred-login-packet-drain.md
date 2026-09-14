@@ -41,7 +41,8 @@ invalid for the current sequence remains deferred and is not silently discarded 
 This is an in-tree compatibility patch, not a claim that every featured-experience sequence is supported. The
 revision-matched Enchanted live test for commit `a600bbff88334fc121a7163a35e8f1f5b8da02b6` completed successfully.
 The capture showed a distinct pack set on the transfer target, so the two hops were not treated as one shared
-resource-pack exchange.
+resource-pack exchange. The later state-aware queue scan is covered by permutation regression tests; a live run
+using a binary stamped with that later implementation is still required before release.
 
 ## Evidence and provenance
 

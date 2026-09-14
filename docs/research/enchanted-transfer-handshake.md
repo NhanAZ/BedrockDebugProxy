@@ -8,6 +8,7 @@ This note records the evidence and current interpretation for Enchanted transfer
 - The current `bedrock-tool/bedrocktool` source was reviewed at [`85d5cfe1545c8d853be2859144a8357539ffc0f2`](https://github.com/bedrock-tool/bedrocktool/tree/85d5cfe1545c8d853be2859144a8357539ffc0f2), GPL-3.0.
 - Transfer behavior in this note is based on owner-controlled captures and project code. It is not attributed to an external repository.
 - The validated BedrockDebugProxy revision for the deferred-packet fix is `a600bbff88334fc121a7163a35e8f1f5b8da02b6`. The local RakNet copy and its narrow changes are described in [`third_party/go-raknet/BEDROCKDEBUGPROXY_PATCH.md`](../../third_party/go-raknet/BEDROCKDEBUGPROXY_PATCH.md).
+- The later state-aware deferred-queue scan is implemented at `7d942293aa9ff5db4d37fe11c7383ee5a10c3df9` and is covered by packet-order permutation tests. Its live compatibility result is intentionally pending until a binary stamped with that revision is exercised.
 
 The external repositories are references with separate licenses. The in-tree gophertunnel and go-raknet copies retain their MIT notices, and their project-specific changes are listed in [`THIRD_PARTY_NOTICES.md`](../../THIRD_PARTY_NOTICES.md).
 

@@ -90,7 +90,8 @@ decode or handling error rather than leaving a blocked dial. This is an independ
 of the problem described by [gophertunnel PR #406](https://github.com/Sandertv/gophertunnel/pull/406), not copied
 source. The regression test is `minecraft/conn_featured_experience_test.go` in the dependency copy. The
 revision-matched Enchanted capture `session-20260914T124716Z` from `a600bbff88334fc121a7163a35e8f1f5b8da02b6`
-confirmed that hop 2 obtains and delivers its own pack set.
+confirmed that hop 2 obtains and delivers its own pack set. The later state-aware queue scan is covered by
+permutation tests; a live result for that implementation remains pending.
 
 ### Featured-experience transfer route behavior
 
