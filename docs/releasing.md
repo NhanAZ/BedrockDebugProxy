@@ -40,9 +40,9 @@ $revision = (git rev-parse HEAD).Trim()
 .\bin\bedrock-debug-proxy.exe version
 ```
 
-The printed binary commit must equal `$revision`. Keep this exact binary for all six live tests. Do not rebuild from a different commit between servers.
+The printed binary commit must equal `$revision`. Keep this exact binary for all five live tests. Do not rebuild from a different commit between servers.
 
-## 3. Validate the six-server baseline
+## 3. Validate the five-server baseline
 
 Use a real Minecraft Bedrock client. For each server, start the same stamped binary, complete a normal session, exercise the named flow, stop with `Ctrl+C`, and wait for the capture verification message.
 
@@ -53,13 +53,12 @@ Include `--follow-transfers` in the release command when the server's flow can s
 | Report label | Upstream target | Required manual flow |
 | --- | --- | --- |
 | `The Hive` | `experience:The Hive` | Connect, spawn, move, interact, and observe normal traffic |
-| `CubeCraft` | `experience:CubeCraft` | Connect, spawn, move, interact, and observe normal traffic |
 | `Galaxite` | `experience:Galaxite` | Connect, spawn, move, interact, and observe normal traffic |
 | `Lifeboat` | `experience:Lifeboat` | Connect, spawn, move, interact, and observe normal traffic |
 | `Mineville Zeqa` | `experience:Mineville Zeqa` | Enter the Zeqa flow and observe it directly |
 | `Enchanted` | `experience:Enchanted` | Connect, spawn, move, interact, and observe normal traffic |
 
-Use this command for an Experience target. Replace `192.168.1.10` with the concrete LAN address used by the Minecraft client, and replace only the value after `--upstream` for each run.
+Use this command for an Experience target. Replace `192.168.1.10` with the concrete LAN address used by the Minecraft client, and replace only the value after `--upstream` for each run. Do not add CubeCraft to this matrix because its published policy prohibits Bedrock proxy use. See [`server-targets.md`](server-targets.md) for the policy disclaimer and endpoint references.
 
 ```powershell
 .\bin\bedrock-debug-proxy.exe `
@@ -97,7 +96,7 @@ Use the exact capture directory printed by the matching run. The following examp
     -Output ".\validation\local\$revision\the-hive.json"
 ```
 
-Use these exact `-Server` labels for the other reports: `CubeCraft`, `Galaxite`, `Lifeboat`, `Mineville Zeqa`, and `Enchanted`. Add a focused manual check when a release specifically changes a flow. Never place raw captures, tokens, addresses, resource-pack keys, or third-party assets in a report.
+Use these exact `-Server` labels for the other reports: `Galaxite`, `Lifeboat`, `Mineville Zeqa`, and `Enchanted`. Add a focused manual check when a release specifically changes a flow. Never place raw captures, tokens, addresses, resource-pack keys, or third-party assets in a report.
 
 Review each JSON file before using it. Then run the matrix gate.
 
@@ -105,7 +104,7 @@ Review each JSON file before using it. Then run the matrix gate.
 .\tools\check-release-readiness.ps1 -Revision $revision
 ```
 
-The command must print `pass` for all six servers. This gate verifies report structure and revision matching. It does not replace human review of the local captures and anomalies.
+The command must print `pass` for all five servers. This gate verifies report structure and revision matching. It does not replace human review of the local captures and anomalies.
 
 ## 5. Create the release
 
@@ -120,7 +119,7 @@ git push origin "v$version"
 
 Use a signed annotated tag when signing is configured. If it is not configured, stop and make an explicit maintainer decision before using an unsigned annotated tag.
 
-Create a checksum and third-party license bundle for the exact tested Windows binary, then create the GitHub release from that exact tag. Include concise release notes, the supported Bedrock and protocol version, important limitations, automated check status, the six-server validation result, the tested binary and checksum, the project license and notices, the generated dependency license bundle, and the sanitized JSON reports as small release assets. Do not attach raw captures or captured third-party content.
+Create a checksum and third-party license bundle for the exact tested Windows binary, then create the GitHub release from that exact tag. Include concise release notes, the supported Bedrock and protocol version, important limitations, automated check status, the five-server validation result, the tested binary and checksum, the project license and notices, the generated dependency license bundle, and the sanitized JSON reports as small release assets. Do not attach raw captures or captured third-party content.
 
 ```powershell
 $binary = (Resolve-Path .\bin\bedrock-debug-proxy.exe).Path

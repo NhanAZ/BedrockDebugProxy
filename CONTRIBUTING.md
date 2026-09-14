@@ -56,4 +56,4 @@ A pull request is merge-ready only when scope and provenance are clear, automate
 
 Record the result as `fail` or `incomplete` and investigate before changing code. Check the capture, packet definitions, optional fields, packet ordering assumptions, transport, authentication, and whether the server behavior is valid. Do not add a server-specific workaround only to make the gate pass.
 
-The detailed report schema, sensitive-data boundary, and pass criteria are in [`docs/validation.md`](docs/validation.md). The release process is separate and documented in [`docs/releasing.md`](docs/releasing.md).
+The detailed report schema, sensitive-data boundary, and pass criteria are in [`docs/validation.md`](docs/validation.md). Use [`docs/server-targets.md`](docs/server-targets.md) for the active endpoint catalog and server-policy disclaimer. CubeCraft is intentionally excluded from validation and release recommendations because its published policy prohibits Bedrock proxy use. The release process is separate and documented in [`docs/releasing.md`](docs/releasing.md).

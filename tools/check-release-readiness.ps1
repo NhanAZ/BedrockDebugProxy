@@ -10,7 +10,6 @@ Set-StrictMode -Version Latest
 $projectRoot = (Resolve-Path (Join-Path $PSScriptRoot "..")).Path
 $requiredServers = @(
     "The Hive"
-    "CubeCraft"
     "Galaxite"
     "Lifeboat"
     "Mineville Zeqa"
