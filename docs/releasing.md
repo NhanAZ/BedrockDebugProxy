@@ -12,6 +12,7 @@ When the maintainer says "I want to release", the AI agent should drive this doc
 4. The maintainer reports that the session is complete and mentions any visible problem. The agent locates and inspects the closed capture, verifies the revision and evidence, and generates the sanitized report. The maintainer does not need to run report scripts unless they are performing the release without an agent.
 5. After all required sessions, the agent runs the release gate, prepares the checksum and release notes, and reports any exact blocker.
 6. If the maintainer explicitly requested a release, the version is settled, every gate passes, and signing or GitHub access is available, the agent creates and pushes the tag, publishes the release assets, and verifies the result. It must not publish from an incomplete or mismatched validation set.
+7. After the published release is verified, the agent synchronizes the Git-tracked source history, branches, and tags with the private recovery mirror described in section 7. The release is not reported as fully complete until this synchronization and ref check succeed.
 
 The remaining sections retain the complete manual procedure so another developer can reproduce and audit what the agent performs.
 
@@ -157,4 +158,35 @@ The release notes file must be reviewed and must not contain credentials, server
 4. Confirm the README quick start matches the released CLI.
 5. Record any external outage, known limitation, or pending compatibility investigation in the release notes instead of silently omitting it.
 
-A release is complete only after the published tag, binary metadata, reports, and release notes all identify the same tested revision.
+A release is complete only after the published tag, binary metadata, reports, release notes, and verified recovery mirror all identify the same tested revision.
+
+## 7. Synchronize the source-history backup
+
+The private repository [`NhanAZ/BedrockDebugProxy-Backup`](https://github.com/NhanAZ/BedrockDebugProxy-Backup) is a recovery mirror for Git-tracked source and history. After the release has been verified, push all local branches and tags to this remote and verify that its default branch points to the tested revision.
+
+Do not mirror ignored captures, authentication state, resource-pack keys, private keys, build output, or other local artifacts. GitHub Release assets are not copied by Git pushes and remain attached to the release itself.
+
+```powershell
+$backupUrl = "https://github.com/NhanAZ/BedrockDebugProxy-Backup.git"
+$configuredBackupUrl = git remote get-url backup 2>$null
+if ($LASTEXITCODE -ne 0) {
+    git remote add backup $backupUrl
+} elseif (($configuredBackupUrl | Select-Object -First 1).TrimEnd('/') -ne $backupUrl.TrimEnd('/')) {
+    throw "The backup remote does not point to $backupUrl"
+}
+
+git push backup --all
+git push backup --tags
+
+$backupRevision = (git ls-remote backup "refs/heads/main" | ForEach-Object { ($_ -split "\s+")[0] } | Select-Object -First 1)
+if ($backupRevision -ne $revision) {
+    throw "Backup main is $backupRevision, expected tested revision $revision"
+}
+
+$backupTag = git ls-remote --tags backup "refs/tags/v$version"
+if (-not $backupTag) {
+    throw "Backup tag v$version was not found"
+}
+```
+
+If the backup remote is unavailable or the ref check fails, retain the published release but report the backup step as incomplete. Do not claim that the recovery mirror is current until the push and verification succeed. Keep the backup repository private and restrict its collaborators and tokens.
