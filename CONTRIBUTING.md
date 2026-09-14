@@ -20,14 +20,15 @@ This file is the shortest path from a local change to a merge-ready pull request
 
 2. Review `git diff`, `git diff --check`, and `git status`. Do not include captures, credentials, build outputs, resource packs, or unrelated files.
 3. Update documentation in the same change when behavior, CLI use, capture fields, or a research assumption changed.
-4. Commit the coherent change. A runtime validation build must come from a clean committed revision.
-5. Decide whether manual validation is required.
+4. Add exactly one commit audit record under [`docs/audits/`](docs/audits/) for the authored commit. Include intent, scope, evidence, automated checks, live validation status, limitations, and follow-up work. Use the stable change ID from the audit template rather than trying to predict the commit hash.
+5. Commit the coherent change. A runtime validation build must come from a clean committed revision.
+6. Decide whether manual validation is required.
 
    - Documentation, comments, and formatting-only changes may be exempt.
    - Code or any possible runtime behavior change requires The Hive validation.
    - A change to authentication, Experience routing, networking, protocol handling, resource packs, or another specific flow must exercise that flow directly.
 
-6. For a runtime change, build the exact commit and validate it before calling the pull request merge-ready.
+7. For a runtime change, build the exact commit and validate it before calling the pull request merge-ready.
 
    ```powershell
    .\tools\build.ps1 -Version pr
@@ -35,7 +36,7 @@ This file is the shortest path from a local change to a merge-ready pull request
    ```
 
    Follow the capture and report steps in [`docs/validation.md`](docs/validation.md). Upload the sanitized report as a pull request artifact or provide it through the review system without adding it to the candidate commit. Keep the raw capture local.
-7. Push the branch and open the pull request using the repository template. State what changed, what did not change, automated results, manual results, and any remaining uncertainty.
+8. Push the branch and open the pull request using the repository template. State what changed, what did not change, automated results, manual results, and any remaining uncertainty.
 
 ## After opening a pull request
 
