@@ -135,6 +135,46 @@ func TestHandleAcceptsResourcePackLoginPermutations(t *testing.T) {
 	}
 }
 
+func TestHandleKeepsLaterPhasePacketsUntilTheirState(t *testing.T) {
+	conn := newLoginTestConn()
+	conn.expectedIDs.Store([]uint32{packet.IDPlayStatus})
+
+	// These packets belong to later phases. They must remain lossless while the
+	// deferred queue drains the packet that advances the current phase.
+	for _, pk := range []packet.Packet{
+		&packet.ResourcePackStack{},
+		&packet.ItemRegistry{},
+		&packet.ResourcePacksInfo{},
+	} {
+		if err := conn.handle(wirePacketData(t, pk)); err != nil {
+			t.Fatalf("defer %T: %v", pk, err)
+		}
+	}
+	if err := conn.handle(wirePacketData(t, &packet.PlayStatus{Status: packet.PlayStatusLoginSuccess})); err != nil {
+		t.Fatalf("handle PlayStatus: %v", err)
+	}
+
+	// ResourcePacksInfo and ResourcePackStack are now valid and must be
+	// consumed, but ItemRegistry is still a later-phase packet and must stay
+	// queued until StartGame advances the state machine.
+	if len(conn.deferredPackets) != 1 {
+		t.Fatalf("deferred packet count after first transition = %d, want 1", len(conn.deferredPackets))
+	}
+	if !conn.isExpectedPacket(packet.IDDimensionData) || !conn.isExpectedPacket(packet.IDStartGame) {
+		t.Fatalf("unexpected state after resource-pack drain: %#v", conn.expectedIDs.Load())
+	}
+
+	if err := conn.handle(wirePacketData(t, &packet.StartGame{})); err != nil {
+		t.Fatalf("handle StartGame: %v", err)
+	}
+	if len(conn.deferredPackets) != 0 {
+		t.Fatalf("deferred packet count after second transition = %d, want 0", len(conn.deferredPackets))
+	}
+	if !conn.isExpectedPacket(packet.IDChunkRadiusUpdated) || !conn.isExpectedPacket(packet.IDPlayStatus) {
+		t.Fatalf("unexpected state after ItemRegistry drain: %#v", conn.expectedIDs.Load())
+	}
+}
+
 func newLoginTestConn() *Conn {
 	return &Conn{
 		ctx:   context.Background(),

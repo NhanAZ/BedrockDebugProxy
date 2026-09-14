@@ -8,6 +8,8 @@ Every authored non-merge commit includes exactly one Markdown record whose filen
 
 The record is created before the commit and uses a stable change ID such as `AUDIT-0001`. It must not depend on the final commit hash. Git metadata is the source of truth for the hash, author, timestamp, and parent history. The commit subject should name the change, and the audit record should be staged with the files it describes.
 
+Before starting a bug fix, search [`../fix-history.md`](../fix-history.md) and its linked decisions, research notes, captures, and validation reports. Update the matching history entry or add a new stable `FIX-NNNN` entry when the root cause is different.
+
 ## Required contents
 
 - Intent and user-visible problem
