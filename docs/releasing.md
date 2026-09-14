@@ -56,7 +56,7 @@ Include `--follow-transfers` in the release command when the server's flow can s
 | `Galaxite` | `experience:Galaxite` | Connect, spawn, move, interact, and observe normal traffic |
 | `Lifeboat` | `experience:Lifeboat` | Connect, spawn, move, interact, and observe normal traffic |
 | `Mineville Zeqa` | `experience:Mineville Zeqa` | Enter the Zeqa flow and observe it directly |
-| `Enchanted` | `experience:Enchanted` | Connect, spawn, move, interact, and observe normal traffic |
+| `Enchanted` | `experience:Enchanted` | Receive the server-sent form, select any minigame, observe `Transfer`, follow the next hop, complete its resource-pack exchange when offered, and reach minigame spawn |
 
 Use this command for an Experience target. Replace `192.168.1.10` with the concrete LAN address used by the Minecraft client, and replace only the value after `--upstream` for each run. Do not add CubeCraft to this matrix because its published policy prohibits Bedrock proxy use. See [`server-targets.md`](server-targets.md) for the policy disclaimer and endpoint references.
 
@@ -81,6 +81,8 @@ For every server, confirm all of the following before recording `pass`.
 8. `Ctrl+C` closes the proxy and the capture verifier succeeds.
 
 If a server cannot be tested, create an `incomplete` report. If an anomaly occurs, create a `fail` report and investigate. Neither result passes the release gate.
+
+The Enchanted report must include `transfer_following=pass` and `resource_pack_transfer=pass`. The server sends the form automatically when the player joins. A hub-only session, or a session where no minigame is selected from that form, does not satisfy the Enchanted release gate.
 
 ## 4. Generate one report per server
 

@@ -20,6 +20,8 @@ These five targets are the required release matrix. Use the exact selector with 
 
 For release validation, follow [`validation.md`](validation.md) and [`releasing.md`](releasing.md). Use a concrete reachable LAN address for `--listen` when testing `--follow-transfers`. Do not place raw addresses, credentials, or captures in sanitized reports.
 
+Enchanted has a required release flow beyond hub connectivity. The server sends its form automatically when the player joins. Select any available minigame in that form and observe the resulting `Transfer` and next-hop resource-pack exchange before recording a passing report. A hub-only session is not sufficient.
+
 ## Additional Experience references
 
 These entries are useful for exploratory research but are not release gates.
