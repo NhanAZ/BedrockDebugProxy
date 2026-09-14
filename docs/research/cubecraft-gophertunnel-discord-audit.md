@@ -89,7 +89,7 @@ The [upstream pull request](https://github.com/Sandertv/gophertunnel/pull/406) a
 
 1. CubeCraft may use proxy detection or may classify a proxy's resulting behavior as an unfair advantage. The April 2024 message is explicitly uncertain.
 2. Authenticated upstream identity, key, token, or chain differences may be visible to server-side validation. Issue #407 demonstrates this mechanism on a different server environment.
-3. Two independent connections, packet decode/re-encode, batching, compression, timing, and transport behavior may produce an anti-cheat-visible profile even when semantic packet intent is unchanged.
+3. Two independent connections, batching, compression, timing, and transport behavior may produce an anti-cheat-visible profile even when semantic packet intent is unchanged. The current bridge preserves raw packet bytes for same-protocol traffic, but it still has two sessions and gophertunnel-managed authentication, encryption, batching, compression, and transport behavior.
 
 ### Not established by this audit
 
@@ -100,7 +100,7 @@ The [upstream pull request](https://github.com/Sandertv/gophertunnel/pull/406) a
 
 ## Implications for BedrockDebugProxy
 
-The project is not a simple transparent relay. It uses gophertunnel as the Bedrock session and protocol adapter, creates a downstream listener and a separate upstream dial, and forwards decoded packets through `ReadPacket()` and `WritePacket()`. Its own capture layer records raw and decoded evidence, but the live wire path still has two session handshakes and gophertunnel-managed authentication, encryption, batching, compression, and packet serialization.
+The project is not a simple transparent relay. It uses gophertunnel as the Bedrock session and protocol adapter, creates a downstream listener and a separate upstream dial, and forwards same-protocol packets through a raw packet boundary while retaining decoded capture views. Its own capture layer records raw and decoded evidence, but the live wire path still has two session handshakes and gophertunnel-managed authentication, encryption, batching, compression, and transport behavior. `Transfer` address rewriting and protocol-mismatched traffic intentionally use typed serialization.
 
 Therefore, "read-only" accurately describes the project's intended mutation policy, but it does not mean "indistinguishable from the official client." A server evaluates the resulting connection and authenticated session, not the proxy's source-level intent.
 
