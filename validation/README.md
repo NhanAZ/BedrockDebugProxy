@@ -6,4 +6,6 @@ A report identifies the tested revision and records sanitized evidence for one s
 
 Runtime-affecting pull requests require a passing The Hive report for the exact revision. Flow-specific changes require an additional report that observes the changed flow. Each official release requires reports for the five servers listed in `docs/validation.md`.
 
+The Enchanted server sends an in-game form when the player joins. The release report must select any minigame from that form and observe the resulting transfer and next-hop resource-pack flow. A hub-only connection does not pass the release gate.
+
 Upload sanitized reports as pull request or release artifacts without committing them into the tested candidate. A report commit would create a new head that the stamped binary did not test. Long-term release evidence belongs with the immutable release assets. Never place packet payloads, addresses, credentials, identifiers, content keys, decrypted resource packs, or third-party assets there.
