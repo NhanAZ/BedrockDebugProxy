@@ -253,19 +253,21 @@ func runProxy(args []string, stdout, stderr io.Writer) int {
 	}
 	_, _ = fmt.Fprintf(stdout, "Automatic artifact folders %s\n", filepath.Join(recorder.Root(), "artifacts"))
 	runErr := runner.Run(ctx)
+	_, _ = fmt.Fprintln(stdout, "Proxy forwarding stopped. Closing network connections...")
 	runErr = errors.Join(runErr, target.Close())
 	status := "closed"
 	if runErr != nil {
 		status = "failed"
 	}
+	_, _ = fmt.Fprintln(stdout, "Closing capture recorder...")
 	closeErr := recorder.Close(status, runErr)
 	if closeErr != nil {
 		runErr = errors.Join(runErr, closeErr)
 	}
-	_, _ = fmt.Fprintln(stdout, "Finishing automatic artifact folders...")
+	_, _ = fmt.Fprintln(stdout, "Capture recorder closed. Finishing automatic artifact folders...")
 	artifactStatus, artifactErr := views.Finish()
 	runErr = errors.Join(runErr, artifactErr)
-	_, _ = fmt.Fprintf(stdout, "Automatic artifacts %s through event %d.\n", artifactStatus.State, artifactStatus.LastSequence)
+	_, _ = fmt.Fprintf(stdout, "Automatic artifacts %s through event %d. Verifying capture...\n", artifactStatus.State, artifactStatus.LastSequence)
 	verification, verifyErr := capture.Verify(recorder.Root())
 	if verifyErr != nil {
 		runErr = errors.Join(runErr, verifyErr)
@@ -275,6 +277,7 @@ func runProxy(args []string, stdout, stderr io.Writer) int {
 			_, _ = fmt.Fprintf(stderr, "Capture issue - %s\n", issue)
 		}
 	}
+	_, _ = fmt.Fprintln(stdout, "Capture verification complete.")
 	if runErr != nil {
 		_, _ = fmt.Fprintf(stderr, "Proxy stopped with an error - %v\n", runErr)
 		return 1

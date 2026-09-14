@@ -35,7 +35,7 @@ A single background reader follows the already-written event stream. It does not
 
 Identical image pixels and dimensions reuse one PNG. A pack copy reuses its sanitized name and archive hash. ZIPs are streamed without decompressing or extracting pack entries. Copies are independent files, not hard links, so editing a convenience file cannot change its source blob. This costs extra disk space for ZIPs, images, and selected JSONL events. It also adds background CPU and disk work, so real-client performance still requires validation.
 
-When finished, press `Ctrl+C` and wait for `Automatic artifacts complete` and the capture verification result. The reader finishes after the recorder closes and checks its last source sequence against the closed manifest. `status.json` is written at startup and completion. An `open` file after an interrupted process is not proof that the folders finished.
+When finished, press `Ctrl+C` and keep the terminal open until the shutdown stages complete. The console reports when forwarding stops, network connections close, the capture recorder closes, automatic artifacts finish, and capture verification completes. The reader finishes after the recorder closes and checks its last source sequence against the closed manifest. `status.json` is written at startup and completion. An `open` file after an interrupted process is not proof that the folders finished.
 
 ## Meaning and boundaries
 

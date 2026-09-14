@@ -92,6 +92,33 @@ func TestLiveReporterExplainsSelfSignedLANLoginOnce(t *testing.T) {
 	}
 }
 
+func TestLiveReporterDowngradesCaptureCloseAfterShutdown(t *testing.T) {
+	var output bytes.Buffer
+	reporter := newLiveReporter(&output)
+	message := "read batch: capture transport read: capture recorder is closed"
+	reporter.SetShuttingDown()
+	reporter.LibraryLog("upstream", slog.LevelError, message)
+
+	text := output.String()
+	if !strings.Contains(text, "WARN") || !strings.Contains(text, "Library [upstream] - "+message) {
+		t.Fatalf("expected expected shutdown warning, got %q", text)
+	}
+	if strings.Contains(text, "ERROR             Library [upstream] - "+message) {
+		t.Fatalf("expected capture-close message not to be reported as an error: %q", text)
+	}
+}
+
+func TestLiveReporterKeepsCaptureCloseAsErrorBeforeShutdown(t *testing.T) {
+	var output bytes.Buffer
+	reporter := newLiveReporter(&output)
+	message := "read batch: capture transport read: capture recorder is closed"
+	reporter.LibraryLog("upstream", slog.LevelError, message)
+
+	if !strings.Contains(output.String(), "ERROR             Library [upstream] - "+message) {
+		t.Fatalf("expected pre-shutdown capture-close error, got %q", output.String())
+	}
+}
+
 func TestLiveReporterUsesMinecraftRGBPalette(t *testing.T) {
 	tests := []struct {
 		name  string

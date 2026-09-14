@@ -198,7 +198,10 @@ func (r *Runner) Run(ctx context.Context) error {
 	runCtx, cancelRun := context.WithCancel(ctx)
 	defer cancelRun()
 	live := newLiveReporter(r.config.Output)
-	defer live.Close()
+	defer func() {
+		live.SetShuttingDown()
+		live.Close()
+	}()
 	failures := bedrock.NewFailureSink(cancelRun)
 	observer := bedrock.NewObserver(r.config.Recorder, failures, sessionID, 1, live.RawPacket)
 	live.SetFollowTransfers(r.config.FollowTransfers)

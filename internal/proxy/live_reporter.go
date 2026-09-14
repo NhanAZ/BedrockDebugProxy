@@ -53,6 +53,7 @@ type liveReporter struct {
 	counts          map[livePacketKey]int
 	hints           map[string]struct{}
 	spawned         atomic.Bool
+	shuttingDown    atomic.Bool
 	color           bool
 	clientRaw       map[uint32]string
 	serverRaw       map[uint32]string
@@ -113,6 +114,13 @@ func (r *liveReporter) SetSpawned() {
 	r.spawned.Store(true)
 }
 
+// SetShuttingDown marks the end of forwarding so late library messages caused
+// by closing the transport can be presented as expected shutdown diagnostics.
+// The capture log handler still records the original library level and text.
+func (r *liveReporter) SetShuttingDown() {
+	r.shuttingDown.Store(true)
+}
+
 func (r *liveReporter) SetFollowTransfers(enabled bool) {
 	r.mu.Lock()
 	r.followTransfers = enabled
@@ -163,6 +171,10 @@ func (r *liveReporter) LibraryLog(channel string, level slog.Level, message stri
 		}
 		r.hints[hint] = struct{}{}
 		r.writeLocked(now, "WARN", ansiYellow, "Downstream login rejected - the client used self-signed LAN authentication. On a trusted LAN, restart with --allow-unauthenticated-client; otherwise add the proxy in the Servers tab for Xbox-authenticated login")
+		return
+	}
+	if r.shuttingDown.Load() && strings.Contains(strings.ToLower(message), "capture recorder is closed") {
+		r.writeLocked(now, "WARN", ansiYellow, fmt.Sprintf("Library [%s] - %s", channel, message))
 		return
 	}
 	color := ansiYellow
