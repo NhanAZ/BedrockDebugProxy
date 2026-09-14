@@ -873,7 +873,9 @@ func (r *Runner) forward(source, destination *minecraft.Conn, failures *bedrock.
 			}
 		}
 		writeStarted := time.Now()
+		writeMode := "typed"
 		if rawForward {
+			writeMode = "raw"
 			err = rawWriter.WriteRawPacket(rawRead)
 		} else {
 			err = destination.WritePacket(outgoing)
@@ -896,7 +898,7 @@ func (r *Runner) forward(source, destination *minecraft.Conn, failures *bedrock.
 			flushDuration = time.Since(flushStarted)
 		}
 		if shouldRecordForwardTiming(decoded) && decodedEvent.Sequence != 0 {
-			if err := r.recordForwardTiming(decodedEvent, direction, connectionID, hop, readDuration, recordDuration, writeDuration, flushDuration, flushMode); err != nil {
+			if err := r.recordForwardTiming(decodedEvent, direction, connectionID, hop, readDuration, recordDuration, writeDuration, flushDuration, flushMode, writeMode); err != nil {
 				return err
 			}
 		}
@@ -999,12 +1001,13 @@ type forwardTimingData struct {
 	ReadPacketDurationNano    int64  `json:"read_packet_duration_nano,string"`
 	RecordDecodedDurationNano int64  `json:"record_decoded_duration_nano,string"`
 	WritePacketDurationNano   int64  `json:"write_packet_duration_nano,string"`
+	WriteMode                 string `json:"write_mode"`
 	FlushMode                 string `json:"flush_mode"`
 	FlushDurationNano         int64  `json:"flush_duration_nano,string"`
 	Measurement               string `json:"measurement"`
 }
 
-func (r *Runner) recordForwardTiming(decodedEvent capture.Event, direction capture.Direction, connectionID string, hop int, readDuration, recordDuration, writeDuration, flushDuration time.Duration, flushMode string) error {
+func (r *Runner) recordForwardTiming(decodedEvent capture.Event, direction capture.Direction, connectionID string, hop int, readDuration, recordDuration, writeDuration, flushDuration time.Duration, flushMode, writeMode string) error {
 	name := ""
 	if decodedEvent.Packet != nil {
 		name = decodedEvent.Packet.Name
@@ -1013,6 +1016,7 @@ func (r *Runner) recordForwardTiming(decodedEvent capture.Event, direction captu
 		ReadPacketDurationNano:    readDuration.Nanoseconds(),
 		RecordDecodedDurationNano: recordDuration.Nanoseconds(),
 		WritePacketDurationNano:   writeDuration.Nanoseconds(),
+		WriteMode:                 writeMode,
 		FlushMode:                 flushMode,
 		FlushDurationNano:         flushDuration.Nanoseconds(),
 		Measurement:               "bridge operation durations; automatic flush completion is represented by subsequent transport.payload events",
