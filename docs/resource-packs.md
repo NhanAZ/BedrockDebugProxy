@@ -29,7 +29,7 @@ The current gophertunnel listener handles requested resource packs sequentially.
 
 The upstream connection is established before the downstream listener receives the pack list. This upstream-first buffering is intentional because the proxy must retain the exact archives and server-supplied content keys before it can offer an archive-backed copy to the real client. The console labels this wait as buffered by design and reports its elapsed duration. Live packet summaries use three-second buckets, while every packet and resource-pack archive remains in the canonical capture.
 
-Each upstream hop has a 60-second dial deadline covering authenticated login and resource-pack exchange. This bounds a missing or unreachable transfer backend instead of leaving the downstream client in an indefinite loading state. A deadline is recorded as `upstream.dial_error` with `timeout: true`, and the listener disconnect reason identifies the elapsed limit. The deadline does not change chunk ordering or resource-pack contents.
+Each upstream hop has a five-minute dial deadline covering authenticated login and resource-pack exchange. Featured experiences may advertise many packs and pace chunk responses across them, so a shorter deadline can abort an active exchange. The deadline still bounds a missing or unreachable transfer backend instead of leaving the downstream client in an indefinite loading state. A deadline is recorded as `upstream.dial_error` with `timeout: true`, and the listener disconnect reason identifies the elapsed limit. The deadline does not change chunk ordering or resource-pack contents.
 
 ## Opt-in decryption
 
