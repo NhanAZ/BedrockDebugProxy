@@ -10,7 +10,7 @@ Counts such as `PlayerSkin`, `PlayerList`, `AddActor`, `LevelChunk`, and `Invent
 
 Live packet summaries are only operator navigation. They are emitted in three-second buckets so a busy session or a resource-pack exchange does not flood the terminal. The complete packet event stream remains in the capture. During upstream login, the console explicitly reports that the resource-pack exchange is intentionally buffered, then reports its elapsed duration before downstream delivery can begin. Labels, channels, directions, totals, and selected packet names remain readable without color. On a truecolor terminal the labels use the following Minecraft RGB palette. Message text keeps the terminal's default foreground.
 
-Upstream login and resource-pack exchange are bounded by a 60-second per-hop dial deadline. A timeout is retained as an `upstream.dial_error` event and is not hidden behind an indefinite console wait.
+Upstream login and resource-pack exchange are bounded by a five-minute per-hop dial deadline. Featured experiences may advertise many packs and pace chunk responses across them, so a shorter deadline can abort an active exchange. A timeout is retained as an `upstream.dial_error` event and is not hidden behind an indefinite console wait.
 
 | Output | Minecraft color | Hex |
 | --- | --- | --- |
