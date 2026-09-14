@@ -791,39 +791,97 @@ func newConnectionMetadata(role string, conn *minecraft.Conn) connectionMetadata
 }
 
 func (r *Runner) forward(source, destination *minecraft.Conn, failures *bedrock.FailureSink, live *liveReporter, shuttingDown *atomic.Bool, localAddress string, direction capture.Direction, sourceChannel, connectionID string, hop int, onTransfer func(string)) error {
+	rawReader, rawReadOK := interface{}(source).(interface {
+		ReadPacketDataWithTime() (*minecraft.PacketRead, time.Time, error)
+		DecodePacketRead(*minecraft.PacketRead) (packet.Packet, error)
+		ProtocolID() int32
+	})
+	rawWriter, rawWriteOK := interface{}(destination).(interface {
+		WriteRawPacket(*minecraft.PacketRead) error
+		ProtocolID() int32
+	})
+	rawCompatible := rawReadOK && rawWriteOK && rawReader.ProtocolID() == rawWriter.ProtocolID()
+
 	for {
 		readStarted := time.Now()
 		if err := failures.Err(); err != nil {
 			return err
 		}
-		decoded, err := source.ReadPacket()
+		var rawRead *minecraft.PacketRead
+		var decoded packet.Packet
+		var err error
+		if rawCompatible {
+			rawRead, _, err = rawReader.ReadPacketDataWithTime()
+			if err == nil && rawRead != nil {
+				if rawRead.Packet != nil {
+					decoded = rawRead.Packet
+					rawRead.Release()
+					rawRead = nil
+				} else {
+					// Decode a clone for the structured capture while retaining the
+					// original bytes for the forwarding decision below.
+					decodedRead, cloneErr := rawRead.Clone()
+					if cloneErr != nil {
+						rawRead.Release()
+						return r.finishForwardAtHop("bridge.decode_error", direction, sourceChannel, connectionID, hop, "clone packet for decode", cloneErr, shuttingDown)
+					}
+					decoded, err = rawReader.DecodePacketRead(decodedRead)
+				}
+			}
+		} else {
+			decoded, err = source.ReadPacket()
+		}
 		readDuration := time.Since(readStarted)
 		if err != nil {
+			if rawRead != nil {
+				rawRead.Release()
+			}
 			return r.finishForwardAtHop("bridge.read_error", direction, sourceChannel, connectionID, hop, "read packet", err, shuttingDown)
+		}
+		if decoded == nil {
+			if rawRead != nil {
+				rawRead.Release()
+			}
+			continue
 		}
 		live.Packet(direction, decoded)
 		recordStarted := time.Now()
 		decodedEvent, err := r.recordDecoded(decoded, direction, connectionID, hop)
 		recordDuration := time.Since(recordStarted)
 		if err != nil {
+			if rawRead != nil {
+				rawRead.Release()
+			}
 			return err
 		}
 		outgoing := decoded
+		rawForward := rawRead != nil
 		if r.config.FollowTransfers && direction == capture.DirectionServerToClient {
 			if transfer, ok := decoded.(*packet.Transfer); ok {
+				rawForward = false
 				rewritten, target, rewriteErr := transferForProxyAddress(transfer, localAddress)
 				if rewriteErr != nil {
+					rawRead.Release()
 					captureErr := r.finishForwardAtHop("bridge.transfer_rewrite_error", direction, sourceChannel, connectionID, hop, "rewrite Transfer", rewriteErr, shuttingDown)
 					return errors.Join(&transferRewriteError{err: rewriteErr}, captureErr)
 				}
 				outgoing = rewritten
 				if err := r.recordTransferRewrite(transfer, rewritten, target, connectionID, hop); err != nil {
+					rawRead.Release()
 					return err
 				}
 			}
 		}
 		writeStarted := time.Now()
-		if err := destination.WritePacket(outgoing); err != nil {
+		if rawForward {
+			err = rawWriter.WriteRawPacket(rawRead)
+		} else {
+			err = destination.WritePacket(outgoing)
+		}
+		if rawRead != nil {
+			rawRead.Release()
+		}
+		if err != nil {
 			return r.finishForwardAtHop("bridge.write_error", direction, sourceChannel, connectionID, hop, "write packet", err, shuttingDown)
 		}
 		writeDuration := time.Since(writeStarted)
