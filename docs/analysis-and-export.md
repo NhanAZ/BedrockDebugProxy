@@ -8,21 +8,21 @@ Alongside canonical blobs, every new `run` automatically creates named pack ZIPs
 
 Counts such as `PlayerSkin`, `PlayerList`, `AddActor`, `LevelChunk`, and `InventoryContent` count packet events. One packet can describe multiple objects, and an object can appear in many packets. These counts are not unique asset or object totals. `resource_pack.archive` counts recorded archive events. The event's blob reference locates the retained archive.
 
-Live packet summaries are only operator navigation. They are emitted in three-second buckets so a busy session or a resource-pack exchange does not flood the terminal. The complete packet event stream remains in the capture. During upstream login, the console explicitly reports that the resource-pack exchange is intentionally buffered, then reports its elapsed duration before downstream delivery can begin. Labels, channels, directions, totals, and selected packet names remain readable without color. On a truecolor terminal the labels use the following Minecraft RGB palette. Message text keeps the terminal's default foreground.
+Live packet summaries are only operator navigation. They are emitted in three-second buckets so a busy session or a resource-pack exchange does not flood the terminal. The complete packet event stream remains in the capture. During upstream login, the console explicitly reports that the resource-pack exchange is intentionally buffered, then reports its elapsed duration before downstream delivery can begin. Labels, channels, directions, totals, and selected packet names remain readable without color. Colored output follows PocketMine-MP's semantic logger roles and xterm 256-color terminal mapping. The timestamp uses aqua, informational messages use white, warnings use yellow, and errors use dark red. Packet directions and transfers retain their own navigation colors. Message text keeps the terminal's default foreground.
 
 Upstream login and resource-pack exchange are bounded by a five-minute per-hop dial deadline. Featured experiences may advertise many packs and pace chunk responses across them, so a shorter deadline can abort an active exchange. A timeout is retained as an `upstream.dial_error` event and is not hidden behind an indefinite console wait.
 
 | Output | Minecraft color | Hex |
 | --- | --- | --- |
-| Timestamp | Gray | `#AAAAAA` |
-| INFO | Gold | `#FFAA00` |
-| Client to server | Aqua | `#55FFFF` |
-| Server to client | Green | `#55FF55` |
-| TRANSFER | Light purple | `#FF55FF` |
-| WARN | Yellow | `#FFFF55` |
-| ERROR | Red | `#FF5555` |
+| Timestamp | Aqua | `#5FFFFF` (xterm 87) |
+| INFO | White | `#FFFFFF` (xterm 231) |
+| Client to server | Aqua | `#5FFFFF` (xterm 87) |
+| Server to client | Green | `#5FFF5F` (xterm 83) |
+| TRANSFER | Light purple | `#FF5FFF` (xterm 207) |
+| WARN | Yellow | `#FFFF5F` (xterm 227) |
+| ERROR | Dark red | `#AF0000` (xterm 124) |
 
-These classic RGB values were cross-checked against [Adventure's named Minecraft text colors at v4.24.0](https://raw.githubusercontent.com/KyoriPowered/adventure/v4.24.0/api/src/main/java/net/kyori/adventure/text/format/NamedTextColor.java) on 2026-08-31. This is a palette reference, not a dependency or source-code import. Output redirection disables generated color escapes, as does a present `NO_COLOR` environment variable. A terminal without truecolor support may approximate the palette. Color does not carry information missing from the text labels.
+The logger roles and terminal values are adapted from [PocketMine-MP MainLogger.php](https://github.com/pmmp/PocketMine-MP/blob/6a7cc02e9dff59b69241aa0bcffdb9903ce86beb/src/utils/MainLogger.php) and [Terminal.php](https://github.com/pmmp/PocketMine-MP/blob/6a7cc02e9dff59b69241aa0bcffdb9903ce86beb/src/utils/Terminal.php), inspected on 2026-09-14. This is a behavioral and palette reference, not a source-code import. Output redirection disables generated color escapes, as does a present `NO_COLOR` environment variable. Color does not carry information missing from the text labels.
 
 ## Analysis contract
 
