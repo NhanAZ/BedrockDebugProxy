@@ -13,7 +13,7 @@ The baseline at repository commit `669557f` is:
 | Component | Pinned value | Evidence |
 | --- | --- | --- |
 | Go toolchain | `go1.26.6` | `go.mod` toolchain directive |
-| gophertunnel | `v1.61.0` plus the in-tree featured-experience spawn compatibility patch | `go.mod` and `third_party/gophertunnel/minecraft/conn.go` |
+| gophertunnel | `v1.61.0` plus in-tree featured-experience spawn and deferred-login ordering compatibility patches | `go.mod` and `third_party/gophertunnel/minecraft/conn.go` |
 | gophertunnel source | `283a5a97dfe65da94bcc0b401807f6aefa9e72ee` | Upstream tag revision reviewed in `docs/research/bedrock-ecosystem.md` |
 | Bedrock protocol | `2169` | `minecraft/protocol/info.go` in gophertunnel `v1.61.0` |
 | Bedrock game version | `1.26.45` | `minecraft/protocol/info.go` in gophertunnel `v1.61.0` |

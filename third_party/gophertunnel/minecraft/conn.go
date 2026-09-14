@@ -700,20 +700,71 @@ func (conn *Conn) receive(data []byte) error {
 
 // handle tries to handle the incoming packetData.
 func (conn *Conn) handle(pkData *packetData) error {
+	if !conn.isExpectedPacket(pkData.h.PacketID) {
+		// This is not the packet we expected next in the login sequence. We push it back so that it may be
+		// handled once the state machine reaches that packet. Some servers send valid login packets out of
+		// order, so the deferred queue may become processable after handling the current packet.
+		conn.deferPacket(pkData)
+		return nil
+	}
+
+	// If the packet was expected, handle it right now.
+	pks, err := pkData.decode(conn)
+	if err != nil {
+		return err
+	}
+	if err := conn.handleMultiple(pks); err != nil {
+		return err
+	}
+	return nil
+}
+
+// isExpectedPacket reports whether packetID is accepted by the current login state.
+func (conn *Conn) isExpectedPacket(packetID uint32) bool {
 	for _, id := range conn.expectedIDs.Load().([]uint32) {
-		if id == pkData.h.PacketID {
-			// If the packet was expected, so we handle it right now.
-			pks, err := pkData.decode(conn)
-			if err != nil {
-				return err
-			}
-			return conn.handleMultiple(pks)
+		if id == packetID {
+			return true
 		}
 	}
-	// This is not the packet we expected next in the login sequence. We push it back so that it may
-	// be handled by the user.
-	conn.deferPacket(pkData)
-	return nil
+	return false
+}
+
+// handleDeferredPackets drains the deferred login queue while its first packet is accepted by the current
+// state. Keeping the queue ordered is important: packets that arrived early must not overtake an earlier
+// packet that is still required by the login sequence. Draining after each handled packet lets the state
+// machine accept valid server-specific orderings, such as ResourcePacksInfo arriving before PlayStatus.
+func (conn *Conn) handleDeferredPackets() error {
+	for {
+		data, ok := conn.takeExpectedDeferredPacket()
+		if !ok {
+			return nil
+		}
+		pks, err := data.decode(conn)
+		if err != nil {
+			return err
+		}
+		if err := conn.handleMultiple(pks); err != nil {
+			return err
+		}
+	}
+}
+
+// takeExpectedDeferredPacket removes and returns the first deferred packet when it is accepted by the current
+// login state. If the queue is empty or its first packet is not expected, it leaves the queue unchanged.
+func (conn *Conn) takeExpectedDeferredPacket() (*packetData, bool) {
+	conn.deferredPacketMu.Lock()
+	defer conn.deferredPacketMu.Unlock()
+
+	if len(conn.deferredPackets) == 0 || !conn.isExpectedPacket(conn.deferredPackets[0].h.PacketID) {
+		return nil, false
+	}
+	data := conn.deferredPackets[0]
+	// Explicitly clear out the packet at offset 0. When we slice it to remove the first element, that element
+	// will not be garbage collectable, because the array it's in is still referenced by the slice. Doing this
+	// makes sure garbage collecting the packet is possible.
+	conn.deferredPackets[0] = nil
+	conn.deferredPackets = conn.deferredPackets[1:]
+	return data, true
 }
 
 // handleMultiple handles multiple packets and returns an error if at least one of those packets could not be handled
@@ -1614,9 +1665,17 @@ func (conn *Conn) encryptionKey(salt []byte, pub *ecdsa.PublicKey) ([32]byte, er
 	return sha256.Sum256(append(salt, sharedSecret...)), nil
 }
 
-// expect sets the packet IDs that are next expected to arrive.
+// expect sets the packet IDs that are next expected to arrive and re-checks the deferred queue. A server may
+// send a valid login packet before the handler has advanced the state machine, so every state transition must
+// give already-received packets a chance to continue the exchange.
 func (conn *Conn) expect(packetIDs ...uint32) {
 	conn.expectedIDs.Store(packetIDs)
+	if err := conn.handleDeferredPackets(); err != nil {
+		// A deferred packet is part of the login stream. Once its state becomes
+		// valid, a decode or handling error must terminate the connection rather
+		// than leave the dialer waiting indefinitely for another packet.
+		_ = conn.close(err)
+	}
 }
 
 func (conn *Conn) close(cause error) error {

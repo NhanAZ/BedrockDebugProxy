@@ -67,13 +67,28 @@ BedrockDebugProxy keeps Sandertv gophertunnel's authentication and packet path u
 
 The current upstream `bedrocktool` source was reviewed on 2026-09-13 at [`85d5cfe1545c8d853be2859144a8357539ffc0f2`](https://github.com/bedrock-tool/bedrocktool/tree/85d5cfe1545c8d853be2859144a8357539ffc0f2). It contains URL-aware resource-pack handling in [`utils/proxy/resourcepacks/resourcepacks.go`](https://github.com/bedrock-tool/bedrocktool/blob/85d5cfe1545c8d853be2859144a8357539ffc0f2/utils/proxy/resourcepacks/resourcepacks.go). The handler separates packs with `DownloadURL`, downloads them, applies the advertised content key, and sends `PackResponseAllPacksDownloaded` after URL and chunk downloads complete. This explains why bedrocktool can join Enchanted where a plain gophertunnel dialer requests chunks instead.
 
-BedrockDebugProxy implements the same protocol-level outcome independently. Its per-connection `ResourcePackCache` observes the already-captured `ResourcePacksInfo` through gophertunnel's public `PacketFunc`, prefetches only the advertised HTTP(S) URL, validates UUID, version, and compressed size, and lets the gophertunnel state machine send its normal completion response. No bedrocktool source was copied or adapted. The URL remains in the reconstructed pack and in the raw capture, while failures remain visible through gophertunnel's cache warning and its normal chunk fallback. URL retrieval is limited to the current accepted connection and is not an offline pack downloader. The in-tree dependency copy carries one additional spawn-completion compatibility patch documented below.
+BedrockDebugProxy implements the same protocol-level outcome independently. Its per-connection `ResourcePackCache` observes the already-captured `ResourcePacksInfo` through gophertunnel's public `PacketFunc`, prefetches only the advertised HTTP(S) URL, validates UUID, version, and compressed size, and lets the gophertunnel state machine send its normal completion response. No bedrocktool source was copied or adapted. The URL remains in the reconstructed pack and in the raw capture, while failures remain visible through gophertunnel's cache warning and its normal chunk fallback. URL retrieval is limited to the current accepted connection and is not an offline pack downloader. The in-tree dependency copy carries the documented spawn-completion and deferred-login ordering compatibility patches.
 
 ### Featured-experience spawn compatibility
 
 Live captures showed that Lifeboat and Enchanted may omit `ChunkRadiusUpdated`. Sandertv gophertunnel `v1.61.0` waits for both signals in `tryFinaliseClientConn`, so its dialer can otherwise remain blocked after the server has already sent `StartGame`, `ItemRegistry`, and `PlayStatusPlayerSpawn`. The project-specific gophertunnel copy marks `gameDataReceived` when `PlayStatusPlayerSpawn` arrives. The current Enchanted capture `session-20260913T081031Z` records that exact sequence: no `ChunkRadiusUpdated` event appears between the upstream `RequestChunkRadius` and `PlayStatus`.
 
 BedrockDebugProxy carries this three-line compatibility patch in the in-tree MIT-licensed gophertunnel copy under `third_party/gophertunnel`. It does not alter packet bytes, reorder traffic, or suppress unknown packets. The patch only permits the existing spawn acknowledgement and dial completion for a valid server sequence that omits the optional radius response. The regression test is `minecraft/conn_featured_experience_test.go` in that dependency copy.
+
+### Featured-experience login ordering
+
+The Enchanted capture `session-20260914T105050Z` exposed a second gophertunnel boundary. On hop 2, the server sent
+`ResourcePacksInfo` before `PlayStatus`. The dialer's login state machine deferred the early packet, handled
+`PlayStatus`, and then waited indefinitely because the deferred queue was not re-checked after the state changed.
+The proxy timed out the upstream login and resource-pack exchange after five minutes while the downstream client
+remained on the loading screen. The failure occurred before any hop 2 pack archive was reconstructed.
+
+The in-tree gophertunnel copy now re-checks the first deferred packet whenever `Conn.expect` advances the login
+state. The ordered drain preserves packet arrival order, processes a now-valid resource-pack offer, and closes
+on a deferred decode or handling error rather than leaving a blocked dial. This is an independent implementation
+of the problem described by [gophertunnel PR #406](https://github.com/Sandertv/gophertunnel/pull/406), not copied
+source. The regression test is `minecraft/conn_featured_experience_test.go` in the dependency copy. A new
+revision-matched Enchanted capture must confirm that hop 2 obtains and delivers its own pack set.
 
 ### Featured-experience transfer route behavior
 
