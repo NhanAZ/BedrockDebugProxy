@@ -78,4 +78,4 @@ The manual checks were `normal_session=pass`, `resource_pack_transfer=pass`, and
 - The capture boundary does not include raw UDP datagrams, RakNet acknowledgements, fragmentation, retransmission, or loss details. A future transport diagnostic can add those observations without changing the canonical Bedrock event stream.
 - The successful run does not identify the private edge behavior that made the earlier handshake fail. The GUID, source-address, MTU, and cookie changes are a supported explanation that fits the before and after event order, not a server-side confirmation.
 - The earlier The Hive report for `d1929d4` is not interchangeable with the current `a600bbf` candidate. The exact-revision The Hive baseline remains the next required live check.
-- An official release still needs reports for CubeCraft, Galaxite, Lifeboat, and Mineville Zeqa. The Enchanted and The Hive reports cover two members of the six-server release matrix.
+- An official release still needs reports for Galaxite, Lifeboat, and Mineville Zeqa. The Enchanted and The Hive reports cover two members of the five-server release matrix.

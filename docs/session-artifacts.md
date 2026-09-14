@@ -61,4 +61,4 @@ Treat generated folders as read-only during a run. They have the same sensitive-
 
 On The Hive, accept the offered packs, spawn, walk through a populated area for two to three minutes, and interact with an inventory or entity. While connected, confirm that the relevant artifact files appear. Stop with `Ctrl+C`. The agent should check final status, source-sequence coverage, ZIP byte equality, PNG dimensions, and observation files. Report visible lag, incomplete chunks, frozen entities, or errors rather than accepting file existence as proof of a healthy session. A missing optional cape is not an error.
 
-Use `--decrypt-resource-packs` to exercise the existing supported decryption flow and confirm that both original and plaintext ZIPs are present. The six-server release gate remains required.
+Use `--decrypt-resource-packs` to exercise the existing supported decryption flow and confirm that both original and plaintext ZIPs are present. The five-server release gate remains required.

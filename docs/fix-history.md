@@ -92,7 +92,7 @@ Every new entry should state the symptom, root cause, implementation commits, ev
 - Root cause: changing the login state did not re-check packets already received for a later state. A later-phase packet could also sit ahead of the packet that advances the current state.
 - Implementation: `a600bbf`, `7d94229`, `7a64a0d`.
 - Evidence and validation: failed capture `captures/session-20260914T105050Z`, successful older Enchanted capture `captures/session-20260914T124716Z`, [`docs/decisions/0005-deferred-login-packet-drain.md`](decisions/0005-deferred-login-packet-drain.md), and login-order permutation tests.
-- Status: fixed in tests and validated on Enchanted with the earlier state-aware implementation. The latest queue-scan implementation still needs an exact-revision The Hive baseline and a fresh six-server release matrix.
+- Status: fixed in tests and validated on Enchanted with the earlier state-aware implementation. The latest queue-scan implementation still needs an exact-revision The Hive baseline and a fresh five-server release matrix.
 
 ## Ordering safety contract
 
@@ -104,5 +104,5 @@ This is a compatibility guard, not permission to assume a universal Bedrock sequ
 
 - Generate a stamped binary from the current commit and run The Hive minimum baseline.
 - Re-run the direct Enchanted transfer and resource-pack flow with the same binary.
-- Complete the exact-revision matrix for CubeCraft, Galaxite, Lifeboat, Mineville Zeqa, and Enchanted before release.
+- Complete the exact-revision matrix for Galaxite, Lifeboat, Mineville Zeqa, and Enchanted after the The Hive baseline before release.
 - If a server fails, record the capture and classify the failure before changing the generic state machine.
