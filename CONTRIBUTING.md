@@ -41,13 +41,14 @@ This file is the shortest path from a local change to a merge-ready pull request
 
 ## After opening a pull request
 
-1. Confirm both GitHub Actions jobs pass.
-2. Confirm the pull request template identifies the validation impact.
-3. For a runtime change, confirm the The Hive report says `pass` and its `tested_revision` is the exact pull request head commit.
-4. Confirm every flow-specific change was observed directly. `not_observed` means the pull request is still awaiting validation.
-5. Address review findings with focused commits. Do not hide unrelated refactors in a review fix.
-6. If code changes after manual validation, rebuild and repeat the affected live tests. A report for an older commit is not evidence for the new head.
-7. Re-run `tools/quality.ps1` after the final change.
+1. After every push, open the Actions page and inspect the run for the exact commit. Wait for both GitHub Actions jobs to finish. A local quality pass is not a CI result.
+2. If a job fails, inspect its logs, classify the failure, make a focused fix with a new audit record, push again, and repeat. Do not declare the change complete while the exact pushed commit is pending or failing.
+3. Confirm the pull request template identifies the validation impact.
+4. For a runtime change, confirm the The Hive report says `pass` and its `tested_revision` is the exact pull request head commit.
+5. Confirm every flow-specific change was observed directly. `not_observed` means the pull request is still awaiting validation.
+6. Address review findings with focused commits. Do not hide unrelated refactors in a review fix.
+7. If code changes after manual validation, rebuild and repeat the affected live tests. A report for an older commit is not evidence for the new head.
+8. Re-run `tools/quality.ps1` after the final change.
 
 A pull request is merge-ready only when scope and provenance are clear, automated checks pass, required live reports match the head revision, review findings are resolved, documentation is current, and no unexplained protocol or decode anomaly remains.
 
