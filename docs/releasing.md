@@ -10,7 +10,7 @@ When the maintainer says "I want to release", the AI agent should drive this doc
 2. The agent runs the automated quality gate and builds the exact stamped candidate.
 3. The agent asks the maintainer to perform the live Minecraft sessions that cannot be automated. A short instruction should identify the server, target command, actions to perform, approximate duration, and when to press `Ctrl+C`.
 4. The maintainer reports that the session is complete and mentions any visible problem. The agent locates and inspects the closed capture, verifies the revision and evidence, and generates the sanitized report. The maintainer does not need to run report scripts unless they are performing the release without an agent.
-5. After all required sessions, the agent runs the release gate, prepares the checksum and release notes, and reports any exact blocker.
+5. After all required sessions, the agent runs the release gate, prepares the checksum and release notes, and reports any exact blocker. A candidate that adds only allowed Markdown documentation after the matrix may use the documented docs-only equivalence with the original validated runtime revision; the reports themselves must not be edited.
 6. If the maintainer explicitly requested a release, the version is settled, every gate passes, and signing or GitHub access is available, the agent creates and pushes the tag, publishes the release assets, and verifies the result. It must not publish from an incomplete or mismatched validation set.
 7. After the published release is verified, the agent synchronizes the Git-tracked source history, branches, and tags with the private recovery mirror described in section 7. The release is not reported as fully complete until this synchronization and ref check succeed.
 
@@ -112,12 +112,18 @@ The command must print `pass` for all five servers. This gate verifies report st
 
 ## 5. Create the release
 
-Before tagging, confirm the code revision still equals `$revision` and no code changed after testing. If code changed, start again from step 2. Documentation-only handling after validation must still be reviewed explicitly rather than assumed safe. Candidate reports live under the ignored `validation/local/` directory so they do not change the tested Git tree.
+Before tagging, confirm the candidate revision and validation mode. If code, tools, workflows, configuration, generated files, or another non-Markdown path changed after testing, start again from step 2. For a docs-only delta, set `$runtimeRevision` to the exact revision whose binary produced the reports and run the equivalence gate. Review the allowlist output explicitly rather than assuming that a documentation commit is safe. Candidate reports live under the ignored `validation/local/` directory so they do not change the tested Git tree.
 
-Create `release-notes.md` from the reviewed version section in `CHANGELOG.md`. Keep the notes concise and exclude credentials, raw captures, private addresses, resource-pack keys, decrypted assets, and unsupported compatibility claims.
+Create `release-notes.md` from the reviewed version section in `CHANGELOG.md`. When docs-only equivalence is used, identify both the candidate revision and the validated runtime revision. Keep the notes concise and exclude credentials, raw captures, private addresses, resource-pack keys, decrypted assets, and unsupported compatibility claims.
 
 ```powershell
-if ((git rev-parse HEAD).Trim() -ne $revision) { throw "HEAD changed after validation." }
+$revision = (git rev-parse HEAD).Trim()
+$runtimeRevision = "<validated-runtime-40-character-commit>"
+if ($revision -eq $runtimeRevision) {
+    .\tools\check-release-readiness.ps1 -Revision $revision
+} else {
+    .\tools\check-release-readiness.ps1 -Revision $revision -ValidatedRevision $runtimeRevision
+}
 git status --short
 git tag -s "v$version" $revision -m "BedrockDebugProxy v$version"
 git push origin "v$version"
@@ -125,7 +131,7 @@ git push origin "v$version"
 
 Use a signed annotated tag when signing is configured. If it is not configured, stop and make an explicit maintainer decision before using an unsigned annotated tag.
 
-Create a checksum and third-party license bundle for the exact tested Windows binary, then create the GitHub release from that exact tag. Include concise release notes, the supported Bedrock and protocol version, important limitations, automated check status, the five-server validation result, the tested binary and checksum, the project license and notices, the generated dependency license bundle, and the sanitized JSON reports as small release assets. Do not attach raw captures or captured third-party content.
+Create a checksum and third-party license bundle for the candidate Windows binary, then create the GitHub release from that exact tag. In docs-only mode, the sanitized reports come from `$validationRevision` and the notes must state that live evidence was inherited from `$runtimeRevision`; do not describe the candidate binary as having been run in those sessions. Include concise release notes, the supported Bedrock and protocol version, important limitations, automated check status, the five-server validation result, the candidate binary and checksum, the project license and notices, the generated dependency license bundle, and the sanitized JSON reports as small release assets. Do not attach raw captures or captured third-party content.
 
 ```powershell
 $binary = (Resolve-Path .\bin\bedrock-debug-proxy.exe).Path
@@ -134,9 +140,10 @@ $hashLine = "{0}  {1}" -f `
     ((Get-FileHash -Algorithm SHA256 -LiteralPath $binary).Hash.ToLowerInvariant()), `
     (Split-Path -Leaf $binary)
 [System.IO.File]::WriteAllText($checksumFile, $hashLine, [System.Text.Encoding]::ASCII)
-$licenseBundle = ".\validation\local\$revision\THIRD_PARTY_LICENSES.txt"
+$validationRevision = if ($revision -eq $runtimeRevision) { $revision } else { $runtimeRevision }
+$licenseBundle = ".\validation\local\$validationRevision\THIRD_PARTY_LICENSES.txt"
 .\tools\collect-third-party-licenses.ps1 -Output $licenseBundle
-$reportAssets = @(Get-ChildItem ".\validation\local\$revision" -File -Filter "*.json" | ForEach-Object FullName)
+$reportAssets = @(Get-ChildItem ".\validation\local\$validationRevision" -File -Filter "*.json" | ForEach-Object FullName)
 $releaseAssets = @(
     $binary
     $checksumFile
@@ -161,11 +168,11 @@ The release notes file must be reviewed and must not contain credentials, server
 4. Confirm the README quick start matches the released CLI.
 5. Record any external outage, known limitation, or pending compatibility investigation in the release notes instead of silently omitting it.
 
-A release is complete only after the published tag, binary metadata, reports, release notes, and verified recovery mirror all identify the same tested revision.
+A release is complete only after the published tag, binary metadata, reports, release notes, and verified recovery mirror identify the candidate revision and, when docs-only equivalence is used, the separately stated validated runtime revision.
 
 ## 7. Synchronize the source-history backup
 
-The private repository [`NhanAZ/BedrockDebugProxy-Backup`](https://github.com/NhanAZ/BedrockDebugProxy-Backup) is a recovery mirror for Git-tracked source and history. After the release has been verified, push all local branches and tags to this remote and verify that its default branch points to the tested revision.
+The private repository [`NhanAZ/BedrockDebugProxy-Backup`](https://github.com/NhanAZ/BedrockDebugProxy-Backup) is a recovery mirror for Git-tracked source and history. After the release has been verified, push all local branches and tags to this remote and verify that its default branch points to the candidate revision.
 
 Do not mirror ignored captures, authentication state, resource-pack keys, private keys, build output, or other local artifacts. GitHub Release assets are not copied by Git pushes and remain attached to the release itself.
 

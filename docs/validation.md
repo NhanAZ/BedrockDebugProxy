@@ -79,7 +79,8 @@ Add `--decrypt-resource-packs` only when the change or release test explicitly n
 
 ## Release gate
 
-Every official release requires a full client session and a revision-matched report for each baseline server.
+Every official release requires a full client session and a report tied to a validated runtime revision for each
+baseline server.
 
 - The Hive
 - Galaxite
@@ -91,4 +92,28 @@ For each server, check connection, authentication, resource packs when offered, 
 
 A baseline failure starts an investigation. Determine whether the cause is a proxy bug, protocol misunderstanding, valid server behavior, or an external outage before changing code. Do not add a server-specific workaround merely to make the release matrix green. If an external condition prevents testing, retain an `incomplete` report and keep the release not ready until the maintainer explicitly resolves the gate.
 
-After generating all five reports for one revision, run `tools/check-release-readiness.ps1 -Revision <40-character-commit>`. It checks that every required label has a passing report with automatic and manual gates for that exact revision. It does not replace human review of the local captures.
+After generating all five reports for one runtime revision, run
+`tools/check-release-readiness.ps1 -Revision <40-character-commit>`. It checks that every required label has a
+passing report with automatic and manual gates for that exact revision. It does not replace human review of the
+local captures.
+
+### Documentation-only release delta
+
+If a candidate is created after the live matrix and the committed diff from the validated runtime revision to
+the candidate contains only Markdown documentation, the existing reports may be reused without changing their
+`tested_revision`. This is an explicit evidence-preserving exception, not permission to edit report facts. The
+validated revision must be an ancestor of the candidate, and the checker must verify that the diff contains only
+Markdown files in the root release documents or `docs/`.
+
+Run the gate with both revisions:
+
+```powershell
+.\tools\check-release-readiness.ps1 `
+    -Revision <candidate-40-character-commit> `
+    -ValidatedRevision <runtime-40-character-commit>
+```
+
+The release notes and audit record must identify the candidate and validated runtime revisions. Any change to
+code, tools, workflows, configuration, generated files, or another non-Markdown path requires a fresh exact-
+revision matrix. The exception still requires a clean tree, quality gate, build, CI, documentation review, and
+the normal release and backup checks.
