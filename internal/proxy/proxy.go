@@ -808,6 +808,9 @@ func (r *Runner) forward(source, destination *minecraft.Conn, failures *bedrock.
 		if err := failures.Err(); err != nil {
 			return err
 		}
+		if err := r.config.Recorder.Err(); err != nil {
+			return err
+		}
 		var rawRead *minecraft.PacketRead
 		var decoded packet.Packet
 		var err error
@@ -1036,7 +1039,7 @@ func (r *Runner) recordForwardTiming(decodedEvent capture.Event, direction captu
 		WriteMode:                 writeMode,
 		FlushMode:                 flushMode,
 		FlushDurationNano:         flushDuration.Nanoseconds(),
-		Measurement:               "bridge operation durations; automatic flush completion is represented by subsequent transport.payload events",
+		Measurement:               "bridge read, capture submission, and write durations; capture submission includes queue backpressure but not writer commit; automatic flush completion is represented by subsequent transport.payload events",
 	})
 	if err != nil {
 		return fmt.Errorf("encode forward timing for %s: %w", name, err)

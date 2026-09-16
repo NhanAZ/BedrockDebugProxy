@@ -8,6 +8,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"strconv"
 	"strings"
 	"testing"
 	"time"
@@ -260,6 +261,71 @@ func TestRecordReaderStreamsAndDeduplicatesBlobs(t *testing.T) {
 	}
 	if manifest.Counts.Events != 2 || manifest.Counts.Blobs != 1 || manifest.Counts.BlobBytes != 7 {
 		t.Fatalf("counts = %#v", manifest.Counts)
+	}
+}
+
+func TestRecorderAsyncWriterPreservesBurstOrder(t *testing.T) {
+	root := filepath.Join(t.TempDir(), "capture")
+	recorder, err := New(root, Options{WriterQueueCapacity: 8})
+	if err != nil {
+		t.Fatal(err)
+	}
+	const count = 2000
+	for index := 0; index < count; index++ {
+		data := json.RawMessage(fmt.Sprintf(`{"index":%d}`, index))
+		payload := []byte(fmt.Sprintf("payload-%d", index))
+		if _, err := recorder.Record(context.Background(), Record{
+			Event: Event{Kind: "packet.raw", Data: data},
+			Raw:   payload,
+		}); err != nil {
+			t.Fatalf("Record(%d) error = %v", index, err)
+		}
+	}
+	if err := recorder.Close("closed", nil); err != nil {
+		t.Fatal(err)
+	}
+
+	seen := 0
+	if err := ScanEvents(root, func(event Event) error {
+		seen++
+		if strconv.FormatUint(event.Sequence, 10) != strconv.Itoa(seen) {
+			return fmt.Errorf("event sequence = %d, want %d", event.Sequence, seen)
+		}
+		var value struct {
+			Index int `json:"index"`
+		}
+		if err := json.Unmarshal(event.Data, &value); err != nil {
+			return err
+		}
+		if value.Index != seen-1 {
+			return fmt.Errorf("event index = %d, want %d", value.Index, seen-1)
+		}
+		return nil
+	}); err != nil {
+		t.Fatal(err)
+	}
+	if seen != count {
+		t.Fatalf("events = %d, want %d", seen, count)
+	}
+	manifest, err := ReadManifest(root)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if manifest.Counts.Events != count || manifest.Counts.Blobs != count {
+		t.Fatalf("counts = %#v, want %d events and blobs", manifest.Counts, count)
+	}
+	if manifest.Options.Values["capture_writer"] != "ordered_async" {
+		t.Fatalf("writer mode = %q", manifest.Options.Values["capture_writer"])
+	}
+	if manifest.Options.Values["capture_writer_queue_peak_records"] == "0" {
+		t.Fatal("writer queue peak was not recorded")
+	}
+	verification, err := Verify(root)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(verification.Issues) != 0 {
+		t.Fatalf("Verify() issues = %v", verification.Issues)
 	}
 }
 

@@ -41,7 +41,7 @@ Gophertunnel is isolated in the Bedrock adapter and proxy packages. The capture 
 
 Decoded data never replaces raw data. A missing decode creates an explicit error or unknown event and does not remove the raw event.
 
-The recorder uses blocking writes by default. If a future asynchronous mode drops, truncates, samples, or rejects data, it must emit a visible limit event and update final completeness counters.
+The recorder uses one bounded ordered asynchronous writer by default. Capture submission blocks only when the queue reaches its configured capacity. The writer never drops, samples, truncates, or reorders accepted events. Queue capacity, blocking policy, loss policy, and peak occupancy are recorded in manifest values. A writer failure marks the capture incomplete and is surfaced to the forwarding path.
 
 Every event receives a process-monotonic elapsed time, UTC wall time, and monotonically increasing sequence number. Connection, hop, channel, endpoints, and logical direction remain explicit.
 

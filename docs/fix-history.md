@@ -134,6 +134,14 @@ Every new entry should state the symptom, root cause, implementation commits, ev
 - Evidence and validation: Enchanted capture `captures/session-20260916T053620Z` selected `factions-spawn.factions.connect.enchanted.gg:19132`; hop 2 recorded seven URL pack archives, reached `session.spawned`, and then received the upstream `You were kicked: Timed out` message. The capture had zero dropped, truncated, decode, or write errors. The concurrency regression test uses a barrier-backed HTTP fixture to prove overlapping downloads and stable offer order.
 - Status: implemented with focused automated tests; a new stamped live Enchanted transfer and The Hive baseline are required before release approval.
 
+### FIX-0016 - Asynchronous bounded capture writer
+
+- Symptom: Galaxite could send a dense `UpdateBlock` burst while the proxy synchronously wrote raw, decoded, and timing events. The forwarding path then stalled long enough for the client to receive `You moved too slow`, while the direct client did not show the same behavior.
+- Root cause: every capture event held the recorder ordering lock through blob hashing, temporary-file publication, JSON encoding, and event-stream writes. High-volume server-to-client traffic therefore blocked unrelated client-to-server forwarding callbacks behind disk I/O.
+- Implementation: capture events now receive their sequence at submission and enter one bounded ordered writer queue. The queue has blocking backpressure, a configurable record and byte budget, and a `never_drop` loss policy. `RecordReader` drains queued events before streaming a barrier-sensitive blob, `Close` drains accepted jobs before publishing the final manifest, and writer failures are exposed through `Recorder.Err` and the forwarding loop.
+- Evidence and validation: Galaxite capture `captures/session-20260916T060203Z` at revision `320478f65db244c8b4d8be05e756e2c7774289db` retained 489,910 events and 93,790 blobs with no drops, but recorded 40,259 `UpdateBlock` packets and rare 596 to 738 ms capture/write stalls before the `You moved too slow` bridge write failure. The burst-order regression test verifies sequence continuity, blob integrity, manifest queue metadata, and closed-capture verification.
+- Status: implemented with automated tests; a new stamped Galaxite run and the five-server release matrix are required before release approval.
+
 ## Ordering safety contract
 
 The deferred-packet change is deliberately narrow. `expectedIDs` remains the only authority for what the current login state accepts. The queue scan selects the earliest packet that is currently expected, leaves packets for later states queued, and never mutates or reorders bytes on the wire. The regression tests cover canonical resource-pack order, featured early `ResourcePacksInfo`, a later-phase packet queued ahead of the current phase, and all six permutations of the three login packets.
