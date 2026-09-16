@@ -1,7 +1,8 @@
 [CmdletBinding()]
 param(
     [string]$Revision = "",
-    [string]$Reports = "validation"
+    [string]$Reports = "validation",
+    [string]$ValidatedRevision = ""
 )
 
 $ErrorActionPreference = "Stop"
@@ -28,6 +29,39 @@ try {
         throw "Revision must be an exact lowercase 40-character Git commit."
     }
 
+    $reportRevision = $Revision
+    $docsOnlyMode = -not [string]::IsNullOrWhiteSpace($ValidatedRevision)
+    if ($docsOnlyMode) {
+        if ($ValidatedRevision -notmatch '^[0-9a-f]{40}$') {
+            throw "ValidatedRevision must be an exact lowercase 40-character Git commit."
+        }
+        & git cat-file -e "$ValidatedRevision^{commit}"
+        if ($LASTEXITCODE -ne 0) {
+            throw "ValidatedRevision does not identify an existing Git commit."
+        }
+        & git cat-file -e "$Revision^{commit}"
+        if ($LASTEXITCODE -ne 0) {
+            throw "Revision does not identify an existing Git commit."
+        }
+        & git merge-base --is-ancestor $ValidatedRevision $Revision
+        if ($LASTEXITCODE -ne 0) {
+            throw "ValidatedRevision must be an ancestor of Revision."
+        }
+
+        $changedPaths = @(& git diff --name-only --diff-filter=ACDMRTUXB "$ValidatedRevision..$Revision")
+        if ($LASTEXITCODE -ne 0) {
+            throw "Could not inspect the candidate revision diff."
+        }
+        $nonDocumentationPaths = @($changedPaths | Where-Object {
+                $_ -and $_ -notmatch '^(AGENTS|CHANGELOG|CONTRIBUTING)\.md$' -and $_ -notmatch '^docs/.+\.md$'
+            })
+        if ($nonDocumentationPaths.Count -ne 0) {
+            throw "ValidatedRevision can only be reused when every candidate change is Markdown documentation. Disallowed paths: $([string]::Join(', ', $nonDocumentationPaths))"
+        }
+        $reportRevision = $ValidatedRevision
+        Write-Host "Docs-only validation equivalence: candidate $Revision reuses reports from runtime revision $ValidatedRevision."
+    }
+
     $reportsPath = if ([System.IO.Path]::IsPathRooted($Reports)) {
         [System.IO.Path]::GetFullPath($Reports)
     } else {
@@ -47,7 +81,7 @@ try {
         if ([string]$report.schema -ne "bedrockdebugproxy.validation.v1") {
             continue
         }
-        if ([string]$report.tested_revision -ne $Revision) {
+        if ([string]$report.tested_revision -ne $reportRevision) {
             continue
         }
         $server = [string]$report.target_server
@@ -83,9 +117,13 @@ try {
 
     $rows | Format-Table -AutoSize
     if ($failures.Count -ne 0) {
-        throw "Release validation is incomplete for revision $Revision. $([string]::Join(', ', $failures))"
+        throw "Release validation is incomplete for runtime revision $reportRevision (candidate $Revision). $([string]::Join(', ', $failures))"
     }
-    Write-Host "Release validation is complete for revision $Revision."
+    if ($docsOnlyMode) {
+        Write-Host "Release validation is complete for candidate $Revision using runtime revision $reportRevision."
+    } else {
+        Write-Host "Release validation is complete for revision $Revision."
+    }
 } finally {
     Pop-Location
 }
