@@ -21,6 +21,7 @@ The remaining sections retain the complete manual procedure so another developer
 1. Decide the semantic version, such as `0.1.0`, and set it for the commands below.
 2. Confirm the intended release commit is on `main`, all required pull requests are merged, and the working tree is clean.
 3. Review user-visible changes, protocol support, known limitations, license notices, and documentation. Do not mix a last-minute refactor or protocol update into release preparation.
+4. Review [`CHANGELOG.md`](../CHANGELOG.md). Confirm that `Unreleased` covers every user-visible change since the latest release, then move those entries into a dated version section for the candidate. Leave a new empty `Unreleased` section for subsequent work. Audit records provide detailed evidence but are not a substitute for this summary.
 
 ```powershell
 $version = "0.1.0"
@@ -112,6 +113,8 @@ The command must print `pass` for all five servers. This gate verifies report st
 ## 5. Create the release
 
 Before tagging, confirm the code revision still equals `$revision` and no code changed after testing. If code changed, start again from step 2. Documentation-only handling after validation must still be reviewed explicitly rather than assumed safe. Candidate reports live under the ignored `validation/local/` directory so they do not change the tested Git tree.
+
+Create `release-notes.md` from the reviewed version section in `CHANGELOG.md`. Keep the notes concise and exclude credentials, raw captures, private addresses, resource-pack keys, decrypted assets, and unsupported compatibility claims.
 
 ```powershell
 if ((git rev-parse HEAD).Trim() -ne $revision) { throw "HEAD changed after validation." }

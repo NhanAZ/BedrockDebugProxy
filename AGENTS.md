@@ -153,6 +153,8 @@ Documentation must explain observable behavior, trust boundaries, storage format
 
 Update documentation in the same commit as the behavior it describes whenever possible.
 
+Maintain the root [`CHANGELOG.md`](CHANGELOG.md) as a concise, user-facing release history. When a coherent change affects user-visible behavior, protocol support, CLI usage, compatibility, capture semantics, security posture, or release workflow, add or revise its entry under `Unreleased` in the same commit. Internal-only tests, formatting, audit records, and other changes with no user-facing effect do not need a changelog entry. Do not put credentials, captures, resource-pack keys, decrypted assets, or other sensitive data in the changelog. Changelog entries summarize; audit records remain the evidence-backed per-commit record.
+
 ## Go conventions
 
 Use standard Go style and `gofmt`. Keep packages cohesive and names direct. Accept `context.Context` for cancellable or long-running work. Return errors with useful operation context and preserve underlying errors for inspection.

@@ -2,6 +2,8 @@
 
 Commit audit records give an AI agent or maintainer a short, evidence-backed explanation of what a commit means without requiring it to infer intent from a diff alone.
 
+Audit records are not the user-facing changelog. Add concise release-relevant entries to the root [`CHANGELOG.md`](../../CHANGELOG.md) for user-visible changes, while keeping technical evidence, provenance, validation, limitations, and follow-up work in the audit record.
+
 ## Policy
 
 Every authored non-merge commit includes exactly one Markdown record whose filename contains a stable change ID such as `AUDIT-0001` in this directory. `README.md` and `template.md` are policy support files, not commit records. Documentation-only and formatting-only commits use the same format and explicitly state that runtime behavior is unchanged. Historical commits before this policy are not rewritten. Their history remains in Git and their evidence remains in the existing research notes, architecture decisions, captures, and validation reports.
