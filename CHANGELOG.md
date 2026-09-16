@@ -1,6 +1,8 @@
 # Changelog
 
-All notable changes to BedrockDebugProxy are documented in this file. Entries are grouped by user-visible or release-relevant change rather than repeated for every internal commit. Detailed evidence and rationale remain in commit audit records under [`docs/audits/`](docs/audits/).
+All notable changes to BedrockDebugProxy are documented in this single file. Each release keeps a concise, curated
+summary here, while GitHub's compare view and the commit audit records provide the complete history and evidence.
+Detailed rationale remains in [`docs/audits/`](docs/audits/).
 
 ## [Unreleased]
 
@@ -9,7 +11,15 @@ All notable changes to BedrockDebugProxy are documented in this file. Entries ar
 - Added weekly Dependabot checks for the root Go module and GitHub Actions, with grouped non-major Go updates and no automatic merge.
 - Added a weekly Mojang protocol release watcher that opens a deduplicated investigation issue without changing protocol code automatically.
 
+### Release process
+
+- Release notes now link to the relevant section in this changelog and to GitHub's compare view for the complete release commit history.
+
 ## [0.2.0] - 2026-09-16
+
+Supported Bedrock version: 1.26.50 (protocol 2193).
+
+[Published release](https://github.com/NhanAZ/BedrockDebugProxy/releases/tag/v0.2.0) | [All changes since v0.1.0](https://github.com/NhanAZ/BedrockDebugProxy/compare/v0.1.0...v0.2.0)
 
 ### Added
 
@@ -32,5 +42,7 @@ All notable changes to BedrockDebugProxy are documented in this file. Entries ar
 - Release workflow documentation now requires synchronization with the private source-history backup after a published release.
 
 ## [0.1.0] - 2026-09-14
+
+[Published release](https://github.com/NhanAZ/BedrockDebugProxy/releases/tag/v0.1.0)
 
 - Initial public release.
