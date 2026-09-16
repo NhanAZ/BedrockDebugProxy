@@ -94,6 +94,14 @@ Every new entry should state the symptom, root cause, implementation commits, ev
 - Evidence and validation: failed capture `captures/session-20260914T105050Z`, successful older Enchanted capture `captures/session-20260914T124716Z`, [`docs/decisions/0005-deferred-login-packet-drain.md`](decisions/0005-deferred-login-packet-drain.md), and login-order permutation tests.
 - Status: fixed in tests and validated on Enchanted with the earlier state-aware implementation. The latest queue-scan implementation still needs an exact-revision The Hive baseline and a fresh five-server release matrix.
 
+### FIX-0011 - Bedrock 1.26.50 protocol 2193 support
+
+- Symptom: a client or server running Bedrock 1.26.50 could use packet IDs and layouts that the 1.26.45 protocol model did not represent correctly.
+- Root cause: the latest stable gophertunnel release predates Bedrock 1.26.50, while its 1.26.50 feature branch diverges before later stable fixes and cannot safely replace the selected tree wholesale.
+- Implementation: this coherent protocol-update commit; see [`AUDIT-0008`](audits/AUDIT-0008-protocol-1.26.50.md) and Git history.
+- Evidence and validation: [`docs/research/protocol-1.26.50.md`](research/protocol-1.26.50.md), Mojang's released schemas, reviewed gophertunnel revisions, and focused metadata, packet-pool, and binary-body tests.
+- Status: implemented with the full project quality gate and nested gophertunnel tests passing. A stamped exact-revision The Hive report remains required before the runtime change is complete.
+
 ## Ordering safety contract
 
 The deferred-packet change is deliberately narrow. `expectedIDs` remains the only authority for what the current login state accepts. The queue scan selects the earliest packet that is currently expected, leaves packets for later states queued, and never mutates or reorders bytes on the wire. The regression tests cover canonical resource-pack order, featured early `ResourcePacksInfo`, a later-phase packet queued ahead of the current phase, and all six permutations of the three login packets.

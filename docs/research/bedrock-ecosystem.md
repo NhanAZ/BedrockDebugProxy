@@ -19,9 +19,10 @@ The canonical capture will be an append-only directory containing a manifest, an
 
 ### Sandertv gophertunnel
 
-- Source reviewed at [`283a5a97dfe65da94bcc0b401807f6aefa9e72ee`](https://github.com/Sandertv/gophertunnel/tree/283a5a97dfe65da94bcc0b401807f6aefa9e72ee), tagged `v1.61.0`
+- Stable source reviewed at [`283a5a97dfe65da94bcc0b401807f6aefa9e72ee`](https://github.com/Sandertv/gophertunnel/tree/283a5a97dfe65da94bcc0b401807f6aefa9e72ee), tagged `v1.61.0`
+- The current in-tree protocol source also includes reviewed Bedrock 1.26.50 changes through [`481f3bd138766304a73d7a0412a47a87acec15ed`](https://github.com/Sandertv/gophertunnel/tree/481f3bd138766304a73d7a0412a47a87acec15ed) and the sound-data correction through [`b8bd7357c24fcba3e32f940d1afb1d3b4e43b96d`](https://github.com/Sandertv/gophertunnel/tree/b8bd7357c24fcba3e32f940d1afb1d3b4e43b96d)
 - License is MIT
-- Current packet constants at this revision are protocol `2169` and game version `1.26.45`
+- Current selected packet constants are protocol `2193` and game version `1.26.50`; the update evidence is in [`protocol-1.26.50.md`](protocol-1.26.50.md)
 - The module requires Go 1.25 or newer
 - Exact implementation evidence is in [`minecraft/dial.go`](https://github.com/Sandertv/gophertunnel/blob/283a5a97dfe65da94bcc0b401807f6aefa9e72ee/minecraft/dial.go), [`minecraft/listener.go`](https://github.com/Sandertv/gophertunnel/blob/283a5a97dfe65da94bcc0b401807f6aefa9e72ee/minecraft/listener.go), [`minecraft/packet.go`](https://github.com/Sandertv/gophertunnel/blob/283a5a97dfe65da94bcc0b401807f6aefa9e72ee/minecraft/packet.go), [`minecraft/conn.go`](https://github.com/Sandertv/gophertunnel/blob/283a5a97dfe65da94bcc0b401807f6aefa9e72ee/minecraft/conn.go), and [`minecraft/network.go`](https://github.com/Sandertv/gophertunnel/blob/283a5a97dfe65da94bcc0b401807f6aefa9e72ee/minecraft/network.go)
 - The `Transfer` packet contract is defined in [`minecraft/protocol/packet/transfer.go`](https://github.com/Sandertv/gophertunnel/blob/283a5a97dfe65da94bcc0b401807f6aefa9e72ee/minecraft/protocol/packet/transfer.go). It carries a hostname, UDP port, `ReloadWorld`, and optional gathering information; the client normally disconnects and joins the target.
