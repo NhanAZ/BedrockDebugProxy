@@ -6,6 +6,12 @@ Minecraft Bedrock protocol updates are evidence changes, not dependency-refresh 
 
 Use this workflow for a gophertunnel upgrade, a new Bedrock release, a packet definition change, or a regression that first appears after either one.
 
+## Automated release signal
+
+The [`check-mojang-protocol.yml`](../.github/workflows/check-mojang-protocol.yml) workflow checks the latest non-prerelease GitHub Release in [Mojang/bedrock-protocol-docs](https://github.com/Mojang/bedrock-protocol-docs) each week and can be run manually. It compares the release tag and any network protocol version stated in the release notes with the baseline in this document. When either value differs, it opens one deduplicated issue containing the release URL and resolved tag commit.
+
+The workflow is a notification mechanism only. It does not copy schemas, update dependencies, edit packet code, or claim that a protocol update is required. Treat its issue as a report to triage, verify the release tag and schemas, record research evidence, and then follow the update procedure below. A release issue does not replace focused tests or the live validation gates.
+
 ## Current baseline
 
 The baseline introduced by the Bedrock 1.26.50 protocol update is:

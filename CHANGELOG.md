@@ -7,6 +7,7 @@ All notable changes to BedrockDebugProxy are documented in this file. Entries ar
 ### Documentation and maintenance
 
 - Added weekly Dependabot checks for the root Go module and GitHub Actions, with grouped non-major Go updates and no automatic merge.
+- Added a weekly Mojang protocol release watcher that opens a deduplicated investigation issue without changing protocol code automatically.
 
 ## [0.2.0] - 2026-09-16
 
