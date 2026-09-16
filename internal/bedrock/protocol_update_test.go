@@ -123,3 +123,72 @@ func TestPlayerInventoryActionRoundTripIncludesHand(t *testing.T) {
 		t.Fatalf("positions shifted after hand: got position %v/%v, want %v/%v", got.Position, got.ClickedPosition, want.Position, want.ClickedPosition)
 	}
 }
+
+func TestSubChunkHeightMapRoundTripUsesRows(t *testing.T) {
+	var want protocol.HeightMap
+	for z := range want {
+		for x := range want[z] {
+			want[z][x] = int8(z*16 + x - 128)
+		}
+	}
+	wantEntry := protocol.SubChunkEntry{
+		Offset:        protocol.SubChunkOffset{1, -2, 3},
+		Result:        protocol.SubChunkResultSuccess,
+		HeightMapType: protocol.HeightMapDataHasData,
+		HeightMapData: protocol.Option(want),
+	}
+
+	var encoded bytes.Buffer
+	wantEntry.Marshal(protocol.NewWriter(&encoded, 0))
+	data := encoded.Bytes()
+	if got, want := len(data), 282; got != want {
+		t.Fatalf("encoded sub-chunk entry length = %d, want %d", got, want)
+	}
+	// The height map begins after the offset, result, raw-payload option,
+	// height-map selector, and height-map option. Each row starts with its
+	// varuint32 length before the 16 signed heights.
+	if got, want := data[7], byte(16); got != want {
+		t.Fatalf("first height-map row length = %d, want %d", got, want)
+	}
+	if got, want := data[8], byte(0x80); got != want {
+		t.Fatalf("first height-map value byte = %#x, want %#x", got, want)
+	}
+	if got, want := data[24], byte(16); got != want {
+		t.Fatalf("second height-map row length = %d, want %d", got, want)
+	}
+	if got, want := data[25], byte(0x90); got != want {
+		t.Fatalf("second height-map value byte = %#x, want %#x", got, want)
+	}
+
+	var gotEntry protocol.SubChunkEntry
+	raw := bytes.NewReader(data)
+	gotEntry.Marshal(protocol.NewReader(raw, 0, true))
+	if raw.Len() != 0 {
+		t.Fatalf("sub-chunk entry left %d bytes", raw.Len())
+	}
+	got, ok := gotEntry.HeightMapData.Value()
+	if !ok {
+		t.Fatal("decoded height map is not set")
+	}
+	if got != want {
+		t.Fatalf("decoded height map differs from input")
+	}
+}
+
+func TestSubChunkHeightMapRejectsWrongRowLength(t *testing.T) {
+	// Keep enough bytes for the former flat-slice decoder to succeed. The
+	// row-aware decoder must reject the first row before consuming its values.
+	data := make([]byte, 282)
+	data[5] = protocol.HeightMapDataHasData
+	data[6] = 1
+	data[7] = 15
+	data[279] = protocol.HeightMapDataNone
+
+	defer func() {
+		if recovered := recover(); recovered == nil {
+			t.Fatal("decoding accepted a height-map row whose length was not 16")
+		}
+	}()
+	var entry protocol.SubChunkEntry
+	entry.Marshal(protocol.NewReader(bytes.NewReader(data), 0, true))
+}
