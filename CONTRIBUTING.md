@@ -42,7 +42,7 @@ This file is the shortest path from a local change to a merge-ready pull request
 
 ## Review comment style
 
-Pull request comments are public maintainer communication. Post from the maintainer account only when the maintainer has explicitly authorized it, and write in a natural, respectful first-person voice that matches the evidence reviewed. Dependabot pull requests are bot-authored maintenance proposals, so routine comments should be brief and should state the decision and its main reason. Use a longer explanation only when audit or debugging requires it. Prefer complete sentences, periods, or `and` over semicolons, and avoid label-style fragments such as `Status: explanation`.
+Pull request comments are public maintainer communication. Post from the maintainer account only when the maintainer has explicitly authorized it, and write in a natural, respectful first-person voice that matches the evidence reviewed. Dependabot pull requests are bot-authored maintenance proposals, so routine comments should be brief and should state the decision and its main reason. Do not address the bot as a human contributor with greetings, thanks, or other social language. Use a longer explanation only when audit or debugging requires it. Prefer complete sentences, periods, or `and` over semicolons, and avoid label-style fragments such as `Status: explanation`.
 
 ## Dependency update pull requests
 
