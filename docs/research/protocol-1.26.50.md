@@ -1,6 +1,6 @@
 # Bedrock 1.26.50 protocol update
 
-Reviewed on 2026-09-16.
+Reviewed on 2026-09-17.
 
 ## Decision
 
@@ -11,17 +11,20 @@ The in-tree gophertunnel source is a reviewed composite rather than a direct che
 - stable base `v1.61.0` at [`283a5a97dfe65da94bcc0b401807f6aefa9e72ee`](https://github.com/Sandertv/gophertunnel/tree/283a5a97dfe65da94bcc0b401807f6aefa9e72ee)
 - upstream `feature/26.50` through [`481f3bd138766304a73d7a0412a47a87acec15ed`](https://github.com/Sandertv/gophertunnel/tree/481f3bd138766304a73d7a0412a47a87acec15ed)
 - upstream master correction through [`b8bd7357c24fcba3e32f940d1afb1d3b4e43b96d`](https://github.com/Sandertv/gophertunnel/tree/b8bd7357c24fcba3e32f940d1afb1d3b4e43b96d)
+- merged upstream `v1.62.0` at [`7a556a07335b663744b50d38062636ad8283f314`](https://github.com/Sandertv/gophertunnel/tree/7a556a07335b663744b50d38062636ad8283f314), including the final 1.26.50 corrections reviewed below
 
-The 1.26.50 feature branch diverged before the final `v1.61.0` fixes. Replacing the stable tree wholesale would have regressed the optional `FilteredCustomName` encoding in item stacks. The selected approach merges the reviewed 1.26.50 changes onto the stable base and preserves the project-specific compatibility hooks documented in [`third_party/gophertunnel/BEDROCKDEBUGPROXY_PATCH.md`](../../third_party/gophertunnel/BEDROCKDEBUGPROXY_PATCH.md).
+The earlier 1.26.50 feature branch diverged before the final `v1.61.0` fixes. The selected in-tree copy remains a reviewed composite rather than a wholesale checkout of `v1.62.0`, because it must preserve the stable item-stack fix and the project-specific transfer, observation, and go-raknet hooks documented in [`third_party/gophertunnel/BEDROCKDEBUGPROXY_PATCH.md`](../../third_party/gophertunnel/BEDROCKDEBUGPROXY_PATCH.md). The final `v1.62.0` merge is used as the reference for the remaining protocol corrections.
 
 ## Evidence table
 
 | Claim | Primary evidence | Independent implementation evidence | Decision |
 | --- | --- | --- | --- |
-| Bedrock 1.26.50 uses protocol 2193 | Mojang [`bedrock-protocol-docs` release `v1.26.50`](https://github.com/Mojang/bedrock-protocol-docs/tree/v1.26.50) at `c0bd91f7d896cec780f1185cc548b5e46a46f5d5`. Released schemas declare `x-protocol-version` 2193. | gophertunnel commit [`18485d3847098cd1bd8ba0d0644e816d3200337a`](https://github.com/Sandertv/gophertunnel/commit/18485d3847098cd1bd8ba0d0644e816d3200337a) changes the release protocol to 2193. | Set `CurrentProtocol` to 2193 and `CurrentVersion` to `1.26.50`. |
+| Bedrock 1.26.50 uses protocol 2193 | Mojang [`bedrock-protocol-docs` release `v1.26.50`](https://github.com/Mojang/bedrock-protocol-docs/tree/v1.26.50) at `475bd72ed89036af4eb18426774ef3b953de7603`. Released schemas declare `x-protocol-version` 2193. | gophertunnel commit [`18485d3847098cd1bd8ba0d0644e816d3200337a`](https://github.com/Sandertv/gophertunnel/commit/18485d3847098cd1bd8ba0d0644e816d3200337a) changes the release protocol to 2193. | Set `CurrentProtocol` to 2193 and `CurrentVersion` to `1.26.50`. |
 | Packet IDs 351 and 352 represent `SetPlayerFurnaceOptions` and `RecordStarted` | Mojang [`MinecraftPacketIds.json`](https://github.com/Mojang/bedrock-protocol-docs/blob/v1.26.50/json/MinecraftPacketIds.json) and the matching packet schemas. | gophertunnel `feature/26.50` packet definitions and pools. | Register both packets in the direction-specific pools and add exact-body encoding tests. |
 | Existing packet and structure layouts changed in 1.26.50 | Mojang 1.26.50 released schemas for the affected packets and types. | gophertunnel commits from [`e95f6c6026d55625ec40089abac3c0131cb49355`](https://github.com/Sandertv/gophertunnel/commit/e95f6c6026d55625ec40089abac3c0131cb49355) through `481f3bd138766304a73d7a0412a47a87acec15ed`. | Import the reviewed definitions, IDs, readers, writers, and value types without changing capture schema. |
 | `ClientboundUpdateSoundData` has seven required fields in this release | Mojang 1.26.50 `ClientboundUpdateSoundDataPacket` schema. | gophertunnel master commit `b8bd7357c24fcba3e32f940d1afb1d3b4e43b96d`. | Include the required-field correction that is newer than the feature branch head. |
+| Sub-chunk height maps are 16 rows of 16 signed heights | Mojang [`SubChunkHeightmapData.json`](https://github.com/Mojang/bedrock-protocol-docs/blob/v1.26.50/json/SubChunkHeightmapData.json) at `475bd72ed89036af4eb18426774ef3b953de7603` describes a `[z][x]` 16 by 16 `int8` array present for `HasData`. | gophertunnel commit [`709768d`](https://github.com/Sandertv/gophertunnel/commit/709768d) adds a fixed `HeightMap` type and validates each row length on the wire. | Decode both optional height maps as `HeightMap` values with row-length prefixes. Preserve raw packet bytes through the existing same-protocol forwarding path. |
+| Packed item-use inventory actions include `Hand` | Mojang 1.26.50 item-use schemas require the hand field. | gophertunnel commit [`d564b7d`](https://github.com/Sandertv/gophertunnel/commit/d564b7d) adds the packed field. The local tree already contains this path and its regression test. | Do not add a duplicate change. Keep the existing local hand alignment implementation. |
 | NetherNet uses the vanilla identity domain and a URL-shaped server address | Mojang's [Minecraft Bedrock Edition 26.50 changelog](https://feedback.minecraft.net/hc/en-us/articles/48826825649933-Minecraft-Bedrock-Edition-26-50-Changelog-Wilderness-Bound) states that NetherNet is the default networking protocol for dedicated servers. | gophertunnel commit `481f3bd138766304a73d7a0412a47a87acec15ed` changes the identity domain and server-address construction. | Import the transport update while preserving BedrockDebugProxy transfer settings. |
 
 ## Resolved source disagreement
@@ -40,9 +43,9 @@ The regression is covered by `TestPlayerInventoryActionRoundTripIncludesHand` in
 
 ## Imported scope
 
-The update includes current protocol metadata, new furnace and recording packet definitions, packet IDs and pools, changed packet and value serializers, corrected subchunk sizing, reader and writer support, changed disconnect and input values, and the corresponding NetherNet transport update. It does not change the BedrockDebugProxy capture schema or remove unknown-packet and raw-payload representation.
+The update includes current protocol metadata, new furnace and recording packet definitions, packet IDs and pools, changed packet and value serializers, 16-row subchunk height-map decoding, reader and writer support, changed disconnect and input values, and the corresponding NetherNet transport update. The packed item-use `Hand` correction is already present in the local tree. It does not change the BedrockDebugProxy capture schema or remove unknown-packet and raw-payload representation.
 
-The root module retains `github.com/sandertv/gophertunnel v1.61.0` as the declared dependency because the `replace` directive selects the documented in-tree composite. Labeling the feature branch as a later module release would be misleading because it diverged before `v1.61.0`.
+The root module retains `github.com/sandertv/gophertunnel v1.61.0` as the declared dependency because the `replace` directive selects the documented in-tree composite. The composite now incorporates the merged `v1.62.0` protocol corrections without claiming that the local copy is an unmodified upstream checkout. Labeling the old feature branch as a standalone module release would be misleading because it diverged before `v1.61.0`.
 
 ## Provenance and license
 
@@ -55,7 +58,7 @@ Cloudburst, PrismarineJS, Endstone, axolotl-pm, Altay, and BetterAltay were comp
 ## Validation status
 
 - The pre-update project quality gate passed at commit `be9ac1c`.
-- Focused tests verify protocol 2193, game version 1.26.50, packet IDs, direction-specific packet pools, and exact new-packet bodies.
+- Focused tests verify protocol 2193, game version 1.26.50, packet IDs, direction-specific packet pools, exact new-packet bodies, and row-preserving subchunk height-map encoding and decoding.
 - The full project quality gate and nested gophertunnel test suite pass on the prepared source tree.
 - A stamped exact-revision The Hive report is required before this runtime change is complete.
 - Follow-up correction: the stamped binary from the hand-alignment fix must be rechecked on The Hive before the protocol update is considered complete.

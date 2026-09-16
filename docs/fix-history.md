@@ -142,6 +142,14 @@ Every new entry should state the symptom, root cause, implementation commits, ev
 - Evidence and validation: Galaxite capture `captures/session-20260916T060203Z` at revision `320478f65db244c8b4d8be05e756e2c7774289db` retained 489,910 events and 93,790 blobs with no drops, but recorded 40,259 `UpdateBlock` packets and rare 596 to 738 ms capture/write stalls before the `You moved too slow` bridge write failure. The burst-order regression test verifies sequence continuity, blob integrity, manifest queue metadata, and closed-capture verification.
 - Status: implemented with automated tests; a new stamped Galaxite run and the five-server release matrix are required before release approval.
 
+### FIX-0017 - Bedrock 1.26.50 sub-chunk height-map rows
+
+- Symptom: decoded `SubChunk` height maps were represented as a flat 272-byte slice, so row-length prefixes were interpreted as height values and malformed row sizes could not be reported.
+- Root cause: the local 1.26.50 composite retained the pre-`v1.62.0` flat decoder instead of the released upstream `HeightMap` structure.
+- Implementation: `fix: align 1.26.50 subchunk height maps` adds the 16 by 16 `[z][x]int8` type, validates each varuint32 row length, and uses it for both optional sub-chunk height maps. Raw same-protocol forwarding remains unchanged.
+- Evidence and validation: Mojang `bedrock-protocol-docs` `v1.26.50` at `475bd72ed89036af4eb18426774ef3b953de7603`, gophertunnel `v1.62.0` at `7a556a07335b663744b50d38062636ad8283f314`, and upstream correction `709768d`. `TestSubChunkHeightMapRoundTripUsesRows` verifies wire row prefixes and value preservation. A fresh stamped The Hive baseline remains required.
+- Status: implemented with focused automated coverage; exact-revision live validation pending.
+
 ## Ordering safety contract
 
 The deferred-packet change is deliberately narrow. `expectedIDs` remains the only authority for what the current login state accepts. The queue scan selects the earliest packet that is currently expected, leaves packets for later states queued, and never mutates or reorders bytes on the wire. The regression tests cover canonical resource-pack order, featured early `ResourcePacksInfo`, a later-phase packet queued ahead of the current phase, and all six permutations of the three login packets.
