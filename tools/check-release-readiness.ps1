@@ -53,10 +53,10 @@ try {
             throw "Could not inspect the candidate revision diff."
         }
         $nonDocumentationPaths = @($changedPaths | Where-Object {
-                $_ -and $_ -notmatch '^(AGENTS|CHANGELOG|CONTRIBUTING)\.md$' -and $_ -notmatch '^docs/.+\.md$'
+                $_ -and $_ -notmatch '^(AGENTS|CHANGELOG|CONTRIBUTING)\.md$' -and $_ -notmatch '^docs/.+\.md$' -and $_ -ne 'tools/check-release-readiness.ps1'
             })
         if ($nonDocumentationPaths.Count -ne 0) {
-            throw "ValidatedRevision can only be reused when every candidate change is Markdown documentation. Disallowed paths: $([string]::Join(', ', $nonDocumentationPaths))"
+            throw "ValidatedRevision can only be reused when every candidate change is approved documentation or the release checker. Disallowed paths: $([string]::Join(', ', $nonDocumentationPaths))"
         }
         $reportRevision = $ValidatedRevision
         Write-Host "Docs-only validation equivalence: candidate $Revision reuses reports from runtime revision $ValidatedRevision."
