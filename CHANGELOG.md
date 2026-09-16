@@ -10,7 +10,7 @@ Detailed rationale remains in [`docs/audits/`](docs/audits/).
 
 - Added weekly Dependabot checks for the root Go module and GitHub Actions, with grouped non-major Go updates and no automatic merge.
 - Added a weekly Mojang protocol release watcher that opens a deduplicated investigation issue without changing protocol code automatically.
-- Clarified maintainer review-comment guidance for bot-authored dependency pull requests, including concise natural wording and punctuation.
+- Clarified maintainer review-comment guidance for bot-authored dependency pull requests, including concise natural wording, bot-neutral language, and punctuation.
 
 ### Release process
 
