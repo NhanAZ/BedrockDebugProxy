@@ -40,6 +40,10 @@ This file is the shortest path from a local change to a merge-ready pull request
    Follow the capture and report steps in [`docs/validation.md`](docs/validation.md). Upload the sanitized report as a pull request artifact or provide it through the review system without adding it to the candidate commit. Keep the raw capture local.
 9. Push the branch and open the pull request using the repository template. State what changed, what did not change, automated results, manual results, and any remaining uncertainty.
 
+## Review comment style
+
+Pull request comments are public maintainer communication. Post from the maintainer account only when the maintainer has explicitly authorized it, and write in a natural, respectful first-person voice that matches the evidence reviewed. Dependabot pull requests are bot-authored maintenance proposals, so routine comments should be brief and should state the decision and its main reason. Use a longer explanation only when audit or debugging requires it. Prefer complete sentences, periods, or `and` over semicolons, and avoid label-style fragments such as `Status: explanation`.
+
 ## Dependency update pull requests
 
 Dependabot checks the root Go module and GitHub Actions weekly. It does not manage the local `third_party/gophertunnel` or `third_party/go-raknet` modules because those trees contain reviewed project patches. Review every dependency update as a proposed change, not as an automatic approval.
