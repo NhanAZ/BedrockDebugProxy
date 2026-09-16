@@ -103,7 +103,8 @@ If a candidate is created after the live matrix and the committed diff from the 
 the candidate contains only Markdown documentation, the existing reports may be reused without changing their
 `tested_revision`. This is an explicit evidence-preserving exception, not permission to edit report facts. The
 validated revision must be an ancestor of the candidate, and the checker must verify that the diff contains only
-Markdown files in the root release documents or `docs/`.
+Markdown files in the root release documents or `docs/`, plus the release-readiness checker itself when its
+allowlist logic is the only non-documentation change.
 
 Run the gate with both revisions:
 
@@ -114,6 +115,7 @@ Run the gate with both revisions:
 ```
 
 The release notes and audit record must identify the candidate and validated runtime revisions. Any change to
-code, tools, workflows, configuration, generated files, or another non-Markdown path requires a fresh exact-
-revision matrix. The exception still requires a clean tree, quality gate, build, CI, documentation review, and
+product code, tools other than the release checker, workflows, configuration, generated files, or another
+non-approved path requires a fresh exact-revision matrix. The exception still requires a clean tree, quality gate,
+build, CI, documentation review, and
 the normal release and backup checks.

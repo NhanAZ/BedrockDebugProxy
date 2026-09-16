@@ -112,7 +112,7 @@ The command must print `pass` for all five servers. This gate verifies report st
 
 ## 5. Create the release
 
-Before tagging, confirm the candidate revision and validation mode. If code, tools, workflows, configuration, generated files, or another non-Markdown path changed after testing, start again from step 2. For a docs-only delta, set `$runtimeRevision` to the exact revision whose binary produced the reports and run the equivalence gate. Review the allowlist output explicitly rather than assuming that a documentation commit is safe. Candidate reports live under the ignored `validation/local/` directory so they do not change the tested Git tree.
+Before tagging, confirm the candidate revision and validation mode. If product code, tools other than the release checker, workflows, configuration, generated files, or another non-approved path changed after testing, start again from step 2. For a docs-only delta, set `$runtimeRevision` to the exact revision whose binary produced the reports and run the equivalence gate. Review the allowlist output explicitly rather than assuming that a documentation commit is safe. Candidate reports live under the ignored `validation/local/` directory so they do not change the tested Git tree.
 
 Create `release-notes.md` from the reviewed version section in `CHANGELOG.md`. When docs-only equivalence is used, identify both the candidate revision and the validated runtime revision. Keep the notes concise and exclude credentials, raw captures, private addresses, resource-pack keys, decrypted assets, and unsupported compatibility claims.
 
