@@ -14,6 +14,19 @@ The independently implemented decoder accepts the following evidence-backed vari
 
 No fallback cipher, inferred key conversion, alternate header, or missing-file workaround is attempted. An unsupported variant produces a structured derived error while the original archive remains available.
 
+## Pending Mojang documentation review
+
+On 2026-09-17, Mojang's [bedrock-protocol-docs pull request #63](https://github.com/Mojang/bedrock-protocol-docs/pull/63) was still open. Its only file, [`additional_docs/PackEncryption.md`](https://github.com/Mojang/bedrock-protocol-docs/blob/2288c5ba945786a90f7bf78717162cee883e8ce7/additional_docs/PackEncryption.md), is recorded at contributor revision `2288c5ba945786a90f7bf78717162cee883e8ce7` and is not an accepted release specification yet.
+
+The proposed document describes two compatibility details that are not represented by the current decoder:
+
+- `contents.json` and a keyed entry without `type` remain AES-256-CFB8, while a keyed entry with exactly `"type": "stream"` uses AES-256-CTR in 26.50. The current `contentsEntry` has no `type` field, so it would silently apply CFB8 to a stream asset.
+- Header bytes `0x08` through `0x0f` are described as uninterpreted. The current decoder rejects any non-zero value in that range, which is stricter than the proposal.
+
+The proposal also says that the content identity is distinct from the pack UUID and is used to select the server-supplied key. The current production call passes the current connection's `ContentKey` directly and cross-checks identity values between archive manifests, but does not compare them with the advertised content identity at this decoder boundary.
+
+No algorithm change is made from this unmerged proposal alone. If the document is merged or independently corroborated, the smallest follow-up should add explicit asset-mode parsing, AES-256-CTR test vectors and decryption, relax the uninterpreted-header check, and validate the advertised content identity without changing the existing CFB8 path. Until then, an observed `type: "stream"` entry must be treated as an unsupported variant rather than being reported as successfully decrypted.
+
 ## Sources reviewed
 
 | Source | Revision and license | Relevant evidence |
