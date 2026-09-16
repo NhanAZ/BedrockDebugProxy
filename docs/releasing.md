@@ -21,7 +21,7 @@ The remaining sections retain the complete manual procedure so another developer
 1. Decide the semantic version, such as `0.1.0`, and set it for the commands below.
 2. Confirm the intended release commit is on `main`, all required pull requests are merged, and the working tree is clean.
 3. Review user-visible changes, protocol support, known limitations, license notices, and documentation. Do not mix a last-minute refactor or protocol update into release preparation.
-4. Review [`CHANGELOG.md`](../CHANGELOG.md). Confirm that `Unreleased` covers every user-visible change since the latest release, then move those entries into a dated version section for the candidate. Leave a new empty `Unreleased` section for subsequent work. Audit records provide detailed evidence but are not a substitute for this summary.
+4. Review [`CHANGELOG.md`](../CHANGELOG.md). Confirm that `Unreleased` covers every user-visible change since the latest release, then move those entries into a dated version section for the candidate. Keep every version in this one root file. Do not create a separate changelog file for each release. Leave a new empty `Unreleased` section for subsequent work. Audit records provide detailed evidence but are not a substitute for this summary.
 
 ```powershell
 $version = "0.1.0"
@@ -114,7 +114,17 @@ The command must print `pass` for all five servers. This gate verifies report st
 
 Before tagging, confirm the candidate revision and validation mode. If product code, tools other than the release checker, workflows, configuration, generated files, or another non-approved path changed after testing, start again from step 2. For a docs-only delta, set `$runtimeRevision` to the exact revision whose binary produced the reports and run the equivalence gate. Review the allowlist output explicitly rather than assuming that a documentation commit is safe. Candidate reports live under the ignored `validation/local/` directory so they do not change the tested Git tree.
 
-Create `release-notes.md` from the reviewed version section in `CHANGELOG.md`. When docs-only equivalence is used, identify both the candidate revision and the validated runtime revision. Keep the notes concise and exclude credentials, raw captures, private addresses, resource-pack keys, decrypted assets, and unsupported compatibility claims.
+Create `release-notes.md` from the reviewed version section in `CHANGELOG.md`. The release body must link back to the version section in the tagged `CHANGELOG.md` and to GitHub's compare view so users can inspect every commit included in the release. Use this shape and replace the placeholders with the actual version and GitHub heading anchor:
+
+```markdown
+# BedrockDebugProxy v<version>
+
+Please see the [changelog](https://github.com/NhanAZ/BedrockDebugProxy/blob/v<version>/CHANGELOG.md#<version-anchor>) for details.
+
+[View all commits in this release](https://github.com/NhanAZ/BedrockDebugProxy/compare/v<previous-version>...v<version>)
+```
+
+Add the concise release summary, validation, scope, and asset notes below those links. When docs-only equivalence is used, identify both the candidate revision and the validated runtime revision. Keep the notes concise and exclude credentials, raw captures, private addresses, resource-pack keys, decrypted assets, and unsupported compatibility claims.
 
 ```powershell
 $revision = (git rev-parse HEAD).Trim()
