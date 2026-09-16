@@ -151,7 +151,7 @@ An exported `.bdpcap` is a portable copy, not a redacted copy. It can contain al
 
 ## Status and limitations
 
-The project currently uses gophertunnel `v1.61.0` with documented featured-experience spawn and login-order compatibility patches and supports one downstream client. With `--follow-transfers`, subsequent upstream hops remain in the same process and capture session. Automated tests include a full local RakNet session and focused tests for capture integrity, representative packet preservation, Experience response parsing, and transport capability preservation.
+The project currently supports Bedrock 1.26.50, protocol 2193, through a documented merge of gophertunnel `v1.61.0`, reviewed upstream 1.26.50 changes, and local featured-experience compatibility patches. It supports one downstream client. With `--follow-transfers`, subsequent upstream hops remain in the same process and capture session. Automated tests include a full local RakNet session and focused tests for capture integrity, representative packet preservation, Experience response parsing, transport capability preservation, protocol metadata, and new packet bodies.
 
 Automated success does not prove live Minecraft compatibility. Runtime changes require a stamped real-client session on The Hive, and releases require the five-server validation matrix documented in [`docs/validation.md`](docs/validation.md). Until the current candidate completes that process, treat it as development software rather than a production-ready proxy.
 

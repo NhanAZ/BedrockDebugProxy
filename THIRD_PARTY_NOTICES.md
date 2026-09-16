@@ -17,18 +17,18 @@ The Go module uses the following direct dependencies. Their source remains under
 | Module | Version | License | Role |
 | --- | --- | --- | --- |
 | [`github.com/coder/websocket`](https://github.com/coder/websocket) | `v1.8.14` | ISC | Minecraft signaling WebSocket transport |
-| [`github.com/df-mc/go-nethernet`](https://github.com/df-mc/go-nethernet) | `v1.0.20` | MIT | NetherNet and WebRTC upstream transport |
+| [`github.com/df-mc/go-nethernet`](https://github.com/df-mc/go-nethernet) | `v1.0.20-0.20260818142457-6fc1eb6f907c` | MIT | NetherNet and WebRTC upstream transport |
 | [`github.com/df-mc/go-playfab/v2`](https://github.com/df-mc/go-playfab) | `v2.0.2` | MIT | Minecraft services authentication |
 | [`github.com/df-mc/go-xsapi/v2`](https://github.com/df-mc/go-xsapi) | `v2.0.3` | MIT | Xbox Live session used for service authentication |
 | [`github.com/go-gl/mathgl`](https://github.com/go-gl/mathgl) | `v1.1.0` | BSD-3-Clause | Vector and matrix types used by the Bedrock protocol model |
 | [`github.com/google/uuid`](https://github.com/google/uuid) | `v1.6.0` | BSD-3-Clause | UUID parsing and values |
 | [`github.com/sandertv/go-raknet`](https://github.com/Sandertv/go-raknet) | `v1.15.2-0.20260705184311-0d1fd09e2cf6` plus the local GUID patch | MIT | RakNet transport |
-| [`github.com/sandertv/gophertunnel`](https://github.com/Sandertv/gophertunnel) | `v1.61.0` plus the local compatibility patch described below | MIT | Bedrock sessions, protocol, authentication, and resource packs |
+| [`github.com/sandertv/gophertunnel`](https://github.com/Sandertv/gophertunnel) | `v1.61.0` plus reviewed upstream 1.26.50 changes and local patches | MIT | Bedrock sessions, protocol, authentication, and resource packs |
 | [`golang.org/x/oauth2`](https://github.com/golang/oauth2) | `v0.36.0` | BSD-3-Clause | Authentication token source API |
 
 The complete direct and transitive module graph and exact checksums are recorded in `go.mod` and `go.sum`. `tools/collect-third-party-licenses.ps1` verifies that every module compiled into the product has root license material and creates the deterministic license bundle used by binary releases. Distributions that include dependency source or compiled dependency code must preserve the license and notice material required by those dependencies.
 
-The in-tree copy under [`third_party/gophertunnel`](third_party/gophertunnel) is based on Sandertv gophertunnel `v1.61.0` at commit `283a5a97dfe65da94bcc0b401807f6aefa9e72ee`. It contains two project-specific compatibility changes in `minecraft/conn.go`: featured experiences that send `PlayStatusPlayerSpawn` without `ChunkRadiusUpdated` are allowed to complete the dialer spawn handshake, and deferred login packets are re-checked when the expected packet state advances. The upstream source and its MIT license are retained unchanged otherwise.
+The in-tree copy under [`third_party/gophertunnel`](third_party/gophertunnel) uses Sandertv gophertunnel `v1.61.0` at commit `283a5a97dfe65da94bcc0b401807f6aefa9e72ee` as its stable base. Reviewed Bedrock 1.26.50 source is merged from the upstream feature branch through `481f3bd138766304a73d7a0412a47a87acec15ed`, together with the required `ClientboundUpdateSoundData` correction from master through `b8bd7357c24fcba3e32f940d1afb1d3b4e43b96d`. The selected result preserves later stable fixes that are absent from the feature branch. It also contains the project-specific compatibility and observation changes described in [`third_party/gophertunnel/BEDROCKDEBUGPROXY_PATCH.md`](third_party/gophertunnel/BEDROCKDEBUGPROXY_PATCH.md). The upstream source and MIT license are retained.
 
 The in-tree copy under [`third_party/go-raknet`](third_party/go-raknet) is based on the selected go-raknet revision above and retains its MIT license. It contains only the documented `Dialer.ClientGUID`, `Dialer.clientGUID`, `Conn.ClientGUID`, and connection-state propagation needed to preserve RakNet identity across featured-experience transfers. See [`third_party/go-raknet/BEDROCKDEBUGPROXY_PATCH.md`](third_party/go-raknet/BEDROCKDEBUGPROXY_PATCH.md).
 

@@ -8,15 +8,15 @@ Use this workflow for a gophertunnel upgrade, a new Bedrock release, a packet de
 
 ## Current baseline
 
-The baseline at repository commit `669557f` is:
+The baseline introduced by the Bedrock 1.26.50 protocol update is:
 
 | Component | Pinned value | Evidence |
 | --- | --- | --- |
 | Go toolchain | `go1.26.6` | `go.mod` toolchain directive |
-| gophertunnel | `v1.61.0` plus in-tree featured-experience spawn and deferred-login ordering compatibility patches | `go.mod` and `third_party/gophertunnel/minecraft/conn.go` |
-| gophertunnel source | `283a5a97dfe65da94bcc0b401807f6aefa9e72ee` | Upstream tag revision reviewed in `docs/research/bedrock-ecosystem.md` |
-| Bedrock protocol | `2169` | `minecraft/protocol/info.go` in gophertunnel `v1.61.0` |
-| Bedrock game version | `1.26.45` | `minecraft/protocol/info.go` in gophertunnel `v1.61.0` |
+| gophertunnel | `v1.61.0` plus reviewed upstream 1.26.50 changes and local compatibility patches | `go.mod`, `third_party/gophertunnel/BEDROCKDEBUGPROXY_PATCH.md`, and `docs/research/protocol-1.26.50.md` |
+| gophertunnel source | `283a5a97dfe65da94bcc0b401807f6aefa9e72ee`, `481f3bd138766304a73d7a0412a47a87acec15ed`, and `b8bd7357c24fcba3e32f940d1afb1d3b4e43b96d` | Stable base, 1.26.50 feature branch, and required-field correction |
+| Bedrock protocol | `2193` | Mojang `bedrock-protocol-docs` release `v1.26.50` and `minecraft/protocol/info.go` |
+| Bedrock game version | `1.26.50` | Mojang `bedrock-protocol-docs` release `v1.26.50` and `minecraft/protocol/info.go` |
 | go-raknet | `v1.15.2-0.20260705184311-0d1fd09e2cf6` | `go.mod` |
 | Capture schema | `bedrockdebugproxy.capture.v1` | `internal/capture/schema.go` |
 
@@ -33,9 +33,30 @@ Do not add or change a packet ID, field, type, serialization order, version gate
 - disagreements and the reason for choosing one interpretation
 - remaining unknowns and how raw capture preserves them
 
-Prefer authoritative runtime evidence and primary source definitions. Cross-check at least two independent sources when practical. Useful sources include the pinned gophertunnel and go-raknet revisions, Cloudburst Protocol, PrismarineJS bedrock-protocol, Endstone spyglass and protocol-dumper output, Dragonfly, owner-authorized Bedrock Dedicated Server captures, and captures from distinct public server categories.
+Prefer authoritative runtime evidence and primary source definitions. Cross-check at least two independent sources when practical. Use the catalog below to select sources with different origins instead of counting forks or generated outputs as independent agreement.
 
 Source agreement is not enough when all sources may share an outdated assumption. A live capture can confirm bytes and ordering for one server and version, but it does not prove that every valid server must behave identically.
+
+## Protocol reference catalog
+
+Record the exact revision, release, file path, protocol version, access date when useful, and license for every source used to support a wire claim. The repository name alone is not evidence.
+
+| Source | Primary role in a protocol review | Review caution |
+| --- | --- | --- |
+| [Mojang bedrock-protocol-docs](https://github.com/Mojang/bedrock-protocol-docs) | Official released packet schemas, IDs, fields, and version metadata | Match the release tag to the target game version. The files are specifications under Mojang's stated terms, not project source to copy. |
+| [Sandertv gophertunnel](https://github.com/Sandertv/gophertunnel) | Selected Go session and protocol implementation | Inspect both stable and relevant development branches. Preserve documented local patches when importing changes. |
+| [Sandertv go-raknet](https://github.com/Sandertv/go-raknet) | Selected RakNet transport implementation | RakNet behavior does not prove Bedrock packet layout. Preserve the local GUID patch. |
+| [Cloudburst Protocol](https://github.com/CloudburstMC/Protocol) | Independent Java packet codecs and protocol metadata | Generated metadata may lag an official release. Resolve version disagreements against primary evidence. |
+| [PrismarineJS bedrock-protocol](https://github.com/PrismarineJS/bedrock-protocol) and [minecraft-data](https://github.com/PrismarineJS/minecraft-data) | JavaScript codecs, relay behavior, and multi-version data | Protocol definitions may be split across repositories and may lag the newest release. |
+| [Endstone spyglass](https://github.com/EndstoneMC/spyglass) | Windows Bedrock client packet decode diagnostics | Diagnostic output is observed evidence for the exercised flow, not a complete definition. |
+| [Endstone endstone](https://github.com/EndstoneMC/endstone) | Bedrock Dedicated Server integration and runtime behavior | BDS call sites show implementation behavior but may not expose raw wire details. |
+| [Endstone endweave](https://github.com/EndstoneMC/endweave) | Cross-version translation and explicit version gates | Translation code can contain compatibility policy rather than a canonical layout. |
+| [axolotl-pm PocketMine-MP](https://github.com/axolotl-pm/PocketMine-MP) | PHP server call sites and packet handling behavior | Pair it with its protocol library at a matching revision. |
+| [axolotl-pm BedrockProtocol](https://github.com/axolotl-pm/BedrockProtocol) | PHP packet serializers and protocol structures | Confirm its advertised Minecraft and protocol version before using a definition. |
+| [Altay](https://github.com/altayofficial/Altay) | Alternate PocketMine-derived server behavior | Establish fork lineage so inherited code is not counted as independent confirmation. |
+| [BetterAltay](https://github.com/BetterAltayBedrock/BetterAltay) | Additional PocketMine-derived server behavior | Establish fork lineage and local modifications before treating it as separate evidence. |
+| [Endstone protocol-dumper](https://github.com/EndstoneMC/protocol-dumper) | Extracted Bedrock Dedicated Server protocol metadata | Record the exact BDS build used to generate the output. |
+| Owner-authorized captures | Actual ordered bytes, timing, directions, and server-specific behavior | A capture proves only the exercised version, server, route, and flow. Retain raw evidence. |
 
 ## Update procedure
 

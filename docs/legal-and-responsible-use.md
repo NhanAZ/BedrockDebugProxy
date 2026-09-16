@@ -4,7 +4,7 @@ Reviewed on 2026-09-13. This is a technical and project-risk assessment, not leg
 
 ## What the implementation actually does
 
-The following trace is based on the current code and gophertunnel `v1.61.0`, not on the names of functions or on an assumed client flow.
+The following trace is based on the current code and the documented in-tree gophertunnel source merge in [`third_party/gophertunnel/BEDROCKDEBUGPROXY_PATCH.md`](../third_party/gophertunnel/BEDROCKDEBUGPROXY_PATCH.md), not on the names of functions or on an assumed client flow.
 
 1. A downstream Bedrock client connects to the local proxy. During its login sequence, [`internal/proxy/proxy.go`](../internal/proxy/proxy.go) uses that client's `ClientData` to establish one upstream connection to the configured server.
 2. Upstream Xbox device authentication is the default. A successful device login is cached per user and reused until refresh fails, but every upstream connection still uses the resulting authenticated session. `--auth none` instead sends an offline identity and succeeds only if the selected server accepts it. A successful connection is therefore a server-accepted current session, but that protocol fact is not by itself a legal conclusion about copyright permission.
