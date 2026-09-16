@@ -60,3 +60,77 @@ func TestFinishForwardDoesNotRecordExpectedShutdownWriteError(t *testing.T) {
 		t.Fatalf("recorded %d expected shutdown bridge errors", bridgeErrors)
 	}
 }
+
+func TestFinishForwardCoordinatesRacingShutdownErrors(t *testing.T) {
+	root := filepath.Join(t.TempDir(), "capture")
+	recorder, err := capture.New(root, capture.Options{})
+	if err != nil {
+		t.Fatal(err)
+	}
+	runner := &Runner{config: Config{Recorder: recorder}}
+	var shuttingDown atomic.Bool
+	readErr := fmt.Errorf("read packet: %w", context.Canceled)
+	if err := runner.finishForward("bridge.read_error", capture.DirectionClientToServer, "downstream", "downstream-1", "read packet", readErr, &shuttingDown); !errors.Is(err, context.Canceled) {
+		t.Fatalf("finishForward() read error = %v, want context cancellation", err)
+	}
+	if !shuttingDown.Load() {
+		t.Fatal("finishForward() did not claim coordinated shutdown")
+	}
+	writeErr := fmt.Errorf("write packet: %w", context.Canceled)
+	if err := runner.finishForward("bridge.write_error", capture.DirectionServerToClient, "upstream", "upstream-1", "write packet", writeErr, &shuttingDown); !errors.Is(err, context.Canceled) {
+		t.Fatalf("finishForward() write error = %v, want context cancellation", err)
+	}
+	if err := recorder.Close("closed", nil); err != nil {
+		t.Fatal(err)
+	}
+	var bridgeErrors, readErrors int
+	if err := capture.ScanEvents(root, func(event capture.Event) error {
+		if event.Kind == "bridge.write_error" {
+			bridgeErrors++
+		}
+		if event.Kind == "bridge.read_error" {
+			readErrors++
+		}
+		return nil
+	}); err != nil {
+		t.Fatal(err)
+	}
+	if bridgeErrors != 0 {
+		t.Fatalf("recorded %d racing peer write errors", bridgeErrors)
+	}
+	if readErrors != 1 {
+		t.Fatalf("recorded %d read-side shutdown errors, want 1", readErrors)
+	}
+}
+
+func TestFinishForwardSuppressesFirstPeerCloseWriteError(t *testing.T) {
+	root := filepath.Join(t.TempDir(), "capture")
+	recorder, err := capture.New(root, capture.Options{})
+	if err != nil {
+		t.Fatal(err)
+	}
+	runner := &Runner{config: Config{Recorder: recorder}}
+	var shuttingDown atomic.Bool
+	operationErr := fmt.Errorf("write packet: %w", net.ErrClosed)
+	if err := runner.finishForward("bridge.write_error", capture.DirectionServerToClient, "upstream", "upstream-1", "write packet", operationErr, &shuttingDown); !errors.Is(err, net.ErrClosed) {
+		t.Fatalf("finishForward() error = %v, want closed-connection error", err)
+	}
+	if !shuttingDown.Load() {
+		t.Fatal("finishForward() did not claim coordinated shutdown")
+	}
+	if err := recorder.Close("closed", nil); err != nil {
+		t.Fatal(err)
+	}
+	var bridgeErrors int
+	if err := capture.ScanEvents(root, func(event capture.Event) error {
+		if event.Kind == "bridge.write_error" {
+			bridgeErrors++
+		}
+		return nil
+	}); err != nil {
+		t.Fatal(err)
+	}
+	if bridgeErrors != 0 {
+		t.Fatalf("recorded %d first peer-close write errors", bridgeErrors)
+	}
+}

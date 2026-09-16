@@ -920,18 +920,34 @@ func (r *Runner) finishForward(kind string, direction capture.Direction, sourceC
 }
 
 func (r *Runner) finishForwardAtHop(kind string, direction capture.Direction, sourceChannel, connectionID string, hop int, operation string, operationErr error, shuttingDown *atomic.Bool) error {
-	if !expectedShutdownError(operationErr, shuttingDown) {
-		captureErr := r.recordNetworkErrorAtHop(kind, direction, sourceChannel, connectionID, hop, operation, operationErr)
-		return errors.Join(operationErr, captureErr)
+	wasShuttingDown := false
+	if shuttingDown != nil {
+		// Claim the terminal state before recording the error. The two forwarding
+		// loops can observe the same connection close concurrently, so waiting for
+		// runHop to set this flag leaves a race where the peer write is reported as
+		// a blocking bridge error.
+		wasShuttingDown = shuttingDown.Swap(true)
 	}
-	return operationErr
+	if expectedShutdownError(operationErr, shuttingDown) && (wasShuttingDown || isWriteSideForwardError(kind)) {
+		return operationErr
+	}
+	captureErr := r.recordNetworkErrorAtHop(kind, direction, sourceChannel, connectionID, hop, operation, operationErr)
+	return errors.Join(operationErr, captureErr)
 }
 
 func expectedShutdownError(err error, shuttingDown *atomic.Bool) bool {
 	if err == nil || shuttingDown == nil || !shuttingDown.Load() {
 		return false
 	}
+	return isExpectedTransportShutdown(err)
+}
+
+func isExpectedTransportShutdown(err error) bool {
 	return errors.Is(err, context.Canceled) || errors.Is(err, net.ErrClosed)
+}
+
+func isWriteSideForwardError(kind string) bool {
+	return kind == "bridge.write_error" || kind == "bridge.flush_error"
 }
 
 func (r *Runner) recordDecoded(decoded packet.Packet, direction capture.Direction, connectionID string, hop int) (capture.Event, error) {
