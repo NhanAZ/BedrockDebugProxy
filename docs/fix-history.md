@@ -102,6 +102,14 @@ Every new entry should state the symptom, root cause, implementation commits, ev
 - Evidence and validation: [`docs/research/protocol-1.26.50.md`](research/protocol-1.26.50.md), Mojang's released schemas, reviewed gophertunnel revisions, and focused metadata, packet-pool, and binary-body tests.
 - Status: implemented with the full project quality gate and nested gophertunnel tests passing. A stamped exact-revision The Hive report remains required before the runtime change is complete.
 
+### FIX-0012 - Packed item-use hand alignment
+
+- Symptom: a Bedrock 1.26.50 `PlayerAuthInput` packet containing item interaction decoded with shifted position and optional fields, left four zero bytes, and produced a bridge decode error at the end of an otherwise active The Hive session.
+- Root cause: the 1.26.50 `UseItemTransactionData` model added the `Hand` byte between `HotBarSlot` and `HeldItem`, but the packed `PlayerInventoryAction` reader and writer did not include that field.
+- Implementation: this follow-up fix adds the missing read and write operation and a round-trip regression test.
+- Evidence and validation: capture `session-20260916T002518Z` (local ignored evidence), [`docs/research/protocol-1.26.50.md`](research/protocol-1.26.50.md), the Mojang `ItemUseInventoryTransaction` schema, and the focused protocol test. A new stamped The Hive report is still required.
+- Status: fixed in the source tree. Exact-revision live validation is pending.
+
 ## Ordering safety contract
 
 The deferred-packet change is deliberately narrow. `expectedIDs` remains the only authority for what the current login state accepts. The queue scan selects the earliest packet that is currently expected, leaves packets for later states queued, and never mutates or reorders bytes on the wire. The regression tests cover canonical resource-pack order, featured early `ResourcePacksInfo`, a later-phase packet queued ahead of the current phase, and all six permutations of the three login packets.

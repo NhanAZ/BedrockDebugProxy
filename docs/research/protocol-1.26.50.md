@@ -30,6 +30,14 @@ Cloudburst Protocol branch `3.0` at `9df9864c2bf79197a30ddff72dc0008dca93a976` l
 
 PrismarineJS minecraft-data and axolotl-pm BedrockProtocol still advertised 1.26.45 as their newest supported version when reviewed. They are useful comparisons for shared structures but do not provide contradictory 1.26.50 evidence.
 
+## Follow-up correction from The Hive capture
+
+The released Mojang schemas define `Item Use Transaction` as a packed legacy wrapper around an item-use transaction. The [`ItemUseInventoryTransaction` schema](https://github.com/Mojang/bedrock-protocol-docs/blob/v1.26.50/json/ItemUseInventoryTransaction.json) requires `Hand` and places it after `Slot` and before `Item`; the [`PackedItemUseLegacyInventoryTransaction schema`](https://github.com/Mojang/bedrock-protocol-docs/blob/v1.26.50/json/PackedItemUseLegacyInventoryTransaction.json) embeds that structure in `PlayerAuthInput`.
+
+The first composite update added `Hand` to `UseItemTransactionData.Marshal`, but its separate packed `PlayerInventoryAction` reader and writer still went directly from `HotBarSlot` to `HeldItem`. The exact-revision The Hive capture `session-20260916T002518Z` exposed the mismatch: the client-to-server `PlayerAuthInput` item interaction had a hand byte, decoded position values became implausible, and four zero bytes remained after the packet body. Adding the missing byte to both packed paths restores the observed position, block-action, vehicle, and trailing vector boundaries while preserving the raw capture.
+
+The regression is covered by `TestPlayerInventoryActionRoundTripIncludesHand` in `internal/bedrock/protocol_update_test.go`. The capture is local ignored evidence and is not committed.
+
 ## Imported scope
 
 The update includes current protocol metadata, new furnace and recording packet definitions, packet IDs and pools, changed packet and value serializers, corrected subchunk sizing, reader and writer support, changed disconnect and input values, and the corresponding NetherNet transport update. It does not change the BedrockDebugProxy capture schema or remove unknown-packet and raw-payload representation.
@@ -50,3 +58,4 @@ Cloudburst, PrismarineJS, Endstone, axolotl-pm, Altay, and BetterAltay were comp
 - Focused tests verify protocol 2193, game version 1.26.50, packet IDs, direction-specific packet pools, and exact new-packet bodies.
 - The full project quality gate and nested gophertunnel test suite pass on the prepared source tree.
 - A stamped exact-revision The Hive report is required before this runtime change is complete.
+- Follow-up correction: the stamped binary from the hand-alignment fix must be rechecked on The Hive before the protocol update is considered complete.
