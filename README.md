@@ -6,18 +6,6 @@ BedrockDebugProxy is a high-fidelity Minecraft Bedrock traffic observation and r
 
 BedrockDebugProxy is independent software. It is not an official Minecraft product and is not approved by or associated with Mojang or Microsoft.
 
-## AI-assisted development
-
-BedrockDebugProxy is maintained by NhanAZ with substantial assistance from AI agents. Agents may help with research, implementation, testing, documentation, and release preparation under the maintainer's direction.
-
-AI assistance does not replace human responsibility. The maintainer decides what is accepted and remains responsible for the project's scope and releases. Changes should be reviewed for provenance, tested proportionally, and validated against the documented evidence and policy requirements.
-
-If you prefer projects that do not use AI-assisted development, please skip this project. That choice is welcome. Please keep technical feedback focused on reproducible behavior, evidence, and concrete improvements, and treat the maintainer and contributors with respect.
-
-## Server policy disclaimer
-
-Using a proxy can violate a server's rules or terms even when the session is read-only and intended only for packet debugging. A server may reject the connection, disconnect or kick the player, or issue a temporary or permanent ban. Check the destination's current policy and obtain permission before connecting. The project does not authorize proxy use on any server. See the [server target and validation catalog](docs/server-targets.md) for the active matrix and known policy exclusions.
-
 ## Quick start
 
 Already have `bin\bedrock-debug-proxy.exe` and only want a useful debug capture? Choose an upstream and run the general form below from the repository root.
@@ -211,6 +199,18 @@ Use the document that matches your task.
 Never commit real captures, authentication state, resource-pack keys, decrypted packs, or third-party assets. Resource packs and other captured content remain owned and licensed by their respective rights holders. They do not become `GPL-3.0-or-later` because BedrockDebugProxy captured or decrypted them. Operators are responsible for their authority to inspect, retain, disclose, or redistribute session artifacts.
 
 See [`docs/legal-and-responsible-use.md`](docs/legal-and-responsible-use.md) for the implementation trace, boundaries, and legal research notes.
+
+## Server policy disclaimer
+
+Using a proxy can violate a server's rules or terms even when the session is read-only and intended only for packet debugging. A server may reject the connection, disconnect or kick the player, or issue a temporary or permanent ban. Check the destination's current policy and obtain permission before connecting. The project does not authorize proxy use on any server. See the [server target and validation catalog](docs/server-targets.md) for the active matrix and known policy exclusions.
+
+## AI-assisted development
+
+BedrockDebugProxy is maintained by NhanAZ with substantial assistance from AI agents. Agents may help with research, implementation, testing, documentation, and release preparation under the maintainer's direction.
+
+AI assistance does not replace human responsibility. The maintainer decides what is accepted and remains responsible for the project's scope and releases. Changes should be reviewed for provenance, tested proportionally, and validated against the documented evidence and policy requirements.
+
+If you prefer projects that do not use AI-assisted development, please skip this project. That choice is welcome. Please keep technical feedback focused on reproducible behavior, evidence, and concrete improvements, and treat the maintainer and contributors with respect.
 
 ## License
 
