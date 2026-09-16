@@ -9,8 +9,11 @@ import (
 	"io"
 	"net/http"
 	"net/http/httptest"
+	"strconv"
+	"strings"
 	"sync/atomic"
 	"testing"
+	"time"
 
 	"github.com/google/uuid"
 	"github.com/sandertv/gophertunnel/minecraft"
@@ -100,6 +103,61 @@ func TestURLResourcePackCacheReportsAdvertisedPackMismatch(t *testing.T) {
 	}
 }
 
+func TestURLResourcePackCacheDownloadsPacksConcurrentlyInOfferOrder(t *testing.T) {
+	firstUUID := uuid.MustParse("11111111-1111-1111-1111-111111111111")
+	secondUUID := uuid.MustParse("22222222-2222-2222-2222-222222222222")
+	archives := map[string][]byte{
+		"/first.zip":  testURLResourcePackArchiveWith(t, firstUUID, "1.0.0"),
+		"/second.zip": testURLResourcePackArchiveWith(t, secondUUID, "2.0.0"),
+	}
+	started := make(chan string, len(archives))
+	release := make(chan struct{})
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		archive, ok := archives[r.URL.Path]
+		if !ok {
+			http.NotFound(w, r)
+			return
+		}
+		started <- r.URL.Path
+		<-release
+		_, _ = w.Write(archive)
+	}))
+	defer server.Close()
+
+	info := &packet.ResourcePacksInfo{TexturePacks: []protocol.TexturePackInfo{
+		{UUID: firstUUID, Version: "1.0.0", Size: uint64(len(archives["/first.zip"])), DownloadURL: server.URL + "/first.zip"},
+		{UUID: secondUUID, Version: "2.0.0", Size: uint64(len(archives["/second.zip"])), DownloadURL: server.URL + "/second.zip"},
+	}}
+	cache := newURLResourcePackCache(context.Background())
+	done := make(chan struct{})
+	go func() {
+		cache.Observe(packet.Header{PacketID: packet.IDResourcePacksInfo}, encodeResourcePacksInfo(t, info))
+		close(done)
+	}()
+
+	for range archives {
+		select {
+		case <-started:
+		case <-time.After(time.Second):
+			t.Fatal("resource-pack downloads did not start concurrently")
+		}
+	}
+	close(release)
+	select {
+	case <-done:
+	case <-time.After(time.Second):
+		t.Fatal("resource-pack downloads did not complete")
+	}
+
+	packs := cache.Packs()
+	if len(packs) != 2 {
+		t.Fatalf("prefetched packs = %d, want 2", len(packs))
+	}
+	if packs[0].UUID() != firstUUID || packs[1].UUID() != secondUUID {
+		t.Fatalf("prefetched pack order = %s, %s, want %s, %s", packs[0].UUID(), packs[1].UUID(), firstUUID, secondUUID)
+	}
+}
+
 func TestResourcePacksForDownstreamClearsURL(t *testing.T) {
 	archive := testURLResourcePackArchive(t)
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
@@ -150,21 +208,32 @@ func encodeResourcePacksInfo(t *testing.T, info *packet.ResourcePacksInfo) []byt
 }
 
 func testURLResourcePackArchive(t *testing.T) []byte {
+	return testURLResourcePackArchiveWith(t, uuid.MustParse("11111111-1111-1111-1111-111111111111"), "1.0.0")
+}
+
+func testURLResourcePackArchiveWith(t *testing.T, packUUID uuid.UUID, version string) []byte {
 	t.Helper()
+	versionParts := make([]int, 3)
+	for index, part := range strings.Split(version, ".") {
+		if index == len(versionParts) {
+			break
+		}
+		versionParts[index], _ = strconv.Atoi(part)
+	}
 	manifest := map[string]any{
 		"format_version": 2,
 		"header": map[string]any{
 			"description":        "URL test pack",
 			"name":               "URL Test Pack",
-			"uuid":               "11111111-1111-1111-1111-111111111111",
-			"version":            []int{1, 0, 0},
+			"uuid":               packUUID.String(),
+			"version":            versionParts,
 			"min_engine_version": []int{1, 20, 0},
 		},
 		"modules": []any{map[string]any{
 			"description": "URL test module",
 			"type":        "resources",
 			"uuid":        "33333333-3333-3333-3333-333333333333",
-			"version":     []int{1, 0, 0},
+			"version":     versionParts,
 		}},
 	}
 	manifestJSON, err := json.Marshal(manifest)
