@@ -138,7 +138,9 @@ The original CloudburstMC project remains evidence for the basic terminating-pro
 
 Spyglass hooks the Bedrock client at packet send and packet read boundaries. It retains raw packet bodies, unread byte counts, decode success, detailed error trees, packet names, sub-client information, and timing. Its UI is backed by a disk stream plus an index rather than an unbounded in-memory packet list.
 
-The bounded writer queue and visible rejected or dropped counters are strong design references. BedrockDebugProxy will make any loss visible in the manifest and event stream. Its default capture path will favor blocking writes over silent loss until measured performance justifies a more complex queue.
+The bounded writer queue and visible rejected or dropped counters are strong design references. BedrockDebugProxy now uses a bounded ordered queue with blocking backpressure and a `never_drop` policy. Queue capacity and peak occupancy are visible in manifest values, while writer failures mark the capture incomplete.
+
+The Galaxite capture `session-20260916T060203Z` at revision `320478f65db244c8b4d8be05e756e2c7774289db` supplied the performance evidence for this change. It retained 489,910 events and 93,790 blobs without loss, but a two-second burst contained 40,259 decoded `UpdateBlock` packets and 135,350 JSONL events. The same capture recorded rare 596 to 738 ms capture and write stalls and a client-side `You moved too slow` bridge write failure. The ordered queue decouples normal forwarding from those disk stalls without filtering the burst. Its bounded capacity still applies backpressure when the writer cannot catch up.
 
 ### EndstoneMC protocol-dumper
 
@@ -191,7 +193,7 @@ Dragonfly is a server implementation built around gophertunnel rather than a pac
 - Add optional raw UDP and PCAPNG capture without requiring elevated privileges for normal operation.
 - Compare decoded fixtures against PrismarineJS and future runtime schemas.
 - `--follow-transfers` starts a new hop after a server `Transfer` by rewriting the client destination to the local listener. The original target is then dialled after client reconnect, while the capture keeps one logical session timeline. See ADR 0003 for the trust boundary and concrete-listener requirement.
-- Continue measuring disk-write backpressure during chunk-heavy sessions before considering any asynchronous queue or overflow policy. The current recorder uses blocking, lossless writes and avoids per-event durable flushes by default.
+- Measure queue occupancy and forwarding latency during chunk-heavy sessions. The current recorder uses a bounded ordered asynchronous queue, blocks when full, and never silently drops evidence.
 - Verify encrypted resource-pack variants with synthetic fixtures and owner-authorized live captures.
 - Decide whether old protocol adapters belong in this repository or separate versioned modules.
 
