@@ -4,6 +4,10 @@ All notable changes to BedrockDebugProxy are documented in this file. Entries ar
 
 ## [Unreleased]
 
+### Documentation and maintenance
+
+- Added weekly Dependabot checks for the root Go module and GitHub Actions, with grouped non-major Go updates and no automatic merge.
+
 ## [0.2.0] - 2026-09-16
 
 ### Added

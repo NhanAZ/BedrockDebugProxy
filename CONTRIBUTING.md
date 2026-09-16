@@ -40,6 +40,15 @@ This file is the shortest path from a local change to a merge-ready pull request
    Follow the capture and report steps in [`docs/validation.md`](docs/validation.md). Upload the sanitized report as a pull request artifact or provide it through the review system without adding it to the candidate commit. Keep the raw capture local.
 9. Push the branch and open the pull request using the repository template. State what changed, what did not change, automated results, manual results, and any remaining uncertainty.
 
+## Dependency update pull requests
+
+Dependabot checks the root Go module and GitHub Actions weekly. It does not manage the local `third_party/gophertunnel` or `third_party/go-raknet` modules because those trees contain reviewed project patches. Review every dependency update as a proposed change, not as an automatic approval.
+
+1. Inspect the upstream release notes, supported protocol versions, license changes, and the complete dependency diff.
+2. Run the formatting, quality, build, and CI checks for the exact pull request revision.
+3. Treat updates to Go modules, transport, protocol, authentication, resource-pack, or capture dependencies as possible runtime changes. They require the The Hive baseline and any affected flow-specific live validation described in [`docs/validation.md`](docs/validation.md).
+4. Do not merge a Dependabot PR while required validation is pending or while a local replacement would overwrite a project patch. Update a local fork deliberately and document its provenance instead.
+
 ## After opening a pull request
 
 1. After every push, open the Actions page and inspect the run for the exact commit. Wait for both GitHub Actions jobs to finish. A local quality pass is not a CI result.
