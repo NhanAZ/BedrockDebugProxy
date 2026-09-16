@@ -52,7 +52,8 @@ type liveReporter struct {
 	lastFlush       time.Time
 	counts          map[livePacketKey]int
 	hints           map[string]struct{}
-	spawned         atomic.Bool
+	currentHop      int
+	spawnedHops     map[int]struct{}
 	shuttingDown    atomic.Bool
 	color           bool
 	clientRaw       map[uint32]string
@@ -72,14 +73,16 @@ func newLiveReporterWithClock(output io.Writer, now func() time.Time) *liveRepor
 		now = time.Now
 	}
 	return &liveReporter{
-		output:    output,
-		now:       now,
-		lastFlush: now(),
-		counts:    make(map[livePacketKey]int),
-		hints:     make(map[string]struct{}),
-		color:     supportsColor(output),
-		clientRaw: rawPacketNames(true),
-		serverRaw: rawPacketNames(false),
+		output:      output,
+		now:         now,
+		lastFlush:   now(),
+		counts:      make(map[livePacketKey]int),
+		hints:       make(map[string]struct{}),
+		currentHop:  1,
+		spawnedHops: make(map[int]struct{}),
+		color:       supportsColor(output),
+		clientRaw:   rawPacketNames(true),
+		serverRaw:   rawPacketNames(false),
 	}
 }
 
@@ -92,15 +95,12 @@ func (r *liveReporter) Info(format string, args ...any) {
 }
 
 func (r *liveReporter) RawPacket(channel string, direction capture.Direction, header packet.Header) {
-	if r.spawned.Load() {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	if _, spawned := r.spawnedHops[r.currentHop]; spawned {
 		return
 	}
 	now := r.now()
-	r.mu.Lock()
-	defer r.mu.Unlock()
-	if r.spawned.Load() {
-		return
-	}
 	r.counts[livePacketKey{channel: channel, direction: direction, name: r.rawPacketName(direction, header.PacketID)}]++
 	if now.Sub(r.lastFlush) >= liveSummaryInterval {
 		r.flushLocked(now)
@@ -111,7 +111,20 @@ func (r *liveReporter) SetSpawned() {
 	r.mu.Lock()
 	defer r.mu.Unlock()
 	r.flushLocked(r.now())
-	r.spawned.Store(true)
+	r.spawnedHops[r.currentHop] = struct{}{}
+}
+
+// SetHop flushes the current summary bucket before a transfer hop becomes
+// active. Raw login and resource-pack packets are shown until that hop has
+// spawned, even when an earlier hop already reached gameplay.
+func (r *liveReporter) SetHop(hop int) {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	if r.currentHop == hop {
+		return
+	}
+	r.flushLocked(r.now())
+	r.currentHop = hop
 }
 
 // SetShuttingDown marks the end of forwarding so late library messages caused
