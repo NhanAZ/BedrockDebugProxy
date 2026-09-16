@@ -110,6 +110,14 @@ Every new entry should state the symptom, root cause, implementation commits, ev
 - Evidence and validation: capture `session-20260916T002518Z` (local ignored evidence), [`docs/research/protocol-1.26.50.md`](research/protocol-1.26.50.md), the Mojang `ItemUseInventoryTransaction` schema, and the focused protocol test. A new stamped The Hive report is still required.
 - Status: fixed in the source tree. Exact-revision live validation is pending.
 
+### FIX-0013 - Racing peer-close write errors
+
+- Symptom: Mineville Zeqa could close the client-facing connection during normal termination while the peer forwarding loop concurrently returned `bridge.write_error` with `context.Canceled`, causing the report to classify the closed session as a blocking error.
+- Root cause: each forwarding loop waited for `runHop` to mark coordinated shutdown after receiving the first error. The read and write loops could therefore classify the same connection close before the marker was visible to either loop.
+- Implementation: the first terminal forwarding error now atomically claims shutdown before classification. Read-side close evidence remains recorded, while first or subsequent write-side `context.Canceled` and `net.ErrClosed` results are retained in `session.close` diagnostics without creating a blocking bridge error.
+- Evidence and validation: Mineville Zeqa capture `captures/session-20260916T025636Z` at revision `9a7859c351b55b66a89cfa7e3448b809f5a48584` showed `bridge.write_error` racing a downstream context-cancelled termination. New shutdown race tests cover read-first and write-first ordering. A fresh stamped live report is required after this fix.
+- Status: fix implemented; exact-revision live validation pending.
+
 ## Ordering safety contract
 
 The deferred-packet change is deliberately narrow. `expectedIDs` remains the only authority for what the current login state accepts. The queue scan selects the earliest packet that is currently expected, leaves packets for later states queued, and never mutates or reorders bytes on the wire. The regression tests cover canonical resource-pack order, featured early `ResourcePacksInfo`, a later-phase packet queued ahead of the current phase, and all six permutations of the three login packets.
