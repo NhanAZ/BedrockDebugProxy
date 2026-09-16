@@ -24,6 +24,12 @@ const urlResourcePackOfferWait = 5 * time.Second
 
 const urlResourcePackDownloadWait = 60 * time.Second
 
+// URL pack downloads run concurrently while the upstream login reader is
+// waiting for the cache to become available. Keep the worker count bounded so
+// a server advertising many large archives cannot multiply the cache's memory
+// and HTTP pressure without limit.
+const urlResourcePackDownloadConcurrency = 3
+
 // urlResourcePackCache adapts the URL form of ResourcePacksInfo to
 // gophertunnel's ResourcePackCache interface. gophertunnel invokes PacketFunc
 // before decoding a packet, which lets this cache observe the advertised URL
@@ -84,6 +90,11 @@ func (cache *urlResourcePackCache) Observe(header packet.Header, payload []byte)
 		close(cache.offered)
 	})
 	defer cache.readyOnce.Do(func() { close(cache.ready) })
+	type downloadJob struct {
+		advertised protocol.TexturePackInfo
+		key        minecraft.ResourcePackCacheKey
+	}
+	jobs := make([]downloadJob, 0, len(info.TexturePacks))
 	for _, advertised := range info.TexturePacks {
 		if advertised.DownloadURL == "" {
 			continue
@@ -100,17 +111,52 @@ func (cache *urlResourcePackCache) Observe(header packet.Header, payload []byte)
 		if alreadyObserved {
 			continue
 		}
-
-		pack, err := cache.download(advertised)
-		cache.mu.Lock()
-		if err != nil {
-			cache.errors[key] = err
-		} else {
-			cache.packs[key] = pack
-			cache.packOrder = append(cache.packOrder, key)
-		}
-		cache.mu.Unlock()
+		jobs = append(jobs, downloadJob{advertised: advertised, key: key})
 	}
+	if len(jobs) == 0 {
+		return
+	}
+
+	results := make([]struct {
+		job  downloadJob
+		pack *resource.Pack
+		err  error
+	}, len(jobs))
+	workerCount := min(urlResourcePackDownloadConcurrency, len(jobs))
+	jobIndex := make(chan int)
+	var workers sync.WaitGroup
+	workers.Add(workerCount)
+	for range workerCount {
+		go func() {
+			defer workers.Done()
+			for index := range jobIndex {
+				job := jobs[index]
+				pack, err := cache.download(job.advertised)
+				results[index] = struct {
+					job  downloadJob
+					pack *resource.Pack
+					err  error
+				}{job: job, pack: pack, err: err}
+			}
+		}()
+	}
+	for index := range jobs {
+		jobIndex <- index
+	}
+	close(jobIndex)
+	workers.Wait()
+
+	cache.mu.Lock()
+	for _, result := range results {
+		pack, err := result.pack, result.err
+		if err != nil {
+			cache.errors[result.job.key] = err
+		} else {
+			cache.packs[result.job.key] = pack
+			cache.packOrder = append(cache.packOrder, result.job.key)
+		}
+	}
+	cache.mu.Unlock()
 }
 
 func (cache *urlResourcePackCache) download(advertised protocol.TexturePackInfo) (*resource.Pack, error) {

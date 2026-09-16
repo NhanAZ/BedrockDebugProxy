@@ -126,6 +126,14 @@ Every new entry should state the symptom, root cause, implementation commits, ev
 - Evidence and validation: Enchanted capture `captures/session-20260916T044421Z` recorded hop 2 resource-pack exchange and spawn while the operator reported missing terminal summaries. The regression test verifies pre-spawn summaries for two hops and continues to suppress post-spawn raw packets within each hop.
 - Status: implemented; a fresh stamped The Hive baseline and the five-server release matrix are required because observable runtime logging changed.
 
+### FIX-0015 - Concurrent URL resource-pack prefetch
+
+- Symptom: after an Enchanted transfer, a backend with several URL-advertised resource packs could keep the upstream login exchange open long enough for the backend to kick the proxy client for `Timed out`, even though hop 2 eventually reached spawn.
+- Root cause: the URL resource-pack adapter downloaded and parsed each advertised archive serially inside the upstream packet reader. The downstream listener could not receive the pack offer until every preceding URL download completed, extending the upstream-first buffering window.
+- Implementation: URL pack downloads now use a bounded worker pool and commit successful results in the original `ResourcePacksInfo` order. Duplicate-offer suppression, UUID/version/size validation, URL removal from downstream copies, and the sequential downstream listener path are unchanged.
+- Evidence and validation: Enchanted capture `captures/session-20260916T053620Z` selected `factions-spawn.factions.connect.enchanted.gg:19132`; hop 2 recorded seven URL pack archives, reached `session.spawned`, and then received the upstream `You were kicked: Timed out` message. The capture had zero dropped, truncated, decode, or write errors. The concurrency regression test uses a barrier-backed HTTP fixture to prove overlapping downloads and stable offer order.
+- Status: implemented with focused automated tests; a new stamped live Enchanted transfer and The Hive baseline are required before release approval.
+
 ## Ordering safety contract
 
 The deferred-packet change is deliberately narrow. `expectedIDs` remains the only authority for what the current login state accepts. The queue scan selects the earliest packet that is currently expected, leaves packets for later states queued, and never mutates or reorders bytes on the wire. The regression tests cover canonical resource-pack order, featured early `ResourcePacksInfo`, a later-phase packet queued ahead of the current phase, and all six permutations of the three login packets.
