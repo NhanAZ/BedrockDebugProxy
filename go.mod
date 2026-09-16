@@ -1,19 +1,19 @@
 module github.com/NhanAZ/BedrockDebugProxy
 
-go 1.25.0
+go 1.26.0
 
 toolchain go1.26.6
 
 require (
-	github.com/coder/websocket v1.8.14
+	github.com/coder/websocket v1.8.15
 	github.com/df-mc/go-nethernet v1.0.20-0.20260818142457-6fc1eb6f907c
-	github.com/df-mc/go-playfab/v2 v2.0.2
+	github.com/df-mc/go-playfab/v2 v2.0.3
 	github.com/df-mc/go-xsapi/v2 v2.0.3
-	github.com/go-gl/mathgl v1.1.0
+	github.com/go-gl/mathgl v1.2.0
 	github.com/google/uuid v1.6.0
 	github.com/sandertv/go-raknet v1.15.2-0.20260705184311-0d1fd09e2cf6
 	github.com/sandertv/gophertunnel v1.61.0
-	golang.org/x/oauth2 v0.36.0
+	golang.org/x/oauth2 v0.37.0
 )
 
 // Enchanted and some other featured experiences omit ChunkRadiusUpdated during
@@ -50,7 +50,6 @@ require (
 	github.com/wlynxg/anet v0.0.5 // indirect
 	golang.org/x/crypto v0.53.0 // indirect
 	golang.org/x/exp v0.0.0-20240909161429-701f63a606c0 // indirect
-	golang.org/x/image v0.41.0 // indirect
 	golang.org/x/net v0.56.0 // indirect
 	golang.org/x/sys v0.46.0 // indirect
 	golang.org/x/text v0.38.0 // indirect
