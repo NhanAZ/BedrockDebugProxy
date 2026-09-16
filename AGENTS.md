@@ -39,6 +39,18 @@ Treat an issue as a report to investigate, not an implementation order. Determin
 
 Review pull requests against the current implementation and architecture before judging their diff. Check correctness, duplicate functionality, unrelated changes, dependencies, protocol assumptions, capture fidelity, cross-server compatibility, tests, and maintenance cost. Compilation alone is not sufficient evidence for approval. Request focused, actionable changes or recommend closing a pull request when warranted.
 
+## Upstream fair-play and good-faith contributions
+
+BedrockDebugProxy depends on open-source projects and should return improvements when practical. If an agent finds a defect in a third-party dependency, it may investigate and propose an upstream contribution, but it must not contact an upstream maintainer or create an issue or pull request without explicit approval from the project maintainer. Approval to investigate is not approval to publish, and approval to publish one artifact does not imply approval for another.
+
+Before proposing an upstream report or patch, reproduce the behavior with the smallest deterministic test, fixture, or redacted capture available. Check the dependency revision, supported versions, changelog, documentation, existing issues and pull requests, contribution rules, security policy, and license. Classify the finding as an upstream defect, local integration error, intentional behavior, duplicate report, or unresolved uncertainty. Preserve a local workaround only when it is needed for the project's supported behavior, and document why it does not hide the upstream evidence.
+
+Give the maintainer a concise proposal containing the target repository, immutable revision and file or symbol, reproduction steps, observed and expected behavior, impact on BedrockDebugProxy, relevant evidence, privacy or security concerns, and the proposed scope. State whether an issue, a pull request, or both are appropriate. Do not include tokens, private captures, decrypted third-party content, personal data, or unpublished security details.
+
+After explicit approval, prepare the smallest respectful upstream contribution that follows that project's conventions. An issue should describe facts and a reproducible symptom without blame. A pull request should include focused code, tests, and documentation where appropriate, and should link the issue when the upstream project uses that workflow. Use only an account and credentials explicitly authorized for the action, do not impersonate a maintainer, and do not promise that upstream will accept the change. Route security vulnerabilities through the upstream security process before public disclosure.
+
+Never use an upstream issue or pull request to request anti-cheat bypasses, exploit behavior, cheat functionality, authentication bypasses, or policy evasion. After submission, record the public URL, revision, and status in the relevant research note or commit audit, respond to maintainer feedback in good faith, avoid duplicate or repeated reports, and update or remove local workarounds only after the upstream change is verified. This pay-it-forward process is intended to help maintainers and users fairly; it does not expand project scope or authorize external communication by itself.
+
 ## Protocol research
 
 Use primary sources whenever possible. Inspect the actual source revision, protocol definitions, tests, and wire behavior. Distinguish confirmed behavior, reasoned inference, and unknown behavior in code comments and documentation.
