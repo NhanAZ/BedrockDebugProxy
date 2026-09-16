@@ -360,6 +360,7 @@ func (r *Runner) Run(ctx context.Context) error {
 			}
 		}
 		state := getAcceptState()
+		live.SetHop(state.hop)
 		observer.SetHop(state.hop)
 		type acceptResult struct {
 			conn net.Conn

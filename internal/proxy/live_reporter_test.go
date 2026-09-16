@@ -61,6 +61,26 @@ func TestLiveReporterSummarisesPreSpawnRawPacketsByChannel(t *testing.T) {
 	}
 }
 
+func TestLiveReporterSummarisesPreSpawnRawPacketsForEachHop(t *testing.T) {
+	current := time.Date(2026, time.August, 30, 15, 0, 0, 0, time.UTC)
+	var output bytes.Buffer
+	reporter := newLiveReporterWithClock(&output, func() time.Time { return current })
+	reporter.RawPacket("upstream", capture.DirectionServerToClient, packet.Header{PacketID: packet.IDResourcePacksInfo})
+	reporter.SetSpawned()
+	reporter.SetHop(2)
+	reporter.RawPacket("upstream", capture.DirectionServerToClient, packet.Header{PacketID: packet.IDResourcePacksInfo})
+	reporter.RawPacket("downstream", capture.DirectionClientToServer, packet.Header{PacketID: packet.IDResourcePackClientResponse})
+	reporter.Close()
+
+	text := output.String()
+	if strings.Count(text, "UPSTREAM S->C     1 packets | ResourcePacksInfo x1") != 2 {
+		t.Fatalf("expected one pre-spawn summary for each hop, got %s", text)
+	}
+	if !strings.Contains(text, "DOWNSTREAM C->S   1 packets | ResourcePackClientResponse x1") {
+		t.Fatalf("missing hop-two downstream pre-spawn summary: %s", text)
+	}
+}
+
 func TestLiveReporterUsesThreeSecondSummaryBuckets(t *testing.T) {
 	current := time.Date(2026, time.August, 30, 15, 0, 0, 0, time.UTC)
 	var output bytes.Buffer

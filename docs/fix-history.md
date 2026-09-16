@@ -118,6 +118,14 @@ Every new entry should state the symptom, root cause, implementation commits, ev
 - Evidence and validation: Mineville Zeqa capture `captures/session-20260916T025636Z` at revision `9a7859c351b55b66a89cfa7e3448b809f5a48584` showed `bridge.write_error` racing a downstream context-cancelled termination. New shutdown race tests cover read-first and write-first ordering. A fresh stamped live report is required after this fix.
 - Status: fix implemented; exact-revision live validation pending.
 
+### FIX-0014 - Per-hop pre-spawn console summaries
+
+- Symptom: after an Enchanted transfer, the capture contained hop 2 login and resource-pack packets but the terminal showed no corresponding `UPSTREAM` or `DOWNSTREAM` summaries.
+- Root cause: the live reporter used one process-wide spawned flag. Once hop 1 reached gameplay, raw packet summaries were suppressed for every later transfer hop, including its pre-spawn exchange.
+- Implementation: live output now tracks spawned state per hop, flushes the previous bucket when a new hop becomes active, and keeps the existing three-second summary cadence and capture path unchanged.
+- Evidence and validation: Enchanted capture `captures/session-20260916T044421Z` recorded hop 2 resource-pack exchange and spawn while the operator reported missing terminal summaries. The regression test verifies pre-spawn summaries for two hops and continues to suppress post-spawn raw packets within each hop.
+- Status: implemented; a fresh stamped The Hive baseline and the five-server release matrix are required because observable runtime logging changed.
+
 ## Ordering safety contract
 
 The deferred-packet change is deliberately narrow. `expectedIDs` remains the only authority for what the current login state accepts. The queue scan selects the earliest packet that is currently expected, leaves packets for later states queued, and never mutates or reorders bytes on the wire. The regression tests cover canonical resource-pack order, featured early `ResourcePacksInfo`, a later-phase packet queued ahead of the current phase, and all six permutations of the three login packets.
