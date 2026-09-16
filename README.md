@@ -6,6 +6,14 @@ BedrockDebugProxy is a high-fidelity Minecraft Bedrock traffic observation and r
 
 BedrockDebugProxy is independent software. It is not an official Minecraft product and is not approved by or associated with Mojang or Microsoft.
 
+## AI-assisted development
+
+BedrockDebugProxy is maintained by NhanAZ with substantial assistance from AI agents. Agents may help with research, implementation, testing, documentation, and release preparation under the maintainer's direction.
+
+AI assistance does not replace human responsibility. The maintainer decides what is accepted and remains responsible for the project's scope and releases. Changes should be reviewed for provenance, tested proportionally, and validated against the documented evidence and policy requirements.
+
+If you prefer projects that do not use AI-assisted development, please skip this project. That choice is welcome. Please keep technical feedback focused on reproducible behavior, evidence, and concrete improvements, and treat the maintainer and contributors with respect.
+
 ## Server policy disclaimer
 
 Using a proxy can violate a server's rules or terms even when the session is read-only and intended only for packet debugging. A server may reject the connection, disconnect or kick the player, or issue a temporary or permanent ban. Check the destination's current policy and obtain permission before connecting. The project does not authorize proxy use on any server. See the [server target and validation catalog](docs/server-targets.md) for the active matrix and known policy exclusions.
