@@ -4,6 +4,8 @@ All notable changes to BedrockDebugProxy are documented in this file. Entries ar
 
 ## [Unreleased]
 
+## [0.2.0] - 2026-09-16
+
 ### Added
 
 - Added Bedrock 1.26.50 support with protocol 2193 metadata and focused packet coverage.
