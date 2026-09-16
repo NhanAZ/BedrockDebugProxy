@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"testing"
 
+	"github.com/go-gl/mathgl/mgl32"
 	"github.com/sandertv/gophertunnel/minecraft/protocol"
 	"github.com/sandertv/gophertunnel/minecraft/protocol/packet"
 )
@@ -84,5 +85,41 @@ func TestRecordStartedEncoding(t *testing.T) {
 	want := []byte{0x02, 0x04, 0x05, 0x08, 0x07, 0x06, 0x05, 0x04, 0x03, 0x02, 0x01}
 	if got := encoded.Bytes(); !bytes.Equal(got, want) {
 		t.Fatalf("encoded record start = %x, want %x", got, want)
+	}
+}
+
+func TestPlayerInventoryActionRoundTripIncludesHand(t *testing.T) {
+	want := protocol.UseItemTransactionData{
+		LegacyRequestID:     0,
+		Actions:             []protocol.InventoryAction{},
+		ActionType:          protocol.UseItemActionBreakBlock,
+		TriggerType:         protocol.TriggerTypeSimulationTick,
+		BlockPosition:       protocol.BlockPos{12, 34, -56},
+		BlockFace:           5,
+		HotBarSlot:          7,
+		Hand:                protocol.HandSlotOffHand,
+		Position:            mgl32.Vec3{1.25, 2.5, 3.75},
+		ClickedPosition:     mgl32.Vec3{0.25, 0.5, 0.75},
+		BlockRuntimeID:      42,
+		ClientPrediction:    protocol.ClientPredictionSuccess,
+		ClientCooldownState: protocol.ClientCooldownStateOn,
+	}
+
+	var encoded bytes.Buffer
+	w := protocol.NewWriter(&encoded, 0)
+	w.PlayerInventoryAction(&want)
+
+	got := protocol.UseItemTransactionData{}
+	raw := bytes.NewReader(encoded.Bytes())
+	r := protocol.NewReader(raw, 0, true)
+	r.PlayerInventoryAction(&got)
+	if raw.Len() != 0 {
+		t.Fatalf("PlayerInventoryAction left %d bytes", raw.Len())
+	}
+	if got.Hand != want.Hand {
+		t.Fatalf("hand = %d, want %d", got.Hand, want.Hand)
+	}
+	if got.Position != want.Position || got.ClickedPosition != want.ClickedPosition {
+		t.Fatalf("positions shifted after hand: got position %v/%v, want %v/%v", got.Position, got.ClickedPosition, want.Position, want.ClickedPosition)
 	}
 }
