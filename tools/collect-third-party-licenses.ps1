@@ -56,6 +56,13 @@ try {
         }
     }
 
+    $embeddedAssetLicenses = @(
+        [pscustomobject]@{
+            Component = "Monocraft e498bf70aeb25b4bdcff1e44d878fb2cb4f7c2a9 and Minecraft Font 261ac77fbf28796ca09c22eb83ecdfe386c4b838"
+            File = Get-Item -LiteralPath (Join-Path $projectRoot "internal/viewer/assets/fonts/OFL-1.1.txt")
+        }
+    )
+
     if (-not [string]::IsNullOrWhiteSpace($Output)) {
         $outputPath = if ([System.IO.Path]::IsPathRooted($Output)) {
             [System.IO.Path]::GetFullPath($Output)
@@ -82,14 +89,24 @@ try {
                 $sections.Add($content)
             }
         }
+        foreach ($item in $embeddedAssetLicenses) {
+            $content = [System.IO.File]::ReadAllText($item.File.FullName)
+            $content = $content.Replace("`r`n", "`n").Replace("`r", "`n").TrimEnd([char[]]"`n")
+            $sections.Add("")
+            $sections.Add("================================================================================")
+            $sections.Add("Embedded asset $($item.Component)")
+            $sections.Add("File $($item.File.Name)")
+            $sections.Add("================================================================================")
+            $sections.Add($content)
+        }
 
         $outputDirectory = Split-Path -Parent $outputPath
         [System.IO.Directory]::CreateDirectory($outputDirectory) | Out-Null
         $bundle = [string]::Join("`n", $sections) + "`n"
         [System.IO.File]::WriteAllText($outputPath, $bundle, [System.Text.UTF8Encoding]::new($false))
-        Write-Host "Wrote licenses for $($inventory.Count) compiled third-party modules to $outputPath"
+        Write-Host "Wrote licenses for $($inventory.Count) compiled third-party modules and $($embeddedAssetLicenses.Count) embedded asset groups to $outputPath"
     } else {
-        Write-Host "Verified license files for $($inventory.Count) compiled third-party modules."
+        Write-Host "Verified license files for $($inventory.Count) compiled third-party modules and $($embeddedAssetLicenses.Count) embedded asset groups."
     }
 } finally {
     Pop-Location

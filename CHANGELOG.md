@@ -10,6 +10,10 @@ Detailed rationale remains in [`docs/audits/`](docs/audits/).
 
 - Added a read-only local capture viewer with paginated event filters, decoded JSON details, bounded blob hex previews, loopback-only serving, and per-run access URLs. Open captures can be followed with `view --live`, and `run --web-viewer` starts the live browser view automatically without putting browser work on the forwarding path.
 
+### Changed
+
+- The capture viewer now embeds two OFL-licensed fan-made fonts. Minecraft Font Bold is used for uppercase headings, and Monocraft is used for all remaining interface and packet content without contacting a font CDN.
+
 ## [0.2.1] - 2026-09-17
 
 Supported Bedrock version: 1.26.50 (protocol 2193).

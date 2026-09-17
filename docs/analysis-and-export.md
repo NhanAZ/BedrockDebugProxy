@@ -68,7 +68,7 @@ Both modes keep a lightweight event index in memory while reading complete selec
 
 The live viewer is a derived reader of files the recorder has already committed. It is not a packet observer, recorder sink, WebSocket in the forwarding path, or source of backpressure. A slow or closed browser cannot delay forwarding. Terminal lifecycle, warning, error, and compact packet-summary output remains available independently.
 
-The HTTP listener is fixed to `127.0.0.1` and each run creates an unpredictable URL path. There is no LAN bind option. Browser assets are embedded in the executable and do not contact a CDN or other external service. The viewer is still able to display sensitive addresses, identifiers, chat, content keys, and decoded packet data from the local capture. Do not share its URL or expose the process through a separate tunnel or port forward.
+The HTTP listener is fixed to `127.0.0.1` and each run creates an unpredictable URL path. There is no LAN bind option. Browser assets are embedded in the executable and do not contact a CDN or other external service. This includes the OFL-licensed Minecraft Font Bold used for uppercase headings and Monocraft used for all remaining content. Their license and provenance are available from the viewer footer and [`THIRD_PARTY_NOTICES.md`](../THIRD_PARTY_NOTICES.md). The viewer is still able to display sensitive addresses, identifiers, chat, content keys, and decoded packet data from the local capture. Do not share its URL or expose the process through a separate tunnel or port forward.
 
 ## Portable export
 
