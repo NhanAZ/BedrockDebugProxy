@@ -6,16 +6,30 @@ Detailed rationale remains in [`docs/audits/`](docs/audits/).
 
 ## [Unreleased]
 
-### Documentation and maintenance
+## [0.2.1] - 2026-09-17
+
+Supported Bedrock version: 1.26.50 (protocol 2193).
+
+[Published release](https://github.com/NhanAZ/BedrockDebugProxy/releases/tag/v0.2.1) | [All changes since v0.2.0](https://github.com/NhanAZ/BedrockDebugProxy/compare/v0.2.0...v0.2.1)
+
+### Added
 
 - Added weekly Dependabot checks for the root Go module and GitHub Actions, with grouped non-major Go updates and no automatic merge.
 - Added a weekly Mojang protocol release watcher that opens a deduplicated investigation issue without changing protocol code automatically.
+
+### Changed
+
 - Clarified maintainer review-comment guidance for bot-authored dependency pull requests, including concise natural wording, bot-neutral language, and punctuation.
+- Documented the server-policy disclaimer, AI-assisted maintenance, protocol research, and resource-pack encryption review in the project guidance.
+- Release notes now link to the relevant section in this changelog and to GitHub's compare view for the complete release commit history.
+
+### Fixed
+
 - Aligned Bedrock 1.26.50 sub-chunk height-map decoding with the released upstream schema, including row-length validation while preserving raw forwarding.
 
-### Release process
+### Documentation and maintenance
 
-- Release notes now link to the relevant section in this changelog and to GitHub's compare view for the complete release commit history.
+- Updated dependency provenance and protocol baselines to record the merged gophertunnel 1.26.50 correction.
 
 ## [0.2.0] - 2026-09-16
 
