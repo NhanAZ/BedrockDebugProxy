@@ -190,6 +190,14 @@ Every new entry should state the symptom, root cause, implementation commits, ev
 - Evidence and validation: the viewer stylesheet audit found the separate heading face, repeated 14px declarations, and four uppercase transforms. The viewer HTTP regression test now checks the single-face, 12px, normal-weight, and natural-casing contract. Browser smoke validation covers the rebuilt page and themed controls.
 - Status: implemented with viewer-only impact. Browser zoom, operating-system scaling, and glyph fallback remain platform-specific.
 
+### FIX-0023 - Single-column viewer workspace
+
+- Symptom: the capture viewer split the event stream and inspection panels into two side-by-side columns, reducing the usable width of each evidence view.
+- Root cause: the workspace grid defined independent event and inspector columns and retained a breakpoint override with a second two-column definition.
+- Implementation: the workspace now has one full-width column with explicit scrollable rows for the event stream and inspector. The inspector still stacks decoded details above raw evidence, and the data flow and controls remain unchanged.
+- Evidence and validation: the stylesheet contained two workspace column definitions before this change. The viewer HTTP regression test now asserts the single-column track, stacked row sizing, and workspace scrolling while rejecting the prior two-column tracks. Browser smoke validation covers the rebuilt layout and filter interaction.
+- Status: implemented with viewer-only impact. The workspace scroll position and panel heights depend on the browser viewport.
+
 ## Ordering safety contract
 
 The deferred-packet change is deliberately narrow. `expectedIDs` remains the only authority for what the current login state accepts. The queue scan selects the earliest packet that is currently expected, leaves packets for later states queued, and never mutates or reorders bytes on the wire. The regression tests cover canonical resource-pack order, featured early `ResourcePacksInfo`, a later-phase packet queued ahead of the current phase, and all six permutations of the three login packets.
