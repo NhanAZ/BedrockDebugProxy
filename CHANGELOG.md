@@ -17,6 +17,7 @@ Detailed rationale remains in [`docs/audits/`](docs/audits/).
 - The capture viewer now uses one 14px normal-weight scale for all visible text and falls back to regular Monocraft instead of a bold heading face.
 - The capture viewer now uses square corners throughout its interface, including status indicators, controls, panels, and metadata cards.
 - The capture viewer now uses themed custom filter dropdowns with keyboard navigation instead of browser-native option popups, while keeping the original filter values and queries unchanged.
+- The contributor validation workflow now requires viewer asset, HTTP, JavaScript, and browser smoke checks in the same change whenever a web-facing change could affect the page.
 
 ## [0.2.1] - 2026-09-17
 

@@ -29,6 +29,7 @@ This file is the shortest path from a local change to a merge-ready pull request
    - Documentation, comments, and formatting-only changes may be exempt.
    - Code or any possible runtime behavior change requires The Hive validation.
    - A change to authentication, Experience routing, networking, protocol handling, resource packs, or another specific flow must exercise that flow directly.
+   - Any change that can affect the local web viewer must include the viewer asset and HTTP tests plus the JavaScript syntax check in the same change. Presentation or interaction changes must also be opened in a browser from the clean committed build, with the affected controls exercised and browser console errors checked. Follow [`docs/web-validation.md`](docs/web-validation.md).
 
 8. For a runtime change, build the exact commit and validate it before calling the pull request merge-ready.
 

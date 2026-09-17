@@ -70,6 +70,12 @@ try {
         throw "PowerShell source contains syntax errors."
     }
 
+    $nodeCommand = Get-Command node -ErrorAction SilentlyContinue
+    if ($null -eq $nodeCommand) {
+        throw "Node.js is required to validate the embedded viewer JavaScript."
+    }
+    Invoke-QualityCommand "viewer JavaScript syntax" $nodeCommand.Source @("--check", (Join-Path $projectRoot "internal/viewer/assets/app.js"))
+
     Invoke-QualityCommand "module tidiness" "go" @("mod", "tidy", "-diff")
     Invoke-QualityCommand "module integrity" "go" @("mod", "verify")
     Invoke-QualityCommand "third-party license inventory" "pwsh" @("-NoProfile", "-File", (Join-Path $PSScriptRoot "collect-third-party-licenses.ps1"))
