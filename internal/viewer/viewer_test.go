@@ -66,6 +66,11 @@ func TestViewerServesFilteredEventsAndBlobPreview(t *testing.T) {
 	if response.StatusCode != http.StatusOK || !strings.Contains(string(index), "Capture Viewer") {
 		t.Fatalf("index status = %d, body = %s", response.StatusCode, index)
 	}
+	for _, marker := range []string{`href="assets/app.css"`, `src="assets/app.js"`, `id="direction"`, `id="packet"`, `id="kind"`, `id="channel"`} {
+		if !strings.Contains(string(index), marker) {
+			t.Fatalf("index is missing viewer marker %q", marker)
+		}
+	}
 
 	var session sessionResponse
 	decodeURL(t, server.URL+"/test-token/api/session", &session)
@@ -126,6 +131,15 @@ func TestViewerServesEmbeddedFontAssets(t *testing.T) {
 	_ = response.Body.Close()
 	if response.StatusCode != http.StatusOK {
 		t.Fatalf("CSS status = %d, want %d", response.StatusCode, http.StatusOK)
+	}
+	jsResponse := get(t, server.URL+"/font-token/assets/app.js")
+	js, err := io.ReadAll(jsResponse.Body)
+	if err != nil {
+		t.Fatal(err)
+	}
+	_ = jsResponse.Body.Close()
+	if jsResponse.StatusCode != http.StatusOK || !strings.Contains(string(js), "setupCustomSelects") {
+		t.Fatalf("JavaScript asset status = %d or custom viewer setup is missing", jsResponse.StatusCode)
 	}
 	for _, source := range []string{`local("Mojangles")`, `local("Minecraft Ten")`} {
 		if !strings.Contains(string(css), source) {

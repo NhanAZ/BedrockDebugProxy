@@ -2,6 +2,8 @@
 
 Automated tests establish that the implementation matches local expectations. They do not establish that those expectations match live Minecraft Bedrock clients and servers. Runtime, networking, protocol, authentication, session, resource-pack, capture, encoding, and decoding changes remain awaiting manual validation until this workflow is complete.
 
+Changes that can affect the local web viewer have an additional same-change requirement. The commit must include the viewer asset and HTTP integration tests and the embedded JavaScript syntax check. Presentation or interaction changes must also be smoke-tested in a browser from a clean committed build. Use [`web-validation.md`](web-validation.md) for the exact scope and checklist.
+
 For the end-to-end pull request checklist, use [`../CONTRIBUTING.md`](../CONTRIBUTING.md). For the ordered five-server release checklist, use [`releasing.md`](releasing.md). See [`server-targets.md`](server-targets.md) for endpoint references and the server-policy disclaimer. This document defines how to create and judge the validation evidence used by both workflows.
 
 The automated suite includes a loopback integration session over RakNet. It exercises offline login, resource-pack negotiation with no packs, StartGame and spawn, typed packet forwarding in both directions, clean shutdown, raw packet capture, decoded events, connection metadata, and GameData snapshots. This catches local forwarding and capture regressions without accounts or public infrastructure. It does not exercise Microsoft authentication, the retail Minecraft client, public-server routing, transfers, live resource packs, or server-specific behavior and therefore does not replace the gates below.

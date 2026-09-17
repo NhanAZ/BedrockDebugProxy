@@ -44,6 +44,8 @@ $revision = (git rev-parse HEAD).Trim()
 
 The printed binary commit must equal `$revision`. Keep this exact binary for all five live tests. Do not rebuild from a different commit between servers.
 
+If the candidate can affect the local web viewer, complete the automated and browser checks in [`web-validation.md`](web-validation.md) from this clean revision before starting the five-server matrix. A release candidate with an untested page, missing embedded asset, JavaScript error, or unexplained browser-console error is not ready for publication.
+
 ## 3. Validate the five-server baseline
 
 Use a real Minecraft Bedrock client. For each server, start the same stamped binary, complete a normal session, exercise the named flow, stop with `Ctrl+C`, and wait for the capture verification message.

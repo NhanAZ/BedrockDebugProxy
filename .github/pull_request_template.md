@@ -13,6 +13,7 @@ Describe the problem, root cause, and focused change.
 - [ ] Documentation, comments, or formatting only. Live validation is not required.
 - [ ] Runtime behavior may change. The Hive validation is required.
 - [ ] A specific flow changed and was exercised directly.
+- [ ] The web viewer may be affected. Viewer asset, HTTP, and JavaScript checks passed, and browser smoke testing was completed for presentation or interaction changes.
 
 ## Evidence
 
