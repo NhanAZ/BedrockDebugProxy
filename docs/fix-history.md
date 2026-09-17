@@ -150,6 +150,14 @@ Every new entry should state the symptom, root cause, implementation commits, ev
 - Evidence and validation: Mojang `bedrock-protocol-docs` `v1.26.50` at `475bd72ed89036af4eb18426774ef3b953de7603`, gophertunnel `v1.62.0` at `7a556a07335b663744b50d38062636ad8283f314`, and upstream correction `709768d`. `TestSubChunkHeightMapRoundTripUsesRows` verifies wire row prefixes and value preservation. A fresh stamped The Hive baseline remains required.
 - Status: implemented with focused automated coverage; exact-revision live validation pending.
 
+### FIX-0018 - Square capture viewer surfaces
+
+- Symptom: the capture viewer used rounded corners on its logo, status indicator, controls, panels, pager buttons, and metadata cards even though the intended interface style is square.
+- Root cause: the viewer stylesheet retained several independent `border-radius` declarations from the earlier visual design.
+- Implementation: removed every `border-radius` declaration from the viewer stylesheet. Layout, colors, typography, controls, and capture behavior remain unchanged.
+- Evidence and validation: a stylesheet search confirms that `internal/viewer/assets/app.css` contains no corner-radius declarations. Automated viewer tests and a local browser check cover the rebuilt interface.
+- Status: implemented with no forwarding, capture, protocol, or resource-pack impact.
+
 ## Ordering safety contract
 
 The deferred-packet change is deliberately narrow. `expectedIDs` remains the only authority for what the current login state accepts. The queue scan selects the earliest packet that is currently expected, leaves packets for later states queued, and never mutates or reorders bytes on the wire. The regression tests cover canonical resource-pack order, featured early `ResourcePacksInfo`, a later-phase packet queued ahead of the current phase, and all six permutations of the three login packets.
