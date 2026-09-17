@@ -7,6 +7,8 @@ import (
 	"flag"
 	"fmt"
 	"io"
+	"net"
+	"net/http"
 	"os"
 	"os/signal"
 	"path/filepath"
@@ -23,6 +25,7 @@ import (
 	"github.com/NhanAZ/BedrockDebugProxy/internal/capturearchive"
 	"github.com/NhanAZ/BedrockDebugProxy/internal/experience"
 	"github.com/NhanAZ/BedrockDebugProxy/internal/proxy"
+	"github.com/NhanAZ/BedrockDebugProxy/internal/viewer"
 	"github.com/sandertv/gophertunnel/minecraft/protocol"
 	"golang.org/x/oauth2"
 )
@@ -45,6 +48,8 @@ func run(args []string, stdout, stderr io.Writer) int {
 		return runVerify(args[1:], stdout, stderr)
 	case "inspect":
 		return runInspect(args[1:], stdout, stderr)
+	case "view":
+		return runView(args[1:], stdout, stderr)
 	case "analyze":
 		return runAnalyze(args[1:], stdout, stderr)
 	case "explain":
@@ -385,6 +390,87 @@ func runInspect(args []string, stdout, stderr io.Writer) int {
 	return 0
 }
 
+func runView(args []string, stdout, stderr io.Writer) int {
+	flags := flag.NewFlagSet("view", flag.ContinueOnError)
+	flags.SetOutput(stderr)
+	noOpen := flags.Bool("no-open", false, "do not open the viewer in the default browser")
+	flags.Usage = func() {
+		_, _ = fmt.Fprintln(stderr, "Usage - bedrock-debug-proxy view [--no-open] CAPTURE_DIRECTORY")
+		flags.PrintDefaults()
+	}
+	if err := flags.Parse(args); err != nil {
+		return 2
+	}
+	if flags.NArg() != 1 {
+		flags.Usage()
+		return 2
+	}
+	_, _ = fmt.Fprintln(stdout, "Verifying and indexing the closed capture...")
+	captureViewer, err := viewer.Open(flags.Arg(0), viewer.Options{})
+	if err != nil {
+		_, _ = fmt.Fprintf(stderr, "Open capture viewer - %v\n", err)
+		return 1
+	}
+	var listenConfig net.ListenConfig
+	listener, err := listenConfig.Listen(context.Background(), "tcp4", "127.0.0.1:0")
+	if err != nil {
+		_, _ = fmt.Fprintf(stderr, "Start capture viewer - %v\n", err)
+		return 1
+	}
+	token, err := viewer.NewAccessToken()
+	if err != nil {
+		_ = listener.Close()
+		_, _ = fmt.Fprintf(stderr, "Start capture viewer - %v\n", err)
+		return 1
+	}
+	url := "http://" + listener.Addr().String() + "/" + token + "/"
+	server := &http.Server{
+		Handler:           captureViewer.Handler(token),
+		ReadHeaderTimeout: 5 * time.Second,
+		IdleTimeout:       30 * time.Second,
+	}
+	serveResult := make(chan error, 1)
+	go func() {
+		err := server.Serve(listener)
+		if errors.Is(err, http.ErrServerClosed) {
+			err = nil
+		}
+		serveResult <- err
+	}()
+	_, _ = fmt.Fprintf(stdout, "Capture viewer %s\n", url)
+	_, _ = fmt.Fprintln(stdout, "The viewer is read-only and bound to this computer. Press Ctrl+C to stop it.")
+	if !*noOpen {
+		if err := viewer.OpenBrowser(url); err != nil {
+			_, _ = fmt.Fprintf(stderr, "Open browser - %v. Open the printed URL manually.\n", err)
+		}
+	}
+
+	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
+	defer stop()
+	select {
+	case err := <-serveResult:
+		if err != nil {
+			_, _ = fmt.Fprintf(stderr, "Capture viewer stopped with an error - %v\n", err)
+			return 1
+		}
+	case <-ctx.Done():
+		shutdownContext, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+		err := server.Shutdown(shutdownContext)
+		cancel()
+		if err != nil {
+			_ = server.Close()
+			_, _ = fmt.Fprintf(stderr, "Stop capture viewer - %v\n", err)
+			return 1
+		}
+		if err := <-serveResult; err != nil {
+			_, _ = fmt.Fprintf(stderr, "Capture viewer stopped with an error - %v\n", err)
+			return 1
+		}
+	}
+	_, _ = fmt.Fprintln(stdout, "Capture viewer stopped.")
+	return 0
+}
+
 func runAnalyze(args []string, stdout, stderr io.Writer) int {
 	if len(args) != 1 {
 		_, _ = fmt.Fprintln(stderr, "Usage - bedrock-debug-proxy analyze CAPTURE_DIRECTORY")
@@ -493,6 +579,7 @@ func printUsage(writer io.Writer) {
 	_, _ = fmt.Fprintln(writer, "  bedrock-debug-proxy logout")
 	_, _ = fmt.Fprintln(writer, "  bedrock-debug-proxy verify CAPTURE_DIRECTORY")
 	_, _ = fmt.Fprintln(writer, "  bedrock-debug-proxy inspect [filters] CAPTURE_DIRECTORY")
+	_, _ = fmt.Fprintln(writer, "  bedrock-debug-proxy view [--no-open] CAPTURE_DIRECTORY")
 	_, _ = fmt.Fprintln(writer, "  bedrock-debug-proxy analyze CAPTURE_DIRECTORY")
 	_, _ = fmt.Fprintln(writer, "  bedrock-debug-proxy explain CAPTURE_DIRECTORY")
 	_, _ = fmt.Fprintln(writer, "  bedrock-debug-proxy export CAPTURE_DIRECTORY OUTPUT.bdpcap")

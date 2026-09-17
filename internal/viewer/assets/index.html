@@ -1,0 +1,105 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="color-scheme" content="dark">
+  <title>Bedrock Capture Viewer</title>
+  <link rel="stylesheet" href="assets/app.css">
+</head>
+<body>
+  <header class="topbar">
+    <div class="brand">
+      <span class="brand-mark" aria-hidden="true"></span>
+      <div>
+        <p class="eyebrow">BEDROCKDEBUGPROXY</p>
+        <h1>Capture Viewer</h1>
+      </div>
+    </div>
+    <div class="capture-identity">
+      <span id="capture-status" class="status-pill">Loading</span>
+      <code id="capture-id">Opening capture...</code>
+    </div>
+  </header>
+
+  <section class="overview" aria-label="Capture overview">
+    <div class="metric"><span>Events</span><strong id="event-count">-</strong></div>
+    <div class="metric"><span>Blobs</span><strong id="blob-count">-</strong></div>
+    <div class="metric"><span>Duration</span><strong id="duration">-</strong></div>
+    <div class="metric"><span>Generator</span><strong id="generator">-</strong></div>
+  </section>
+
+  <section class="filters" aria-label="Event filters">
+    <label class="search-field">
+      <span class="sr-only">Search events</span>
+      <span aria-hidden="true">⌕</span>
+      <input id="search" type="search" placeholder="Search sequence, packet, kind, status, or error" autocomplete="off">
+      <kbd>Ctrl F</kbd>
+    </label>
+    <label><span>Direction</span><select id="direction"><option value="">All directions</option></select></label>
+    <label><span>Packet</span><select id="packet"><option value="">All packets</option></select></label>
+    <label><span>Kind</span><select id="kind"><option value="">All kinds</option></select></label>
+    <label><span>Channel</span><select id="channel"><option value="">All channels</option></select></label>
+    <label class="problem-toggle"><input id="problems" type="checkbox"><span>Problems only</span></label>
+    <button id="reset" class="quiet-button" type="button">Reset</button>
+  </section>
+
+  <main class="workspace">
+    <section class="panel event-panel" aria-labelledby="events-heading">
+      <div class="panel-heading">
+        <div>
+          <p class="eyebrow">ORDERED STREAM</p>
+          <h2 id="events-heading">Events</h2>
+        </div>
+        <div class="pager">
+          <button id="previous" type="button" aria-label="Previous page">←</button>
+          <span id="page-label">-</span>
+          <button id="next" type="button" aria-label="Next page">→</button>
+        </div>
+      </div>
+      <div class="table-wrap">
+        <table>
+          <thead>
+            <tr><th>Seq</th><th>Time</th><th>Flow</th><th>Event</th><th>Details</th></tr>
+          </thead>
+          <tbody id="event-rows"></tbody>
+        </table>
+        <div id="empty-state" class="empty-state" hidden>No events match these filters.</div>
+      </div>
+    </section>
+
+    <aside class="inspector">
+      <section class="panel detail-panel" aria-labelledby="details-heading">
+        <div class="panel-heading">
+          <div>
+            <p class="eyebrow">DECODED VIEW</p>
+            <h2 id="details-heading">Event details</h2>
+          </div>
+          <button id="copy-json" class="quiet-button" type="button" disabled>Copy JSON</button>
+        </div>
+        <div id="event-details" class="detail-content">
+          <div class="selection-prompt">Select an event to inspect its metadata and decoded fields.</div>
+        </div>
+      </section>
+
+      <section class="panel bytes-panel" aria-labelledby="bytes-heading">
+        <div class="panel-heading">
+          <div>
+            <p class="eyebrow">RAW EVIDENCE</p>
+            <h2 id="bytes-heading">Blob bytes</h2>
+          </div>
+          <span id="byte-status" class="muted">No blob selected</span>
+        </div>
+        <pre id="hex-view" class="hex-view">Select an event with a blob reference.</pre>
+      </section>
+    </aside>
+  </main>
+
+  <footer>
+    <span id="viewer-status" aria-live="polite">Opening and verifying capture...</span>
+    <span>Read-only local viewer. The canonical capture is unchanged.</span>
+  </footer>
+
+  <script src="assets/app.js"></script>
+</body>
+</html>

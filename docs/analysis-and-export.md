@@ -54,6 +54,16 @@ bedrock-debug-proxy inspect --kind packet.decode_error --direction server_to_cli
 
 The command verifies referenced blobs before streaming and exits with status 1 if the verifier found an issue. Event output may include private payload metadata and resource-pack content keys. Treat it with the same care as the capture.
 
+## Local capture viewer
+
+`bedrock-debug-proxy view CAPTURE_DIRECTORY` verifies and indexes a closed capture, starts a temporary HTTP server on an automatically selected IPv4 loopback port, and opens the default browser. Use `--no-open` to print the URL without starting a browser.
+
+The interface provides server-side pagination and filters for direction, packet name, event kind, channel, text, and problem events. Selecting a row loads its complete event JSON on demand and shows at most 64 KiB of its referenced blob as a hex preview. The decoded tree stops rendering after 4,000 nodes so one unusually large event cannot make the browser unresponsive. These are display limits only. They do not modify, truncate, or replace the canonical event stream or blobs.
+
+The viewer accepts only a closed capture with no verifier issues. It keeps a lightweight event index in memory while reading complete selected events from `events.jsonl` on demand. Startup therefore includes full blob verification and one event-stream indexing pass. Very large captures can take time to open and consume memory proportional to their event count, but not to their decoded payload size.
+
+The HTTP listener is fixed to `127.0.0.1` and each run creates an unpredictable URL path. There is no LAN bind option. Browser assets are embedded in the executable and do not contact a CDN or other external service. The viewer is still able to display sensitive addresses, identifiers, chat, content keys, and decoded packet data from the local capture. Do not share its URL or expose the process through a separate tunnel or port forward.
+
 ## Portable export
 
 `export` accepts only a closed capture with no verifier issues. It creates a deterministic, uncompressed ZIP-compatible `.bdpcap` file outside the source directory without replacing any existing file. The CLI returns the absolute output path, archive SHA-256, byte length, entry count, and whether decrypted resource-pack artifacts are present as JSON. When they are present, it also writes a warning to standard error that the project license grants no ownership or redistribution rights for those assets.
