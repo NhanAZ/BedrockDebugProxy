@@ -18,8 +18,160 @@ const elements = Object.fromEntries([
   "copy-json", "byte-status", "hex-view", "viewer-status", "follow", "follow-container",
 ].map((id) => [id, document.getElementById(id)]));
 
+const filterSelectKeys = ["direction", "packet", "kind", "channel"];
+const customSelects = new Map();
 let searchTimer;
 let pollTimer;
+
+function closeCustomSelect(select) {
+  const custom = customSelects.get(select);
+  if (!custom) return;
+  custom.menu.hidden = true;
+  custom.trigger.setAttribute("aria-expanded", "false");
+}
+
+function closeAllCustomSelects(except) {
+  for (const select of customSelects.keys()) {
+    if (select !== except) closeCustomSelect(select);
+  }
+}
+
+function updateCustomSelectActive(select) {
+  const custom = customSelects.get(select);
+  if (!custom) return;
+  for (const option of custom.menu.querySelectorAll(".select-option")) {
+    option.classList.toggle("active", Number(option.dataset.index) === custom.activeIndex);
+  }
+  custom.menu.querySelector(`[data-index="${custom.activeIndex}"]`)?.scrollIntoView({ block: "nearest" });
+}
+
+function syncCustomSelect(select) {
+  const custom = customSelects.get(select);
+  if (!custom) return;
+  const options = Array.from(select.options);
+  const selectedIndex = Math.max(0, select.selectedIndex);
+  custom.activeIndex = selectedIndex;
+  custom.trigger.textContent = options[selectedIndex]?.textContent || "";
+  custom.menu.replaceChildren();
+  for (const [index, option] of options.entries()) {
+    const item = document.createElement("div");
+    item.className = "select-option";
+    item.dataset.index = String(index);
+    item.setAttribute("role", "option");
+    item.setAttribute("aria-selected", String(index === selectedIndex));
+    item.textContent = option.textContent;
+    item.addEventListener("pointerdown", (event) => {
+      event.preventDefault();
+      selectCustomOption(select, index);
+    });
+    item.addEventListener("mouseenter", () => {
+      custom.activeIndex = index;
+      updateCustomSelectActive(select);
+    });
+    custom.menu.append(item);
+  }
+  updateCustomSelectActive(select);
+}
+
+function openCustomSelect(select) {
+  const custom = customSelects.get(select);
+  if (!custom) return;
+  closeAllCustomSelects(select);
+  custom.activeIndex = Math.max(0, select.selectedIndex);
+  custom.menu.hidden = false;
+  custom.trigger.setAttribute("aria-expanded", "true");
+  updateCustomSelectActive(select);
+}
+
+function selectCustomOption(select, index) {
+  const custom = customSelects.get(select);
+  const option = select.options[index];
+  if (!custom || !option) return;
+  select.selectedIndex = index;
+  select.dispatchEvent(new Event("change", { bubbles: true }));
+  syncCustomSelect(select);
+  closeCustomSelect(select);
+  custom.trigger.focus();
+}
+
+function moveCustomSelectActive(select, delta) {
+  const custom = customSelects.get(select);
+  if (!custom || !select.options.length) return;
+  const count = select.options.length;
+  custom.activeIndex = (custom.activeIndex + delta + count) % count;
+  updateCustomSelectActive(select);
+}
+
+function setupCustomSelects() {
+  for (const key of filterSelectKeys) {
+    const select = elements[key];
+    const label = select.closest("label");
+    const labelText = label?.querySelector(":scope > span")?.textContent.trim() || key;
+    const wrapper = document.createElement("span");
+    wrapper.className = "select-control";
+    select.replaceWith(wrapper);
+    wrapper.append(select);
+    select.classList.add("native-select");
+    select.tabIndex = -1;
+    select.setAttribute("aria-hidden", "true");
+
+    const trigger = document.createElement("button");
+    trigger.type = "button";
+    trigger.className = "select-trigger";
+    trigger.setAttribute("aria-label", labelText);
+    trigger.setAttribute("aria-haspopup", "listbox");
+    trigger.setAttribute("aria-expanded", "false");
+
+    const menu = document.createElement("div");
+    menu.className = "select-menu";
+    menu.id = `${key}-menu`;
+    menu.hidden = true;
+    menu.setAttribute("role", "listbox");
+    trigger.setAttribute("aria-controls", menu.id);
+    wrapper.append(trigger, menu);
+
+    customSelects.set(select, { wrapper, trigger, menu, activeIndex: 0 });
+    select.addEventListener("change", () => syncCustomSelect(select));
+    trigger.addEventListener("click", () => {
+      if (menu.hidden) openCustomSelect(select);
+      else closeCustomSelect(select);
+    });
+    trigger.addEventListener("keydown", (event) => {
+      if (event.key === "ArrowDown" || event.key === "ArrowUp") {
+        event.preventDefault();
+        if (menu.hidden) openCustomSelect(select);
+        else moveCustomSelectActive(select, event.key === "ArrowDown" ? 1 : -1);
+        return;
+      }
+      if (event.key === "Home" || event.key === "End") {
+        if (menu.hidden) return;
+        event.preventDefault();
+        const custom = customSelects.get(select);
+        custom.activeIndex = event.key === "Home" ? 0 : select.options.length - 1;
+        updateCustomSelectActive(select);
+        return;
+      }
+      if (event.key === "Enter" || event.key === " ") {
+        event.preventDefault();
+        if (menu.hidden) openCustomSelect(select);
+        else selectCustomOption(select, customSelects.get(select).activeIndex);
+        return;
+      }
+      if (event.key === "Escape" && !menu.hidden) {
+        event.preventDefault();
+        closeCustomSelect(select);
+      }
+    });
+    syncCustomSelect(select);
+  }
+  document.addEventListener("pointerdown", (event) => {
+    for (const [select, custom] of customSelects) {
+      if (!custom.wrapper.contains(event.target)) closeCustomSelect(select);
+    }
+  });
+}
+
+setupCustomSelects();
 
 async function requestJSON(path) {
   const response = await fetch(path, { headers: { Accept: "application/json" } });
@@ -66,6 +218,7 @@ function syncOptions(select, values) {
     select.append(option);
   }
   if ((values || []).includes(selected)) select.value = selected;
+  syncCustomSelect(select);
 }
 
 async function loadSession() {
@@ -312,7 +465,10 @@ function clearSelection() {
 
 function resetFilters() {
   elements.search.value = "";
-  for (const key of ["direction", "packet", "kind", "channel"]) elements[key].value = "";
+  for (const key of filterSelectKeys) {
+    elements[key].value = "";
+    syncCustomSelect(elements[key]);
+  }
   elements.problems.checked = false;
   state.offset = 0;
   loadEvents({ preserveSelection: false }).catch(showFatal);
