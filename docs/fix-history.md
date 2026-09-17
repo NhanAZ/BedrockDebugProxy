@@ -166,6 +166,14 @@ Every new entry should state the symptom, root cause, implementation commits, ev
 - Evidence and validation: local name-table inspection identified the supplied files as `Mojangles` and `Minecraft Ten`. The official [Minecraft Usage Guidelines](https://www.minecraft.net/en-us/usage-guidelines) identify fonts as part of the Minecraft brand and prohibit redistribution of game files. A viewer HTTP regression test verifies both `local()` sources.
 - Status: implemented with viewer-only impact. Exact appearance depends on the font being installed and available to the browser.
 
+### FIX-0020 - Uniform normal-weight viewer typography
+
+- Symptom: viewer text used several small and large font sizes and bold weights across headings, filters, metadata, packet rows, JSON, hex evidence, and the footer.
+- Root cause: the stylesheet assigned independent type sizes and weights to each interface role, and headings fell back to an embedded bold face when the optional local font was unavailable.
+- Implementation: normalize visible text to 14px, set all viewer text roles to normal weight, and use regular Monocraft as the heading fallback. Local Mojangles and Minecraft Ten preferences remain opt-in through browser `local()` lookup.
+- Evidence and validation: a stylesheet audit found all prior size and weight declarations. The viewer HTTP regression test rejects the previous non-uniform sizes and bold weights while checking the local font sources. No forwarding, capture, protocol, or resource-pack behavior changes.
+- Status: implemented with viewer-only impact. Browser rendering and local font availability remain platform-specific.
+
 ## Ordering safety contract
 
 The deferred-packet change is deliberately narrow. `expectedIDs` remains the only authority for what the current login state accepts. The queue scan selects the earliest packet that is currently expected, leaves packets for later states queued, and never mutates or reorders bytes on the wire. The regression tests cover canonical resource-pack order, featured early `ResourcePacksInfo`, a later-phase packet queued ahead of the current phase, and all six permutations of the three login packets.
