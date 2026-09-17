@@ -17,11 +17,13 @@ The local capture viewer embeds the following unmodified font files. They remain
 | Font file | Source revision | SHA-256 | Viewer role |
 | --- | --- | --- | --- |
 | `Monocraft.ttf` | [`IdreesInc/Monocraft` `e498bf70aeb25b4bdcff1e44d878fb2cb4f7c2a9`](https://github.com/IdreesInc/Monocraft/blob/e498bf70aeb25b4bdcff1e44d878fb2cb4f7c2a9/dist/Monocraft-ttf/Monocraft.ttf) | `262e31822e0a75be567b02320bfa092143d871e8a273e529d1c5ab0c04cd215f` | Content, packet data, decoded JSON, and hex evidence |
-| `Minecraft-Bold.otf` | [`IdreesInc/Minecraft-Font` `261ac77fbf28796ca09c22eb83ecdfe386c4b838`](https://github.com/IdreesInc/Minecraft-Font/blob/261ac77fbf28796ca09c22eb83ecdfe386c4b838/Minecraft-Bold.otf) | `2a7216d047fd2991aa8a2fcbc002e0782a903d68de3cc248092ffa88aa941b4f` | Uppercase viewer headings and labels |
+| `Minecraft-Bold.otf` | [`IdreesInc/Minecraft-Font` `261ac77fbf28796ca09c22eb83ecdfe386c4b838`](https://github.com/IdreesInc/Minecraft-Font/blob/261ac77fbf28796ca09c22eb83ecdfe386c4b838/Minecraft-Bold.otf) | `2a7216d047fd2991aa8a2fcbc002e0782a903d68de3cc248092ffa88aa941b4f` | Embedded compatibility asset, not selected by the current stylesheet |
 
 Both upstream projects describe the fonts as independent fan-made emulations and state that they do not contain assets or font files from Minecraft. BedrockDebugProxy is not affiliated with or endorsed by Mojang or Microsoft. The font names identify the upstream files and do not imply official status.
 
 The viewer stylesheet also checks for locally installed `Mojangles` and `Minecraft Ten` fonts before these embedded fallbacks. Those proprietary files are not present in this repository, executable, or license bundle. A local installation remains subject to the rights holder's terms. The viewer does not read or serve arbitrary font paths.
+
+The current stylesheet uses regular Monocraft as the fallback for every visible text role. The previously embedded Minecraft-Bold asset remains available from its existing protected asset route and license bundle, but this typography configuration does not select it.
 
 ## Direct runtime dependencies
 
