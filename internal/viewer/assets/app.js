@@ -1,0 +1,370 @@
+"use strict";
+
+const state = {
+  offset: 0,
+  limit: 100,
+  total: 0,
+  rows: [],
+  selectedSequence: null,
+  selectedEvent: null,
+  requestVersion: 0,
+};
+
+const elements = Object.fromEntries([
+  "capture-status", "capture-id", "event-count", "blob-count", "duration", "generator",
+  "search", "direction", "packet", "kind", "channel", "problems", "reset",
+  "previous", "next", "page-label", "event-rows", "empty-state", "event-details",
+  "copy-json", "byte-status", "hex-view", "viewer-status",
+].map((id) => [id, document.getElementById(id)]));
+
+let searchTimer;
+
+async function requestJSON(path) {
+  const response = await fetch(path, { headers: { Accept: "application/json" } });
+  const value = await response.json();
+  if (!response.ok) {
+    throw new Error(value.error || `Request failed with status ${response.status}`);
+  }
+  return value;
+}
+
+function formatCount(value) {
+  return new Intl.NumberFormat().format(value);
+}
+
+function formatDuration(nanoseconds) {
+  const milliseconds = Number(BigInt(nanoseconds || "0") / 1000000n);
+  if (milliseconds < 1000) return `${milliseconds} ms`;
+  const seconds = milliseconds / 1000;
+  if (seconds < 60) return `${seconds.toFixed(seconds < 10 ? 2 : 1)} s`;
+  const minutes = Math.floor(seconds / 60);
+  return `${minutes}m ${(seconds % 60).toFixed(1)}s`;
+}
+
+function eventClock(value) {
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return value || "-";
+  return date.toLocaleTimeString([], { hour12: false, hour: "2-digit", minute: "2-digit", second: "2-digit", fractionalSecondDigits: 3 });
+}
+
+function flowLabel(direction) {
+  if (direction === "client_to_server") return "C → S";
+  if (direction === "server_to_client") return "S → C";
+  if (direction === "internal") return "LOCAL";
+  return "?";
+}
+
+function fillOptions(select, values) {
+  for (const value of values || []) {
+    const option = document.createElement("option");
+    option.value = value;
+    option.textContent = value;
+    select.append(option);
+  }
+}
+
+async function loadSession() {
+  const session = await requestJSON("api/session");
+  const manifest = session.manifest;
+  elements["capture-status"].textContent = manifest.status;
+  elements["capture-id"].textContent = manifest.capture_id;
+  elements["event-count"].textContent = formatCount(session.events);
+  elements["blob-count"].textContent = formatCount(session.blobs);
+  const start = Date.parse(manifest.started_at);
+  const end = Date.parse(manifest.ended_at);
+  elements.duration.textContent = Number.isNaN(start) || Number.isNaN(end) ? "-" : formatDuration(String((end - start) * 1000000));
+  const generator = manifest.generator;
+  elements.generator.textContent = [generator.name, generator.version].filter(Boolean).join(" ") || "-";
+  fillOptions(elements.direction, session.filters.directions);
+  fillOptions(elements.packet, session.filters.packets);
+  fillOptions(elements.kind, session.filters.kinds);
+  fillOptions(elements.channel, session.filters.channels);
+}
+
+function filterQuery() {
+  const query = new URLSearchParams({ offset: String(state.offset), limit: String(state.limit) });
+  for (const key of ["search", "direction", "packet", "kind", "channel"]) {
+    const value = elements[key].value.trim();
+    if (value) query.set(key === "search" ? "q" : key, value);
+  }
+  if (elements.problems.checked) query.set("problems", "true");
+  return query.toString();
+}
+
+async function loadEvents({ preserveSelection = true } = {}) {
+  const version = ++state.requestVersion;
+  elements["viewer-status"].textContent = "Loading events...";
+  const result = await requestJSON(`api/events?${filterQuery()}`);
+  if (version !== state.requestVersion) return;
+  state.total = result.total;
+  state.rows = result.rows;
+  renderRows();
+  updatePager();
+  if (!preserveSelection || !state.rows.some((row) => row.sequence === state.selectedSequence)) {
+    clearSelection();
+  } else {
+    markSelectedRow();
+  }
+  const start = state.total === 0 ? 0 : state.offset + 1;
+  const end = Math.min(state.offset + state.rows.length, state.total);
+  elements["viewer-status"].textContent = `Showing ${formatCount(start)}-${formatCount(end)} of ${formatCount(state.total)} matching events`;
+}
+
+function renderRows() {
+  elements["event-rows"].replaceChildren();
+  elements["empty-state"].hidden = state.rows.length !== 0;
+  for (const row of state.rows) {
+    const tr = document.createElement("tr");
+    tr.dataset.sequence = String(row.sequence);
+    tr.tabIndex = 0;
+    if (row.problem) tr.classList.add("problem");
+
+    const sequence = cell(`#${row.sequence}`, "sequence");
+    const time = cell(eventClock(row.time), "time");
+    const flow = cell(flowLabel(row.direction), `flow ${row.direction || "unknown"}`);
+    const eventCell = document.createElement("td");
+    const eventName = document.createElement("span");
+    eventName.className = "event-name";
+    eventName.textContent = row.packet?.name || row.kind;
+    const eventKind = document.createElement("span");
+    eventKind.className = "event-kind";
+    eventKind.textContent = row.packet ? `${row.kind} · 0x${row.packet.id.toString(16).padStart(2, "0")}` : row.channel || row.stage || "event";
+    eventCell.append(eventName, eventKind);
+    const details = cell(row.summary || "-", row.problem ? "problem-text" : "");
+    tr.append(sequence, time, flow, eventCell, details);
+    tr.addEventListener("click", () => selectEvent(row.sequence));
+    tr.addEventListener("keydown", (event) => {
+      if (event.key === "Enter" || event.key === " ") {
+        event.preventDefault();
+        selectEvent(row.sequence);
+      }
+    });
+    elements["event-rows"].append(tr);
+  }
+  markSelectedRow();
+}
+
+function cell(text, className) {
+  const td = document.createElement("td");
+  td.textContent = text;
+  if (className) td.className = className;
+  td.title = text;
+  return td;
+}
+
+function updatePager() {
+  const page = state.total === 0 ? 0 : Math.floor(state.offset / state.limit) + 1;
+  const pages = state.total === 0 ? 0 : Math.ceil(state.total / state.limit);
+  elements["page-label"].textContent = `${page} / ${pages}`;
+  elements.previous.disabled = state.offset === 0;
+  elements.next.disabled = state.offset + state.limit >= state.total;
+}
+
+function markSelectedRow() {
+  for (const tr of elements["event-rows"].querySelectorAll("tr")) {
+    tr.classList.toggle("selected", Number(tr.dataset.sequence) === state.selectedSequence);
+  }
+}
+
+async function selectEvent(sequence) {
+  state.selectedSequence = sequence;
+  markSelectedRow();
+  elements["event-details"].textContent = "Loading event details...";
+  elements["hex-view"].textContent = "Loading blob preview...";
+  try {
+    const result = await requestJSON(`api/events/${sequence}`);
+    if (state.selectedSequence !== sequence) return;
+    state.selectedEvent = result.event;
+    renderEvent(result);
+  } catch (error) {
+    if (state.selectedSequence !== sequence) return;
+    elements["event-details"].textContent = error.message;
+    elements["hex-view"].textContent = "Blob preview unavailable.";
+    elements["viewer-status"].textContent = error.message;
+  }
+}
+
+function renderEvent(result) {
+  const event = result.event;
+  elements["copy-json"].disabled = false;
+  const container = document.createDocumentFragment();
+  const meta = document.createElement("div");
+  meta.className = "meta-grid";
+  const fields = [
+    ["Sequence", `#${event.sequence}`], ["Elapsed", formatDuration(event.elapsed_nano)],
+    ["Direction", flowLabel(event.direction)], ["Kind", event.kind],
+    ["Channel", event.channel || "-"], ["Hop", event.hop ? String(event.hop) : "-"],
+    ["Packet", event.packet?.name || "-"], ["Decode", event.packet?.decode_status || "-"],
+  ];
+  for (const [label, value] of fields) {
+    const item = document.createElement("div");
+    item.className = "meta-item";
+    const name = document.createElement("span");
+    name.textContent = label;
+    const content = document.createElement("strong");
+    content.textContent = value;
+    content.title = value;
+    item.append(name, content);
+    meta.append(item);
+  }
+  container.append(meta);
+
+  const tree = document.createElement("div");
+  tree.className = "json-tree";
+  const budget = { remaining: 4000, clipped: false };
+  tree.append(renderJSON("event", event, budget));
+  if (budget.clipped) {
+    const note = document.createElement("p");
+    note.className = "muted";
+    note.textContent = "The decoded tree display stopped after 4,000 nodes. The canonical event remains complete.";
+    tree.append(note);
+  }
+  container.append(tree);
+  elements["event-details"].replaceChildren(container);
+  renderHex(result.blob_preview, result.blob_preview_truncated, event.blob);
+}
+
+function renderJSON(key, value, budget) {
+  if (budget.remaining-- <= 0) {
+    budget.clipped = true;
+    return textValue(key, "display limit reached", "json-null");
+  }
+  if (value !== null && typeof value === "object") {
+    const details = document.createElement("details");
+    details.open = key === "event" || key === "data";
+    const summary = document.createElement("summary");
+    const keySpan = document.createElement("span");
+    keySpan.className = "json-key";
+    keySpan.textContent = key;
+    const count = Array.isArray(value) ? value.length : Object.keys(value).length;
+    summary.append(keySpan, document.createTextNode(Array.isArray(value) ? ` [${count}]` : ` {${count}}`));
+    details.append(summary);
+    const entries = Array.isArray(value) ? value.entries() : Object.entries(value);
+    for (const [childKey, childValue] of entries) {
+      if (budget.remaining <= 0) {
+        budget.clipped = true;
+        break;
+      }
+      details.append(renderJSON(String(childKey), childValue, budget));
+    }
+    return details;
+  }
+  const className = value === null ? "json-null" : `json-${typeof value}`;
+  const formatted = typeof value === "string" ? JSON.stringify(value) : String(value);
+  return textValue(key, formatted, className);
+}
+
+function textValue(key, value, className) {
+  const line = document.createElement("div");
+  line.className = "json-value";
+  const keySpan = document.createElement("span");
+  keySpan.className = "json-key";
+  keySpan.textContent = `${key}: `;
+  const valueSpan = document.createElement("span");
+  valueSpan.className = className;
+  valueSpan.textContent = value;
+  line.append(keySpan, valueSpan);
+  return line;
+}
+
+function renderHex(encoded, truncated, blob) {
+  if (!encoded || !blob) {
+    elements["byte-status"].textContent = "No blob selected";
+    elements["hex-view"].textContent = "This event has no content-addressed blob.";
+    return;
+  }
+  const binary = atob(encoded);
+  const bytes = Uint8Array.from(binary, (character) => character.charCodeAt(0));
+  const lines = [];
+  for (let offset = 0; offset < bytes.length; offset += 16) {
+    const slice = bytes.slice(offset, offset + 16);
+    const hex = Array.from(slice, (byte) => byte.toString(16).padStart(2, "0")).join(" ").padEnd(47, " ");
+    const ascii = Array.from(slice, (byte) => byte >= 32 && byte <= 126 ? String.fromCharCode(byte) : ".").join("");
+    lines.push(`${offset.toString(16).padStart(8, "0")}  ${hex}  |${ascii}|`);
+  }
+  elements["hex-view"].textContent = lines.join("\n") || "Blob is empty.";
+  const suffix = truncated ? ` of ${formatCount(blob.size)} bytes` : " bytes";
+  elements["byte-status"].textContent = `${formatCount(bytes.length)}${suffix} · ${blob.representation || blob.media_type || "blob"}`;
+}
+
+function clearSelection() {
+  state.selectedSequence = null;
+  state.selectedEvent = null;
+  markSelectedRow();
+  elements["copy-json"].disabled = true;
+  elements["event-details"].innerHTML = '<div class="selection-prompt">Select an event to inspect its metadata and decoded fields.</div>';
+  elements["byte-status"].textContent = "No blob selected";
+  elements["hex-view"].textContent = "Select an event with a blob reference.";
+}
+
+function resetFilters() {
+  elements.search.value = "";
+  for (const key of ["direction", "packet", "kind", "channel"]) elements[key].value = "";
+  elements.problems.checked = false;
+  state.offset = 0;
+  loadEvents({ preserveSelection: false }).catch(showFatal);
+}
+
+function showFatal(error) {
+  elements["viewer-status"].textContent = error.message;
+  elements["event-rows"].replaceChildren();
+  elements["empty-state"].hidden = false;
+  elements["empty-state"].textContent = error.message;
+}
+
+for (const key of ["direction", "packet", "kind", "channel", "problems"]) {
+  elements[key].addEventListener("change", () => {
+    state.offset = 0;
+    loadEvents({ preserveSelection: false }).catch(showFatal);
+  });
+}
+
+elements.search.addEventListener("input", () => {
+  clearTimeout(searchTimer);
+  searchTimer = setTimeout(() => {
+    state.offset = 0;
+    loadEvents({ preserveSelection: false }).catch(showFatal);
+  }, 180);
+});
+
+elements.reset.addEventListener("click", resetFilters);
+elements.previous.addEventListener("click", () => {
+  state.offset = Math.max(0, state.offset - state.limit);
+  loadEvents().catch(showFatal);
+});
+elements.next.addEventListener("click", () => {
+  state.offset += state.limit;
+  loadEvents().catch(showFatal);
+});
+elements["copy-json"].addEventListener("click", async () => {
+  if (!state.selectedEvent) return;
+  await navigator.clipboard.writeText(JSON.stringify(state.selectedEvent, null, 2));
+  elements["viewer-status"].textContent = `Copied event #${state.selectedEvent.sequence} as JSON`;
+});
+
+document.addEventListener("keydown", (event) => {
+  if ((event.ctrlKey || event.metaKey) && event.key.toLowerCase() === "f") {
+    event.preventDefault();
+    elements.search.focus();
+    elements.search.select();
+    return;
+  }
+  if (event.target.matches("input, select, button")) return;
+  if (event.key !== "ArrowDown" && event.key !== "ArrowUp") return;
+  const current = state.rows.findIndex((row) => row.sequence === state.selectedSequence);
+  const next = event.key === "ArrowDown" ? Math.min(state.rows.length - 1, current + 1) : Math.max(0, current <= 0 ? 0 : current - 1);
+  if (state.rows[next]) {
+    event.preventDefault();
+    selectEvent(state.rows[next].sequence);
+    elements["event-rows"].querySelector(`[data-sequence="${state.rows[next].sequence}"]`)?.scrollIntoView({ block: "nearest" });
+  }
+});
+
+(async () => {
+  try {
+    await loadSession();
+    await loadEvents({ preserveSelection: false });
+  } catch (error) {
+    showFatal(error);
+  }
+})();

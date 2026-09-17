@@ -70,6 +70,16 @@ func TestRunRejectsMissingUpstream(t *testing.T) {
 	}
 }
 
+func TestViewRejectsMissingCapture(t *testing.T) {
+	var stdout, stderr bytes.Buffer
+	if code := run([]string{"view"}, &stdout, &stderr); code != 2 {
+		t.Fatalf("run() code = %d", code)
+	}
+	if !strings.Contains(stderr.String(), "bedrock-debug-proxy view") {
+		t.Fatalf("stderr = %s", stderr.String())
+	}
+}
+
 func TestRunRejectsExperienceWithoutDeviceAuthentication(t *testing.T) {
 	var stdout, stderr bytes.Buffer
 	code := run([]string{"run", "--upstream", "experience:The Hive", "--auth", "none"}, &stdout, &stderr)

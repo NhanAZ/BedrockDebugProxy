@@ -6,6 +6,10 @@ Detailed rationale remains in [`docs/audits/`](docs/audits/).
 
 ## [Unreleased]
 
+### Added
+
+- Added a read-only local capture viewer with paginated event filters, decoded JSON details, bounded blob hex previews, loopback-only serving, and per-run access URLs.
+
 ## [0.2.1] - 2026-09-17
 
 Supported Bedrock version: 1.26.50 (protocol 2193).

@@ -132,13 +132,15 @@ The original CloudburstMC project remains evidence for the basic terminating-pro
 
 ### EndstoneMC spyglass
 
-- Source reviewed at [`b4f5f7f879ec0089d353093ee15e6770caf7c1b0`](https://github.com/EndstoneMC/spyglass/tree/b4f5f7f879ec0089d353093ee15e6770caf7c1b0)
+- Source reviewed at [`8fb7e2cdd888b591382ad4d002e08390f3685d83`](https://github.com/EndstoneMC/spyglass/tree/8fb7e2cdd888b591382ad4d002e08390f3685d83)
 - License is MIT
-- Capture evidence is in [`network.cpp`](https://github.com/EndstoneMC/spyglass/blob/b4f5f7f879ec0089d353093ee15e6770caf7c1b0/src/spyglass/network.cpp), [`capture.cpp`](https://github.com/EndstoneMC/spyglass/blob/b4f5f7f879ec0089d353093ee15e6770caf7c1b0/src/spyglass/overlay/capture.cpp), [`store.cpp`](https://github.com/EndstoneMC/spyglass/blob/b4f5f7f879ec0089d353093ee15e6770caf7c1b0/src/spyglass/overlay/store.cpp), and [`packet_details.cpp`](https://github.com/EndstoneMC/spyglass/blob/b4f5f7f879ec0089d353093ee15e6770caf7c1b0/src/spyglass/overlay/pane/packet_details.cpp)
+- Capture and interface evidence is in [`network.cpp`](https://github.com/EndstoneMC/spyglass/blob/8fb7e2cdd888b591382ad4d002e08390f3685d83/src/spyglass/network.cpp), [`store.h`](https://github.com/EndstoneMC/spyglass/blob/8fb7e2cdd888b591382ad4d002e08390f3685d83/src/spyglass/overlay/store.h), [`view.cpp`](https://github.com/EndstoneMC/spyglass/blob/8fb7e2cdd888b591382ad4d002e08390f3685d83/src/spyglass/overlay/view.cpp), [`packet_list.cpp`](https://github.com/EndstoneMC/spyglass/blob/8fb7e2cdd888b591382ad4d002e08390f3685d83/src/spyglass/overlay/pane/packet_list.cpp), and [`status_bar.cpp`](https://github.com/EndstoneMC/spyglass/blob/8fb7e2cdd888b591382ad4d002e08390f3685d83/src/spyglass/overlay/status_bar.cpp)
 
 Spyglass hooks the Bedrock client at packet send and packet read boundaries. It retains raw packet bodies, unread byte counts, decode success, detailed error trees, packet names, sub-client information, and timing. Its UI is backed by a disk stream plus an index rather than an unbounded in-memory packet list.
 
 The bounded writer queue and visible rejected or dropped counters are strong design references. BedrockDebugProxy now uses a bounded ordered queue with blocking backpressure and a `never_drop` policy. Queue capacity and peak occupancy are visible in manifest values, while writer failures mark the capture incomplete.
+
+Spyglass also demonstrates that an ordered packet list, direction and failure filters, a decoded detail tree, a hex pane, keyboard navigation, and visible counts make packet research substantially easier than terminal summaries alone. BedrockDebugProxy adopts those interaction goals in a separate read-only viewer for closed canonical captures. It does not copy Spyglass source or use its injected overlay architecture. The local viewer remains independent from packet forwarding, keeps exact evidence in the existing capture format, and applies only bounded display previews.
 
 The Galaxite capture `session-20260916T060203Z` at revision `320478f65db244c8b4d8be05e756e2c7774289db` supplied the performance evidence for this change. It retained 489,910 events and 93,790 blobs without loss, but a two-second burst contained 40,259 decoded `UpdateBlock` packets and 135,350 JSONL events. The same capture recorded rare 596 to 738 ms capture and write stalls and a client-side `You moved too slow` bridge write failure. The ordered queue decouples normal forwarding from those disk stalls without filtering the burst. Its bounded capacity still applies backpressure when the writer cannot catch up.
 

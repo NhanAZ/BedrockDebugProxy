@@ -121,12 +121,13 @@ The following commands are optional analysis and packaging tools, not extra step
 ```powershell
 .\bin\bedrock-debug-proxy.exe verify C:\path\to\capture
 .\bin\bedrock-debug-proxy.exe inspect --direction server_to_client --kind packet.decoded C:\path\to\capture
+.\bin\bedrock-debug-proxy.exe view C:\path\to\capture
 .\bin\bedrock-debug-proxy.exe analyze C:\path\to\capture > analysis.json
 .\bin\bedrock-debug-proxy.exe explain C:\path\to\capture > explanation.md
 .\bin\bedrock-debug-proxy.exe export C:\path\to\capture C:\path\to\session.bdpcap
 ```
 
-The canonical capture is an event stream plus content-addressed blobs. Automatic convenience folders are described in the [folder guide](docs/session-artifacts.md). `inspect` locates original evidence and `export` packages the canonical capture, not the convenience folders. Packet counts are event counts, not counts of unique players, assets, or chunks. See [capture output and live colors](docs/analysis-and-export.md#live-output-and-saved-data) for the distinction.
+The canonical capture is an event stream plus content-addressed blobs. Automatic convenience folders are described in the [folder guide](docs/session-artifacts.md). `view` verifies a closed capture and opens a read-only local browser interface with event filters, decoded details, and bounded blob previews. `inspect` locates original evidence and `export` packages the canonical capture, not the convenience folders. Packet counts are event counts, not counts of unique players, assets, or chunks. See [capture analysis and viewer behavior](docs/analysis-and-export.md) for details.
 
 ```powershell
 # Resource-pack archives and their blob paths.
@@ -191,7 +192,7 @@ Use the document that matches your task.
 - `internal/bedrock` adapts transport and packet observation hooks.
 - `internal/proxy` owns login, resource-pack negotiation, spawn, and forwarding.
 - `internal/capture` owns the protocol-neutral capture schema, recorder, and verifier.
-- `internal/analysis` and `internal/capturearchive` provide later analysis and portable export.
+- `internal/analysis`, `internal/viewer`, and `internal/capturearchive` provide later analysis, local visual inspection, and portable export.
 - `docs/research` records source revisions, licenses, evidence, and open questions.
 
 ## Security and content ownership
