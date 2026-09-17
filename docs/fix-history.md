@@ -174,6 +174,14 @@ Every new entry should state the symptom, root cause, implementation commits, ev
 - Evidence and validation: a stylesheet audit found all prior size and weight declarations. The viewer HTTP regression test rejects the previous non-uniform sizes and bold weights while checking the local font sources. No forwarding, capture, protocol, or resource-pack behavior changes.
 - Status: implemented with viewer-only impact. Browser rendering and local font availability remain platform-specific.
 
+### FIX-0021 - Themed filter dropdowns
+
+- Symptom: filter controls matched the viewer when closed, but opening a native select displayed a browser-owned popup with unrelated colors, spacing, and typography.
+- Root cause: native option popups are rendered by the browser or operating system and do not consistently honor the viewer stylesheet.
+- Implementation: filter selects now retain their native elements as synchronized value sources while exposing themed listbox controls with keyboard navigation, pointer selection, focus state, and outside-click closing. Existing query construction, reset behavior, and change listeners continue to use the native values.
+- Evidence and validation: the viewer asset test checks the embedded themed dropdown selectors. `node --check internal/viewer/assets/app.js` checks the custom control script syntax. No forwarding, capture, protocol, or resource-pack behavior changes.
+- Status: implemented with viewer-only impact. Popup dimensions and text rasterization remain subject to the browser viewport and installed font availability.
+
 ## Ordering safety contract
 
 The deferred-packet change is deliberately narrow. `expectedIDs` remains the only authority for what the current login state accepts. The queue scan selects the earliest packet that is currently expected, leaves packets for later states queued, and never mutates or reorders bytes on the wire. The regression tests cover canonical resource-pack order, featured early `ResourcePacksInfo`, a later-phase packet queued ahead of the current phase, and all six permutations of the three login packets.

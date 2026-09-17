@@ -132,6 +132,11 @@ func TestViewerServesEmbeddedFontAssets(t *testing.T) {
 			t.Fatalf("CSS does not prefer locally installed font %s", source)
 		}
 	}
+	for _, source := range []string{".select-trigger", ".select-menu", ".select-option"} {
+		if !strings.Contains(string(css), source) {
+			t.Fatalf("CSS does not contain themed dropdown selector %s", source)
+		}
+	}
 	for _, forbidden := range []string{"font-weight: 650", "font-weight: 700", "font-weight: 750", "font-size: 9px", "font-size: 10px", "font-size: 11px", "font-size: 12px", "font-size: 16px", "font-size: 17px", "font-size: 18px", "font: 11px/1.55"} {
 		if strings.Contains(string(css), forbidden) {
 			t.Fatalf("CSS still contains non-uniform typography declaration %q", forbidden)
