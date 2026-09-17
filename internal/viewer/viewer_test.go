@@ -66,9 +66,14 @@ func TestViewerServesFilteredEventsAndBlobPreview(t *testing.T) {
 	if response.StatusCode != http.StatusOK || !strings.Contains(string(index), "Capture Viewer") {
 		t.Fatalf("index status = %d, body = %s", response.StatusCode, index)
 	}
-	for _, marker := range []string{`href="assets/app.css"`, `src="assets/app.js"`, `id="direction"`, `id="packet"`, `id="kind"`, `id="channel"`} {
+	for _, marker := range []string{`href="assets/app.css"`, `src="assets/app.js"`, `id="direction"`, `id="packet"`, `id="kind"`, `id="channel"`, "BedrockDebugProxy", "Ordered stream", "Decoded view", "Raw evidence"} {
 		if !strings.Contains(string(index), marker) {
 			t.Fatalf("index is missing viewer marker %q", marker)
+		}
+	}
+	for _, forbidden := range []string{"BEDROCKDEBUGPROXY", "ORDERED STREAM", "DECODED VIEW", "RAW EVIDENCE"} {
+		if strings.Contains(string(index), forbidden) {
+			t.Fatalf("index still contains forced uppercase label %q", forbidden)
 		}
 	}
 
@@ -141,17 +146,21 @@ func TestViewerServesEmbeddedFontAssets(t *testing.T) {
 	if jsResponse.StatusCode != http.StatusOK || !strings.Contains(string(js), "setupCustomSelects") {
 		t.Fatalf("JavaScript asset status = %d or custom viewer setup is missing", jsResponse.StatusCode)
 	}
-	for _, source := range []string{`local("Mojangles")`, `local("Minecraft Ten")`} {
-		if !strings.Contains(string(css), source) {
-			t.Fatalf("CSS does not prefer locally installed font %s", source)
-		}
+	if !strings.Contains(string(css), `local("Minecraft Ten")`) {
+		t.Fatal("CSS does not prefer the locally installed Minecraft Ten font")
+	}
+	if strings.Contains(string(css), `local("Mojangles")`) || strings.Contains(string(css), "font-heading") {
+		t.Fatal("CSS still selects a separate heading font")
+	}
+	if !strings.Contains(string(css), "font-size: var(--font-size)") || !strings.Contains(string(css), "--font-size: 12px") {
+		t.Fatal("CSS does not expose the shared 12px font-size contract")
 	}
 	for _, source := range []string{".select-trigger", ".select-menu", ".select-option"} {
 		if !strings.Contains(string(css), source) {
 			t.Fatalf("CSS does not contain themed dropdown selector %s", source)
 		}
 	}
-	for _, forbidden := range []string{"font-weight: 650", "font-weight: 700", "font-weight: 750", "font-size: 9px", "font-size: 10px", "font-size: 11px", "font-size: 12px", "font-size: 16px", "font-size: 17px", "font-size: 18px", "font: 11px/1.55"} {
+	for _, forbidden := range []string{"font-weight: 650", "font-weight: 700", "font-weight: 750", "font-size: 9px", "font-size: 10px", "font-size: 11px", "font-size: 13px", "font-size: 14px", "font-size: 15px", "font-size: 16px", "font-size: 17px", "font-size: 18px", "font: 11px/1.55", "text-transform: uppercase"} {
 		if strings.Contains(string(css), forbidden) {
 			t.Fatalf("CSS still contains non-uniform typography declaration %q", forbidden)
 		}
