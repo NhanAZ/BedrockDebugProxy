@@ -6,10 +6,12 @@ import (
 	"io"
 	"net/http"
 	"net/http/httptest"
+	"os"
 	"path/filepath"
 	"strconv"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/NhanAZ/BedrockDebugProxy/internal/capture"
 )
@@ -107,6 +109,166 @@ func TestViewerRequiresTokenAndClosedVerifiedCapture(t *testing.T) {
 	defer func() { _ = response.Body.Close() }()
 	if response.StatusCode != http.StatusNotFound {
 		t.Fatalf("status = %d, want %d", response.StatusCode, http.StatusNotFound)
+	}
+}
+
+func TestLiveViewerIndexesAppendedEventsAndVerifiesOnClose(t *testing.T) {
+	root := filepath.Join(t.TempDir(), "capture")
+	recorder, err := capture.New(root, capture.Options{CaptureID: "live-viewer"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() { _ = recorder.Close("failed", nil) })
+	view, err := OpenLive(root, Options{BlobPreviewBytes: 8})
+	if err != nil {
+		t.Fatal(err)
+	}
+	server := httptest.NewServer(view.Handler("live-token"))
+	defer server.Close()
+
+	var initial sessionResponse
+	decodeURL(t, server.URL+"/live-token/api/session", &initial)
+	if initial.Mode != "live" || initial.Verification != "pending" || initial.Events != 0 {
+		t.Fatalf("initial session = %+v", initial)
+	}
+
+	for i := 1; i <= 3; i++ {
+		_, err := recorder.Record(context.Background(), capture.Record{
+			Event: capture.Event{
+				Kind:      "packet.decoded",
+				Direction: capture.DirectionServerToClient,
+				Packet:    &capture.PacketInfo{ID: uint32(i), Name: "Packet" + strconv.Itoa(i), DecodeStatus: "decoded"},
+			},
+			Raw:            []byte{byte(i), byte(i + 1)},
+			MediaType:      "application/octet-stream",
+			Representation: "packet_payload",
+		})
+		if err != nil {
+			t.Fatal(err)
+		}
+	}
+
+	var tail eventsResponse
+	deadline := time.Now().Add(5 * time.Second)
+	for {
+		decodeURL(t, server.URL+"/live-token/api/events?tail=true&limit=2", &tail)
+		if tail.Total == 3 || time.Now().After(deadline) {
+			break
+		}
+		time.Sleep(10 * time.Millisecond)
+	}
+	if tail.Total != 3 || tail.Offset != 1 || len(tail.Rows) != 2 || tail.Rows[0].Sequence != 2 || tail.Rows[1].Sequence != 3 {
+		t.Fatalf("tail events = %+v", tail)
+	}
+
+	var detail eventResponse
+	decodeURL(t, server.URL+"/live-token/api/events/3", &detail)
+	if detail.Event.Sequence != 3 || string(detail.BlobPreview) != string([]byte{3, 4}) || detail.Truncated {
+		t.Fatalf("detail = %+v", detail)
+	}
+
+	if err := recorder.Close("closed", nil); err != nil {
+		t.Fatal(err)
+	}
+	var completed sessionResponse
+	decodeURL(t, server.URL+"/live-token/api/session", &completed)
+	if completed.Mode != "closed" || completed.Verification != "verified" || completed.Events != 3 || completed.Blobs != 3 {
+		t.Fatalf("completed session = %+v", completed)
+	}
+}
+
+func TestLocalServerUsesLoopbackAndStops(t *testing.T) {
+	root := filepath.Join(t.TempDir(), "capture")
+	recorder, err := capture.New(root, capture.Options{CaptureID: "local-server"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := recorder.Close("closed", nil); err != nil {
+		t.Fatal(err)
+	}
+	view, err := Open(root, Options{})
+	if err != nil {
+		t.Fatal(err)
+	}
+	server, err := StartLocal(view)
+	if err != nil {
+		t.Fatal(err)
+	}
+	response := get(t, server.URL+"api/session")
+	_ = response.Body.Close()
+	if response.StatusCode != http.StatusOK || !strings.HasPrefix(server.URL, "http://127.0.0.1:") {
+		t.Fatalf("server URL = %q, status = %d", server.URL, response.StatusCode)
+	}
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+	if err := server.Close(ctx); err != nil {
+		t.Fatal(err)
+	}
+	select {
+	case <-server.Done():
+	default:
+		t.Fatal("server did not stop")
+	}
+}
+
+func TestLiveViewerIgnoresIncompleteTrailingEvent(t *testing.T) {
+	root := filepath.Join(t.TempDir(), "capture")
+	recorder, err := capture.New(root, capture.Options{CaptureID: "partial-live-event"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() { _ = recorder.Close("failed", nil) })
+	if _, err := recorder.Record(context.Background(), capture.Record{Event: capture.Event{Kind: "complete"}}); err != nil {
+		t.Fatal(err)
+	}
+	view, err := OpenLive(root, Options{})
+	if err != nil {
+		t.Fatal(err)
+	}
+	server := httptest.NewServer(view.Handler("partial-token"))
+	defer server.Close()
+
+	eventsPath := filepath.Join(root, eventsFileName)
+	var originalSize int64
+	deadline := time.Now().Add(5 * time.Second)
+	for {
+		info, statErr := os.Stat(eventsPath)
+		if statErr != nil {
+			t.Fatal(statErr)
+		}
+		originalSize = info.Size()
+		var session sessionResponse
+		decodeURL(t, server.URL+"/partial-token/api/session", &session)
+		if session.Events == 1 {
+			break
+		}
+		if time.Now().After(deadline) {
+			t.Fatalf("event was not written before deadline: %+v", session)
+		}
+		time.Sleep(10 * time.Millisecond)
+	}
+	file, err := os.OpenFile(eventsPath, os.O_APPEND|os.O_WRONLY, 0)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := file.WriteString(`{"schema":"incomplete"`); err != nil {
+		_ = file.Close()
+		t.Fatal(err)
+	}
+	if err := file.Close(); err != nil {
+		t.Fatal(err)
+	}
+
+	var session sessionResponse
+	decodeURL(t, server.URL+"/partial-token/api/session", &session)
+	if session.Events != 1 || session.Verification != "pending" {
+		t.Fatalf("session with partial event = %+v", session)
+	}
+	if err := os.Truncate(eventsPath, originalSize); err != nil {
+		t.Fatal(err)
+	}
+	if err := recorder.Close("closed", nil); err != nil {
+		t.Fatal(err)
 	}
 }
 

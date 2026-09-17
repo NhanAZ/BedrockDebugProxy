@@ -72,6 +72,19 @@ For a trusted-LAN run that accepts a LAN World connection and follows server tra
     --follow-transfers
 ```
 
+Add `--web-viewer` when you want to inspect the ordered capture in a local browser while the proxy is running. The browser follows complete events already committed to the canonical capture. It does not receive packets directly from the forwarding path.
+
+```powershell
+.\bin\bedrock-debug-proxy.exe `
+    run `
+    --listen 192.168.1.10:19132 `
+    --upstream "<UPSTREAM>" `
+    --auth device `
+    --allow-unauthenticated-client `
+    --follow-transfers `
+    --web-viewer
+```
+
 On Windows, the Microsoft token cache is `%AppData%\BedrockDebugProxy\auth-token.json`. It contains authentication secrets, remains outside the repository, and must not be shared or committed. To change accounts, stop the proxy and run `.\bin\bedrock-debug-proxy.exe logout`, then start the proxy again. This removes only the local cache; it does not revoke the Microsoft session or sign out other applications.
 
 If the binary does not exist yet, install the Go version declared in `go.mod`, keep the working tree clean, and build it once.
@@ -122,12 +135,13 @@ The following commands are optional analysis and packaging tools, not extra step
 .\bin\bedrock-debug-proxy.exe verify C:\path\to\capture
 .\bin\bedrock-debug-proxy.exe inspect --direction server_to_client --kind packet.decoded C:\path\to\capture
 .\bin\bedrock-debug-proxy.exe view C:\path\to\capture
+.\bin\bedrock-debug-proxy.exe view --live C:\path\to\open-capture
 .\bin\bedrock-debug-proxy.exe analyze C:\path\to\capture > analysis.json
 .\bin\bedrock-debug-proxy.exe explain C:\path\to\capture > explanation.md
 .\bin\bedrock-debug-proxy.exe export C:\path\to\capture C:\path\to\session.bdpcap
 ```
 
-The canonical capture is an event stream plus content-addressed blobs. Automatic convenience folders are described in the [folder guide](docs/session-artifacts.md). `view` verifies a closed capture and opens a read-only local browser interface with event filters, decoded details, and bounded blob previews. `inspect` locates original evidence and `export` packages the canonical capture, not the convenience folders. Packet counts are event counts, not counts of unique players, assets, or chunks. See [capture analysis and viewer behavior](docs/analysis-and-export.md) for details.
+The canonical capture is an event stream plus content-addressed blobs. Automatic convenience folders are described in the [folder guide](docs/session-artifacts.md). `view` verifies a closed capture and opens a read-only local browser interface with event filters, decoded details, and bounded blob previews. `view --live` follows complete events from an open capture, and `run --web-viewer` starts that live view automatically. `inspect` locates original evidence and `export` packages the canonical capture, not the convenience folders. Packet counts are event counts, not counts of unique players, assets, or chunks. See [capture analysis and viewer behavior](docs/analysis-and-export.md) for details.
 
 ```powershell
 # Resource-pack archives and their blob paths.

@@ -15,6 +15,7 @@ import (
 	"sort"
 	"strconv"
 	"strings"
+	"sync"
 
 	"github.com/NhanAZ/BedrockDebugProxy/internal/capture"
 )
@@ -33,13 +34,22 @@ type Options struct {
 }
 
 type Viewer struct {
+	mu               sync.RWMutex
 	root             string
 	resolvedRoot     string
 	eventsPath       string
 	verification     capture.Verification
+	verificationDone bool
+	tailing          bool
+	indexedOffset    int64
 	rows             []eventIndex
 	bySequence       map[uint64]int
 	filters          filterValues
+	directions       map[string]struct{}
+	kinds            map[string]struct{}
+	packets          map[string]struct{}
+	channels         map[string]struct{}
+	seenBlobs        map[string]struct{}
 	blobPreviewBytes int64
 }
 
@@ -81,11 +91,14 @@ type filterValues struct {
 }
 
 type sessionResponse struct {
-	Manifest     capture.Manifest `json:"manifest"`
-	Events       uint64           `json:"events"`
-	Blobs        uint64           `json:"blobs"`
-	Filters      filterValues     `json:"filters"`
-	PreviewBytes int64            `json:"blob_preview_bytes"`
+	Manifest           capture.Manifest `json:"manifest"`
+	Events             uint64           `json:"events"`
+	Blobs              uint64           `json:"blobs"`
+	Filters            filterValues     `json:"filters"`
+	PreviewBytes       int64            `json:"blob_preview_bytes"`
+	Mode               string           `json:"mode"`
+	Verification       string           `json:"verification"`
+	VerificationIssues []string         `json:"verification_issues,omitempty"`
 }
 
 type eventsResponse struct {
@@ -112,10 +125,45 @@ func Open(root string, options Options) (*Viewer, error) {
 	if verification.Manifest.Status == "open" || verification.Manifest.EndedAt == "" {
 		return nil, errors.New("capture is still open")
 	}
-	if filepath.ToSlash(filepath.Clean(filepath.FromSlash(verification.Manifest.EventsPath))) != eventsFileName {
-		return nil, fmt.Errorf("unsupported event stream path %q", verification.Manifest.EventsPath)
+	viewer, err := newViewer(root, verification.Manifest, options)
+	if err != nil {
+		return nil, err
 	}
-	root, err = filepath.Abs(root)
+	viewer.verification = verification
+	viewer.verificationDone = true
+	if _, err := viewer.indexAppendedEvents(false); err != nil {
+		return nil, err
+	}
+	return viewer, nil
+}
+
+// OpenLive opens a capture that may still be written by a recorder. Only
+// newline-terminated events are indexed. Once the manifest closes, the normal
+// capture verifier becomes the authority for the final status.
+func OpenLive(root string, options Options) (*Viewer, error) {
+	manifest, err := capture.ReadManifest(root)
+	if err != nil {
+		return nil, err
+	}
+	if manifest.Schema != capture.SchemaVersion {
+		return nil, fmt.Errorf("unsupported capture schema %q", manifest.Schema)
+	}
+	viewer, err := newViewer(root, manifest, options)
+	if err != nil {
+		return nil, err
+	}
+	viewer.tailing = true
+	if err := viewer.Refresh(); err != nil {
+		return nil, err
+	}
+	return viewer, nil
+}
+
+func newViewer(root string, manifest capture.Manifest, options Options) (*Viewer, error) {
+	if filepath.ToSlash(filepath.Clean(filepath.FromSlash(manifest.EventsPath))) != eventsFileName {
+		return nil, fmt.Errorf("unsupported event stream path %q", manifest.EventsPath)
+	}
+	root, err := filepath.Abs(root)
 	if err != nil {
 		return nil, fmt.Errorf("resolve capture directory: %w", err)
 	}
@@ -131,18 +179,19 @@ func Open(root string, options Options) (*Viewer, error) {
 	if previewBytes <= 0 {
 		previewBytes = defaultBlobPreviewBytes
 	}
-	viewer := &Viewer{
+	return &Viewer{
 		root:             root,
 		resolvedRoot:     resolvedRoot,
 		eventsPath:       eventsPath,
-		verification:     verification,
-		bySequence:       make(map[uint64]int, verification.Events),
+		verification:     capture.Verification{Manifest: manifest},
+		bySequence:       make(map[uint64]int),
+		directions:       make(map[string]struct{}),
+		kinds:            make(map[string]struct{}),
+		packets:          make(map[string]struct{}),
+		channels:         make(map[string]struct{}),
+		seenBlobs:        make(map[string]struct{}),
 		blobPreviewBytes: previewBytes,
-	}
-	if err := viewer.indexEvents(); err != nil {
-		return nil, err
-	}
-	return viewer, nil
+	}, nil
 }
 
 func NewAccessToken() (string, error) {
@@ -211,16 +260,42 @@ func (v *Viewer) serveAsset(writer http.ResponseWriter, request *http.Request, n
 }
 
 func (v *Viewer) serveSession(writer http.ResponseWriter) {
+	if err := v.Refresh(); err != nil {
+		writeAPIError(writer, http.StatusInternalServerError, err)
+		return
+	}
+	v.mu.RLock()
+	defer v.mu.RUnlock()
+	mode := "closed"
+	if v.verification.Manifest.Status == "open" {
+		mode = "live"
+	}
+	verification := "pending"
+	if v.verificationDone {
+		verification = "verified"
+		if len(v.verification.Issues) != 0 {
+			verification = "failed"
+		}
+	}
 	writeJSON(writer, http.StatusOK, sessionResponse{
-		Manifest:     v.verification.Manifest,
-		Events:       v.verification.Events,
-		Blobs:        v.verification.Blobs,
-		Filters:      v.filters,
-		PreviewBytes: v.blobPreviewBytes,
+		Manifest:           v.verification.Manifest,
+		Events:             uint64(len(v.rows)),
+		Blobs:              uint64(len(v.seenBlobs)),
+		Filters:            v.filters,
+		PreviewBytes:       v.blobPreviewBytes,
+		Mode:               mode,
+		Verification:       verification,
+		VerificationIssues: v.verification.Issues,
 	})
 }
 
 func (v *Viewer) serveEvents(writer http.ResponseWriter, request *http.Request) {
+	if err := v.Refresh(); err != nil {
+		writeAPIError(writer, http.StatusInternalServerError, err)
+		return
+	}
+	v.mu.RLock()
+	defer v.mu.RUnlock()
 	offset, err := queryInteger(request, "offset", 0, 0, len(v.rows))
 	if err != nil {
 		writeAPIError(writer, http.StatusBadRequest, err)
@@ -237,6 +312,7 @@ func (v *Viewer) serveEvents(writer http.ResponseWriter, request *http.Request) 
 	packet := request.URL.Query().Get("packet")
 	channel := request.URL.Query().Get("channel")
 	problems := request.URL.Query().Get("problems") == "true"
+	tail := request.URL.Query().Get("tail") == "true"
 
 	matched := make([]Row, 0, limit)
 	total := 0
@@ -247,15 +323,29 @@ func (v *Viewer) serveEvents(writer http.ResponseWriter, request *http.Request) 
 			problems && !row.Problem || query != "" && !strings.Contains(row.search, query) {
 			continue
 		}
-		if total >= offset && len(matched) < limit {
+		if tail {
+			if len(matched) == limit {
+				copy(matched, matched[1:])
+				matched[len(matched)-1] = row.Row
+			} else {
+				matched = append(matched, row.Row)
+			}
+		} else if total >= offset && len(matched) < limit {
 			matched = append(matched, row.Row)
 		}
 		total++
+	}
+	if tail {
+		offset = max(0, total-len(matched))
 	}
 	writeJSON(writer, http.StatusOK, eventsResponse{Offset: offset, Limit: limit, Total: total, Rows: matched})
 }
 
 func (v *Viewer) serveEvent(writer http.ResponseWriter, request *http.Request) {
+	if err := v.Refresh(); err != nil {
+		writeAPIError(writer, http.StatusInternalServerError, err)
+		return
+	}
 	text := strings.TrimPrefix(request.URL.Path, "/api/events/")
 	if text == "" || strings.Contains(text, "/") {
 		writeAPIError(writer, http.StatusNotFound, errors.New("event not found"))
@@ -266,12 +356,16 @@ func (v *Viewer) serveEvent(writer http.ResponseWriter, request *http.Request) {
 		writeAPIError(writer, http.StatusBadRequest, errors.New("invalid event sequence"))
 		return
 	}
+	v.mu.RLock()
 	position, ok := v.bySequence[sequence]
 	if !ok {
+		v.mu.RUnlock()
 		writeAPIError(writer, http.StatusNotFound, errors.New("event not found"))
 		return
 	}
-	event, err := v.readEvent(v.rows[position])
+	index := v.rows[position]
+	v.mu.RUnlock()
+	event, err := v.readEvent(index)
 	if err != nil {
 		writeAPIError(writer, http.StatusInternalServerError, err)
 		return
@@ -287,56 +381,125 @@ func (v *Viewer) serveEvent(writer http.ResponseWriter, request *http.Request) {
 	writeJSON(writer, http.StatusOK, response)
 }
 
-func (v *Viewer) indexEvents() error {
+// Refresh indexes complete events appended since the previous request. It does
+// not read from the proxy packet path and never mutates the canonical capture.
+func (v *Viewer) Refresh() error {
+	v.mu.Lock()
+	defer v.mu.Unlock()
+	if !v.tailing {
+		return nil
+	}
+	if _, err := v.indexAppendedEvents(true); err != nil {
+		return err
+	}
+	manifest, err := capture.ReadManifest(v.root)
+	if err != nil {
+		return err
+	}
+	if manifest.CaptureID != v.verification.Manifest.CaptureID {
+		return fmt.Errorf("capture ID changed from %q to %q", v.verification.Manifest.CaptureID, manifest.CaptureID)
+	}
+	v.verification.Manifest = manifest
+	if manifest.Status == "open" || manifest.EndedAt == "" {
+		return nil
+	}
+	if _, err := v.indexAppendedEvents(false); err != nil {
+		return err
+	}
+	verification, err := capture.Verify(v.root)
+	if err != nil {
+		return fmt.Errorf("verify completed capture: %w", err)
+	}
+	v.verification = verification
+	v.verificationDone = true
+	v.tailing = false
+	return nil
+}
+
+// indexAppendedEvents requires exclusive ownership of the viewer state.
+func (v *Viewer) indexAppendedEvents(allowPartial bool) (bool, error) {
 	file, err := os.Open(v.eventsPath)
 	if err != nil {
-		return fmt.Errorf("open event stream: %w", err)
+		return false, fmt.Errorf("open event stream: %w", err)
 	}
 	defer func() { _ = file.Close() }()
 
-	directions := map[string]struct{}{}
-	kinds := map[string]struct{}{}
-	packets := map[string]struct{}{}
-	channels := map[string]struct{}{}
+	info, err := file.Stat()
+	if err != nil {
+		return false, fmt.Errorf("inspect event stream: %w", err)
+	}
+	if info.Size() < v.indexedOffset {
+		return false, fmt.Errorf("event stream shrank from %d to %d bytes", v.indexedOffset, info.Size())
+	}
+	if _, err := file.Seek(v.indexedOffset, io.SeekStart); err != nil {
+		return false, fmt.Errorf("seek event stream: %w", err)
+	}
 	reader := bufio.NewReaderSize(file, 256*1024)
-	var offset int64
-	for lineNumber := 1; ; lineNumber++ {
+	lineNumber := len(v.rows) + 1
+	changed := false
+	for {
 		line, readErr := reader.ReadBytes('\n')
 		if len(line) != 0 {
 			if line[len(line)-1] != '\n' {
-				return fmt.Errorf("event line %d is not newline terminated", lineNumber)
+				if allowPartial && errors.Is(readErr, io.EOF) {
+					if changed {
+						v.refreshFilters()
+					}
+					return true, nil
+				}
+				return false, fmt.Errorf("event line %d is not newline terminated", lineNumber)
 			}
 			var event capture.Event
 			if err := json.Unmarshal(line, &event); err != nil {
-				return fmt.Errorf("decode event line %d: %w", lineNumber, err)
+				return false, fmt.Errorf("decode event line %d: %w", lineNumber, err)
+			}
+			if event.Schema != capture.SchemaVersion {
+				return false, fmt.Errorf("event %d has unsupported schema %q", event.Sequence, event.Schema)
+			}
+			if event.CaptureID != v.verification.Manifest.CaptureID {
+				return false, fmt.Errorf("event %d has capture ID %q", event.Sequence, event.CaptureID)
+			}
+			if event.Sequence != uint64(len(v.rows)+1) {
+				return false, fmt.Errorf("event sequence jumps from %d to %d", len(v.rows), event.Sequence)
 			}
 			row := makeRow(event)
-			row.offset = offset
+			row.offset = v.indexedOffset
 			row.length = len(line)
 			v.bySequence[event.Sequence] = len(v.rows)
 			v.rows = append(v.rows, row)
-			addValue(directions, string(event.Direction))
-			addValue(kinds, event.Kind)
-			addValue(channels, event.Channel)
+			addValue(v.directions, string(event.Direction))
+			addValue(v.kinds, event.Kind)
+			addValue(v.channels, event.Channel)
 			if event.Packet != nil {
-				addValue(packets, event.Packet.Name)
+				addValue(v.packets, event.Packet.Name)
 			}
-			offset += int64(len(line))
+			if event.Blob != nil && event.Blob.SHA256 != "" {
+				v.seenBlobs[event.Blob.SHA256] = struct{}{}
+			}
+			v.indexedOffset += int64(len(line))
+			lineNumber++
+			changed = true
 		}
 		if errors.Is(readErr, io.EOF) {
 			break
 		}
 		if readErr != nil {
-			return fmt.Errorf("read event line %d: %w", lineNumber, readErr)
+			return false, fmt.Errorf("read event line %d: %w", lineNumber, readErr)
 		}
 	}
-	v.filters = filterValues{
-		Directions: sortedValues(directions),
-		Kinds:      sortedValues(kinds),
-		Packets:    sortedValues(packets),
-		Channels:   sortedValues(channels),
+	if changed {
+		v.refreshFilters()
 	}
-	return nil
+	return false, nil
+}
+
+func (v *Viewer) refreshFilters() {
+	v.filters = filterValues{
+		Directions: sortedValues(v.directions),
+		Kinds:      sortedValues(v.kinds),
+		Packets:    sortedValues(v.packets),
+		Channels:   sortedValues(v.channels),
+	}
 }
 
 func (v *Viewer) readEvent(index eventIndex) (capture.Event, error) {

@@ -8,16 +8,18 @@ const state = {
   selectedSequence: null,
   selectedEvent: null,
   requestVersion: 0,
+  live: false,
 };
 
 const elements = Object.fromEntries([
   "capture-status", "capture-id", "event-count", "blob-count", "duration", "generator",
   "search", "direction", "packet", "kind", "channel", "problems", "reset",
   "previous", "next", "page-label", "event-rows", "empty-state", "event-details",
-  "copy-json", "byte-status", "hex-view", "viewer-status",
+  "copy-json", "byte-status", "hex-view", "viewer-status", "follow", "follow-container",
 ].map((id) => [id, document.getElementById(id)]));
 
 let searchTimer;
+let pollTimer;
 
 async function requestJSON(path) {
   const response = await fetch(path, { headers: { Accept: "application/json" } });
@@ -54,31 +56,39 @@ function flowLabel(direction) {
   return "?";
 }
 
-function fillOptions(select, values) {
+function syncOptions(select, values) {
+  const selected = select.value;
+  while (select.options.length > 1) select.remove(1);
   for (const value of values || []) {
     const option = document.createElement("option");
     option.value = value;
     option.textContent = value;
     select.append(option);
   }
+  if ((values || []).includes(selected)) select.value = selected;
 }
 
 async function loadSession() {
   const session = await requestJSON("api/session");
   const manifest = session.manifest;
-  elements["capture-status"].textContent = manifest.status;
+  state.live = session.mode === "live" && manifest.status === "open";
+  const displayStatus = state.live ? "live" : manifest.status === "failed" || session.verification === "failed" ? "failed" : session.verification === "verified" ? "verified" : manifest.status;
+  elements["capture-status"].textContent = displayStatus;
+  elements["capture-status"].className = `status-pill ${state.live ? "live" : displayStatus === "failed" ? "failed" : ""}`;
+  elements["follow-container"].hidden = !state.live;
   elements["capture-id"].textContent = manifest.capture_id;
   elements["event-count"].textContent = formatCount(session.events);
   elements["blob-count"].textContent = formatCount(session.blobs);
   const start = Date.parse(manifest.started_at);
-  const end = Date.parse(manifest.ended_at);
+  const end = state.live ? Date.now() : Date.parse(manifest.ended_at);
   elements.duration.textContent = Number.isNaN(start) || Number.isNaN(end) ? "-" : formatDuration(String((end - start) * 1000000));
   const generator = manifest.generator;
   elements.generator.textContent = [generator.name, generator.version].filter(Boolean).join(" ") || "-";
-  fillOptions(elements.direction, session.filters.directions);
-  fillOptions(elements.packet, session.filters.packets);
-  fillOptions(elements.kind, session.filters.kinds);
-  fillOptions(elements.channel, session.filters.channels);
+  syncOptions(elements.direction, session.filters.directions);
+  syncOptions(elements.packet, session.filters.packets);
+  syncOptions(elements.kind, session.filters.kinds);
+  syncOptions(elements.channel, session.filters.channels);
+  return session;
 }
 
 function filterQuery() {
@@ -88,6 +98,7 @@ function filterQuery() {
     if (value) query.set(key === "search" ? "q" : key, value);
   }
   if (elements.problems.checked) query.set("problems", "true");
+  if (state.live && elements.follow.checked) query.set("tail", "true");
   return query.toString();
 }
 
@@ -96,18 +107,20 @@ async function loadEvents({ preserveSelection = true } = {}) {
   elements["viewer-status"].textContent = "Loading events...";
   const result = await requestJSON(`api/events?${filterQuery()}`);
   if (version !== state.requestVersion) return;
+  state.offset = result.offset;
   state.total = result.total;
   state.rows = result.rows;
   renderRows();
   updatePager();
-  if (!preserveSelection || !state.rows.some((row) => row.sequence === state.selectedSequence)) {
+  if (!preserveSelection) {
     clearSelection();
   } else {
     markSelectedRow();
   }
   const start = state.total === 0 ? 0 : state.offset + 1;
   const end = Math.min(state.offset + state.rows.length, state.total);
-  elements["viewer-status"].textContent = `Showing ${formatCount(start)}-${formatCount(end)} of ${formatCount(state.total)} matching events`;
+  const prefix = state.live ? "Live" : "Showing";
+  elements["viewer-status"].textContent = `${prefix} ${formatCount(start)}-${formatCount(end)} of ${formatCount(state.total)} matching events`;
 }
 
 function renderRows() {
@@ -312,6 +325,21 @@ function showFatal(error) {
   elements["empty-state"].textContent = error.message;
 }
 
+function schedulePoll() {
+  clearTimeout(pollTimer);
+  if (!state.live) return;
+  pollTimer = setTimeout(async () => {
+    try {
+      await loadSession();
+      await loadEvents();
+    } catch (error) {
+      elements["viewer-status"].textContent = `Live refresh failed: ${error.message}`;
+    } finally {
+      schedulePoll();
+    }
+  }, 1000);
+}
+
 for (const key of ["direction", "packet", "kind", "channel", "problems"]) {
   elements[key].addEventListener("change", () => {
     state.offset = 0;
@@ -329,11 +357,17 @@ elements.search.addEventListener("input", () => {
 
 elements.reset.addEventListener("click", resetFilters);
 elements.previous.addEventListener("click", () => {
+  elements.follow.checked = false;
   state.offset = Math.max(0, state.offset - state.limit);
   loadEvents().catch(showFatal);
 });
 elements.next.addEventListener("click", () => {
+  elements.follow.checked = false;
   state.offset += state.limit;
+  loadEvents().catch(showFatal);
+});
+elements.follow.addEventListener("change", () => {
+  if (elements.follow.checked) state.offset = 0;
   loadEvents().catch(showFatal);
 });
 elements["copy-json"].addEventListener("click", async () => {
@@ -364,6 +398,7 @@ document.addEventListener("keydown", (event) => {
   try {
     await loadSession();
     await loadEvents({ preserveSelection: false });
+    schedulePoll();
   } catch (error) {
     showFatal(error);
   }
