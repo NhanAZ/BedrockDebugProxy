@@ -155,6 +155,14 @@ func TestViewerServesEmbeddedFontAssets(t *testing.T) {
 	if !strings.Contains(string(css), "font-size: var(--font-size)") || !strings.Contains(string(css), "--font-size: 12px") {
 		t.Fatal("CSS does not expose the shared 12px font-size contract")
 	}
+	for _, layout := range []string{"grid-template-columns: minmax(0, 1fr)", "grid-template-rows: minmax(360px, 1fr) minmax(420px, 1fr)", "overflow: auto"} {
+		if !strings.Contains(string(css), layout) {
+			t.Fatalf("CSS does not contain the single-column workspace layout %q", layout)
+		}
+	}
+	if strings.Contains(string(css), "minmax(500px, 1.08fr) minmax(420px, 0.92fr)") || strings.Contains(string(css), "minmax(430px, 1fr) minmax(360px, 0.8fr)") {
+		t.Fatal("CSS still contains a two-column workspace layout")
+	}
 	for _, source := range []string{".select-trigger", ".select-menu", ".select-option"} {
 		if !strings.Contains(string(css), source) {
 			t.Fatalf("CSS does not contain themed dropdown selector %s", source)
