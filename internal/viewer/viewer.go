@@ -233,6 +233,12 @@ func (v *Viewer) serveHTTP(writer http.ResponseWriter, request *http.Request) {
 		v.serveAsset(writer, request, "assets/app.css", "text/css; charset=utf-8")
 	case request.URL.Path == "/assets/app.js":
 		v.serveAsset(writer, request, "assets/app.js", "text/javascript; charset=utf-8")
+	case request.URL.Path == "/assets/fonts/Monocraft.ttf":
+		v.serveAsset(writer, request, "assets/fonts/Monocraft.ttf", "font/ttf")
+	case request.URL.Path == "/assets/fonts/Minecraft-Bold.otf":
+		v.serveAsset(writer, request, "assets/fonts/Minecraft-Bold.otf", "font/otf")
+	case request.URL.Path == "/assets/fonts/OFL-1.1.txt":
+		v.serveAsset(writer, request, "assets/fonts/OFL-1.1.txt", "text/plain; charset=utf-8")
 	case request.URL.Path == "/api/session":
 		v.serveSession(writer)
 	case request.URL.Path == "/api/events":
@@ -643,7 +649,7 @@ func sortedValues(values map[string]struct{}) []string {
 
 func setSecurityHeaders(writer http.ResponseWriter) {
 	writer.Header().Set("Cache-Control", "no-store")
-	writer.Header().Set("Content-Security-Policy", "default-src 'self'; script-src 'self'; style-src 'self'; img-src 'self' data:; connect-src 'self'; object-src 'none'; base-uri 'none'; frame-ancestors 'none'")
+	writer.Header().Set("Content-Security-Policy", "default-src 'self'; script-src 'self'; style-src 'self'; font-src 'self'; img-src 'self' data:; connect-src 'self'; object-src 'none'; base-uri 'none'; frame-ancestors 'none'")
 	writer.Header().Set("Cross-Origin-Resource-Policy", "same-origin")
 	writer.Header().Set("Referrer-Policy", "no-referrer")
 	writer.Header().Set("X-Content-Type-Options", "nosniff")

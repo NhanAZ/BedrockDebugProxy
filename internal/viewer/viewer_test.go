@@ -2,7 +2,9 @@ package viewer
 
 import (
 	"context"
+	"crypto/sha256"
 	"encoding/json"
+	"fmt"
 	"io"
 	"net/http"
 	"net/http/httptest"
@@ -109,6 +111,50 @@ func TestViewerRequiresTokenAndClosedVerifiedCapture(t *testing.T) {
 	defer func() { _ = response.Body.Close() }()
 	if response.StatusCode != http.StatusNotFound {
 		t.Fatalf("status = %d, want %d", response.StatusCode, http.StatusNotFound)
+	}
+}
+
+func TestViewerServesEmbeddedFontAssets(t *testing.T) {
+	server := httptest.NewServer((&Viewer{}).Handler("font-token"))
+	defer server.Close()
+
+	tests := []struct {
+		path        string
+		contentType string
+		prefix      string
+		sha256      string
+	}{
+		{path: "Monocraft.ttf", contentType: "font/ttf", prefix: "\x00\x01\x00\x00", sha256: "262e31822e0a75be567b02320bfa092143d871e8a273e529d1c5ab0c04cd215f"},
+		{path: "Minecraft-Bold.otf", contentType: "font/otf", prefix: "OTTO", sha256: "2a7216d047fd2991aa8a2fcbc002e0782a903d68de3cc248092ffa88aa941b4f"},
+		{path: "OFL-1.1.txt", contentType: "text/plain; charset=utf-8", prefix: "Monocraft\n"},
+	}
+	for _, test := range tests {
+		t.Run(test.path, func(t *testing.T) {
+			response := get(t, server.URL+"/font-token/assets/fonts/"+test.path)
+			body, err := io.ReadAll(response.Body)
+			if err != nil {
+				t.Fatal(err)
+			}
+			_ = response.Body.Close()
+			if response.StatusCode != http.StatusOK {
+				t.Fatalf("status = %d, want %d", response.StatusCode, http.StatusOK)
+			}
+			if got := response.Header.Get("Content-Type"); got != test.contentType {
+				t.Fatalf("Content-Type = %q, want %q", got, test.contentType)
+			}
+			if !strings.HasPrefix(string(body), test.prefix) {
+				t.Fatalf("asset %s does not have the expected prefix", test.path)
+			}
+			if test.sha256 != "" {
+				digest := sha256.Sum256(body)
+				if got := fmt.Sprintf("%x", digest); got != test.sha256 {
+					t.Fatalf("SHA-256 = %s, want %s", got, test.sha256)
+				}
+			}
+			if got := response.Header.Get("Content-Security-Policy"); !strings.Contains(got, "font-src 'self'") {
+				t.Fatalf("Content-Security-Policy = %q, want a self-only font source", got)
+			}
+		})
 	}
 }
 

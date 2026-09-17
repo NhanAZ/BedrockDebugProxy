@@ -10,6 +10,17 @@ The legacy signaling portions of `internal/experience/signaling.go` are substant
 
 The resource-pack decryption behavior was cross-checked against MIT, Apache-2.0, LGPL-3.0, and AGPL-3.0 implementations plus official NIST AES validation material. No source from those projects was copied or adapted. Exact revisions, file links, licenses, the resolved header-field discrepancy, and validation boundaries are recorded in [`docs/research/resource-pack-encryption.md`](docs/research/resource-pack-encryption.md).
 
+## Embedded viewer fonts
+
+The local capture viewer embeds the following unmodified font files. They remain under the SIL Open Font License 1.1 and are not relicensed under the project GPL. Their copyright notices and full license text are preserved in [`internal/viewer/assets/fonts/OFL-1.1.txt`](internal/viewer/assets/fonts/OFL-1.1.txt) and in the generated binary release license bundle.
+
+| Font file | Source revision | SHA-256 | Viewer role |
+| --- | --- | --- | --- |
+| `Monocraft.ttf` | [`IdreesInc/Monocraft` `e498bf70aeb25b4bdcff1e44d878fb2cb4f7c2a9`](https://github.com/IdreesInc/Monocraft/blob/e498bf70aeb25b4bdcff1e44d878fb2cb4f7c2a9/dist/Monocraft-ttf/Monocraft.ttf) | `262e31822e0a75be567b02320bfa092143d871e8a273e529d1c5ab0c04cd215f` | Content, packet data, decoded JSON, and hex evidence |
+| `Minecraft-Bold.otf` | [`IdreesInc/Minecraft-Font` `261ac77fbf28796ca09c22eb83ecdfe386c4b838`](https://github.com/IdreesInc/Minecraft-Font/blob/261ac77fbf28796ca09c22eb83ecdfe386c4b838/Minecraft-Bold.otf) | `2a7216d047fd2991aa8a2fcbc002e0782a903d68de3cc248092ffa88aa941b4f` | Uppercase viewer headings and labels |
+
+Both upstream projects describe the fonts as independent fan-made emulations and state that they do not contain assets or font files from Minecraft. BedrockDebugProxy is not affiliated with or endorsed by Mojang or Microsoft. The font names identify the upstream files and do not imply official status.
+
 ## Direct runtime dependencies
 
 The Go module uses the following direct dependencies. Their source remains under their respective licenses and is not relicensed by BedrockDebugProxy.
