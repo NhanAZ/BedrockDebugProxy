@@ -182,6 +182,14 @@ Every new entry should state the symptom, root cause, implementation commits, ev
 - Evidence and validation: the viewer asset test checks the embedded themed dropdown selectors. `node --check internal/viewer/assets/app.js` checks the custom control script syntax. No forwarding, capture, protocol, or resource-pack behavior changes.
 - Status: implemented with viewer-only impact. Popup dimensions and text rasterization remain subject to the browser viewport and installed font availability.
 
+### FIX-0022 - Smaller unified viewer typography
+
+- Symptom: the capture viewer still appeared oversized, and headings, labels, and status controls could use a different locally installed face or forced uppercase presentation.
+- Root cause: the stylesheet retained a separate heading face, repeated 14px declarations, and uppercase transforms for several visible roles.
+- Implementation: visible viewer text now uses one regular Monocraft content face, with optional local Minecraft Ten lookup before the embedded fallback. A shared 12px size variable replaces repeated size declarations, and forced uppercase styling plus all-caps eyebrow literals were removed.
+- Evidence and validation: the viewer stylesheet audit found the separate heading face, repeated 14px declarations, and four uppercase transforms. The viewer HTTP regression test now checks the single-face, 12px, normal-weight, and natural-casing contract. Browser smoke validation covers the rebuilt page and themed controls.
+- Status: implemented with viewer-only impact. Browser zoom, operating-system scaling, and glyph fallback remain platform-specific.
+
 ## Ordering safety contract
 
 The deferred-packet change is deliberately narrow. `expectedIDs` remains the only authority for what the current login state accepts. The queue scan selects the earliest packet that is currently expected, leaves packets for later states queued, and never mutates or reorders bytes on the wire. The regression tests cover canonical resource-pack order, featured early `ResourcePacksInfo`, a later-phase packet queued ahead of the current phase, and all six permutations of the three login packets.

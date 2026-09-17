@@ -1,12 +1,4 @@
 @font-face {
-  font-family: "Minecraft Viewer Heading";
-  src: local("Mojangles"), local("Mojangles Regular"), url("fonts/Monocraft.ttf") format("truetype");
-  font-style: normal;
-  font-weight: 400;
-  font-display: swap;
-}
-
-@font-face {
   font-family: "Monocraft";
   src: local("Minecraft Ten"), local("Minecraft-Ten"), url("fonts/Monocraft.ttf") format("truetype");
   font-style: normal;
@@ -32,10 +24,10 @@
   --red: #ff6b7a;
   --blue: #5794ff;
   --shadow: 0 20px 55px rgb(0 0 0 / 28%);
-  --font-heading: "Minecraft Viewer Heading";
   --font-content: "Monocraft";
+  --font-size: 12px;
   font-family: var(--font-content);
-  font-size: 14px;
+  font-size: var(--font-size);
   font-weight: 400;
   font-variant-ligatures: none;
   font-feature-settings: "liga" 0, "calt" 0;
@@ -96,31 +88,29 @@ button:focus-visible, select:focus-visible, input:focus-visible {
 
 h1, h2, p { margin: 0; }
 h1, h2, .eyebrow, th {
-  font-family: var(--font-heading);
+  font-family: var(--font-content);
   font-weight: 400;
-  text-transform: uppercase;
 }
-h1 { font-size: 14px; letter-spacing: 0.02em; }
-h2 { font-size: 14px; letter-spacing: 0.03em; }
+h1 { font-size: var(--font-size); letter-spacing: 0.02em; }
+h2 { font-size: var(--font-size); letter-spacing: 0.03em; }
 
 .eyebrow {
   margin-bottom: 3px;
   color: var(--muted);
-  font-size: 14px;
+  font-size: var(--font-size);
   font-weight: 400;
   letter-spacing: 0.16em;
 }
 
-.capture-identity code { color: var(--muted); font-size: 14px; }
+.capture-identity code { color: var(--muted); font-size: var(--font-size); }
 
 .status-pill {
   padding: 5px 9px;
   border: 1px solid rgb(95 255 114 / 30%);
   color: var(--green);
   background: rgb(95 255 114 / 8%);
-  font-size: 14px;
+  font-size: var(--font-size);
   font-weight: 400;
-  text-transform: uppercase;
 }
 
 .status-pill.live {
@@ -153,8 +143,8 @@ h2 { font-size: 14px; letter-spacing: 0.03em; }
 }
 
 .metric:last-child { border-right: 0; }
-.metric span { color: var(--muted); font-size: 14px; }
-.metric strong { overflow: hidden; font-size: 14px; font-weight: 400; text-overflow: ellipsis; white-space: nowrap; }
+.metric span { color: var(--muted); font-size: var(--font-size); }
+.metric strong { overflow: hidden; font-size: var(--font-size); font-weight: 400; text-overflow: ellipsis; white-space: nowrap; }
 
 .filters {
   display: flex;
@@ -171,7 +161,7 @@ h2 { font-size: 14px; letter-spacing: 0.03em; }
   min-width: 130px;
 }
 
-.filters label > span { color: var(--muted); font-size: 14px; }
+.filters label > span { color: var(--muted); font-size: var(--font-size); }
 
 .filters select, .quiet-button {
   height: 34px;
@@ -204,7 +194,7 @@ h2 { font-size: 14px; letter-spacing: 0.03em; }
   color: var(--text);
   border: 1px solid var(--line);
   background: var(--surface-soft);
-  font-size: 14px;
+  font-size: var(--font-size);
   font-weight: 400;
   text-align: left;
   text-overflow: ellipsis;
@@ -255,7 +245,7 @@ h2 { font-size: 14px; letter-spacing: 0.03em; }
   overflow: hidden;
   color: var(--text);
   background: transparent;
-  font-size: 14px;
+  font-size: var(--font-size);
   font-weight: 400;
   text-overflow: ellipsis;
   white-space: nowrap;
@@ -286,7 +276,7 @@ h2 { font-size: 14px; letter-spacing: 0.03em; }
 }
 
 .search-field input { min-width: 0; flex: 1; border: 0; background: transparent; outline: 0; }
-.search-field kbd { color: var(--subtle); font-size: 14px; }
+.search-field kbd { color: var(--subtle); font-size: var(--font-size); }
 
 .problem-toggle, .follow-toggle {
   height: 34px;
@@ -333,14 +323,14 @@ h2 { font-size: 14px; letter-spacing: 0.03em; }
   background: linear-gradient(180deg, rgb(255 255 255 / 2%), transparent);
 }
 
-.pager { display: flex; align-items: center; gap: 8px; color: var(--muted); font-size: 14px; }
+.pager { display: flex; align-items: center; gap: 8px; color: var(--muted); font-size: var(--font-size); }
 .pager button { width: 30px; height: 30px; cursor: pointer; }
 .pager button:disabled { opacity: 0.35; cursor: default; }
 
 .table-wrap { min-height: 0; overflow: auto; }
-table { width: 100%; border-collapse: collapse; table-layout: fixed; font-size: 14px; }
+table { width: 100%; border-collapse: collapse; table-layout: fixed; font-size: var(--font-size); }
 thead { position: sticky; top: 0; z-index: 2; background: #111824; }
-th { padding: 9px 10px; color: var(--muted); font-size: 14px; font-weight: 400; text-align: left; text-transform: uppercase; letter-spacing: 0.08em; }
+th { padding: 9px 10px; color: var(--muted); font-size: var(--font-size); font-weight: 400; text-align: left; letter-spacing: 0.08em; }
 th:nth-child(1) { width: 62px; }
 th:nth-child(2) { width: 80px; }
 th:nth-child(3) { width: 70px; }
@@ -361,7 +351,7 @@ tbody tr.selected.problem { box-shadow: inset 3px 0 var(--red), inset 6px 0 var(
 .flow.internal { color: var(--violet); }
 .flow.unknown { color: var(--yellow); }
 .event-name { font-weight: 400; }
-.event-kind { display: block; margin-top: 2px; color: var(--subtle); font-size: 14px; }
+.event-kind { display: block; margin-top: 2px; color: var(--subtle); font-size: var(--font-size); }
 .problem-text { color: var(--red); }
 
 .inspector { min-width: 0; min-height: 0; display: grid; grid-template-rows: minmax(280px, 1.2fr) minmax(210px, 0.8fr); gap: 12px; }
@@ -378,10 +368,10 @@ tbody tr.selected.problem { box-shadow: inset 3px 0 var(--red), inset 6px 0 var(
 }
 
 .meta-item { padding: 9px 10px; border: 1px solid var(--line); background: rgb(8 11 18 / 38%); }
-.meta-item span { display: block; margin-bottom: 3px; color: var(--muted); font-size: 14px; text-transform: uppercase; letter-spacing: 0.08em; }
-.meta-item strong { display: block; overflow: hidden; font-size: 14px; font-weight: 400; text-overflow: ellipsis; white-space: nowrap; }
+.meta-item span { display: block; margin-bottom: 3px; color: var(--muted); font-size: var(--font-size); letter-spacing: 0.08em; }
+.meta-item strong { display: block; overflow: hidden; font-size: var(--font-size); font-weight: 400; text-overflow: ellipsis; white-space: nowrap; }
 
-.json-tree { font: 14px/1.55 var(--font-content); font-weight: 400; }
+.json-tree { font: var(--font-size)/1.55 var(--font-content); font-weight: 400; }
 .json-tree details { margin-left: 13px; }
 .json-tree > details { margin-left: 0; }
 .json-tree summary { cursor: pointer; color: var(--muted); }
@@ -393,8 +383,8 @@ tbody tr.selected.problem { box-shadow: inset 3px 0 var(--red), inset 6px 0 var(
 .json-value { margin-left: 13px; }
 
 .bytes-panel .panel-heading { min-height: 49px; }
-.muted { color: var(--muted); font-size: 14px; }
-.hex-view { min-height: 0; margin: 0; padding: 12px 14px; overflow: auto; color: #d9e2f1; background: #090d15; font-size: 14px; font-weight: 400; line-height: 1.55; tab-size: 2; }
+.muted { color: var(--muted); font-size: var(--font-size); }
+.hex-view { min-height: 0; margin: 0; padding: 12px 14px; overflow: auto; color: #d9e2f1; background: #090d15; font-size: var(--font-size); font-weight: 400; line-height: 1.55; tab-size: 2; }
 
 footer {
   min-height: 31px;
@@ -405,7 +395,7 @@ footer {
   justify-content: space-between;
   color: var(--muted);
   background: #0b1019;
-  font-size: 14px;
+  font-size: var(--font-size);
   font-weight: 400;
 }
 
