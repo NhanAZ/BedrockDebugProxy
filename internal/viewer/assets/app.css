@@ -97,6 +97,18 @@ h2 { font-size: 16px; letter-spacing: -0.01em; }
   text-transform: uppercase;
 }
 
+.status-pill.live {
+  color: var(--cyan);
+  border-color: rgb(95 255 255 / 35%);
+  background: rgb(95 255 255 / 8%);
+}
+
+.status-pill.failed {
+  color: var(--red);
+  border-color: rgb(255 107 122 / 35%);
+  background: rgb(255 107 122 / 8%);
+}
+
 .overview {
   display: grid;
   grid-template-columns: repeat(4, minmax(0, 1fr));
@@ -127,7 +139,7 @@ h2 { font-size: 16px; letter-spacing: -0.01em; }
   background: rgb(8 11 18 / 75%);
 }
 
-.filters label:not(.search-field):not(.problem-toggle) {
+.filters label:not(.search-field):not(.problem-toggle):not(.follow-toggle) {
   display: grid;
   gap: 5px;
   min-width: 130px;
@@ -160,7 +172,7 @@ h2 { font-size: 16px; letter-spacing: -0.01em; }
 .search-field input { min-width: 0; flex: 1; border: 0; background: transparent; outline: 0; }
 .search-field kbd { color: var(--subtle); font-size: 10px; }
 
-.problem-toggle {
+.problem-toggle, .follow-toggle {
   height: 34px;
   display: flex;
   align-items: center;
@@ -172,6 +184,8 @@ h2 { font-size: 16px; letter-spacing: -0.01em; }
 }
 
 .problem-toggle input { accent-color: var(--red); }
+.follow-toggle input { accent-color: var(--cyan); }
+[hidden] { display: none !important; }
 .quiet-button { cursor: pointer; color: var(--muted); }
 .quiet-button:hover:not(:disabled) { color: var(--text); border-color: var(--line-bright); }
 .quiet-button:disabled { opacity: 0.45; cursor: default; }

@@ -2,7 +2,7 @@
 
 ## Status
 
-Accepted on 2026-09-17.
+Accepted on 2026-09-17. The closed-capture restriction was superseded by ADR 0009. The separation and loopback security decisions remain active.
 
 ## Context
 

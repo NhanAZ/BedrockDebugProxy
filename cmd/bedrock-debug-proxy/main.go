@@ -7,8 +7,6 @@ import (
 	"flag"
 	"fmt"
 	"io"
-	"net"
-	"net/http"
 	"os"
 	"os/signal"
 	"path/filepath"
@@ -119,6 +117,7 @@ func runProxy(args []string, stdout, stderr io.Writer) int {
 	binaryPreview := flags.Int("decoded-binary-preview", 32, "decoded binary preview bytes")
 	maxCollection := flags.Int("max-decoded-items", 0, "decoded items per collection - zero keeps all")
 	decryptResourcePacks := flags.Bool("decrypt-resource-packs", false, "derive decrypted resource pack artifacts when a supported content key is available")
+	webViewer := flags.Bool("web-viewer", false, "open a live read-only capture viewer in the default browser")
 	flags.Usage = func() {
 		_, _ = fmt.Fprintln(stderr, "Usage - bedrock-debug-proxy run --upstream HOST:PORT|experience:NAME [options]")
 		flags.PrintDefaults()
@@ -215,6 +214,7 @@ func runProxy(args []string, stdout, stderr io.Writer) int {
 			"protocol_id":                  strconv.FormatInt(int64(protocol.CurrentProtocol), 10),
 			"game_version":                 protocol.CurrentVersion,
 			"decrypt_resource_packs":       strconv.FormatBool(*decryptResourcePacks),
+			"web_viewer":                   strconv.FormatBool(*webViewer),
 			"automatic_artifacts":          artifacts.Schema,
 		},
 		Limitations: limitations,
@@ -225,6 +225,36 @@ func runProxy(args []string, stdout, stderr io.Writer) int {
 		return 1
 	}
 	_, _ = fmt.Fprintf(stdout, "Capture directory %s\n", recorder.Root())
+	var liveCaptureViewer *viewer.Viewer
+	var liveViewerServer *viewer.LocalServer
+	if *webViewer {
+		liveCaptureViewer, err = viewer.OpenLive(recorder.Root(), viewer.Options{})
+		if err != nil {
+			_ = target.Close()
+			_ = recorder.Close("failed", err)
+			_, _ = fmt.Fprintf(stderr, "Open live capture viewer - %v\n", err)
+			return 1
+		}
+		liveViewerServer, err = viewer.StartLocal(liveCaptureViewer)
+		if err != nil {
+			_ = target.Close()
+			_ = recorder.Close("failed", err)
+			_, _ = fmt.Fprintf(stderr, "Start live capture viewer - %v\n", err)
+			return 1
+		}
+		defer func() {
+			shutdownContext, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+			defer cancel()
+			if err := liveViewerServer.Close(shutdownContext); err != nil {
+				_, _ = fmt.Fprintf(stderr, "Stop live capture viewer - %v\n", err)
+			}
+		}()
+		_, _ = fmt.Fprintf(stdout, "Live capture viewer %s\n", liveViewerServer.URL)
+		_, _ = fmt.Fprintln(stdout, "The viewer follows complete capture events and does not run on the packet forwarding path.")
+		if err := viewer.OpenBrowser(liveViewerServer.URL); err != nil {
+			_, _ = fmt.Fprintf(stderr, "Open browser - %v. Open the printed URL manually.\n", err)
+		}
+	}
 
 	runner, err := proxy.New(proxy.Config{
 		ListenAddress:              *listen,
@@ -280,6 +310,11 @@ func runProxy(args []string, stdout, stderr io.Writer) int {
 		runErr = errors.Join(runErr, fmt.Errorf("capture verification found %d issue(s)", len(verification.Issues)))
 		for _, issue := range verification.Issues {
 			_, _ = fmt.Fprintf(stderr, "Capture issue - %s\n", issue)
+		}
+	}
+	if liveCaptureViewer != nil {
+		if err := liveCaptureViewer.Refresh(); err != nil {
+			_, _ = fmt.Fprintf(stderr, "Refresh completed capture in viewer - %v\n", err)
 		}
 	}
 	_, _ = fmt.Fprintln(stdout, "Capture verification complete.")
@@ -394,8 +429,9 @@ func runView(args []string, stdout, stderr io.Writer) int {
 	flags := flag.NewFlagSet("view", flag.ContinueOnError)
 	flags.SetOutput(stderr)
 	noOpen := flags.Bool("no-open", false, "do not open the viewer in the default browser")
+	live := flags.Bool("live", false, "follow a capture that may still be open")
 	flags.Usage = func() {
-		_, _ = fmt.Fprintln(stderr, "Usage - bedrock-debug-proxy view [--no-open] CAPTURE_DIRECTORY")
+		_, _ = fmt.Fprintln(stderr, "Usage - bedrock-debug-proxy view [--live] [--no-open] CAPTURE_DIRECTORY")
 		flags.PrintDefaults()
 	}
 	if err := flags.Parse(args); err != nil {
@@ -405,42 +441,28 @@ func runView(args []string, stdout, stderr io.Writer) int {
 		flags.Usage()
 		return 2
 	}
-	_, _ = fmt.Fprintln(stdout, "Verifying and indexing the closed capture...")
-	captureViewer, err := viewer.Open(flags.Arg(0), viewer.Options{})
+	var captureViewer *viewer.Viewer
+	var err error
+	if *live {
+		_, _ = fmt.Fprintln(stdout, "Indexing complete events and following the capture...")
+		captureViewer, err = viewer.OpenLive(flags.Arg(0), viewer.Options{})
+	} else {
+		_, _ = fmt.Fprintln(stdout, "Verifying and indexing the closed capture...")
+		captureViewer, err = viewer.Open(flags.Arg(0), viewer.Options{})
+	}
 	if err != nil {
 		_, _ = fmt.Fprintf(stderr, "Open capture viewer - %v\n", err)
 		return 1
 	}
-	var listenConfig net.ListenConfig
-	listener, err := listenConfig.Listen(context.Background(), "tcp4", "127.0.0.1:0")
+	server, err := viewer.StartLocal(captureViewer)
 	if err != nil {
 		_, _ = fmt.Fprintf(stderr, "Start capture viewer - %v\n", err)
 		return 1
 	}
-	token, err := viewer.NewAccessToken()
-	if err != nil {
-		_ = listener.Close()
-		_, _ = fmt.Fprintf(stderr, "Start capture viewer - %v\n", err)
-		return 1
-	}
-	url := "http://" + listener.Addr().String() + "/" + token + "/"
-	server := &http.Server{
-		Handler:           captureViewer.Handler(token),
-		ReadHeaderTimeout: 5 * time.Second,
-		IdleTimeout:       30 * time.Second,
-	}
-	serveResult := make(chan error, 1)
-	go func() {
-		err := server.Serve(listener)
-		if errors.Is(err, http.ErrServerClosed) {
-			err = nil
-		}
-		serveResult <- err
-	}()
-	_, _ = fmt.Fprintf(stdout, "Capture viewer %s\n", url)
+	_, _ = fmt.Fprintf(stdout, "Capture viewer %s\n", server.URL)
 	_, _ = fmt.Fprintln(stdout, "The viewer is read-only and bound to this computer. Press Ctrl+C to stop it.")
 	if !*noOpen {
-		if err := viewer.OpenBrowser(url); err != nil {
+		if err := viewer.OpenBrowser(server.URL); err != nil {
 			_, _ = fmt.Fprintf(stderr, "Open browser - %v. Open the printed URL manually.\n", err)
 		}
 	}
@@ -448,22 +470,18 @@ func runView(args []string, stdout, stderr io.Writer) int {
 	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
 	defer stop()
 	select {
-	case err := <-serveResult:
+	case <-server.Done():
+		err := server.Err()
 		if err != nil {
 			_, _ = fmt.Fprintf(stderr, "Capture viewer stopped with an error - %v\n", err)
 			return 1
 		}
 	case <-ctx.Done():
 		shutdownContext, cancel := context.WithTimeout(context.Background(), 5*time.Second)
-		err := server.Shutdown(shutdownContext)
+		err := server.Close(shutdownContext)
 		cancel()
 		if err != nil {
-			_ = server.Close()
 			_, _ = fmt.Fprintf(stderr, "Stop capture viewer - %v\n", err)
-			return 1
-		}
-		if err := <-serveResult; err != nil {
-			_, _ = fmt.Fprintf(stderr, "Capture viewer stopped with an error - %v\n", err)
 			return 1
 		}
 	}
@@ -579,7 +597,7 @@ func printUsage(writer io.Writer) {
 	_, _ = fmt.Fprintln(writer, "  bedrock-debug-proxy logout")
 	_, _ = fmt.Fprintln(writer, "  bedrock-debug-proxy verify CAPTURE_DIRECTORY")
 	_, _ = fmt.Fprintln(writer, "  bedrock-debug-proxy inspect [filters] CAPTURE_DIRECTORY")
-	_, _ = fmt.Fprintln(writer, "  bedrock-debug-proxy view [--no-open] CAPTURE_DIRECTORY")
+	_, _ = fmt.Fprintln(writer, "  bedrock-debug-proxy view [--live] [--no-open] CAPTURE_DIRECTORY")
 	_, _ = fmt.Fprintln(writer, "  bedrock-debug-proxy analyze CAPTURE_DIRECTORY")
 	_, _ = fmt.Fprintln(writer, "  bedrock-debug-proxy explain CAPTURE_DIRECTORY")
 	_, _ = fmt.Fprintln(writer, "  bedrock-debug-proxy export CAPTURE_DIRECTORY OUTPUT.bdpcap")

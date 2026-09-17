@@ -58,9 +58,15 @@ The command verifies referenced blobs before streaming and exits with status 1 i
 
 `bedrock-debug-proxy view CAPTURE_DIRECTORY` verifies and indexes a closed capture, starts a temporary HTTP server on an automatically selected IPv4 loopback port, and opens the default browser. Use `--no-open` to print the URL without starting a browser.
 
+Use `bedrock-debug-proxy view --live CAPTURE_DIRECTORY` to follow a capture that another proxy process is writing. More commonly, add `--web-viewer` to `run` so the proxy starts the live viewer and opens the browser automatically. The page refreshes once per second while the manifest is open. "Follow live" keeps the newest matching page visible and can be disabled to inspect earlier pages.
+
 The interface provides server-side pagination and filters for direction, packet name, event kind, channel, text, and problem events. Selecting a row loads its complete event JSON on demand and shows at most 64 KiB of its referenced blob as a hex preview. The decoded tree stops rendering after 4,000 nodes so one unusually large event cannot make the browser unresponsive. These are display limits only. They do not modify, truncate, or replace the canonical event stream or blobs.
 
-The viewer accepts only a closed capture with no verifier issues. It keeps a lightweight event index in memory while reading complete selected events from `events.jsonl` on demand. Startup therefore includes full blob verification and one event-stream indexing pass. Very large captures can take time to open and consume memory proportional to their event count, but not to their decoded payload size.
+Closed mode accepts only a completed capture with no verifier issues. It performs full blob verification before serving. Live mode indexes only newline-terminated event records and ignores an incomplete trailing write until it becomes complete. The recorder commits a referenced blob before its event record, so a visible live event never intentionally points to a blob that is still being written. When the manifest closes, the viewer indexes the final records and runs the normal capture verifier. Its status then changes from live to verified or failed.
+
+Both modes keep a lightweight event index in memory while reading complete selected events from `events.jsonl` on demand. Very large captures can take time to open and consume memory proportional to their event count, but not to their decoded payload size. Live refresh reads only bytes appended after the previous index boundary. It does not scan the complete file on every poll.
+
+The live viewer is a derived reader of files the recorder has already committed. It is not a packet observer, recorder sink, WebSocket in the forwarding path, or source of backpressure. A slow or closed browser cannot delay forwarding. Terminal lifecycle, warning, error, and compact packet-summary output remains available independently.
 
 The HTTP listener is fixed to `127.0.0.1` and each run creates an unpredictable URL path. There is no LAN bind option. Browser assets are embedded in the executable and do not contact a CDN or other external service. The viewer is still able to display sensitive addresses, identifiers, chat, content keys, and decoded packet data from the local capture. Do not share its URL or expose the process through a separate tunnel or port forward.
 
