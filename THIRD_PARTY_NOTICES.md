@@ -21,6 +21,8 @@ The local capture viewer embeds the following unmodified font files. They remain
 
 Both upstream projects describe the fonts as independent fan-made emulations and state that they do not contain assets or font files from Minecraft. BedrockDebugProxy is not affiliated with or endorsed by Mojang or Microsoft. The font names identify the upstream files and do not imply official status.
 
+The viewer stylesheet also checks for locally installed `Mojangles` and `Minecraft Ten` fonts before these embedded fallbacks. Those proprietary files are not present in this repository, executable, or license bundle. A local installation remains subject to the rights holder's terms. The viewer does not read or serve arbitrary font paths.
+
 ## Direct runtime dependencies
 
 The Go module uses the following direct dependencies. Their source remains under their respective licenses and is not relicensed by BedrockDebugProxy.

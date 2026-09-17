@@ -118,6 +118,21 @@ func TestViewerServesEmbeddedFontAssets(t *testing.T) {
 	server := httptest.NewServer((&Viewer{}).Handler("font-token"))
 	defer server.Close()
 
+	response := get(t, server.URL+"/font-token/assets/app.css")
+	css, err := io.ReadAll(response.Body)
+	if err != nil {
+		t.Fatal(err)
+	}
+	_ = response.Body.Close()
+	if response.StatusCode != http.StatusOK {
+		t.Fatalf("CSS status = %d, want %d", response.StatusCode, http.StatusOK)
+	}
+	for _, source := range []string{`local("Mojangles")`, `local("Minecraft Ten")`} {
+		if !strings.Contains(string(css), source) {
+			t.Fatalf("CSS does not prefer locally installed font %s", source)
+		}
+	}
+
 	tests := []struct {
 		path        string
 		contentType string

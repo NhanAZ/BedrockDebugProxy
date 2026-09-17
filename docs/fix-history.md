@@ -158,6 +158,14 @@ Every new entry should state the symptom, root cause, implementation commits, ev
 - Evidence and validation: a stylesheet search confirms that `internal/viewer/assets/app.css` contains no corner-radius declarations. Automated viewer tests and a local browser check cover the rebuilt interface.
 - Status: implemented with no forwarding, capture, protocol, or resource-pack impact.
 
+### FIX-0019 - Optional local Mojang font preference
+
+- Symptom: the capture viewer could use only the embedded fan-made fonts even when the operator had a separately installed Mojangles or Minecraft Ten font available for personal use.
+- Root cause: the viewer's `@font-face` sources referenced only the redistributable fallback files.
+- Implementation: the heading and content faces now try the exact locally installed `Mojangles` and `Minecraft Ten` family names before the embedded OFL fallbacks. No proprietary font file is copied into the repository, executable, or license bundle.
+- Evidence and validation: local name-table inspection identified the supplied files as `Mojangles` and `Minecraft Ten`. The official [Minecraft Usage Guidelines](https://www.minecraft.net/en-us/usage-guidelines) identify fonts as part of the Minecraft brand and prohibit redistribution of game files. A viewer HTTP regression test verifies both `local()` sources.
+- Status: implemented with viewer-only impact. Exact appearance depends on the font being installed and available to the browser.
+
 ## Ordering safety contract
 
 The deferred-packet change is deliberately narrow. `expectedIDs` remains the only authority for what the current login state accepts. The queue scan selects the earliest packet that is currently expected, leaves packets for later states queued, and never mutates or reorders bytes on the wire. The regression tests cover canonical resource-pack order, featured early `ResourcePacksInfo`, a later-phase packet queued ahead of the current phase, and all six permutations of the three login packets.

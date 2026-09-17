@@ -13,6 +13,7 @@ Detailed rationale remains in [`docs/audits/`](docs/audits/).
 ### Changed
 
 - The capture viewer now embeds two OFL-licensed fan-made fonts. Minecraft Font Bold is used for uppercase headings, and Monocraft is used for all remaining interface and packet content without contacting a font CDN.
+- The capture viewer now prefers separately installed Mojangles and Minecraft Ten fonts through browser-local lookup, while retaining the embedded OFL fonts as fallbacks and bundling no Mojang font files.
 - The capture viewer now uses square corners throughout its interface, including status indicators, controls, panels, and metadata cards.
 
 ## [0.2.1] - 2026-09-17
