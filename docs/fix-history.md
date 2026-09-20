@@ -406,6 +406,14 @@ Every new entry should state the symptom, root cause, implementation commits, ev
 - Evidence and validation: the viewer asset test checks the cross-browser marker removal declarations and glyph reference. Browser smoke validation must inspect an expanded event JSON tree and confirm that no native triangle remains.
 - Status: implemented with viewer-only impact.
 
+### FIX-0050 - Square the filter checkboxes
+
+- Symptom: the native checkbox inside the Problems only control retained a rounded platform shape that did not match the viewer's square controls.
+- Root cause: the checkbox input used browser-native appearance and accent coloring.
+- Implementation: remove native checkbox appearance, render a twelve-pixel square border with a palette-colored checked fill, and apply the same geometry to the hidden live-follow control.
+- Evidence and validation: the viewer asset test checks the custom checkbox declarations and checked-state marker. Browser smoke validation confirms the Problems only control keeps its native label behavior while the checkbox uses square corners.
+- Status: implemented with viewer-only impact.
+
 ## Ordering safety contract
 
 The deferred-packet change is deliberately narrow. `expectedIDs` remains the only authority for what the current login state accepts. The queue scan selects the earliest packet that is currently expected, leaves packets for later states queued, and never mutates or reorders bytes on the wire. The regression tests cover canonical resource-pack order, featured early `ResourcePacksInfo`, a later-phase packet queued ahead of the current phase, and all six permutations of the three login packets.

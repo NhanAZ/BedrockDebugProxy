@@ -23,6 +23,7 @@ Detailed rationale remains in [`docs/audits/`](docs/audits/).
 - The capture viewer now gives the outer page scrollbar the same compact four-pixel palette styling as the inner scrollbars.
 - The capture viewer now uses the supplied pixel SVG glyphs for dropdown and Blob bytes toggles instead of CSS-drawn chevrons.
 - The capture viewer now replaces native JSON tree disclosure markers with the supplied pixel glyph instead of the browser triangle.
+- The capture viewer now uses square, palette-colored custom checkboxes instead of native rounded checkbox controls.
 - The capture viewer now reflows filters, overview metrics, event controls, and detail metadata for narrow screens without forcing a page-wide minimum width.
 - The capture viewer now lets event details grow with their content instead of clipping or collapsing the panel behind an internal vertical scrollbar.
 - The capture viewer now uses one page-level scrollbar so the header, filters, event stream, details, and raw evidence share the same scroll context.

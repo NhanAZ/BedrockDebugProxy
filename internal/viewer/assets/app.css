@@ -279,8 +279,28 @@ h2 { font-size: var(--font-size); letter-spacing: 0.03em; }
   white-space: nowrap;
 }
 
-.problem-toggle input { accent-color: var(--red); }
-.follow-toggle input { accent-color: var(--cyan); }
+.problem-toggle input, .follow-toggle input {
+  appearance: none;
+  width: 12px;
+  height: 12px;
+  margin: 0;
+  border: 1px solid var(--line-bright);
+  border-radius: 0;
+  background: var(--surface-soft);
+  display: grid;
+  place-items: center;
+}
+.problem-toggle input::after, .follow-toggle input::after {
+  width: 6px;
+  height: 6px;
+  background: var(--text);
+  content: "";
+  transform: scale(0);
+}
+.problem-toggle input:checked { border-color: var(--red); }
+.problem-toggle input:checked::after { background: var(--red); transform: scale(1); }
+.follow-toggle input:checked { border-color: var(--cyan); }
+.follow-toggle input:checked::after { background: var(--cyan); transform: scale(1); }
 [hidden] { display: none !important; }
 .quiet-button { cursor: pointer; color: var(--muted); }
 .quiet-button:hover:not(:disabled) { color: var(--text); border-color: var(--line-bright); }
