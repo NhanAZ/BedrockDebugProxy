@@ -114,7 +114,7 @@ h2 { font-size: var(--font-size); letter-spacing: 0.03em; }
   border-right: 1px solid var(--line);
   display: flex;
   flex-direction: row;
-  align-items: baseline;
+  align-items: center;
   justify-content: center;
   gap: 6px;
 }
