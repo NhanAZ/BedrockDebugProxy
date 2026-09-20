@@ -52,7 +52,11 @@
         <span id="viewer-status" class="event-status" aria-live="polite">Opening and verifying capture...</span>
         <div class="pager">
           <button id="previous" type="button" aria-label="Previous page">←</button>
-          <span id="page-label">-</span>
+          <label class="page-jump">
+            <input id="page-input" type="number" min="1" inputmode="numeric" aria-label="Current page" value="" disabled>
+            <span aria-hidden="true">/</span>
+            <span id="page-label">-</span>
+          </label>
           <button id="next" type="button" aria-label="Next page">→</button>
         </div>
       </div>

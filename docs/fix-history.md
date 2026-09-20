@@ -310,6 +310,14 @@ Every new entry should state the symptom, root cause, implementation commits, ev
 - Evidence and validation: the viewer asset test now requires the shared font declaration for the hint and rejects the separate Space Grotesk rule. Browser smoke validation confirms the hint matches the search field typography.
 - Status: implemented with viewer-only impact.
 
+### FIX-0038 - Direct event page entry
+
+- Symptom: large captures required repeated previous or next clicks to reach a distant event page.
+- Root cause: the pager displayed the current page as text and exposed no direct page-entry control.
+- Implementation: replace the current-page text with a bounded number input, keep the total page count beside it, and load the requested offset on Enter or change while clamping invalid values to the available range.
+- Evidence and validation: the viewer HTTP test checks the page input markers and JavaScript page-jump handler. Browser smoke validation confirms the input remains aligned with the existing pager controls and accepts direct page navigation.
+- Status: implemented with viewer-only impact.
+
 ## Ordering safety contract
 
 The deferred-packet change is deliberately narrow. `expectedIDs` remains the only authority for what the current login state accepts. The queue scan selects the earliest packet that is currently expected, leaves packets for later states queued, and never mutates or reorders bytes on the wire. The regression tests cover canonical resource-pack order, featured early `ResourcePacksInfo`, a later-phase packet queued ahead of the current phase, and all six permutations of the three login packets.
