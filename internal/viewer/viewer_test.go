@@ -141,7 +141,7 @@ func TestViewerServesEmbeddedFontAssets(t *testing.T) {
 		t.Fatal(err)
 	}
 	_ = response.Body.Close()
-	for _, source := range []string{"url(\"glyph_e031.svg\")", "url(\"glyph_v.svg\")"} {
+	for _, source := range []string{"url(\"glyph_e031.svg\")", "url(\"glyph_v.svg\")", ".json-tree summary::marker", ".json-tree summary::-webkit-details-marker", ".json-tree details:not([open]) > summary::before"} {
 		if !strings.Contains(string(css), source) {
 			t.Fatalf("CSS does not use the supplied glyph asset %s", source)
 		}
