@@ -17,6 +17,7 @@ Detailed rationale remains in [`docs/audits/`](docs/audits/).
 - The capture viewer now stacks the event stream, decoded details, and raw evidence in one scrollable column instead of splitting the workspace into two columns.
 - The capture viewer now uses square corners throughout its interface, including status indicators, controls, panels, and metadata cards.
 - The capture viewer now uses themed custom filter dropdowns with keyboard navigation instead of browser-native option popups, while keeping the original filter values and queries unchanged.
+- The capture viewer now renders intentionally pending raw packet decodes in gold (`#FFAA00`) instead of using the error red reserved for decode failures.
 - The contributor validation workflow now requires viewer asset, HTTP, JavaScript, and browser smoke checks in the same change whenever a web-facing change could affect the page.
 
 ## [0.2.1] - 2026-09-17

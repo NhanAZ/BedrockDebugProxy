@@ -168,6 +168,20 @@ func TestViewerServesEmbeddedFontAssets(t *testing.T) {
 			t.Fatalf("CSS does not contain themed dropdown selector %s", source)
 		}
 	}
+	for _, source := range []string{"--gold: #ffaa00", "tbody tr.problem.decode-pending", ".decode-pending-text"} {
+		if !strings.Contains(string(css), source) {
+			t.Fatalf("CSS does not contain pending-decode styling %s", source)
+		}
+	}
+	jsResponse = get(t, server.URL+"/font-token/assets/app.js")
+	js, err = io.ReadAll(jsResponse.Body)
+	if err != nil {
+		t.Fatal(err)
+	}
+	_ = jsResponse.Body.Close()
+	if !strings.Contains(string(js), "decode-pending") || !strings.Contains(string(js), "not_yet_decoded") {
+		t.Fatal("JavaScript does not classify pending-decode rows")
+	}
 	for _, forbidden := range []string{"font-weight: 650", "font-weight: 700", "font-weight: 750", "font-size: 9px", "font-size: 10px", "font-size: 11px", "font-size: 13px", "font-size: 14px", "font-size: 15px", "font-size: 16px", "font-size: 17px", "font-size: 18px", "font: 11px/1.55", "text-transform: uppercase"} {
 		if strings.Contains(string(css), forbidden) {
 			t.Fatalf("CSS still contains non-uniform typography declaration %q", forbidden)

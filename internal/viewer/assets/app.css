@@ -21,6 +21,7 @@
   --green: #5fff72;
   --violet: #e878ff;
   --yellow: #ffff5f;
+  --gold: #ffaa00;
   --red: #ff6b7a;
   --blue: #5794ff;
   --shadow: 0 20px 55px rgb(0 0 0 / 28%);
@@ -344,6 +345,8 @@ tbody tr:hover { background: rgb(87 148 255 / 8%); }
 tbody tr.selected { background: rgb(87 148 255 / 14%); box-shadow: inset 3px 0 var(--blue); }
 tbody tr.problem { box-shadow: inset 3px 0 var(--red); }
 tbody tr.selected.problem { box-shadow: inset 3px 0 var(--red), inset 6px 0 var(--blue); }
+tbody tr.problem.decode-pending { box-shadow: inset 3px 0 var(--gold); }
+tbody tr.selected.problem.decode-pending { box-shadow: inset 3px 0 var(--gold), inset 6px 0 var(--blue); }
 
 .sequence, .time, .packet-id, .hex-view, code { font-family: var(--font-content); }
 .sequence, .time { color: var(--muted); }
@@ -355,6 +358,7 @@ tbody tr.selected.problem { box-shadow: inset 3px 0 var(--red), inset 6px 0 var(
 .event-name { font-weight: 400; }
 .event-kind { display: block; margin-top: 2px; color: var(--subtle); font-size: var(--font-size); }
 .problem-text { color: var(--red); }
+.decode-pending-text { color: var(--gold); }
 
 .inspector { min-width: 0; min-height: 420px; display: grid; grid-template-rows: minmax(280px, 1.2fr) minmax(210px, 0.8fr); gap: 12px; }
 .detail-content { min-height: 0; padding: 14px; overflow: auto; }
