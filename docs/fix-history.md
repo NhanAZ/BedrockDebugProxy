@@ -350,6 +350,14 @@ Every new entry should state the symptom, root cause, implementation commits, ev
 - Evidence and validation: the viewer asset test checks the cross-browser themed scrollbar declarations. Browser smoke validation confirms the dropdown scrollbar is thin and aligned with the existing dark palette.
 - Status: implemented with viewer-only impact.
 
+### FIX-0043 - Theme event stream scrollbar
+
+- Symptom: the event stream's internal scrollbar was hidden, so its bounded table area had no visible drag affordance beside the rows.
+- Root cause: the earlier cleanup hid `.table-wrap` scrollbar chrome even though the table remains an independently scrollable viewport.
+- Implementation: restore the scrollbar and apply the same thin six-pixel track, transparent background, `--line-bright` thumb, and muted hover color used by the Packet and Kind menus. Wheel and keyboard scrolling remain unchanged.
+- Evidence and validation: the viewer asset test checks the themed `.table-wrap` declarations and rejects the previous hidden-scrollbar rules. Browser smoke validation confirms the event stream scrollbar matches the filter menus.
+- Status: implemented with viewer-only impact.
+
 ## Ordering safety contract
 
 The deferred-packet change is deliberately narrow. `expectedIDs` remains the only authority for what the current login state accepts. The queue scan selects the earliest packet that is currently expected, leaves packets for later states queued, and never mutates or reorders bytes on the wire. The regression tests cover canonical resource-pack order, featured early `ResourcePacksInfo`, a later-phase packet queued ahead of the current phase, and all six permutations of the three login packets.
