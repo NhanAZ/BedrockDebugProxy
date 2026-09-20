@@ -419,7 +419,7 @@ Every new entry should state the symptom, root cause, implementation commits, ev
 - Symptom: a The Hive session through the read-only proxy received a temporary `Unfair Advantage` ban response even though the capture retained raw same-protocol traffic and showed no intentional gameplay mutation.
 - Root cause: unresolved. The capture proves the server response, but it does not expose whether the trigger was a server-side blocklist or anti-cheat change, the `SrDuck84` upstream identity at the separate authenticated session boundary, client 1.26.51 behavior, or a combination.
 - Implementation: none. This is an evidence and policy record, not a runtime fix.
-- Evidence and validation: [`docs/research/hive-unfair-advantage-2026-09.md`](research/hive-unfair-advantage-2026-09.md), affected capture `session-20260920T135412Z`, comparison capture `session-20260917T034859Z`, Hive's current proxy policy, and the public Hive and Mojang release pages cited in the research note.
+- Evidence and validation: [`docs/research/hive-unfair-advantage-2026-09.md`](research/hive-unfair-advantage-2026-09.md), affected capture `session-20260920T135412Z`, comparison capture `session-20260917T034859Z`, Hive's current proxy policy, public Hive and Mojang release pages, and the community reports cited in the research note.
 - Status: unresolved research. The same `NhanAZ` to `SrDuck84` pattern appears in 22 earlier successful Hive captures, so `SrDuck84` is not proven sufficient by itself and must not be excluded as an interaction hypothesis. No further live test is authorized by this record.
 
 ## Ordering safety contract
