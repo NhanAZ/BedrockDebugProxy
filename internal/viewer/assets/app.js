@@ -306,7 +306,15 @@ function renderRows() {
     });
     elements["event-rows"].append(tr);
   }
+  updateSequenceColumnWidth();
   markSelectedRow();
+}
+
+function updateSequenceColumnWidth() {
+  const table = elements["event-rows"].closest("table");
+  if (!table) return;
+  const maxDigits = state.rows.reduce((max, row) => Math.max(max, String(row.sequence).length), 1);
+  table.style.setProperty("--sequence-column-width", `${Math.max(4, maxDigits + 1)}ch`);
 }
 
 function cell(text, className) {

@@ -375,7 +375,7 @@ h2 { font-size: var(--font-size); letter-spacing: 0.03em; }
 table { width: 100%; border-collapse: collapse; table-layout: fixed; font-size: var(--font-size); }
 thead { position: sticky; top: 0; z-index: 2; background: var(--surface-soft); }
 th { padding: 9px 10px; color: var(--muted); font-size: var(--font-size); font-weight: 400; text-align: left; letter-spacing: 0.08em; }
-th:nth-child(1) { width: 62px; }
+th:nth-child(1) { width: calc(var(--sequence-column-width, 5ch) + 20px); }
 th:nth-child(2) { width: 132px; }
 th:nth-child(3) { width: 70px; }
 th:nth-child(4) { width: 35%; }
@@ -548,7 +548,7 @@ tbody tr.selected.problem.decode-pending { box-shadow: inset 3px 0 var(--gold), 
   }
   .table-wrap { overflow: auto; }
   table { min-width: 620px; }
-  th:nth-child(1) { width: 52px; }
+  th:nth-child(1) { width: calc(var(--sequence-column-width, 5ch) + 20px); }
   th:nth-child(2) { width: 112px; }
   .detail-content { padding: 10px; }
   .meta-grid { grid-template-columns: minmax(0, 1fr); }

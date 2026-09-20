@@ -422,6 +422,14 @@ Every new entry should state the symptom, root cause, implementation commits, ev
 - Evidence and validation: [`docs/research/hive-unfair-advantage-2026-09.md`](research/hive-unfair-advantage-2026-09.md), affected capture `session-20260920T135412Z`, comparison capture `session-20260917T034859Z`, Hive's current proxy policy, public Hive and Mojang release pages, and the community reports cited in the research note.
 - Status: unresolved research. The same `NhanAZ` to `SrDuck84` pattern appears in 22 earlier successful Hive captures, so `SrDuck84` is not proven sufficient by itself and must not be excluded as an interaction hypothesis. No further live test is authorized by this record.
 
+### FIX-0052 - Size the event sequence column from visible values
+
+- Symptom: larger sequence numbers such as `#93461` were truncated to `#934...` in the event stream.
+- Root cause: the first table column used a fixed width that was smaller than the rendered sequence text once a capture reached five or more digits.
+- Implementation: the viewer sets a CSS custom property from the longest visible sequence number after each page load, and the Seq header uses that value with a small padding allowance at desktop and narrow breakpoints.
+- Evidence and validation: the viewer asset test checks the dynamic sizing hook and CSS contract. Browser smoke validation must open a large capture on a page containing a five-digit sequence and confirm the complete value is visible without an ellipsis.
+- Status: implemented with viewer-only impact. The width follows the current page and may change when navigating between pages.
+
 ## Ordering safety contract
 
 The deferred-packet change is deliberately narrow. `expectedIDs` remains the only authority for what the current login state accepts. The queue scan selects the earliest packet that is currently expected, leaves packets for later states queued, and never mutates or reorders bytes on the wire. The regression tests cover canonical resource-pack order, featured early `ResourcePacksInfo`, a later-phase packet queued ahead of the current phase, and all six permutations of the three login packets.
