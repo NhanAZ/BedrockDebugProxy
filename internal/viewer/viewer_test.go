@@ -66,7 +66,7 @@ func TestViewerServesFilteredEventsAndBlobPreview(t *testing.T) {
 	if response.StatusCode != http.StatusOK || !strings.Contains(string(index), "Capture Viewer") {
 		t.Fatalf("index status = %d, body = %s", response.StatusCode, index)
 	}
-	for _, marker := range []string{`href="assets/app.css"`, `src="assets/app.js"`, `id="direction"`, `id="packet"`, `id="kind"`, `id="channel"`, "BedrockDebugProxy", "Ordered stream", "Decoded view", "Raw evidence"} {
+	for _, marker := range []string{`href="assets/app.css"`, `src="assets/app.js"`, `id="direction"`, `id="packet"`, `id="kind"`, `id="channel"`, `id="bytes-panel"`, `id="bytes-toggle"`, `aria-expanded="false"`, `id="hex-view" class="hex-view" hidden`, "BedrockDebugProxy", "Ordered stream", "Decoded view", "Raw evidence"} {
 		if !strings.Contains(string(index), marker) {
 			t.Fatalf("index is missing viewer marker %q", marker)
 		}
@@ -169,7 +169,7 @@ func TestViewerServesEmbeddedFontAssets(t *testing.T) {
 	if strings.Contains(string(css), "grid-template-rows: auto auto auto minmax(0, 1fr) auto") || strings.Contains(string(css), "  overflow: hidden;\n}\n\nbutton, input, select") {
 		t.Fatal("CSS still keeps the page inside a workspace-only scroll container")
 	}
-	for _, source := range []string{".select-trigger", ".select-menu", ".select-option"} {
+	for _, source := range []string{".select-trigger", ".select-menu", ".select-option", ".bytes-panel.collapsed", ".panel-heading-toggle"} {
 		if !strings.Contains(string(css), source) {
 			t.Fatalf("CSS does not contain themed dropdown selector %s", source)
 		}
@@ -185,7 +185,7 @@ func TestViewerServesEmbeddedFontAssets(t *testing.T) {
 		t.Fatal(err)
 	}
 	_ = jsResponse.Body.Close()
-	if !strings.Contains(string(js), "decode-pending") || !strings.Contains(string(js), "not_yet_decoded") {
+	if !strings.Contains(string(js), "decode-pending") || !strings.Contains(string(js), "not_yet_decoded") || !strings.Contains(string(js), "setBytesExpanded") || !strings.Contains(string(js), "elements[\"hex-view\"].hidden") {
 		t.Fatal("JavaScript does not classify pending-decode rows")
 	}
 	for _, forbidden := range []string{"font-weight: 650", "font-weight: 700", "font-weight: 750", "font-size: 9px", "font-size: 10px", "font-size: 11px", "font-size: 13px", "font-size: 14px", "font-size: 15px", "font-size: 16px", "font-size: 17px", "font-size: 18px", "font: 11px/1.55", "text-transform: uppercase"} {

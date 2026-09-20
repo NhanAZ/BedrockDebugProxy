@@ -83,15 +83,17 @@
         </div>
       </section>
 
-      <section class="panel bytes-panel" aria-labelledby="bytes-heading">
+      <section id="bytes-panel" class="panel bytes-panel collapsed" aria-labelledby="bytes-heading">
         <div class="panel-heading">
-          <div>
-            <p class="eyebrow">Raw evidence</p>
-            <h2 id="bytes-heading">Blob bytes</h2>
-          </div>
+          <button id="bytes-toggle" class="panel-heading-toggle" type="button" aria-controls="hex-view" aria-expanded="false" aria-label="Expand blob bytes">
+            <div>
+              <p class="eyebrow">Raw evidence</p>
+              <h2 id="bytes-heading">Blob bytes</h2>
+            </div>
+          </button>
           <span id="byte-status" class="muted">No blob selected</span>
         </div>
-        <pre id="hex-view" class="hex-view">Select an event with a blob reference.</pre>
+        <pre id="hex-view" class="hex-view" hidden>Select an event with a blob reference.</pre>
       </section>
     </aside>
   </main>
