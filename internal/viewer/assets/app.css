@@ -212,10 +212,17 @@ h2 { font-size: var(--font-size); letter-spacing: 0.03em; }
   max-height: 240px;
   overflow-x: hidden;
   overflow-y: auto;
+  scrollbar-width: thin;
+  scrollbar-color: var(--line-bright) transparent;
   border: 1px solid var(--line-bright);
   background: var(--surface-raised);
   box-shadow: 0 12px 28px rgb(0 0 0 / 42%);
 }
+
+.select-menu::-webkit-scrollbar { width: 6px; }
+.select-menu::-webkit-scrollbar-track { background: transparent; }
+.select-menu::-webkit-scrollbar-thumb { background: var(--line-bright); border: 1px solid var(--surface-raised); }
+.select-menu::-webkit-scrollbar-thumb:hover { background: var(--muted); }
 
 .select-option {
   min-height: 34px;
