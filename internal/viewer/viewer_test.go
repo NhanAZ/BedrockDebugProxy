@@ -66,10 +66,15 @@ func TestViewerServesFilteredEventsAndBlobPreview(t *testing.T) {
 	if response.StatusCode != http.StatusOK || !strings.Contains(string(index), "Capture Viewer") {
 		t.Fatalf("index status = %d, body = %s", response.StatusCode, index)
 	}
-	for _, marker := range []string{`href="assets/app.css"`, `src="assets/app.js"`, `src="assets/original-logo.png"`, `href="assets/favicon-32x32.png"`, `href="assets/favicon.ico"`, `href="assets/apple-touch-icon.png"`, `href="assets/site.webmanifest"`, `id="direction"`, `id="packet"`, `id="kind"`, `id="channel"`, `id="bytes-panel"`, `id="bytes-toggle"`, `aria-expanded="false"`, `id="hex-view" class="hex-view" hidden`, "BedrockDebugProxy", "Ordered stream", "Decoded view", "Raw evidence"} {
+	for _, marker := range []string{`href="assets/app.css"`, `src="assets/app.js"`, `src="assets/original-logo.png"`, `href="assets/favicon-32x32.png"`, `href="assets/favicon.ico"`, `href="assets/apple-touch-icon.png"`, `href="assets/site.webmanifest"`, `aria-label="Capture overview"`, `id="event-count"`, `id="blob-count"`, `id="duration"`, `id="generator"`, `id="direction"`, `id="packet"`, `id="kind"`, `id="channel"`, `id="bytes-panel"`, `id="bytes-toggle"`, `aria-expanded="false"`, `id="hex-view" class="hex-view" hidden`, "BedrockDebugProxy", "Ordered stream", "Decoded view", "Raw evidence"} {
 		if !strings.Contains(string(index), marker) {
 			t.Fatalf("index is missing viewer marker %q", marker)
 		}
+	}
+	headerEnd := strings.Index(string(index), "</header>")
+	overviewStart := strings.Index(string(index), `class="overview"`)
+	if overviewStart < 0 || headerEnd < 0 || overviewStart > headerEnd {
+		t.Fatal("capture overview is not rendered inside the compact header")
 	}
 	for _, forbidden := range []string{"BEDROCKDEBUGPROXY", "ORDERED STREAM", "DECODED VIEW", "RAW EVIDENCE"} {
 		if strings.Contains(string(index), forbidden) {
@@ -155,7 +160,7 @@ func TestViewerServesEmbeddedFontAssets(t *testing.T) {
 	if !strings.Contains(string(css), "font-size: var(--font-size)") || !strings.Contains(string(css), "--font-size: 12px") {
 		t.Fatal("CSS does not expose the shared 12px font-size contract")
 	}
-	for _, layout := range []string{"grid-template-columns: minmax(0, 1fr)", "grid-template-rows: auto auto auto auto auto", "grid-template-rows: minmax(360px, 65vh) max-content", "grid-template-rows: max-content max-content", "min-height: max-content", "overflow: auto", "overflow: visible"} {
+	for _, layout := range []string{"grid-template-columns: minmax(0, 1fr)", "grid-template-columns: auto minmax(0, 1fr) auto", "grid-template-rows: auto auto auto auto", "grid-template-rows: minmax(360px, 65vh) max-content", "grid-template-rows: max-content max-content", "min-height: max-content", "overflow: auto", "overflow: visible"} {
 		if !strings.Contains(string(css), layout) {
 			t.Fatalf("CSS does not contain the single-column workspace layout %q", layout)
 		}

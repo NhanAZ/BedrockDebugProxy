@@ -49,7 +49,7 @@ body {
     var(--bg);
   display: grid;
   grid-template-columns: minmax(0, 1fr);
-  grid-template-rows: auto auto auto auto auto;
+  grid-template-rows: auto auto auto auto;
   overflow: auto;
 }
 
@@ -67,9 +67,9 @@ button:focus-visible, select:focus-visible, input:focus-visible {
 }
 
 .topbar {
-  display: flex;
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto;
   align-items: center;
-  justify-content: space-between;
   min-height: 76px;
   padding: 14px 24px;
   border-bottom: 1px solid var(--line);
@@ -78,6 +78,8 @@ button:focus-visible, select:focus-visible, input:focus-visible {
 }
 
 .brand, .capture-identity { display: flex; align-items: center; gap: 13px; }
+.brand { min-width: max-content; }
+.capture-identity { min-width: 0; }
 
 .brand-mark {
   width: 38px;
@@ -103,6 +105,7 @@ h2 { font-size: var(--font-size); letter-spacing: 0.03em; }
 }
 
 .capture-identity code { color: var(--muted); font-size: var(--font-size); }
+.capture-identity code { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 
 .status-pill {
   padding: 5px 9px;
@@ -126,24 +129,28 @@ h2 { font-size: var(--font-size); letter-spacing: 0.03em; }
 }
 
 .overview {
+  min-width: 0;
   display: grid;
   grid-template-columns: repeat(4, minmax(0, 1fr));
-  border-bottom: 1px solid var(--line);
-  background: rgb(15 20 32 / 68%);
+  margin: 0 18px;
+  border-left: 1px solid var(--line);
+  background: transparent;
 }
 
 .metric {
-  min-height: 65px;
-  padding: 12px 24px;
+  min-width: 0;
+  min-height: 38px;
+  padding: 4px 12px;
   border-right: 1px solid var(--line);
   display: flex;
-  flex-direction: column;
+  flex-direction: row;
+  align-items: baseline;
   justify-content: center;
-  gap: 3px;
+  gap: 6px;
 }
 
 .metric:last-child { border-right: 0; }
-.metric span { color: var(--muted); font-size: var(--font-size); }
+.metric span { overflow: hidden; color: var(--muted); font-size: var(--font-size); text-overflow: ellipsis; white-space: nowrap; }
 .metric strong { overflow: hidden; font-size: var(--font-size); font-weight: 400; text-overflow: ellipsis; white-space: nowrap; }
 
 .filters {
