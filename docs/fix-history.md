@@ -222,6 +222,14 @@ Every new entry should state the symptom, root cause, implementation commits, ev
 - Evidence and validation: the viewer asset regression test now requires max-content sizing and rejects the zero-minimum inspector rule. Browser smoke validation must inspect the details panel at a constrained viewport and confirm that its metadata and decoded fields remain visible without an internal scrollbar.
 - Status: implemented with viewer-only impact. Very large decoded trees intentionally increase the outer workspace scroll height.
 
+### FIX-0027 - Use one page-level viewer scrollbar
+
+- Symptom: the red scrollbar began below the header and filters because the workspace owned the vertical scroll context, making the page feel split into a fixed control area and a separate scrollable body.
+- Root cause: `body` was height-constrained with `overflow: hidden`, while `.workspace` used `overflow: auto` as an inner scroll container.
+- Implementation: let the body grid grow with its content and own the vertical scrollbar. The workspace now keeps a bounded event-stream row, expands the inspector below it, and leaves its overflow visible so the header, filters, details, and raw evidence share one page-level scroll context.
+- Evidence and validation: the viewer asset regression test now requires the page-sized body tracks and the bounded workspace row, while rejecting the previous body-only grid constraint. Browser smoke validation must confirm that the scrollbar starts at the top of the page and that selected event details remain reachable below the event stream.
+- Status: implemented with viewer-only impact. The event table retains its local table overflow for its paginated rows.
+
 ## Ordering safety contract
 
 The deferred-packet change is deliberately narrow. `expectedIDs` remains the only authority for what the current login state accepts. The queue scan selects the earliest packet that is currently expected, leaves packets for later states queued, and never mutates or reorders bytes on the wire. The regression tests cover canonical resource-pack order, featured early `ResourcePacksInfo`, a later-phase packet queued ahead of the current phase, and all six permutations of the three login packets.
