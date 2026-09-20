@@ -332,7 +332,8 @@ h2 { font-size: var(--font-size); letter-spacing: 0.03em; }
 .page-jump input::-webkit-inner-spin-button, .page-jump input::-webkit-outer-spin-button { margin: 0; appearance: none; }
 .page-jump input:disabled { opacity: 0.35; }
 
-.table-wrap { min-height: 0; overflow: auto; }
+.table-wrap { min-height: 0; overflow: auto; scrollbar-width: none; -ms-overflow-style: none; }
+.table-wrap::-webkit-scrollbar { display: none; }
 table { width: 100%; border-collapse: collapse; table-layout: fixed; font-size: var(--font-size); }
 thead { position: sticky; top: 0; z-index: 2; background: #111824; }
 th { padding: 9px 10px; color: var(--muted); font-size: var(--font-size); font-weight: 400; text-align: left; letter-spacing: 0.08em; }
