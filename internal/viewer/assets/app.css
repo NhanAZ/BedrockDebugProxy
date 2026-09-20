@@ -253,7 +253,7 @@ h2 { font-size: var(--font-size); letter-spacing: 0.03em; }
 }
 
 .search-field input { min-width: 0; flex: 1; border: 0; background: transparent; outline: 0; }
-.search-field kbd { color: var(--subtle); font-family: "Space Grotesk", system-ui, sans-serif; font-size: var(--font-size); }
+.search-field kbd { color: var(--subtle); font-family: var(--font-content); font-size: var(--font-size); }
 
 .problem-toggle, .follow-toggle {
   height: 34px;

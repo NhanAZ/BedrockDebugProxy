@@ -298,8 +298,16 @@ Every new entry should state the symptom, root cause, implementation commits, ev
 
 - Symptom: the overview header left excess vertical space, Time values were truncated, the result count occupied a separate footer, and the search field showed an unwanted magnifier.
 - Root cause: the header retained its earlier minimum height, the Time column was too narrow for full millisecond timestamps, viewer status was coupled to footer metadata, and the search affordance included a decorative glyph.
-- Implementation: reduce the overview header height, widen the Time column to 132px, move the live result status into the event panel heading, remove the footer and magnifier, and style the Ctrl F hint with Space Grotesk when available. The web manifest now uses BedrockDebugProxy as its app name.
-- Evidence and validation: viewer HTTP tests check the compact page grid, status placement, removed footer and glyph, wider Time column, manifest name, and Space Grotesk declaration. Browser smoke validation confirms the header, table, in-panel count, and search hint remain readable.
+- Implementation: reduce the overview header height, widen the Time column to 132px, move the live result status into the event panel heading, remove the footer and magnifier, and style the Ctrl F hint with the shared pixel font. The web manifest now uses BedrockDebugProxy as its app name.
+- Evidence and validation: viewer HTTP tests check the compact page grid, status placement, removed footer and glyph, wider Time column, manifest name, and shared pixel-font declaration. Browser smoke validation confirms the header, table, in-panel count, and search hint remain readable.
+- Status: implemented with viewer-only impact.
+
+### FIX-0037 - Use the shared pixel font for the search hint
+
+- Symptom: the Ctrl F hint used a non-pixel sans-serif fallback while the rest of the viewer used the pixel font.
+- Root cause: the search hint had an explicit Space Grotesk font override.
+- Implementation: use the shared `var(--font-content)` family for the Ctrl F hint so every visible viewer role follows one pixel-font stack.
+- Evidence and validation: the viewer asset test now requires the shared font declaration for the hint and rejects the separate Space Grotesk rule. Browser smoke validation confirms the hint matches the search field typography.
 - Status: implemented with viewer-only impact.
 
 ## Ordering safety contract
