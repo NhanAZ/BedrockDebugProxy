@@ -6,10 +6,12 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
+	"math"
 	"net/http"
 	"net/http/httptest"
 	"os"
 	"path/filepath"
+	"regexp"
 	"strconv"
 	"strings"
 	"testing"
@@ -66,7 +68,7 @@ func TestViewerServesFilteredEventsAndBlobPreview(t *testing.T) {
 	if response.StatusCode != http.StatusOK || !strings.Contains(string(index), "BedrockDebugProxy") {
 		t.Fatalf("index status = %d, body = %s", response.StatusCode, index)
 	}
-	for _, marker := range []string{`href="assets/app.css"`, `src="assets/app.js"`, `href="assets/favicon-32x32.png"`, `href="assets/favicon.ico"`, `href="assets/apple-touch-icon.png"`, `href="assets/site.webmanifest"`, `aria-label="Capture overview"`, `class="brand-name"`, `id="viewer-status"`, `id="event-count"`, `id="blob-count"`, `id="duration"`, `id="generator"`, `id="direction"`, `id="packet"`, `id="kind"`, `id="channel"`, `id="page-input"`, `id="page-label"`, `id="bytes-panel"`, `id="bytes-toggle"`, `aria-expanded="false"`, `id="hex-view" class="hex-view" hidden`, `class="panel-title"`, `class="panel-title-separator"`, "BedrockDebugProxy", "Ordered stream", "Decoded view", "Raw evidence"} {
+	for _, marker := range []string{`href="assets/app.css"`, `src="assets/app.js"`, `href="assets/favicon-32x32.png"`, `href="assets/favicon.ico"`, `href="assets/apple-touch-icon.png"`, `href="assets/site.webmanifest"`, `<meta name="theme-color" content="#000000">`, `aria-label="Capture overview"`, `class="brand-name"`, `id="viewer-status"`, `id="event-count"`, `id="blob-count"`, `id="duration"`, `id="generator"`, `id="direction"`, `id="packet"`, `id="kind"`, `id="channel"`, `id="page-input"`, `id="page-label"`, `id="bytes-panel"`, `id="bytes-toggle"`, `aria-expanded="false"`, `id="hex-view" class="hex-view" hidden`, `class="panel-title"`, `class="panel-title-separator"`, "BedrockDebugProxy", "Ordered stream", "Decoded view", "Raw evidence"} {
 		if !strings.Contains(string(index), marker) {
 			t.Fatalf("index is missing viewer marker %q", marker)
 		}
@@ -139,6 +141,11 @@ func TestViewerServesEmbeddedFontAssets(t *testing.T) {
 		t.Fatal(err)
 	}
 	_ = response.Body.Close()
+	for _, source := range []string{"url(\"glyph_e031.svg\")", "url(\"glyph_v.svg\")"} {
+		if !strings.Contains(string(css), source) {
+			t.Fatalf("CSS does not use the supplied glyph asset %s", source)
+		}
+	}
 	if response.StatusCode != http.StatusOK {
 		t.Fatalf("CSS status = %d, want %d", response.StatusCode, http.StatusOK)
 	}
@@ -160,7 +167,7 @@ func TestViewerServesEmbeddedFontAssets(t *testing.T) {
 	if !strings.Contains(string(css), "font-size: var(--font-size)") || !strings.Contains(string(css), "--font-size: 12px") {
 		t.Fatal("CSS does not expose the shared 12px font-size contract")
 	}
-	for _, layout := range []string{"grid-template-columns: minmax(0, 1fr)", "grid-template-columns: auto minmax(0, 1fr)", "grid-template-rows: max-content max-content max-content", "grid-template-rows: minmax(360px, 65vh) max-content", "grid-template-rows: max-content max-content", "min-height: max-content", "overflow: auto", "overflow: visible", "th:nth-child(2) { width: 132px; }", ".event-status", ".search-field kbd { color: var(--subtle); font-family: var(--font-content);"} {
+	for _, layout := range []string{"min-width: 0", "grid-template-columns: minmax(0, 1fr)", "grid-template-columns: auto minmax(0, 1fr)", "grid-template-rows: max-content max-content max-content", "grid-template-rows: minmax(360px, 65vh) max-content", "grid-template-rows: max-content max-content", "min-height: max-content", "overflow: auto", "overflow: visible", "th:nth-child(2) { width: 132px; }", ".event-status", ".search-field kbd { color: var(--subtle); font-family: var(--font-content);", "@media (max-width: 1100px)", "flex-wrap: wrap", "@media (max-width: 640px)", "grid-template-columns: repeat(2, minmax(0, 1fr))", "grid-template-rows: minmax(320px, 62vh) max-content", "table { min-width: 620px; }"} {
 		if !strings.Contains(string(css), layout) {
 			t.Fatalf("CSS does not contain the single-column workspace layout %q", layout)
 		}
@@ -174,7 +181,7 @@ func TestViewerServesEmbeddedFontAssets(t *testing.T) {
 	if strings.Contains(string(css), "grid-template-rows: auto auto auto minmax(0, 1fr) auto") || strings.Contains(string(css), "  overflow: hidden;\n}\n\nbutton, input, select") {
 		t.Fatal("CSS still keeps the page inside a workspace-only scroll container")
 	}
-	for _, source := range []string{".select-trigger", ".select-menu", ".select-option", "width: max-content", "max-width: min(480px, calc(100vw - 16px))", "scrollbar-width: thin", ".select-menu::-webkit-scrollbar", ".select-menu::-webkit-scrollbar-thumb", ".table-wrap::-webkit-scrollbar", ".table-wrap::-webkit-scrollbar-thumb", ".bytes-panel.collapsed", ".panel-heading-toggle", ".panel-title {", ".panel-title-separator", ".brand-name"} {
+	for _, source := range []string{".select-trigger", ".select-menu", ".select-option", "width: max-content", "max-width: min(480px, calc(100vw - 16px))", "scrollbar-width: thin", "scrollbar-color: var(--line) var(--surface-raised)", "html, body {\n  scrollbar-width: thin;\n  scrollbar-color: var(--line) var(--bg);\n}", "html::-webkit-scrollbar, body::-webkit-scrollbar { width: 4px; height: 4px; }", "html::-webkit-scrollbar-button, body::-webkit-scrollbar-button", "html::-webkit-scrollbar-thumb, body::-webkit-scrollbar-thumb", ".select-menu::-webkit-scrollbar { width: 4px; }", ".select-menu::-webkit-scrollbar-button", ".select-menu::-webkit-scrollbar-thumb", ".table-wrap::-webkit-scrollbar { width: 4px; height: 4px; }", ".table-wrap::-webkit-scrollbar-button", ".table-wrap::-webkit-scrollbar-thumb", ".bytes-panel.collapsed", ".panel-heading-toggle", ".panel-title {", ".panel-title-separator", ".brand-name"} {
 		if !strings.Contains(string(css), source) {
 			t.Fatalf("CSS does not contain themed dropdown selector %s", source)
 		}
@@ -185,6 +192,33 @@ func TestViewerServesEmbeddedFontAssets(t *testing.T) {
 	for _, source := range []string{"--gold: #ffaa00", "tbody tr.problem.decode-pending", ".decode-pending-text"} {
 		if !strings.Contains(string(css), source) {
 			t.Fatalf("CSS does not contain pending-decode styling %s", source)
+		}
+	}
+	allowedColors := map[string]bool{
+		"#000000": true, "#00002a": true, "#002a00": true, "#002a2a": true,
+		"#2a0000": true, "#2a002a": true, "#2a2a00": true, "#2a2a2a": true,
+		"#151515": true, "#15153f": true, "#153f15": true, "#153f3f": true,
+		"#3f1515": true, "#3f153f": true, "#3f3f15": true, "#3f3f3f": true,
+		"#373501": true, "#383534": true, "#333232": true, "#110e0e": true,
+		"#250501": true, "#2d1a13": true, "#372c0b": true, "#04280d": true,
+		"#0b2e2a": true, "#08121e": true, "#261731": true, "#3b1d05": true,
+		"#232d40": true, "#0000aa": true, "#00aa00": true, "#00aaaa": true,
+		"#aa0000": true, "#aa00aa": true, "#ffaa00": true, "#aaaaaa": true,
+		"#555555": true, "#5555ff": true, "#55ff55": true, "#55ffff": true,
+		"#ff5555": true, "#ff55ff": true, "#ffff55": true, "#ffffff": true,
+		"#ddd605": true, "#e3d4d1": true, "#cecaca": true, "#443a3b": true,
+		"#971607": true, "#b4684d": true, "#deb12d": true, "#47a036": true,
+		"#2cbaa8": true, "#21497b": true, "#9a5cc6": true, "#eb7114": true,
+		"#8bb3ff": true,
+	}
+	for _, color := range regexp.MustCompile(`#[0-9a-fA-F]{6}`).FindAllString(string(css), -1) {
+		if !allowedColors[strings.ToLower(color)] {
+			t.Fatalf("CSS uses a color outside the Minecraft palette: %s", color)
+		}
+	}
+	for _, forbidden := range []string{"linear-gradient", "radial-gradient", "rgb(", "rgba(", "hsl(", "hsla("} {
+		if strings.Contains(string(css), forbidden) {
+			t.Fatalf("CSS uses forbidden color function or gradient %q", forbidden)
 		}
 	}
 	jsResponse = get(t, server.URL+"/font-token/assets/app.js")
@@ -213,6 +247,8 @@ func TestViewerServesEmbeddedFontAssets(t *testing.T) {
 		prefix      string
 		sha256      string
 	}{
+		{path: "glyph_e031.svg", contentType: "image/svg+xml", prefix: "<?xml"},
+		{path: "glyph_v.svg", contentType: "image/svg+xml", prefix: "<?xml"},
 		{path: "favicon-16x16.png", contentType: "image/png", prefix: "\x89PNG\r\n\x1a\n", sha256: "221dc39a54736e4858934b808210f8cdec08b2eeb86f73b919705aab48166fcc"},
 		{path: "favicon-32x32.png", contentType: "image/png", prefix: "\x89PNG\r\n\x1a\n", sha256: "a665788fd84c8a293a25719101354b411d951bebf7cc958200f245b279ac55ee"},
 		{path: "favicon.ico", contentType: "image/x-icon", prefix: "\x00\x00\x01\x00", sha256: "18fa56a2443be147555797ce573e5922cd371183cf81acfe5f40e760335d0763"},
@@ -264,7 +300,7 @@ func TestViewerServesEmbeddedFontAssets(t *testing.T) {
 		t.Fatal(err)
 	}
 	_ = manifestResponse.Body.Close()
-	if !strings.Contains(string(manifest), `"name": "BedrockDebugProxy"`) || !strings.Contains(string(manifest), `"start_url": "../"`) || !strings.Contains(string(manifest), `"scope": "../"`) || !strings.Contains(string(manifest), `"theme_color": "#080c14"`) {
+	if !strings.Contains(string(manifest), `"name": "BedrockDebugProxy"`) || !strings.Contains(string(manifest), `"start_url": "../"`) || !strings.Contains(string(manifest), `"scope": "../"`) || !strings.Contains(string(manifest), `"theme_color": "#000000"`) || !strings.Contains(string(manifest), `"background_color": "#000000"`) {
 		t.Fatalf("manifest does not target the token-scoped dark viewer root: %s", manifest)
 	}
 }
@@ -447,6 +483,56 @@ func TestOpenBrowserRejectsNonLoopbackURL(t *testing.T) {
 	if err := OpenBrowser("https://example.com/capture"); err == nil {
 		t.Fatal("OpenBrowser() accepted a non-loopback URL")
 	}
+}
+
+func TestViewerPaletteTextContrast(t *testing.T) {
+	pairs := []struct {
+		name, foreground, background string
+	}{
+		{"muted on black", "#aaaaaa", "#000000"},
+		{"muted on surface", "#aaaaaa", "#151515"},
+		{"muted on raised", "#aaaaaa", "#2a2a2a"},
+		{"white on black", "#ffffff", "#000000"},
+		{"white on surface", "#ffffff", "#151515"},
+		{"white on raised", "#ffffff", "#2a2a2a"},
+		{"aqua on selection", "#55ffff", "#15153f"},
+		{"green on surface", "#55ff55", "#151515"},
+		{"gold on surface", "#ffaa00", "#151515"},
+		{"red on surface", "#ff5555", "#151515"},
+		{"magenta on surface", "#ff55ff", "#151515"},
+		{"yellow on surface", "#ffff55", "#151515"},
+	}
+	for _, pair := range pairs {
+		if ratio := contrastRatio(pair.foreground, pair.background); ratio < 4.5 {
+			t.Errorf("%s contrast ratio = %.2f, want at least 4.5", pair.name, ratio)
+		}
+	}
+}
+
+func contrastRatio(foreground, background string) float64 {
+	parse := func(color string) [3]float64 {
+		value, err := strconv.ParseUint(strings.TrimPrefix(color, "#"), 16, 32)
+		if err != nil {
+			panic(err)
+		}
+		return [3]float64{float64(value >> 16 & 0xff), float64(value >> 8 & 0xff), float64(value & 0xff)}
+	}
+	luminance := func(color string) float64 {
+		channels := parse(color)
+		linear := func(channel float64) float64 {
+			channel /= 255
+			if channel <= 0.03928 {
+				return channel / 12.92
+			}
+			return math.Pow((channel+0.055)/1.055, 2.4)
+		}
+		return 0.2126*linear(channels[0]) + 0.7152*linear(channels[1]) + 0.0722*linear(channels[2])
+	}
+	fg, bg := luminance(foreground), luminance(background)
+	if fg < bg {
+		fg, bg = bg, fg
+	}
+	return (fg + 0.05) / (bg + 0.05)
 }
 
 func get(t *testing.T, url string) *http.Response {

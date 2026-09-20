@@ -233,6 +233,10 @@ func (v *Viewer) serveHTTP(writer http.ResponseWriter, request *http.Request) {
 		v.serveAsset(writer, request, "assets/app.css", "text/css; charset=utf-8")
 	case request.URL.Path == "/assets/app.js":
 		v.serveAsset(writer, request, "assets/app.js", "text/javascript; charset=utf-8")
+	case request.URL.Path == "/assets/glyph_e031.svg":
+		v.serveAsset(writer, request, "assets/glyph_e031.svg", "image/svg+xml")
+	case request.URL.Path == "/assets/glyph_v.svg":
+		v.serveAsset(writer, request, "assets/glyph_v.svg", "image/svg+xml")
 	case request.URL.Path == "/assets/favicon-16x16.png":
 		v.serveAsset(writer, request, "assets/favicon-16x16.png", "image/png")
 	case request.URL.Path == "/assets/favicon-32x32.png":
