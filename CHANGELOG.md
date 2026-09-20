@@ -12,6 +12,7 @@ Detailed rationale remains in [`docs/audits/`](docs/audits/).
 
 ### Changed
 
+- Unauthenticated upstream dials now preserve the downstream client's identity instead of falling back to gophertunnel's default `Steve` identity. Xbox-authenticated dials continue to use the identity from the authentication chain.
 - The capture viewer retains the OFL-licensed fan-made font assets without contacting a font CDN. Visible text uses regular Monocraft and can resolve a separately installed Minecraft Ten before the embedded fallback.
 - The capture viewer now uses one 12px normal-weight scale for all visible text, removes forced uppercase styling, and keeps labels in natural casing.
 - The capture viewer now stacks the event stream, decoded details, and raw evidence in one scrollable column instead of splitting the workspace into two columns.

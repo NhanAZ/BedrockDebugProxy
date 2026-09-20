@@ -277,7 +277,7 @@ func (r *Runner) Run(ctx context.Context) error {
 		StatusProvider:         minecraft.NewStatusProvider("BedrockDebugProxy", r.config.UpstreamAddress),
 		MaxDecompressedLen:     r.config.MaxDecompressedBytes,
 		PacketFunc:             observer.PacketFuncDynamic("downstream", func() string { return getAcceptState().downstreamID }),
-		FetchResourcePacks: func(_ login.IdentityData, clientData login.ClientData, _ []*resource.Pack) []*resource.Pack {
+		FetchResourcePacks: func(identityData login.IdentityData, clientData login.ClientData, _ []*resource.Pack) []*resource.Pack {
 			state := getAcceptState()
 			state.slot.once.Do(func() {
 				clientContext, _ := downstreamContext.Get()
@@ -298,7 +298,7 @@ func (r *Runner) Run(ctx context.Context) error {
 					Channel: "upstream", Hop: state.hop, ReadDirection: capture.DirectionServerToClient,
 					WriteDirection: capture.DirectionClientToServer,
 				}
-				state.slot.conn, state.slot.resourcePacks, state.slot.err = r.connectUpstream(connectCtx, state.target, state.upstreamNetwork, observer, state.upstreamID, state.hop, state.upstreamLogger, live, clientData, state.transferLocalAddr != nil, state.transferRouteProbed)
+				state.slot.conn, state.slot.resourcePacks, state.slot.err = r.connectUpstream(connectCtx, state.target, state.upstreamNetwork, observer, state.upstreamID, state.hop, state.upstreamLogger, live, identityData, clientData, state.transferLocalAddr != nil, state.transferRouteProbed)
 			})
 			if state.slot.err != nil || state.slot.conn == nil {
 				return nil
@@ -630,7 +630,7 @@ func (r *Runner) probeTransferRoute(ctx context.Context, target string, localAdd
 	return nil
 }
 
-func (r *Runner) connectUpstream(ctx context.Context, target string, network bedrock.Network, observer *bedrock.Observer, connectionID string, hop int, logger *slog.Logger, live *liveReporter, clientData login.ClientData, transferRoute, routeProbed bool) (*minecraft.Conn, []*resource.Pack, error) {
+func (r *Runner) connectUpstream(ctx context.Context, target string, network bedrock.Network, observer *bedrock.Observer, connectionID string, hop int, logger *slog.Logger, live *liveReporter, identityData login.IdentityData, clientData login.ClientData, transferRoute, routeProbed bool) (*minecraft.Conn, []*resource.Pack, error) {
 	if err := r.recordAtHop("upstream.dial_start", capture.SeverityInfo, map[string]any{"address": target}, hop); err != nil {
 		return nil, nil, err
 	}
@@ -640,9 +640,10 @@ func (r *Runner) connectUpstream(ctx context.Context, target string, network bed
 	urlResourcePacks := newURLResourcePackCache(dialCtx)
 	recordPacket := observer.PacketFunc("upstream", connectionID)
 	dialer := minecraft.Dialer{
-		TokenSource: r.config.TokenSource,
-		ClientData:  clientData,
-		ErrorLog:    logger,
+		TokenSource:  r.config.TokenSource,
+		IdentityData: identityData,
+		ClientData:   clientData,
+		ErrorLog:     logger,
 		// A pre-probe can happen several seconds before Minecraft reconnects.
 		// Always perform a fresh bounded ping on the actual hop-2 dial so the
 		// featured-experience route is active when RakNet starts its handshake.

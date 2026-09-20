@@ -226,6 +226,11 @@ func TestRunnerForwardsBidirectionalPacketsAndCapturesSession(t *testing.T) {
 			return
 		}
 		defer func() { _ = serverConn.Close() }()
+		identity := serverConn.IdentityData()
+		if identity.Identity != "11111111-1111-1111-1111-111111111111" || identity.DisplayName != "Integration" {
+			serverErrors <- fmt.Errorf("upstream identity = %#v, want downstream identity", identity)
+			return
+		}
 		if startErr := serverConn.StartGame(minecraft.GameData{
 			WorldName:       "BedrockDebugProxy integration",
 			EntityUniqueID:  1,
