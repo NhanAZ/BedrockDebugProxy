@@ -286,6 +286,14 @@ Every new entry should state the symptom, root cause, implementation commits, ev
 - Evidence and validation: viewer HTTP tests check inline heading markers and CSS, and browser smoke validation confirms all three headings remain readable on one line.
 - Status: implemented with viewer-only impact.
 
+### FIX-0035 - Simplify viewer brand header
+
+- Symptom: the viewer header used a decorative logo and a secondary Capture Viewer title, taking space away from the capture overview.
+- Root cause: the brand block retained the earlier two-line identity treatment after the header was compacted.
+- Implementation: remove the header logo and secondary title, keep BedrockDebugProxy as the sole visible brand name, and retain the favicon assets for browser metadata.
+- Evidence and validation: the viewer HTTP test rejects the removed header elements and title text, while browser smoke validation confirms the name and overview metrics remain aligned.
+- Status: implemented with viewer-only impact.
+
 ## Ordering safety contract
 
 The deferred-packet change is deliberately narrow. `expectedIDs` remains the only authority for what the current login state accepts. The queue scan selects the earliest packet that is currently expected, leaves packets for later states queued, and never mutates or reorders bytes on the wire. The regression tests cover canonical resource-pack order, featured early `ResourcePacksInfo`, a later-phase packet queued ahead of the current phase, and all six permutations of the three login packets.

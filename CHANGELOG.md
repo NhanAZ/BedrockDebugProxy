@@ -26,6 +26,7 @@ Detailed rationale remains in [`docs/audits/`](docs/audits/).
 - The capture viewer now places Events, Blobs, Duration, and Generator in one compact header row instead of a separate overview strip.
 - The capture viewer header no longer displays the verification pill or capture identifier, leaving the compact overview as the only header metadata.
 - The capture viewer now renders each panel eyebrow and title on one line with a hyphen separator to reduce heading height.
+- The capture viewer header now keeps only the BedrockDebugProxy name and removes its decorative logo and secondary viewer title.
 - The contributor validation workflow now requires viewer asset, HTTP, JavaScript, and browser smoke checks in the same change whenever a web-facing change could affect the page.
 
 ### Fixed
