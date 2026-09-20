@@ -414,15 +414,3 @@ Every new entry should state the symptom, root cause, implementation commits, ev
 - Evidence and validation: the viewer asset test checks the custom checkbox declarations and checked-state marker. Browser smoke validation confirms the Problems only control keeps its native label behavior while the checkbox uses square corners.
 - Status: implemented with viewer-only impact.
 
-## Ordering safety contract
-
-The deferred-packet change is deliberately narrow. `expectedIDs` remains the only authority for what the current login state accepts. The queue scan selects the earliest packet that is currently expected, leaves packets for later states queued, and never mutates or reorders bytes on the wire. The regression tests cover canonical resource-pack order, featured early `ResourcePacksInfo`, a later-phase packet queued ahead of the current phase, and all six permutations of the three login packets.
-
-This is a compatibility guard, not permission to assume a universal Bedrock sequence. Before changing an expected set, inspect the packet definitions, the relevant capture, and the server-specific validation flow. A new server observation must add a focused test and update this index or a linked research note.
-
-## Open and pending items
-
-- Generate a stamped binary from the current commit and run The Hive minimum baseline.
-- Re-run the direct Enchanted transfer and resource-pack flow with the same binary.
-- Complete the exact-revision matrix for Galaxite, Lifeboat, Mineville Zeqa, and Enchanted after the The Hive baseline before release.
-- If a server fails, record the capture and classify the failure before changing the generic state machine.

@@ -6,6 +6,12 @@ This catalog records the server selectors and endpoint references used by the pr
 
 BedrockDebugProxy is a read-only observation and research tool, but that does not make proxy use authorized by a server. Each server controls its own rules, terms, authentication, and anti-abuse systems. A server may reject a connection, disconnect or kick a player, or issue a temporary or permanent ban even when the proxy does not intentionally modify, inject, replay, or automate gameplay traffic. Check the server's current policy and obtain permission before connecting through a proxy. The project does not provide authorization to use any listed service.
 
+### The Hive policy status
+
+The Hive's [VPN and proxy policy](https://support.playhive.com/vpn/) was reviewed on 2026-09-20. It says that VPN and proxy use is not allowed, most proxy logins are automatically rejected, and blocklists are updated continually. It also says that proxy use alone should not result in a ban. This is a server policy boundary, not evidence that a proxy connection is safe for project validation.
+
+The project must not use a punished account or another account to probe The Hive's enforcement behavior. Existing Hive captures are historical evidence. A future live baseline requires a current policy review and explicit authorization for the proxy path. If that authorization is unavailable, record the validation as `incomplete` rather than substituting another account or treating a blocked or banned session as a passing baseline.
+
 ## Active pre-release validation matrix
 
 These five targets are the required release matrix. Use the exact selector with the stamped binary and record the observed endpoint in the local report rather than assuming that the reference remains current.
