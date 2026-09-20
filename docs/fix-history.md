@@ -358,6 +358,46 @@ Every new entry should state the symptom, root cause, implementation commits, ev
 - Evidence and validation: the viewer asset test checks the themed `.table-wrap` declarations and rejects the previous hidden-scrollbar rules. Browser smoke validation confirms the event stream scrollbar matches the filter menus.
 - Status: implemented with viewer-only impact.
 
+### FIX-0044 - Constrain viewer colors to the Minecraft palette
+
+- Symptom: the viewer used custom navy, pastel, alpha-blended, and gradient colors outside the requested Minecraft formatting-code palette, which also made some text and surface combinations difficult to audit for contrast.
+- Root cause: the stylesheet had accumulated independent color literals, translucent RGB overlays, shadows, and gradient backgrounds instead of a finite palette contract.
+- Implementation: map viewer tokens to the supplied Minecraft foreground and background colors, remove gradients and RGB/HSL color functions, replace blended surfaces with opaque palette colors, remove decorative shadows, and keep text colors bright against dark palette backgrounds. The manifest and theme-color metadata now use `#000000`.
+- Evidence and validation: the viewer asset test rejects non-palette CSS color literals and gradients, checks the manifest and HTML theme color, and the clean browser smoke test confirms the opaque palette renders across the viewer without console errors.
+- Status: implemented with viewer-only impact.
+
+### FIX-0045 - Minimize viewer scrollbars
+
+- Symptom: filter menus and the event stream used more scrollbar chrome than the surrounding pixel-style controls needed.
+- Root cause: the browser scrollbar declarations used six-pixel tracks, bright bordered thumbs, and left native arrow buttons visible.
+- Implementation: use four-pixel square scrollbars, palette-colored tracks and thumbs, no thumb border, and hidden WebKit scrollbar buttons for the filter menus and event stream.
+- Evidence and validation: the viewer asset test checks the compact cross-browser declarations. Browser smoke validation confirms the Packet menu and event stream retain usable scrolling without native arrow buttons.
+- Status: implemented with viewer-only impact.
+
+### FIX-0046 - Reflow viewer for narrow screens
+
+- Symptom: the viewer kept a 780-pixel page minimum and exposed a horizontal filter scrollbar when opened in a narrow browser viewport.
+- Root cause: the desktop grid and single-line filter row were not allowed to reflow below the desktop width.
+- Implementation: remove the global page minimum width, wrap filters below 1100 pixels, stack the header and overview metrics below 640 pixels, let event controls wrap, and keep only the event table's content scrollable on mobile.
+- Evidence and validation: the viewer asset test checks the responsive media queries and narrow table contract. Browser smoke validation covers desktop, tablet, and phone viewport layouts with no document-level horizontal overflow.
+- Status: implemented with viewer-only impact.
+
+### FIX-0047 - Theme page scrollbar
+
+- Symptom: the outer page scrollbar remained native gray and thicker than the Packet, Kind, and event stream scrollbars.
+- Root cause: only the inner scrollable regions had custom scrollbar declarations.
+- Implementation: apply the same four-pixel square palette scrollbar to the document root and body, including hidden WebKit arrow buttons.
+- Evidence and validation: the viewer asset regression test checks the global scrollbar declarations. Browser smoke validation confirms that the far-right page scrollbar matches the inner controls.
+- Status: implemented with viewer-only impact.
+
+### FIX-0048 - Use supplied pixel toggle glyphs
+
+- Symptom: dropdown and Blob bytes toggles used CSS borders and transforms instead of the supplied pixel glyph artwork.
+- Root cause: the viewer drew its chevrons as generic CSS geometry and did not bundle the requested SVG assets.
+- Implementation: embed the supplied `glyph_e031.svg` and `∨.svg` artwork under ASCII-safe bundle names, serve both as same-origin SVG assets, and use them for the dropdown and Blob bytes toggle indicators.
+- Evidence and validation: the viewer asset test checks both SVG responses, MIME types, and CSS references. Browser smoke validation confirms the dropdown and Blob bytes controls render the bundled pixel glyphs.
+- Status: implemented with viewer-only impact.
+
 ## Ordering safety contract
 
 The deferred-packet change is deliberately narrow. `expectedIDs` remains the only authority for what the current login state accepts. The queue scan selects the earliest packet that is currently expected, leaves packets for later states queued, and never mutates or reorders bytes on the wire. The regression tests cover canonical resource-pack order, featured early `ResourcePacksInfo`, a later-phase packet queued ahead of the current phase, and all six permutations of the three login packets.

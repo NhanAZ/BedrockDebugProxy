@@ -18,6 +18,11 @@ Detailed rationale remains in [`docs/audits/`](docs/audits/).
 - The capture viewer now uses square corners throughout its interface, including status indicators, controls, panels, and metadata cards.
 - The capture viewer now uses themed custom filter dropdowns with keyboard navigation instead of browser-native option popups, while keeping the original filter values and queries unchanged.
 - The capture viewer now renders intentionally pending raw packet decodes in gold (`#FFAA00`) instead of using the error red reserved for decode failures.
+- The capture viewer now uses only the Minecraft formatting-code palette, removes all gradients and blended color functions, and keeps viewer text on high-contrast dark surfaces.
+- The capture viewer now uses compact four-pixel palette scrollbars without native arrow buttons in filter menus and the event stream.
+- The capture viewer now gives the outer page scrollbar the same compact four-pixel palette styling as the inner scrollbars.
+- The capture viewer now uses the supplied pixel SVG glyphs for dropdown and Blob bytes toggles instead of CSS-drawn chevrons.
+- The capture viewer now reflows filters, overview metrics, event controls, and detail metadata for narrow screens without forcing a page-wide minimum width.
 - The capture viewer now lets event details grow with their content instead of clipping or collapsing the panel behind an internal vertical scrollbar.
 - The capture viewer now uses one page-level scrollbar so the header, filters, event stream, details, and raw evidence share the same scroll context.
 - The capture viewer now keeps Blob bytes collapsed by default and provides an accessible toggle for expanding the raw hexdump when needed.
