@@ -238,6 +238,14 @@ Every new entry should state the symptom, root cause, implementation commits, ev
 - Evidence and validation: the viewer HTTP test checks the collapsed HTML contract, themed toggle CSS, and JavaScript state synchronization. Browser smoke validation must select an event, confirm Blob bytes stays collapsed, then expand it and confirm the hexdump is visible.
 - Status: implemented with viewer-only impact. The operator's expanded or collapsed state is local to the current page and is not persisted in the capture.
 
+### FIX-0029 - Add viewer favicon package
+
+- Symptom: the local capture viewer used the browser's generic tab icon and did not advertise installable app metadata.
+- Root cause: the embedded viewer had no favicon, touch icon, or web manifest assets.
+- Implementation: embed the supplied favicon package, serve its standard icon variants and manifest through the token-scoped viewer handler, and link them from the document head. The manifest points back to the token-scoped viewer root and uses the viewer's dark theme.
+- Evidence and validation: the viewer asset test checks the head links, manifest response, content types, and PNG/ICO signatures. Browser smoke validation must confirm the page loads the favicon and manifest without console errors.
+- Status: implemented with viewer-only impact. The icons are static presentation assets and do not affect captures, packet handling, or viewer data.
+
 ## Ordering safety contract
 
 The deferred-packet change is deliberately narrow. `expectedIDs` remains the only authority for what the current login state accepts. The queue scan selects the earliest packet that is currently expected, leaves packets for later states queued, and never mutates or reorders bytes on the wire. The regression tests cover canonical resource-pack order, featured early `ResourcePacksInfo`, a later-phase packet queued ahead of the current phase, and all six permutations of the three login packets.

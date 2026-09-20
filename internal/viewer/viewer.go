@@ -233,6 +233,22 @@ func (v *Viewer) serveHTTP(writer http.ResponseWriter, request *http.Request) {
 		v.serveAsset(writer, request, "assets/app.css", "text/css; charset=utf-8")
 	case request.URL.Path == "/assets/app.js":
 		v.serveAsset(writer, request, "assets/app.js", "text/javascript; charset=utf-8")
+	case request.URL.Path == "/assets/favicon-16x16.png":
+		v.serveAsset(writer, request, "assets/favicon-16x16.png", "image/png")
+	case request.URL.Path == "/assets/favicon-32x32.png":
+		v.serveAsset(writer, request, "assets/favicon-32x32.png", "image/png")
+	case request.URL.Path == "/assets/favicon.ico":
+		v.serveAsset(writer, request, "assets/favicon.ico", "image/x-icon")
+	case request.URL.Path == "/assets/apple-touch-icon.png":
+		v.serveAsset(writer, request, "assets/apple-touch-icon.png", "image/png")
+	case request.URL.Path == "/assets/android-chrome-192x192.png":
+		v.serveAsset(writer, request, "assets/android-chrome-192x192.png", "image/png")
+	case request.URL.Path == "/assets/android-chrome-512x512.png":
+		v.serveAsset(writer, request, "assets/android-chrome-512x512.png", "image/png")
+	case request.URL.Path == "/assets/android-chrome-512x512-maskable.png":
+		v.serveAsset(writer, request, "assets/android-chrome-512x512-maskable.png", "image/png")
+	case request.URL.Path == "/assets/site.webmanifest":
+		v.serveAsset(writer, request, "assets/site.webmanifest", "application/manifest+json")
 	case request.URL.Path == "/assets/fonts/Monocraft.ttf":
 		v.serveAsset(writer, request, "assets/fonts/Monocraft.ttf", "font/ttf")
 	case request.URL.Path == "/assets/fonts/Minecraft-Bold.otf":
