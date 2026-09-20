@@ -49,7 +49,7 @@ body {
     var(--bg);
   display: grid;
   grid-template-columns: minmax(0, 1fr);
-  grid-template-rows: auto auto auto auto;
+  grid-template-rows: max-content max-content max-content max-content;
   overflow: auto;
 }
 
@@ -303,7 +303,7 @@ h2 { font-size: var(--font-size); letter-spacing: 0.03em; }
 .quiet-button:disabled { opacity: 0.45; cursor: default; }
 
 .workspace {
-  min-height: 0;
+  min-height: max-content;
   padding: 12px;
   display: grid;
   grid-template-columns: minmax(0, 1fr);

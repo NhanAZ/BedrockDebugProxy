@@ -26,6 +26,10 @@ Detailed rationale remains in [`docs/audits/`](docs/audits/).
 - The capture viewer now places Events, Blobs, Duration, and Generator in one compact header row instead of a separate overview strip.
 - The contributor validation workflow now requires viewer asset, HTTP, JavaScript, and browser smoke checks in the same change whenever a web-facing change could affect the page.
 
+### Fixed
+
+- Fixed the page-level footer overlapping the viewer inspector when decoded details extend beyond the initial viewport. The footer now stays below the complete workspace, including Blob bytes.
+
 ## [0.2.1] - 2026-09-17
 
 Supported Bedrock version: 1.26.50 (protocol 2193).

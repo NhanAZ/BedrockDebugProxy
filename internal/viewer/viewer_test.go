@@ -160,7 +160,7 @@ func TestViewerServesEmbeddedFontAssets(t *testing.T) {
 	if !strings.Contains(string(css), "font-size: var(--font-size)") || !strings.Contains(string(css), "--font-size: 12px") {
 		t.Fatal("CSS does not expose the shared 12px font-size contract")
 	}
-	for _, layout := range []string{"grid-template-columns: minmax(0, 1fr)", "grid-template-columns: auto minmax(0, 1fr) auto", "grid-template-rows: auto auto auto auto", "grid-template-rows: minmax(360px, 65vh) max-content", "grid-template-rows: max-content max-content", "min-height: max-content", "overflow: auto", "overflow: visible"} {
+	for _, layout := range []string{"grid-template-columns: minmax(0, 1fr)", "grid-template-columns: auto minmax(0, 1fr) auto", "grid-template-rows: max-content max-content max-content max-content", "grid-template-rows: minmax(360px, 65vh) max-content", "grid-template-rows: max-content max-content", "min-height: max-content", "overflow: auto", "overflow: visible"} {
 		if !strings.Contains(string(css), layout) {
 			t.Fatalf("CSS does not contain the single-column workspace layout %q", layout)
 		}
