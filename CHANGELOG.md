@@ -41,6 +41,7 @@ Detailed rationale remains in [`docs/audits/`](docs/audits/).
 - The event stream now uses the same thin, theme-colored scrollbar as the Packet and Kind filter menus.
 - Packet filter menus now expand to fit longer packet names before applying a viewport-safe maximum width.
 - Packet filter menus now use a thin, theme-colored scrollbar instead of the browser default.
+- The event stream now sizes the Seq column from the visible sequence numbers so long values do not collapse into ellipses.
 - The compact capture overview now vertically centers each metric label and value within the header row.
 - The contributor validation workflow now requires viewer asset, HTTP, JavaScript, and browser smoke checks in the same change whenever a web-facing change could affect the page.
 

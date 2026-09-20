@@ -414,3 +414,23 @@ Every new entry should state the symptom, root cause, implementation commits, ev
 - Evidence and validation: the viewer asset test checks the custom checkbox declarations and checked-state marker. Browser smoke validation confirms the Problems only control keeps its native label behavior while the checkbox uses square corners.
 - Status: implemented with viewer-only impact.
 
+### FIX-0052 - Size the event sequence column from visible values
+
+- Symptom: larger sequence numbers such as `#93461` were truncated to `#934...` in the event stream.
+- Root cause: the first table column used a fixed width that was smaller than the rendered sequence text once a capture reached five or more digits.
+- Implementation: the viewer sets a CSS custom property from the longest visible sequence number after each page load, and the Seq header uses that value with a small padding allowance at desktop and narrow breakpoints.
+- Evidence and validation: the viewer asset test checks the dynamic sizing hook and CSS contract. Browser smoke validation must open a large capture on a page containing a five-digit sequence and confirm the complete value is visible without an ellipsis.
+- Status: implemented with viewer-only impact. The width follows the current page and may change when navigating between pages.
+
+## Ordering safety contract
+
+The deferred-packet change is deliberately narrow. `expectedIDs` remains the only authority for what the current login state accepts. The queue scan selects the earliest packet that is currently expected, leaves packets for later states queued, and never mutates or reorders bytes on the wire. The regression tests cover canonical resource-pack order, featured early `ResourcePacksInfo`, a later-phase packet queued ahead of the current phase, and all six permutations of the three login packets.
+
+This is a compatibility guard, not permission to assume a universal Bedrock sequence. Before changing an expected set, inspect the packet definitions, the relevant capture, and the server-specific validation flow. A new server observation must add a focused test and update this index or a linked research note.
+
+## Open and pending items
+
+- Generate a stamped binary from the current commit and run The Hive minimum baseline.
+- Re-run the direct Enchanted transfer and resource-pack flow with the same binary.
+- Complete the exact-revision matrix for Galaxite, Lifeboat, Mineville Zeqa, and Enchanted after the The Hive baseline before release.
+- If a server fails, record the capture and classify the failure before changing the generic state machine.

@@ -155,7 +155,7 @@ func TestViewerServesEmbeddedFontAssets(t *testing.T) {
 		t.Fatal(err)
 	}
 	_ = jsResponse.Body.Close()
-	if jsResponse.StatusCode != http.StatusOK || !strings.Contains(string(js), "setupCustomSelects") {
+	if jsResponse.StatusCode != http.StatusOK || !strings.Contains(string(js), "setupCustomSelects") || !strings.Contains(string(js), "updateSequenceColumnWidth") {
 		t.Fatalf("JavaScript asset status = %d or custom viewer setup is missing", jsResponse.StatusCode)
 	}
 	if !strings.Contains(string(css), `local("Minecraft Ten")`) {
@@ -167,7 +167,7 @@ func TestViewerServesEmbeddedFontAssets(t *testing.T) {
 	if !strings.Contains(string(css), "font-size: var(--font-size)") || !strings.Contains(string(css), "--font-size: 12px") {
 		t.Fatal("CSS does not expose the shared 12px font-size contract")
 	}
-	for _, layout := range []string{"min-width: 0", "grid-template-columns: minmax(0, 1fr)", "grid-template-columns: auto minmax(0, 1fr)", "grid-template-rows: max-content max-content max-content", "grid-template-rows: minmax(360px, 65vh) max-content", "grid-template-rows: max-content max-content", "min-height: max-content", "overflow: auto", "overflow: visible", "th:nth-child(2) { width: 132px; }", ".event-status", ".search-field kbd { color: var(--subtle); font-family: var(--font-content);", "@media (max-width: 1100px)", "flex-wrap: wrap", "@media (max-width: 640px)", "grid-template-columns: repeat(2, minmax(0, 1fr))", "grid-template-rows: minmax(320px, 62vh) max-content", "table { min-width: 620px; }"} {
+	for _, layout := range []string{"min-width: 0", "grid-template-columns: minmax(0, 1fr)", "grid-template-columns: auto minmax(0, 1fr)", "grid-template-rows: max-content max-content max-content", "grid-template-rows: minmax(360px, 65vh) max-content", "grid-template-rows: max-content max-content", "min-height: max-content", "overflow: auto", "overflow: visible", "th:nth-child(1) { width: calc(var(--sequence-column-width, 5ch) + 20px); }", "th:nth-child(2) { width: 132px; }", ".event-status", ".search-field kbd { color: var(--subtle); font-family: var(--font-content);", "@media (max-width: 1100px)", "flex-wrap: wrap", "@media (max-width: 640px)", "grid-template-columns: repeat(2, minmax(0, 1fr))", "grid-template-rows: minmax(320px, 62vh) max-content", "table { min-width: 620px; }"} {
 		if !strings.Contains(string(css), layout) {
 			t.Fatalf("CSS does not contain the single-column workspace layout %q", layout)
 		}
