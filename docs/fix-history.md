@@ -334,6 +334,14 @@ Every new entry should state the symptom, root cause, implementation commits, ev
 - Evidence and validation: the viewer asset test checks the cross-browser scrollbar-hiding declarations. Browser smoke validation confirms the event rows remain available and the nested scrollbar is no longer visible.
 - Status: implemented with viewer-only impact.
 
+### FIX-0041 - Expand packet filter menu labels
+
+- Symptom: longer packet names in the Packet filter menu were truncated even when there was room to show the full label.
+- Root cause: the custom menu used a fixed minimum width tied to the trigger instead of sizing itself from its option content.
+- Implementation: size the menu from its max-content width, keep it at least as wide as the trigger, and cap it at a viewport-safe 480px maximum.
+- Evidence and validation: the viewer asset test checks the intrinsic menu width and viewport cap. Browser smoke validation confirms long packet names remain readable in the expanded Packet menu.
+- Status: implemented with viewer-only impact.
+
 ## Ordering safety contract
 
 The deferred-packet change is deliberately narrow. `expectedIDs` remains the only authority for what the current login state accepts. The queue scan selects the earliest packet that is currently expected, leaves packets for later states queued, and never mutates or reorders bytes on the wire. The regression tests cover canonical resource-pack order, featured early `ResourcePacksInfo`, a later-phase packet queued ahead of the current phase, and all six permutations of the three login packets.
