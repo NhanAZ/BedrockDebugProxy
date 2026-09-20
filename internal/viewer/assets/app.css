@@ -77,15 +77,10 @@ button:focus-visible, select:focus-visible, input:focus-visible {
   backdrop-filter: blur(18px);
 }
 
-.brand { display: flex; align-items: center; gap: 13px; }
+.brand { display: flex; align-items: center; }
 .brand { min-width: max-content; }
 
-.brand-mark {
-  width: 38px;
-  height: 38px;
-  object-fit: contain;
-  image-rendering: pixelated;
-}
+.brand-name { margin: 0; font-family: var(--font-content); font-size: var(--font-size); letter-spacing: 0.02em; }
 
 h1, h2, p { margin: 0; }
 h1, h2, .eyebrow, th {

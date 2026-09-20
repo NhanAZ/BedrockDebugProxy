@@ -63,10 +63,10 @@ func TestViewerServesFilteredEventsAndBlobPreview(t *testing.T) {
 		t.Fatal(err)
 	}
 	_ = response.Body.Close()
-	if response.StatusCode != http.StatusOK || !strings.Contains(string(index), "Capture Viewer") {
+	if response.StatusCode != http.StatusOK || !strings.Contains(string(index), "BedrockDebugProxy") {
 		t.Fatalf("index status = %d, body = %s", response.StatusCode, index)
 	}
-	for _, marker := range []string{`href="assets/app.css"`, `src="assets/app.js"`, `src="assets/original-logo.png"`, `href="assets/favicon-32x32.png"`, `href="assets/favicon.ico"`, `href="assets/apple-touch-icon.png"`, `href="assets/site.webmanifest"`, `aria-label="Capture overview"`, `id="event-count"`, `id="blob-count"`, `id="duration"`, `id="generator"`, `id="direction"`, `id="packet"`, `id="kind"`, `id="channel"`, `id="bytes-panel"`, `id="bytes-toggle"`, `aria-expanded="false"`, `id="hex-view" class="hex-view" hidden`, `class="panel-title"`, `class="panel-title-separator"`, "BedrockDebugProxy", "Ordered stream", "Decoded view", "Raw evidence"} {
+	for _, marker := range []string{`href="assets/app.css"`, `src="assets/app.js"`, `href="assets/favicon-32x32.png"`, `href="assets/favicon.ico"`, `href="assets/apple-touch-icon.png"`, `href="assets/site.webmanifest"`, `aria-label="Capture overview"`, `class="brand-name"`, `id="event-count"`, `id="blob-count"`, `id="duration"`, `id="generator"`, `id="direction"`, `id="packet"`, `id="kind"`, `id="channel"`, `id="bytes-panel"`, `id="bytes-toggle"`, `aria-expanded="false"`, `id="hex-view" class="hex-view" hidden`, `class="panel-title"`, `class="panel-title-separator"`, "BedrockDebugProxy", "Ordered stream", "Decoded view", "Raw evidence"} {
 		if !strings.Contains(string(index), marker) {
 			t.Fatalf("index is missing viewer marker %q", marker)
 		}
@@ -76,7 +76,7 @@ func TestViewerServesFilteredEventsAndBlobPreview(t *testing.T) {
 	if overviewStart < 0 || headerEnd < 0 || overviewStart > headerEnd {
 		t.Fatal("capture overview is not rendered inside the compact header")
 	}
-	for _, forbidden := range []string{"BEDROCKDEBUGPROXY", "ORDERED STREAM", "DECODED VIEW", "RAW EVIDENCE", "capture-status", "capture-id", "capture-identity", "status-pill"} {
+	for _, forbidden := range []string{"BEDROCKDEBUGPROXY", "ORDERED STREAM", "DECODED VIEW", "RAW EVIDENCE", "Capture Viewer", "capture-status", "capture-id", "capture-identity", "status-pill", "brand-mark"} {
 		if strings.Contains(string(index), forbidden) {
 			t.Fatalf("index still contains forced uppercase label %q", forbidden)
 		}
@@ -174,7 +174,7 @@ func TestViewerServesEmbeddedFontAssets(t *testing.T) {
 	if strings.Contains(string(css), "grid-template-rows: auto auto auto minmax(0, 1fr) auto") || strings.Contains(string(css), "  overflow: hidden;\n}\n\nbutton, input, select") {
 		t.Fatal("CSS still keeps the page inside a workspace-only scroll container")
 	}
-	for _, source := range []string{".select-trigger", ".select-menu", ".select-option", ".bytes-panel.collapsed", ".panel-heading-toggle", ".panel-title {", ".panel-title-separator", ".brand-mark", "image-rendering: pixelated"} {
+	for _, source := range []string{".select-trigger", ".select-menu", ".select-option", ".bytes-panel.collapsed", ".panel-heading-toggle", ".panel-title {", ".panel-title-separator", ".brand-name"} {
 		if !strings.Contains(string(css), source) {
 			t.Fatalf("CSS does not contain themed dropdown selector %s", source)
 		}
