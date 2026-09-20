@@ -43,6 +43,7 @@ Detailed rationale remains in [`docs/audits/`](docs/audits/).
 - Packet filter menus now use a thin, theme-colored scrollbar instead of the browser default.
 - The event stream now sizes the Seq column from the visible sequence numbers so long values do not collapse into ellipses.
 - Long event Details messages now wrap onto additional lines instead of being truncated with an ellipsis.
+- Live capture refreshes now preserve the open filter menu's scroll position while its options are rebuilt.
 - The compact capture overview now vertically centers each metric label and value within the header row.
 - The contributor validation workflow now requires viewer asset, HTTP, JavaScript, and browser smoke checks in the same change whenever a web-facing change could affect the page.
 

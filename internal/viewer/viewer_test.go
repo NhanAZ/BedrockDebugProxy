@@ -155,7 +155,7 @@ func TestViewerServesEmbeddedFontAssets(t *testing.T) {
 		t.Fatal(err)
 	}
 	_ = jsResponse.Body.Close()
-	if jsResponse.StatusCode != http.StatusOK || !strings.Contains(string(js), "setupCustomSelects") || !strings.Contains(string(js), "updateSequenceColumnWidth") || !strings.Contains(string(js), "event-details") {
+	if jsResponse.StatusCode != http.StatusOK || !strings.Contains(string(js), "setupCustomSelects") || !strings.Contains(string(js), "updateSequenceColumnWidth") || !strings.Contains(string(js), "menuScrollTop") || !strings.Contains(string(js), "event-details") {
 		t.Fatalf("JavaScript asset status = %d or custom viewer setup is missing", jsResponse.StatusCode)
 	}
 	if !strings.Contains(string(css), `local("Minecraft Ten")`) {

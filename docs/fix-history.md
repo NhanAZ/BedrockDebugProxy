@@ -438,6 +438,14 @@ Every new entry should state the symptom, root cause, implementation commits, ev
 - Evidence and validation: the viewer asset test checks the Details class and wrapping declarations. Browser smoke validation must open the Hive ban event on the large capture and confirm its full error summary continues on additional lines without the ellipsis.
 - Status: implemented with viewer-only impact. A wrapped Details message increases that event row's height.
 
+### FIX-0054 - Preserve filter menu scroll during live refresh
+
+- Symptom: opening the Packet or Kind filter in a live viewer and scrolling down caused the menu to jump back to its first option during the periodic refresh.
+- Root cause: each live `loadSession` refresh rebuilt the custom menu with `replaceChildren`, which reset its scroll position before the next poll completed.
+- Implementation: capture the custom menu's current `scrollTop` before rebuilding its options and restore it after active-option synchronization.
+- Evidence and validation: the viewer asset test checks the scroll-preservation hook. Browser smoke validation must keep a long filter menu open through a live refresh and confirm its visible option range remains stable.
+- Status: implemented with viewer-only impact. The selected filter value and available options still follow the latest session response.
+
 ## Ordering safety contract
 
 The deferred-packet change is deliberately narrow. `expectedIDs` remains the only authority for what the current login state accepts. The queue scan selects the earliest packet that is currently expected, leaves packets for later states queued, and never mutates or reorders bytes on the wire. The regression tests cover canonical resource-pack order, featured early `ResourcePacksInfo`, a later-phase packet queued ahead of the current phase, and all six permutations of the three login packets.
