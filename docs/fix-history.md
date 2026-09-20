@@ -262,6 +262,14 @@ Every new entry should state the symptom, root cause, implementation commits, ev
 - Evidence and validation: the viewer HTTP test verifies that the overview is inside the header and that the compact topbar grid is present. Browser smoke validation must confirm the brand, metrics, status, and capture ID share one row without clipping.
 - Status: implemented with viewer-only impact. Long generator values and capture IDs may ellipsize in narrow windows.
 
+### FIX-0033 - Remove verification and capture identity from viewer header
+
+- Symptom: the verification pill and long capture identifier occupied the right side of the compact header even though they were not needed for the operator's packet review.
+- Root cause: the header retained the status and capture identity presentation from the earlier full-width layout.
+- Implementation: remove the status and capture identifier elements, their CSS, and their JavaScript updates. The overview metrics now use the freed header column without changing the capture manifest or session API.
+- Evidence and validation: the viewer HTTP test rejects the removed element IDs and selectors, and browser smoke validation confirms only the brand and compact metrics remain in the header.
+- Status: implemented with viewer-only impact. Capture identity and verification remain available in the capture manifest and API for programmatic inspection.
+
 ### FIX-0032 - Keep viewer footer below the inspector
 
 - Symptom: the page footer could appear between decoded details and Blob bytes when the inspector content overflowed the initial viewport.
