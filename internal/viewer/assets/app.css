@@ -402,7 +402,21 @@ tbody tr.selected.problem.decode-pending { box-shadow: inset 3px 0 var(--gold), 
 .json-tree { font: var(--font-size)/1.55 var(--font-content); font-weight: 400; }
 .json-tree details { margin-left: 13px; }
 .json-tree > details { margin-left: 0; }
-.json-tree summary { cursor: pointer; color: var(--muted); }
+.json-tree summary {
+  cursor: pointer;
+  color: var(--muted);
+  list-style: none;
+}
+.json-tree summary::marker, .json-tree summary::-webkit-details-marker { display: none; content: ""; }
+.json-tree summary::before {
+  display: inline-block;
+  width: 8px;
+  height: 8px;
+  margin-right: 4px;
+  background: url("glyph_e031.svg") center / 8px 8px no-repeat;
+  content: "";
+}
+.json-tree details:not([open]) > summary::before { transform: rotate(-90deg); }
 .json-key { color: var(--cyan); }
 .json-string { color: var(--green); overflow-wrap: anywhere; }
 .json-number { color: var(--gold); }

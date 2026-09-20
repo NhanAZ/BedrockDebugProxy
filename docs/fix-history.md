@@ -398,6 +398,14 @@ Every new entry should state the symptom, root cause, implementation commits, ev
 - Evidence and validation: the viewer asset test checks both SVG responses, MIME types, and CSS references. Browser smoke validation confirms the dropdown and Blob bytes controls render the bundled pixel glyphs.
 - Status: implemented with viewer-only impact.
 
+### FIX-0049 - Replace native JSON disclosure markers
+
+- Symptom: expanded JSON event details still showed the browser's native triangle marker beside nested values.
+- Root cause: `<details>` summaries retained the platform disclosure marker even after the custom dropdown and Blob bytes indicators were replaced.
+- Implementation: hide the native summary markers and render the bundled `glyph_e031.svg` asset for open and closed JSON tree nodes, rotating the closed state for the collapsed direction.
+- Evidence and validation: the viewer asset test checks the cross-browser marker removal declarations and glyph reference. Browser smoke validation must inspect an expanded event JSON tree and confirm that no native triangle remains.
+- Status: implemented with viewer-only impact.
+
 ## Ordering safety contract
 
 The deferred-packet change is deliberately narrow. `expectedIDs` remains the only authority for what the current login state accepts. The queue scan selects the earliest packet that is currently expected, leaves packets for later states queued, and never mutates or reorders bytes on the wire. The regression tests cover canonical resource-pack order, featured early `ResourcePacksInfo`, a later-phase packet queued ahead of the current phase, and all six permutations of the three login packets.
