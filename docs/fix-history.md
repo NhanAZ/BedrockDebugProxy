@@ -278,6 +278,14 @@ Every new entry should state the symptom, root cause, implementation commits, ev
 - Evidence and validation: the viewer asset test checks the content-sized page grid contract. Browser smoke validation confirms the footer remains below Blob bytes after selecting an event and expanding the details.
 - Status: implemented with viewer-only impact. Long decoded events still increase the page scroll height by design.
 
+### FIX-0034 - Inline viewer panel headings
+
+- Symptom: each viewer panel used two stacked heading lines, consuming unnecessary vertical space.
+- Root cause: the eyebrow and panel title were rendered as a vertical block.
+- Implementation: render each pair as one inline title row with an explicit hyphen separator for Ordered stream, Decoded view, and Raw evidence. Panel controls and data are unchanged.
+- Evidence and validation: viewer HTTP tests check inline heading markers and CSS, and browser smoke validation confirms all three headings remain readable on one line.
+- Status: implemented with viewer-only impact.
+
 ## Ordering safety contract
 
 The deferred-packet change is deliberately narrow. `expectedIDs` remains the only authority for what the current login state accepts. The queue scan selects the earliest packet that is currently expected, leaves packets for later states queued, and never mutates or reorders bytes on the wire. The regression tests cover canonical resource-pack order, featured early `ResourcePacksInfo`, a later-phase packet queued ahead of the current phase, and all six permutations of the three login packets.

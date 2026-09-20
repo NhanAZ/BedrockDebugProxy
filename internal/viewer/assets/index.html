@@ -49,8 +49,9 @@
   <main class="workspace">
     <section class="panel event-panel" aria-labelledby="events-heading">
       <div class="panel-heading">
-        <div>
+        <div class="panel-title">
           <p class="eyebrow">Ordered stream</p>
+          <span class="panel-title-separator" aria-hidden="true">-</span>
           <h2 id="events-heading">Events</h2>
         </div>
         <div class="pager">
@@ -73,8 +74,9 @@
     <aside class="inspector">
       <section class="panel detail-panel" aria-labelledby="details-heading">
         <div class="panel-heading">
-          <div>
+          <div class="panel-title">
             <p class="eyebrow">Decoded view</p>
+            <span class="panel-title-separator" aria-hidden="true">-</span>
             <h2 id="details-heading">Event details</h2>
           </div>
           <button id="copy-json" class="quiet-button" type="button" disabled>Copy JSON</button>
@@ -87,8 +89,9 @@
       <section id="bytes-panel" class="panel bytes-panel collapsed" aria-labelledby="bytes-heading">
         <div class="panel-heading">
           <button id="bytes-toggle" class="panel-heading-toggle" type="button" aria-controls="hex-view" aria-expanded="false" aria-label="Expand blob bytes">
-            <div>
+            <div class="panel-title">
               <p class="eyebrow">Raw evidence</p>
+              <span class="panel-title-separator" aria-hidden="true">-</span>
               <h2 id="bytes-heading">Blob bytes</h2>
             </div>
           </button>
