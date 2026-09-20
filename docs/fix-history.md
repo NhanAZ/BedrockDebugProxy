@@ -342,6 +342,14 @@ Every new entry should state the symptom, root cause, implementation commits, ev
 - Evidence and validation: the viewer asset test checks the intrinsic menu width and viewport cap. Browser smoke validation confirms long packet names remain readable in the expanded Packet menu.
 - Status: implemented with viewer-only impact.
 
+### FIX-0042 - Theme packet filter scrollbars
+
+- Symptom: the expanded Packet and Kind menus used a thick, bright native scrollbar that did not match the viewer controls.
+- Root cause: the custom menu had no scrollbar styling, so each browser supplied its default track and thumb.
+- Implementation: use a thin six-pixel Chromium scrollbar with a transparent track and `--line-bright` thumb, plus the Firefox `scrollbar-width` and `scrollbar-color` equivalents.
+- Evidence and validation: the viewer asset test checks the cross-browser themed scrollbar declarations. Browser smoke validation confirms the dropdown scrollbar is thin and aligned with the existing dark palette.
+- Status: implemented with viewer-only impact.
+
 ## Ordering safety contract
 
 The deferred-packet change is deliberately narrow. `expectedIDs` remains the only authority for what the current login state accepts. The queue scan selects the earliest packet that is currently expected, leaves packets for later states queued, and never mutates or reorders bytes on the wire. The regression tests cover canonical resource-pack order, featured early `ResourcePacksInfo`, a later-phase packet queued ahead of the current phase, and all six permutations of the three login packets.

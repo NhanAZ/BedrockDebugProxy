@@ -32,6 +32,7 @@ Detailed rationale remains in [`docs/audits/`](docs/audits/).
 - The event pager now accepts a page number so large captures can be opened directly without stepping through every page.
 - The event stream keeps wheel and keyboard scrolling but hides its nested scrollbar for a cleaner right edge.
 - Packet filter menus now expand to fit longer packet names before applying a viewport-safe maximum width.
+- Packet filter menus now use a thin, theme-colored scrollbar instead of the browser default.
 - The compact capture overview now vertically centers each metric label and value within the header row.
 - The contributor validation workflow now requires viewer asset, HTTP, JavaScript, and browser smoke checks in the same change whenever a web-facing change could affect the page.
 
