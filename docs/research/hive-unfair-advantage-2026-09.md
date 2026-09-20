@@ -80,6 +80,14 @@ The previous statement that `SrDuck84` could be excluded was too strong. The cor
 
 No runtime change is justified by this evidence. Preserve the affected capture, do not retest a punished account or substitute another account, and treat any future Hive validation as incomplete unless current policy review and explicit authorization permit the proxy connection. If authorized testing becomes available, compare a stamped binary, client version, downstream and upstream login metadata, timing, and the server response without attempting to evade enforcement.
 
+## Official appeal and support routes
+
+The Hive's [Punishments and Appeals](https://support.playhive.com/ive-been-banned-muted/) page says to use the official [Player Support form](https://contact.playhive.com/) and select `Appeal In-Game Punishment` for an in-game ban. The form requires the Minecraft username, the punishment ID, the punishment reason, and an explanation of why the punishment is disputed. The page says that only the punished player or their parent or guardian should submit the appeal, that decisions are final, and that additional appeals for the same punishment are not answered.
+
+The [Punishment ID guide](https://support.playhive.com/punishment-id/) says the Ban ID shown on the join error screen is the required punishment ID. If the ID is missing, a 2026 Hive forum staff reply says to select `Game Ban` in the appeal form because that route does not require a punishment ID. The screenshot for this incident contains additional connection and client identifiers. Those values should be submitted only through the official private form if requested, not posted publicly or added to the repository.
+
+The separate [VPN exemption route](https://support.playhive.com/vpn/) is under `Technical Support` and `VPN Exemption Request`. It is a request for future access and is not a substitute for appealing the current ban. An appeal should be factual and should disclose the proxy use rather than claiming that the proxy was permitted.
+
 ## Sources and provenance
 
 - The Hive VPN and proxy policy, last updated 2026-08-18, accessed 2026-09-20.
