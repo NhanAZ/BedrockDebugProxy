@@ -48,6 +48,7 @@ function updateCustomSelectActive(select) {
 function syncCustomSelect(select) {
   const custom = customSelects.get(select);
   if (!custom) return;
+  const menuScrollTop = custom.menu.scrollTop;
   const options = Array.from(select.options);
   const selectedIndex = Math.max(0, select.selectedIndex);
   custom.activeIndex = selectedIndex;
@@ -71,6 +72,7 @@ function syncCustomSelect(select) {
     custom.menu.append(item);
   }
   updateCustomSelectActive(select);
+  custom.menu.scrollTop = menuScrollTop;
 }
 
 function openCustomSelect(select) {
