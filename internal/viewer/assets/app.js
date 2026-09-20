@@ -284,6 +284,8 @@ function renderRows() {
     tr.dataset.sequence = String(row.sequence);
     tr.tabIndex = 0;
     if (row.problem) tr.classList.add("problem");
+    const pendingDecode = row.packet?.decode_status?.toLowerCase() === "not_yet_decoded";
+    if (pendingDecode) tr.classList.add("decode-pending");
 
     const sequence = cell(`#${row.sequence}`, "sequence");
     const time = cell(eventClock(row.time), "time");
@@ -296,7 +298,8 @@ function renderRows() {
     eventKind.className = "event-kind";
     eventKind.textContent = row.packet ? `${row.kind} · 0x${row.packet.id.toString(16).padStart(2, "0")}` : row.channel || row.stage || "event";
     eventCell.append(eventName, eventKind);
-    const details = cell(row.summary || "-", row.problem ? "problem-text" : "");
+    const detailsClass = pendingDecode ? "decode-pending-text" : row.problem ? "problem-text" : "";
+    const details = cell(row.summary || "-", detailsClass);
     tr.append(sequence, time, flow, eventCell, details);
     tr.addEventListener("click", () => selectEvent(row.sequence));
     tr.addEventListener("keydown", (event) => {

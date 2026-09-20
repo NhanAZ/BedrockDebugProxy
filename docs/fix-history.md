@@ -198,6 +198,14 @@ Every new entry should state the symptom, root cause, implementation commits, ev
 - Evidence and validation: the stylesheet contained two workspace column definitions before this change. The viewer HTTP regression test now asserts the single-column track, stacked row sizing, and workspace scrolling while rejecting the prior two-column tracks. Browser smoke validation covers the rebuilt layout and filter interaction.
 - Status: implemented with viewer-only impact. The workspace scroll position and panel heights depend on the browser viewport.
 
+### FIX-0024 - Gold pending-decode viewer status
+
+- Symptom: raw packet rows with the intentional `not_yet_decoded` status were rendered in the same red style as actual decode problems, making preserved raw evidence look like a failure.
+- Root cause: the viewer treated every non-`decoded` status as a red problem presentation without distinguishing the observer's pre-decode raw-capture marker.
+- Implementation: classify `not_yet_decoded` rows in the embedded viewer script and render their row accent and summary text with the gold `#FFAA00` color. Other problem statuses keep the existing red styling.
+- Evidence and validation: `internal/bedrock/observer.go` intentionally writes `not_yet_decoded` at `post_decrypt_decompress_frame`, while decode failures are represented by separate `packet.decode_error` or view-error events. Viewer asset tests assert the gold selectors and status classification, and JavaScript syntax validation remains required.
+- Status: implemented with viewer-only impact. The `Problems only` filter still includes pending-decode rows because they remain useful review targets, but their presentation no longer implies a decode failure.
+
 ## Ordering safety contract
 
 The deferred-packet change is deliberately narrow. `expectedIDs` remains the only authority for what the current login state accepts. The queue scan selects the earliest packet that is currently expected, leaves packets for later states queued, and never mutates or reorders bytes on the wire. The regression tests cover canonical resource-pack order, featured early `ResourcePacksInfo`, a later-phase packet queued ahead of the current phase, and all six permutations of the three login packets.
