@@ -214,6 +214,14 @@ Every new entry should state the symptom, root cause, implementation commits, ev
 - Evidence and validation: the previous stylesheet contained the fractional inspector rows and `.detail-content` internal overflow. Viewer asset tests reject those declarations and browser smoke validation checks a selected raw event in the expanded panel.
 - Status: implemented with viewer-only impact. Very large decoded trees can still make the workspace long, which is intentional so the evidence remains reachable without a nested detail scrollbar.
 
+### FIX-0026 - Preserve the expanded event-details track
+
+- Symptom: after the first event-details expansion change, the details panel could collapse to a thin header when the workspace grid was constrained by the browser viewport.
+- Root cause: the workspace's content-sized row and the inspector's auto tracks still allowed grid items with `min-height: 0` to contribute zero intrinsic height, so the outer scroll boundary had no reliable minimum for the details content.
+- Implementation: size the inspector and details rows from their max-content height, keep the detail panel and content at max-content minimums, and leave the workspace as the only scroll boundary. The raw evidence panel remains a separate bounded view.
+- Evidence and validation: the viewer asset regression test now requires max-content sizing and rejects the zero-minimum inspector rule. Browser smoke validation must inspect the details panel at a constrained viewport and confirm that its metadata and decoded fields remain visible without an internal scrollbar.
+- Status: implemented with viewer-only impact. Very large decoded trees intentionally increase the outer workspace scroll height.
+
 ## Ordering safety contract
 
 The deferred-packet change is deliberately narrow. `expectedIDs` remains the only authority for what the current login state accepts. The queue scan selects the earliest packet that is currently expected, leaves packets for later states queued, and never mutates or reorders bytes on the wire. The regression tests cover canonical resource-pack order, featured early `ResourcePacksInfo`, a later-phase packet queued ahead of the current phase, and all six permutations of the three login packets.

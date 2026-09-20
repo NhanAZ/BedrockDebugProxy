@@ -301,7 +301,7 @@ h2 { font-size: var(--font-size); letter-spacing: 0.03em; }
   padding: 12px;
   display: grid;
   grid-template-columns: minmax(0, 1fr);
-  grid-template-rows: minmax(360px, 1fr) auto;
+  grid-template-rows: minmax(360px, 1fr) max-content;
   gap: 12px;
   align-content: start;
   overflow: auto;
@@ -361,9 +361,9 @@ tbody tr.selected.problem.decode-pending { box-shadow: inset 3px 0 var(--gold), 
 .problem-text { color: var(--red); }
 .decode-pending-text { color: var(--gold); }
 
-.inspector { min-width: 0; min-height: 0; display: grid; grid-template-rows: auto auto; align-content: start; gap: 12px; }
-.detail-panel { overflow: visible; grid-template-rows: auto auto; }
-.detail-content { min-height: auto; padding: 14px; overflow: visible; }
+.inspector { min-width: 0; min-height: max-content; display: grid; grid-template-rows: max-content max-content; align-content: start; gap: 12px; }
+.detail-panel { min-height: max-content; overflow: visible; grid-template-rows: auto max-content; }
+.detail-content { min-height: max-content; display: block; padding: 14px; overflow: visible; }
 .selection-prompt, .empty-state { color: var(--muted); text-align: center; }
 .selection-prompt { padding: 48px 20px; }
 .empty-state { padding: 42px 12px; }
