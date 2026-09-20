@@ -15,7 +15,7 @@ const elements = Object.fromEntries([
   "capture-status", "capture-id", "event-count", "blob-count", "duration", "generator",
   "search", "direction", "packet", "kind", "channel", "problems", "reset",
   "previous", "next", "page-label", "event-rows", "empty-state", "event-details",
-  "copy-json", "byte-status", "hex-view", "viewer-status", "follow", "follow-container",
+  "copy-json", "bytes-panel", "bytes-toggle", "byte-status", "hex-view", "viewer-status", "follow", "follow-container",
 ].map((id) => [id, document.getElementById(id)]));
 
 const filterSelectKeys = ["direction", "packet", "kind", "channel"];
@@ -456,6 +456,13 @@ function renderHex(encoded, truncated, blob) {
   elements["byte-status"].textContent = `${formatCount(bytes.length)}${suffix} · ${blob.representation || blob.media_type || "blob"}`;
 }
 
+function setBytesExpanded(expanded) {
+  elements["bytes-panel"].classList.toggle("collapsed", !expanded);
+  elements["bytes-toggle"].setAttribute("aria-expanded", String(expanded));
+  elements["bytes-toggle"].setAttribute("aria-label", `${expanded ? "Collapse" : "Expand"} blob bytes`);
+  elements["hex-view"].hidden = !expanded;
+}
+
 function clearSelection() {
   state.selectedSequence = null;
   state.selectedEvent = null;
@@ -533,6 +540,9 @@ elements["copy-json"].addEventListener("click", async () => {
   if (!state.selectedEvent) return;
   await navigator.clipboard.writeText(JSON.stringify(state.selectedEvent, null, 2));
   elements["viewer-status"].textContent = `Copied event #${state.selectedEvent.sequence} as JSON`;
+});
+elements["bytes-toggle"].addEventListener("click", () => {
+  setBytesExpanded(elements["bytes-toggle"].getAttribute("aria-expanded") !== "true");
 });
 
 document.addEventListener("keydown", (event) => {

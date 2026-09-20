@@ -230,6 +230,14 @@ Every new entry should state the symptom, root cause, implementation commits, ev
 - Evidence and validation: the viewer asset regression test now requires the page-sized body tracks and the bounded workspace row, while rejecting the previous body-only grid constraint. Browser smoke validation must confirm that the scrollbar starts at the top of the page and that selected event details remain reachable below the event stream.
 - Status: implemented with viewer-only impact. The event table retains its local table overflow for its paginated rows.
 
+### FIX-0028 - Collapse Blob bytes by default
+
+- Symptom: selecting an event with a large blob made the raw hexdump occupy most of the page even when the operator was inspecting decoded details.
+- Root cause: the raw evidence `<pre>` was always visible and its panel expanded to the full preview height for every selected blob.
+- Implementation: keep the Blob bytes panel collapsed on initial load, preserve the byte count and representation in the header, and add an accessible toggle that expands or collapses the hexdump without changing captured bytes.
+- Evidence and validation: the viewer HTTP test checks the collapsed HTML contract, themed toggle CSS, and JavaScript state synchronization. Browser smoke validation must select an event, confirm Blob bytes stays collapsed, then expand it and confirm the hexdump is visible.
+- Status: implemented with viewer-only impact. The operator's expanded or collapsed state is local to the current page and is not persisted in the capture.
+
 ## Ordering safety contract
 
 The deferred-packet change is deliberately narrow. `expectedIDs` remains the only authority for what the current login state accepts. The queue scan selects the earliest packet that is currently expected, leaves packets for later states queued, and never mutates or reorders bytes on the wire. The regression tests cover canonical resource-pack order, featured early `ResourcePacksInfo`, a later-phase packet queued ahead of the current phase, and all six permutations of the three login packets.
