@@ -398,6 +398,7 @@ tbody tr.selected.problem.decode-pending { box-shadow: inset 3px 0 var(--gold), 
 .flow.unknown { color: var(--yellow); }
 .event-name { font-weight: 400; }
 .event-kind { display: block; margin-top: 2px; color: var(--subtle); font-size: var(--font-size); }
+.event-details { white-space: normal; overflow-wrap: anywhere; text-overflow: clip; }
 .problem-text { color: var(--red); }
 .decode-pending-text { color: var(--gold); }
 

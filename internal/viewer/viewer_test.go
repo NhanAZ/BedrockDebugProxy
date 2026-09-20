@@ -155,7 +155,7 @@ func TestViewerServesEmbeddedFontAssets(t *testing.T) {
 		t.Fatal(err)
 	}
 	_ = jsResponse.Body.Close()
-	if jsResponse.StatusCode != http.StatusOK || !strings.Contains(string(js), "setupCustomSelects") || !strings.Contains(string(js), "updateSequenceColumnWidth") {
+	if jsResponse.StatusCode != http.StatusOK || !strings.Contains(string(js), "setupCustomSelects") || !strings.Contains(string(js), "updateSequenceColumnWidth") || !strings.Contains(string(js), "event-details") {
 		t.Fatalf("JavaScript asset status = %d or custom viewer setup is missing", jsResponse.StatusCode)
 	}
 	if !strings.Contains(string(css), `local("Minecraft Ten")`) {
@@ -189,7 +189,7 @@ func TestViewerServesEmbeddedFontAssets(t *testing.T) {
 	if strings.Contains(string(css), "scrollbar-width: none") || strings.Contains(string(css), ".table-wrap::-webkit-scrollbar { display: none; }") {
 		t.Fatal("CSS still hides the event stream scrollbar")
 	}
-	for _, source := range []string{"--gold: #ffaa00", "tbody tr.problem.decode-pending", ".decode-pending-text"} {
+	for _, source := range []string{"--gold: #ffaa00", "tbody tr.problem.decode-pending", ".decode-pending-text", ".event-details", "overflow-wrap: anywhere", "white-space: normal;"} {
 		if !strings.Contains(string(css), source) {
 			t.Fatalf("CSS does not contain pending-decode styling %s", source)
 		}

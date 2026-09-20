@@ -295,7 +295,7 @@ function renderRows() {
     eventKind.textContent = row.packet ? `${row.kind} · 0x${row.packet.id.toString(16).padStart(2, "0")}` : row.channel || row.stage || "event";
     eventCell.append(eventName, eventKind);
     const detailsClass = pendingDecode ? "decode-pending-text" : row.problem ? "problem-text" : "";
-    const details = cell(row.summary || "-", detailsClass);
+    const details = cell(row.summary || "-", ["event-details", detailsClass].filter(Boolean).join(" "));
     tr.append(sequence, time, flow, eventCell, details);
     tr.addEventListener("click", () => selectEvent(row.sequence));
     tr.addEventListener("keydown", (event) => {
