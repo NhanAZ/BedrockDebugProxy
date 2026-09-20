@@ -174,7 +174,7 @@ func TestViewerServesEmbeddedFontAssets(t *testing.T) {
 	if strings.Contains(string(css), "grid-template-rows: auto auto auto minmax(0, 1fr) auto") || strings.Contains(string(css), "  overflow: hidden;\n}\n\nbutton, input, select") {
 		t.Fatal("CSS still keeps the page inside a workspace-only scroll container")
 	}
-	for _, source := range []string{".select-trigger", ".select-menu", ".select-option", ".bytes-panel.collapsed", ".panel-heading-toggle", ".panel-title {", ".panel-title-separator", ".brand-name"} {
+	for _, source := range []string{".select-trigger", ".select-menu", ".select-option", ".bytes-panel.collapsed", ".panel-heading-toggle", ".panel-title {", ".panel-title-separator", ".brand-name", ".table-wrap::-webkit-scrollbar", "scrollbar-width: none"} {
 		if !strings.Contains(string(css), source) {
 			t.Fatalf("CSS does not contain themed dropdown selector %s", source)
 		}

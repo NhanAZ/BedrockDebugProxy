@@ -326,6 +326,14 @@ Every new entry should state the symptom, root cause, implementation commits, ev
 - Evidence and validation: the viewer asset test continues to cover the compact header layout, and browser smoke validation confirms the metric labels and values are vertically centered beside the brand name.
 - Status: implemented with viewer-only impact.
 
+### FIX-0040 - Hide the event stream scrollbar chrome
+
+- Symptom: the event stream displayed a second vertical scrollbar inside the panel's right edge.
+- Root cause: the paginated table wrapper retained native scrollbar chrome even though the viewer already communicates page movement through the pager and remains wheel-scrollable.
+- Implementation: hide the table wrapper's scrollbar track and thumb across Firefox, legacy Windows behavior, and Chromium while preserving `overflow: auto` scrolling.
+- Evidence and validation: the viewer asset test checks the cross-browser scrollbar-hiding declarations. Browser smoke validation confirms the event rows remain available and the nested scrollbar is no longer visible.
+- Status: implemented with viewer-only impact.
+
 ## Ordering safety contract
 
 The deferred-packet change is deliberately narrow. `expectedIDs` remains the only authority for what the current login state accepts. The queue scan selects the earliest packet that is currently expected, leaves packets for later states queued, and never mutates or reorders bytes on the wire. The regression tests cover canonical resource-pack order, featured early `ResourcePacksInfo`, a later-phase packet queued ahead of the current phase, and all six permutations of the three login packets.
