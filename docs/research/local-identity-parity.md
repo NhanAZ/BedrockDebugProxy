@@ -12,6 +12,8 @@ Before the fix, the proxied connection reached the local server as `Steve`, whic
 
 The fix passes the identity supplied to `FetchResourcePacks` into the upstream `minecraft.Dialer`. After the fix, both direct and proxied local connections reached the server as `LocalProbe`. The upstream fake-server regression test also confirms that the downstream identity UUID and display name are preserved.
 
+The binary used for the first post-fix loopback attempt was stale and predated this change. Rebuilding `bin/bedrock-debug-proxy.exe` from the current revision removed the apparent mismatch. The rebuilt comparison reported zero field differences, no packet-count differences, and a common packet prefix of eight for the direct and proxied sessions. Both sessions completed login, resource-pack exchange, spawn, and disconnect.
+
 ## Source path
 
 - `internal/proxy/proxy.go` receives `login.IdentityData` in the gophertunnel `FetchResourcePacks` callback and now passes it to `connectUpstream`.
@@ -22,10 +24,13 @@ The fix passes the identity supplied to `FetchResourcePacks` into the upstream `
 
 This was a local protocol and identity-parity defect, not evidence about any public server's anti-cheat. Passing the identity is safe for the local unauthenticated path and does not override authenticated Xbox identity data. The change does not mutate packets or attempt to evade server policy.
 
+The local PocketMine console also emitted `Unexpected JSON property` warnings for `PlayFabId` in ClientData and `ipt`/`tid` in the self-signed token. PocketMine's local JSON models do not declare those fields in this revision, while gophertunnel includes them. The warnings were identical on direct and proxied connections, and both connections completed successfully. They are therefore parser-compatibility observations, not evidence that the proxy caused a ban or that the local server rejected the login.
+
 ## Validation
 
 - `go test ./internal/proxy -run '^TestRunnerForwardsBidirectionalPacketsAndCapturesSession$' -count=1 -v` passed after the regression assertion was added.
 - A temporary loopback run against PocketMine with `xbox-auth=off` completed direct and proxied login, resource-pack exchange, spawn, and report capture. The temporary client and server setting were removed or restored after the run.
+- The rebuilt-binary comparison used labeled `direct` and `bedrockdebugproxy` reports. The comparison showed zero field differences and zero packet-count differences.
 
 ## Limitations
 
