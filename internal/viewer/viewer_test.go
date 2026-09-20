@@ -76,7 +76,7 @@ func TestViewerServesFilteredEventsAndBlobPreview(t *testing.T) {
 	if overviewStart < 0 || headerEnd < 0 || overviewStart > headerEnd {
 		t.Fatal("capture overview is not rendered inside the compact header")
 	}
-	for _, forbidden := range []string{"BEDROCKDEBUGPROXY", "ORDERED STREAM", "DECODED VIEW", "RAW EVIDENCE"} {
+	for _, forbidden := range []string{"BEDROCKDEBUGPROXY", "ORDERED STREAM", "DECODED VIEW", "RAW EVIDENCE", "capture-status", "capture-id", "capture-identity", "status-pill"} {
 		if strings.Contains(string(index), forbidden) {
 			t.Fatalf("index still contains forced uppercase label %q", forbidden)
 		}
@@ -160,7 +160,7 @@ func TestViewerServesEmbeddedFontAssets(t *testing.T) {
 	if !strings.Contains(string(css), "font-size: var(--font-size)") || !strings.Contains(string(css), "--font-size: 12px") {
 		t.Fatal("CSS does not expose the shared 12px font-size contract")
 	}
-	for _, layout := range []string{"grid-template-columns: minmax(0, 1fr)", "grid-template-columns: auto minmax(0, 1fr) auto", "grid-template-rows: max-content max-content max-content max-content", "grid-template-rows: minmax(360px, 65vh) max-content", "grid-template-rows: max-content max-content", "min-height: max-content", "overflow: auto", "overflow: visible"} {
+	for _, layout := range []string{"grid-template-columns: minmax(0, 1fr)", "grid-template-columns: auto minmax(0, 1fr)", "grid-template-rows: max-content max-content max-content max-content", "grid-template-rows: minmax(360px, 65vh) max-content", "grid-template-rows: max-content max-content", "min-height: max-content", "overflow: auto", "overflow: visible"} {
 		if !strings.Contains(string(css), layout) {
 			t.Fatalf("CSS does not contain the single-column workspace layout %q", layout)
 		}

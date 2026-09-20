@@ -12,7 +12,7 @@ const state = {
 };
 
 const elements = Object.fromEntries([
-  "capture-status", "capture-id", "event-count", "blob-count", "duration", "generator",
+  "event-count", "blob-count", "duration", "generator",
   "search", "direction", "packet", "kind", "channel", "problems", "reset",
   "previous", "next", "page-label", "event-rows", "empty-state", "event-details",
   "copy-json", "bytes-panel", "bytes-toggle", "byte-status", "hex-view", "viewer-status", "follow", "follow-container",
@@ -225,11 +225,7 @@ async function loadSession() {
   const session = await requestJSON("api/session");
   const manifest = session.manifest;
   state.live = session.mode === "live" && manifest.status === "open";
-  const displayStatus = state.live ? "live" : manifest.status === "failed" || session.verification === "failed" ? "failed" : session.verification === "verified" ? "verified" : manifest.status;
-  elements["capture-status"].textContent = displayStatus;
-  elements["capture-status"].className = `status-pill ${state.live ? "live" : displayStatus === "failed" ? "failed" : ""}`;
   elements["follow-container"].hidden = !state.live;
-  elements["capture-id"].textContent = manifest.capture_id;
   elements["event-count"].textContent = formatCount(session.events);
   elements["blob-count"].textContent = formatCount(session.blobs);
   const start = Date.parse(manifest.started_at);
