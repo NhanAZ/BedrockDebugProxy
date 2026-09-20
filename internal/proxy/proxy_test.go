@@ -95,15 +95,23 @@ func isIntegrationPlayerSkin(skin *packet.PlayerSkin) bool {
 
 func integrationClientData() login.ClientData {
 	return login.ClientData{
-		SkinID:          "integration-login-skin",
-		SkinImageWidth:  1,
-		SkinImageHeight: 1,
-		SkinData:        base64.StdEncoding.EncodeToString([]byte{1, 2, 3, 4}),
-		CapeID:          "integration-login-cape",
-		CapeImageWidth:  1,
-		CapeImageHeight: 1,
-		CapeData:        base64.StdEncoding.EncodeToString([]byte{5, 6, 7, 8}),
-		SkinGeometry:    base64.StdEncoding.EncodeToString([]byte(`{"geometry":{"default":"integration"}}`)),
+		DeviceOS:         protocol.DeviceAndroid,
+		GameVersion:      "1.26.50",
+		LanguageCode:     "en_GB",
+		DeviceID:         login.DeviceID("0123456789abcdef0123456789abcdef"),
+		SelfSignedID:     "22222222-2222-4222-8222-222222222222",
+		PlayFabID:        "0123456789abcdef",
+		CurrentInputMode: 2,
+		DefaultInputMode: 2,
+		SkinID:           "integration-login-skin",
+		SkinImageWidth:   1,
+		SkinImageHeight:  1,
+		SkinData:         base64.StdEncoding.EncodeToString([]byte{1, 2, 3, 4}),
+		CapeID:           "integration-login-cape",
+		CapeImageWidth:   1,
+		CapeImageHeight:  1,
+		CapeData:         base64.StdEncoding.EncodeToString([]byte{5, 6, 7, 8}),
+		SkinGeometry:     base64.StdEncoding.EncodeToString([]byte(`{"geometry":{"default":"integration"}}`)),
 	}
 }
 
@@ -232,9 +240,13 @@ func TestRunnerForwardsBidirectionalPacketsAndCapturesSession(t *testing.T) {
 			return
 		}
 		clientData := serverConn.ClientData()
-		if clientData.SkinID != "integration-login-skin" || clientData.SkinData != base64.StdEncoding.EncodeToString([]byte{1, 2, 3, 4}) ||
+		if clientData.DeviceOS != protocol.DeviceAndroid || clientData.GameVersion != "1.26.50" ||
+			clientData.LanguageCode != "en_GB" || clientData.DeviceID != login.DeviceID("0123456789abcdef0123456789abcdef") ||
+			clientData.SelfSignedID != "22222222-2222-4222-8222-222222222222" || clientData.PlayFabID != "0123456789abcdef" ||
+			clientData.CurrentInputMode != 2 || clientData.DefaultInputMode != 2 ||
+			clientData.SkinID != "integration-login-skin" || clientData.SkinData != base64.StdEncoding.EncodeToString([]byte{1, 2, 3, 4}) ||
 			clientData.CapeID != "integration-login-cape" || clientData.CapeData != base64.StdEncoding.EncodeToString([]byte{5, 6, 7, 8}) {
-			serverErrors <- fmt.Errorf("upstream client data did not preserve downstream skin metadata: %#v", clientData)
+			serverErrors <- fmt.Errorf("upstream client data did not preserve downstream metadata: %#v", clientData)
 			return
 		}
 		if startErr := serverConn.StartGame(minecraft.GameData{
