@@ -438,6 +438,14 @@ Every new entry should state the symptom, root cause, implementation commits, ev
 - Evidence and validation: the viewer asset test checks the scroll-preservation hook. Browser smoke validation must keep a long filter menu open through a live refresh and confirm its visible option range remains stable.
 - Status: implemented with viewer-only impact. The selected filter value and available options still follow the latest session response.
 
+### FIX-0055 - Preserve downstream identity on unauthenticated upstream dials
+
+- Symptom: a local unauthenticated upstream server saw the proxied client as gophertunnel's default `Steve` identity instead of the downstream client's identity.
+- Root cause: the listener exposed the downstream `ClientData` to the asynchronous upstream dial callback, but the callback discarded the accompanying `login.IdentityData`. The upstream `minecraft.Dialer` therefore generated default identity data when no token source was configured.
+- Implementation: pass the callback identity through `connectUpstream` and set `minecraft.Dialer.IdentityData`. Authenticated dials still replace this value with the identity obtained from the Xbox authentication chain.
+- Evidence and validation: [`docs/research/local-identity-parity.md`](research/local-identity-parity.md), the upstream identity regression assertion in `internal/proxy/proxy_test.go`, and a local PocketMine direct-versus-proxy loopback run.
+- Status: fixed for the unauthenticated local path. The authenticated path still requires a real vanilla-client validation; this change does not infer public-server anti-cheat behavior.
+
 ## Ordering safety contract
 
 The deferred-packet change is deliberately narrow. `expectedIDs` remains the only authority for what the current login state accepts. The queue scan selects the earliest packet that is currently expected, leaves packets for later states queued, and never mutates or reorders bytes on the wire. The regression tests cover canonical resource-pack order, featured early `ResourcePacksInfo`, a later-phase packet queued ahead of the current phase, and all six permutations of the three login packets.
