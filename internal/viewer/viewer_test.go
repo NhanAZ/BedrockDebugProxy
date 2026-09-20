@@ -66,7 +66,7 @@ func TestViewerServesFilteredEventsAndBlobPreview(t *testing.T) {
 	if response.StatusCode != http.StatusOK || !strings.Contains(string(index), "BedrockDebugProxy") {
 		t.Fatalf("index status = %d, body = %s", response.StatusCode, index)
 	}
-	for _, marker := range []string{`href="assets/app.css"`, `src="assets/app.js"`, `href="assets/favicon-32x32.png"`, `href="assets/favicon.ico"`, `href="assets/apple-touch-icon.png"`, `href="assets/site.webmanifest"`, `aria-label="Capture overview"`, `class="brand-name"`, `id="viewer-status"`, `id="event-count"`, `id="blob-count"`, `id="duration"`, `id="generator"`, `id="direction"`, `id="packet"`, `id="kind"`, `id="channel"`, `id="bytes-panel"`, `id="bytes-toggle"`, `aria-expanded="false"`, `id="hex-view" class="hex-view" hidden`, `class="panel-title"`, `class="panel-title-separator"`, "BedrockDebugProxy", "Ordered stream", "Decoded view", "Raw evidence"} {
+	for _, marker := range []string{`href="assets/app.css"`, `src="assets/app.js"`, `href="assets/favicon-32x32.png"`, `href="assets/favicon.ico"`, `href="assets/apple-touch-icon.png"`, `href="assets/site.webmanifest"`, `aria-label="Capture overview"`, `class="brand-name"`, `id="viewer-status"`, `id="event-count"`, `id="blob-count"`, `id="duration"`, `id="generator"`, `id="direction"`, `id="packet"`, `id="kind"`, `id="channel"`, `id="page-input"`, `id="page-label"`, `id="bytes-panel"`, `id="bytes-toggle"`, `aria-expanded="false"`, `id="hex-view" class="hex-view" hidden`, `class="panel-title"`, `class="panel-title-separator"`, "BedrockDebugProxy", "Ordered stream", "Decoded view", "Raw evidence"} {
 		if !strings.Contains(string(index), marker) {
 			t.Fatalf("index is missing viewer marker %q", marker)
 		}
@@ -192,6 +192,11 @@ func TestViewerServesEmbeddedFontAssets(t *testing.T) {
 	_ = jsResponse.Body.Close()
 	if !strings.Contains(string(js), "decode-pending") || !strings.Contains(string(js), "not_yet_decoded") || !strings.Contains(string(js), "setBytesExpanded") || !strings.Contains(string(js), "elements[\"hex-view\"].hidden") {
 		t.Fatal("JavaScript does not classify pending-decode rows")
+	}
+	for _, source := range []string{"function goToPage", "elements[\"page-input\"].max", "event.key === \"Enter\""} {
+		if !strings.Contains(string(js), source) {
+			t.Fatalf("JavaScript does not support direct page entry %q", source)
+		}
 	}
 	for _, forbidden := range []string{"font-weight: 650", "font-weight: 700", "font-weight: 750", "font-size: 9px", "font-size: 10px", "font-size: 11px", "font-size: 13px", "font-size: 14px", "font-size: 15px", "font-size: 16px", "font-size: 17px", "font-size: 18px", "font: 11px/1.55", "text-transform: uppercase"} {
 		if strings.Contains(string(css), forbidden) {

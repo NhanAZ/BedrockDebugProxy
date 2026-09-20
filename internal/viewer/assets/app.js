@@ -14,7 +14,7 @@ const state = {
 const elements = Object.fromEntries([
   "event-count", "blob-count", "duration", "generator",
   "search", "direction", "packet", "kind", "channel", "problems", "reset",
-  "previous", "next", "page-label", "event-rows", "empty-state", "event-details",
+  "previous", "next", "page-input", "page-label", "event-rows", "empty-state", "event-details",
   "copy-json", "bytes-panel", "bytes-toggle", "byte-status", "hex-view", "viewer-status", "follow", "follow-container",
 ].map((id) => [id, document.getElementById(id)]));
 
@@ -320,9 +320,28 @@ function cell(text, className) {
 function updatePager() {
   const page = state.total === 0 ? 0 : Math.floor(state.offset / state.limit) + 1;
   const pages = state.total === 0 ? 0 : Math.ceil(state.total / state.limit);
-  elements["page-label"].textContent = `${page} / ${pages}`;
+  elements["page-input"].value = pages === 0 ? "" : String(page);
+  elements["page-input"].max = String(Math.max(1, pages));
+  elements["page-input"].disabled = pages === 0;
+  elements["page-label"].textContent = pages === 0 ? "-" : String(pages);
   elements.previous.disabled = state.offset === 0;
   elements.next.disabled = state.offset + state.limit >= state.total;
+}
+
+function goToPage(value) {
+  const pages = state.total === 0 ? 0 : Math.ceil(state.total / state.limit);
+  const requested = Number.parseInt(value, 10);
+  if (pages === 0 || !Number.isFinite(requested)) {
+    updatePager();
+    return;
+  }
+  const page = Math.min(pages, Math.max(1, requested));
+  const offset = (page - 1) * state.limit;
+  elements["page-input"].value = String(page);
+  if (offset === state.offset) return;
+  elements.follow.checked = false;
+  state.offset = offset;
+  loadEvents().catch(showFatal);
 }
 
 function markSelectedRow() {
@@ -527,6 +546,19 @@ elements.next.addEventListener("click", () => {
   elements.follow.checked = false;
   state.offset += state.limit;
   loadEvents().catch(showFatal);
+});
+elements["page-input"].addEventListener("change", (event) => goToPage(event.target.value));
+elements["page-input"].addEventListener("keydown", (event) => {
+  if (event.key === "Enter") {
+    event.preventDefault();
+    goToPage(event.target.value);
+    event.target.select();
+  }
+  if (event.key === "Escape") {
+    event.preventDefault();
+    updatePager();
+    event.target.blur();
+  }
 });
 elements.follow.addEventListener("change", () => {
   if (elements.follow.checked) state.offset = 0;
