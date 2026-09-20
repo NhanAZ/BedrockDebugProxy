@@ -318,6 +318,14 @@ Every new entry should state the symptom, root cause, implementation commits, ev
 - Evidence and validation: the viewer HTTP test checks the page input markers and JavaScript page-jump handler. Browser smoke validation confirms the input remains aligned with the existing pager controls and accepts direct page navigation.
 - Status: implemented with viewer-only impact.
 
+### FIX-0039 - Center compact overview metrics
+
+- Symptom: the compact header's metric text appeared raised within the overview row compared with the BedrockDebugProxy name.
+- Root cause: the metric flex rows used baseline alignment, which placed their single-line content at the cross-axis start instead of centering it in the stretched header cells.
+- Implementation: use center alignment for each metric row while keeping the existing compact header height and horizontal layout.
+- Evidence and validation: the viewer asset test continues to cover the compact header layout, and browser smoke validation confirms the metric labels and values are vertically centered beside the brand name.
+- Status: implemented with viewer-only impact.
+
 ## Ordering safety contract
 
 The deferred-packet change is deliberately narrow. `expectedIDs` remains the only authority for what the current login state accepts. The queue scan selects the earliest packet that is currently expected, leaves packets for later states queued, and never mutates or reorders bytes on the wire. The regression tests cover canonical resource-pack order, featured early `ResourcePacksInfo`, a later-phase packet queued ahead of the current phase, and all six permutations of the three login packets.
