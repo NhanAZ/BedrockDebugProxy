@@ -29,7 +29,6 @@
   <section class="filters" aria-label="Event filters">
     <label class="search-field">
       <span class="sr-only">Search events</span>
-      <span aria-hidden="true">⌕</span>
       <input id="search" type="search" placeholder="Search sequence, packet, kind, status, or error" autocomplete="off">
       <kbd>Ctrl F</kbd>
     </label>
@@ -50,6 +49,7 @@
           <span class="panel-title-separator" aria-hidden="true">-</span>
           <h2 id="events-heading">Events</h2>
         </div>
+        <span id="viewer-status" class="event-status" aria-live="polite">Opening and verifying capture...</span>
         <div class="pager">
           <button id="previous" type="button" aria-label="Previous page">←</button>
           <span id="page-label">-</span>
@@ -97,14 +97,6 @@
       </section>
     </aside>
   </main>
-
-  <footer>
-    <span id="viewer-status" aria-live="polite">Opening and verifying capture...</span>
-    <span class="footer-meta">
-      <a href="assets/fonts/OFL-1.1.txt" target="_blank" rel="noreferrer">Font licenses</a>
-      <span>Read-only local viewer. The canonical capture is unchanged.</span>
-    </span>
-  </footer>
 
   <script src="assets/app.js"></script>
 </body>

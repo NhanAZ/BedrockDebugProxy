@@ -294,6 +294,14 @@ Every new entry should state the symptom, root cause, implementation commits, ev
 - Evidence and validation: the viewer HTTP test rejects the removed header elements and title text, while browser smoke validation confirms the name and overview metrics remain aligned.
 - Status: implemented with viewer-only impact.
 
+### FIX-0036 - Compact viewer controls and result status
+
+- Symptom: the overview header left excess vertical space, Time values were truncated, the result count occupied a separate footer, and the search field showed an unwanted magnifier.
+- Root cause: the header retained its earlier minimum height, the Time column was too narrow for full millisecond timestamps, viewer status was coupled to footer metadata, and the search affordance included a decorative glyph.
+- Implementation: reduce the overview header height, widen the Time column to 132px, move the live result status into the event panel heading, remove the footer and magnifier, and style the Ctrl F hint with Space Grotesk when available. The web manifest now uses BedrockDebugProxy as its app name.
+- Evidence and validation: viewer HTTP tests check the compact page grid, status placement, removed footer and glyph, wider Time column, manifest name, and Space Grotesk declaration. Browser smoke validation confirms the header, table, in-panel count, and search hint remain readable.
+- Status: implemented with viewer-only impact.
+
 ## Ordering safety contract
 
 The deferred-packet change is deliberately narrow. `expectedIDs` remains the only authority for what the current login state accepts. The queue scan selects the earliest packet that is currently expected, leaves packets for later states queued, and never mutates or reorders bytes on the wire. The regression tests cover canonical resource-pack order, featured early `ResourcePacksInfo`, a later-phase packet queued ahead of the current phase, and all six permutations of the three login packets.

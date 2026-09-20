@@ -1,6 +1,6 @@
 {
-  "name": "Bedrock Capture Viewer",
-  "short_name": "Bedrock Viewer",
+  "name": "BedrockDebugProxy",
+  "short_name": "BedrockDebugProxy",
   "start_url": "../",
   "scope": "../",
   "display": "standalone",
