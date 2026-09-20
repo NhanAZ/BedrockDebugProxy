@@ -206,6 +206,14 @@ Every new entry should state the symptom, root cause, implementation commits, ev
 - Evidence and validation: `internal/bedrock/observer.go` intentionally writes `not_yet_decoded` at `post_decrypt_decompress_frame`, while decode failures are represented by separate `packet.decode_error` or view-error events. Viewer asset tests assert the gold selectors and status classification, and JavaScript syntax validation remains required.
 - Status: implemented with viewer-only impact. The `Problems only` filter still includes pending-decode rows because they remain useful review targets, but their presentation no longer implies a decode failure.
 
+### FIX-0025 - Expand event details without an internal scrollbar
+
+- Symptom: the selected event details panel constrained its decoded metadata and tree to a fixed grid track, forcing a second vertical scrollbar inside the panel.
+- Root cause: the inspector and detail content used fractional rows and `overflow: auto`, so content was clipped to the panel viewport instead of contributing to the workspace height.
+- Implementation: let the inspector and detail panel use content-sized rows, allow the detail content to expand naturally, and keep the workspace as the scroll boundary. The raw evidence panel and event table retain their bounded evidence views.
+- Evidence and validation: the previous stylesheet contained the fractional inspector rows and `.detail-content` internal overflow. Viewer asset tests reject those declarations and browser smoke validation checks a selected raw event in the expanded panel.
+- Status: implemented with viewer-only impact. Very large decoded trees can still make the workspace long, which is intentional so the evidence remains reachable without a nested detail scrollbar.
+
 ## Ordering safety contract
 
 The deferred-packet change is deliberately narrow. `expectedIDs` remains the only authority for what the current login state accepts. The queue scan selects the earliest packet that is currently expected, leaves packets for later states queued, and never mutates or reorders bytes on the wire. The regression tests cover canonical resource-pack order, featured early `ResourcePacksInfo`, a later-phase packet queued ahead of the current phase, and all six permutations of the three login packets.
