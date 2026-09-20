@@ -66,7 +66,7 @@ func TestViewerServesFilteredEventsAndBlobPreview(t *testing.T) {
 	if response.StatusCode != http.StatusOK || !strings.Contains(string(index), "Capture Viewer") {
 		t.Fatalf("index status = %d, body = %s", response.StatusCode, index)
 	}
-	for _, marker := range []string{`href="assets/app.css"`, `src="assets/app.js"`, `href="assets/favicon-32x32.png"`, `href="assets/favicon.ico"`, `href="assets/apple-touch-icon.png"`, `href="assets/site.webmanifest"`, `id="direction"`, `id="packet"`, `id="kind"`, `id="channel"`, `id="bytes-panel"`, `id="bytes-toggle"`, `aria-expanded="false"`, `id="hex-view" class="hex-view" hidden`, "BedrockDebugProxy", "Ordered stream", "Decoded view", "Raw evidence"} {
+	for _, marker := range []string{`href="assets/app.css"`, `src="assets/app.js"`, `src="assets/original-logo.png"`, `href="assets/favicon-32x32.png"`, `href="assets/favicon.ico"`, `href="assets/apple-touch-icon.png"`, `href="assets/site.webmanifest"`, `id="direction"`, `id="packet"`, `id="kind"`, `id="channel"`, `id="bytes-panel"`, `id="bytes-toggle"`, `aria-expanded="false"`, `id="hex-view" class="hex-view" hidden`, "BedrockDebugProxy", "Ordered stream", "Decoded view", "Raw evidence"} {
 		if !strings.Contains(string(index), marker) {
 			t.Fatalf("index is missing viewer marker %q", marker)
 		}
@@ -169,7 +169,7 @@ func TestViewerServesEmbeddedFontAssets(t *testing.T) {
 	if strings.Contains(string(css), "grid-template-rows: auto auto auto minmax(0, 1fr) auto") || strings.Contains(string(css), "  overflow: hidden;\n}\n\nbutton, input, select") {
 		t.Fatal("CSS still keeps the page inside a workspace-only scroll container")
 	}
-	for _, source := range []string{".select-trigger", ".select-menu", ".select-option", ".bytes-panel.collapsed", ".panel-heading-toggle"} {
+	for _, source := range []string{".select-trigger", ".select-menu", ".select-option", ".bytes-panel.collapsed", ".panel-heading-toggle", ".brand-mark", "image-rendering: pixelated"} {
 		if !strings.Contains(string(css), source) {
 			t.Fatalf("CSS does not contain themed dropdown selector %s", source)
 		}
@@ -203,6 +203,7 @@ func TestViewerServesEmbeddedFontAssets(t *testing.T) {
 		{path: "favicon-16x16.png", contentType: "image/png", prefix: "\x89PNG\r\n\x1a\n", sha256: "221dc39a54736e4858934b808210f8cdec08b2eeb86f73b919705aab48166fcc"},
 		{path: "favicon-32x32.png", contentType: "image/png", prefix: "\x89PNG\r\n\x1a\n", sha256: "a665788fd84c8a293a25719101354b411d951bebf7cc958200f245b279ac55ee"},
 		{path: "favicon.ico", contentType: "image/x-icon", prefix: "\x00\x00\x01\x00", sha256: "18fa56a2443be147555797ce573e5922cd371183cf81acfe5f40e760335d0763"},
+		{path: "original-logo.png", contentType: "image/png", prefix: "\x89PNG\r\n\x1a\n", sha256: "31546288c624301e9cfbcf25a4ff922a1d358247bc78f964482780b318b4e057"},
 		{path: "apple-touch-icon.png", contentType: "image/png", prefix: "\x89PNG\r\n\x1a\n", sha256: "f5012c266c3f17118b9bc2aea0a231b667d800c683f422ce30680e8dcac47d56"},
 		{path: "android-chrome-192x192.png", contentType: "image/png", prefix: "\x89PNG\r\n\x1a\n", sha256: "60e1934ee8c6ddf03d55d6cf73304ba7b2d61a39c0f768df4a834b9e6c1757db"},
 		{path: "android-chrome-512x512.png", contentType: "image/png", prefix: "\x89PNG\r\n\x1a\n", sha256: "21b1cbd71b4a8f46320e80a3f121010e49acdcf74afdfe1001a75ea7498253a0"},

@@ -239,6 +239,8 @@ func (v *Viewer) serveHTTP(writer http.ResponseWriter, request *http.Request) {
 		v.serveAsset(writer, request, "assets/favicon-32x32.png", "image/png")
 	case request.URL.Path == "/assets/favicon.ico":
 		v.serveAsset(writer, request, "assets/favicon.ico", "image/x-icon")
+	case request.URL.Path == "/assets/original-logo.png":
+		v.serveAsset(writer, request, "assets/original-logo.png", "image/png")
 	case request.URL.Path == "/assets/apple-touch-icon.png":
 		v.serveAsset(writer, request, "assets/apple-touch-icon.png", "image/png")
 	case request.URL.Path == "/assets/android-chrome-192x192.png":
