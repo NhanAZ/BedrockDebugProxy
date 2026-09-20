@@ -527,10 +527,18 @@ func (r *Runner) runHop(runCtx context.Context, localAddress string, state *hopS
 	if err := failures.Err(); err != nil {
 		return fmt.Errorf("capture hook failed during login: %w", err)
 	}
+	downstreamClientData := clientConn.ClientData()
+	upstreamClientData := serverConn.ClientData()
 	if err := r.recordAtHop("session.negotiated", capture.SeverityInfo, map[string]any{
 		"downstream_protocol_id": clientConn.Proto().ID(), "downstream_game_version": clientConn.Proto().Ver(),
 		"upstream_protocol_id": serverConn.Proto().ID(), "upstream_game_version": serverConn.Proto().Ver(),
-		"resource_pack_count": len(serverConn.ResourcePacks()), "target": state.target,
+		"downstream_client_data_game_version": downstreamClientData.GameVersion,
+		"upstream_client_data_game_version":   upstreamClientData.GameVersion,
+		"client_data_game_version_match":      downstreamClientData.GameVersion == upstreamClientData.GameVersion,
+		"downstream_client_data_device_os":    downstreamClientData.DeviceOS,
+		"upstream_client_data_device_os":      upstreamClientData.DeviceOS,
+		"client_data_device_os_match":         downstreamClientData.DeviceOS == upstreamClientData.DeviceOS,
+		"resource_pack_count":                 len(serverConn.ResourcePacks()), "target": state.target,
 	}, state.hop); err != nil {
 		return err
 	}

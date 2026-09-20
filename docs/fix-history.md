@@ -454,6 +454,14 @@ Every new entry should state the symptom, root cause, implementation commits, ev
 - Evidence and validation: [`docs/research/local-identity-parity.md`](research/local-identity-parity.md), the upstream identity regression assertion in `internal/proxy/proxy_test.go`, and a local PocketMine direct-versus-proxy loopback run.
 - Status: fixed for the unauthenticated local path. The authenticated path still requires a real vanilla-client validation; this change does not infer public-server anti-cheat behavior.
 
+### FIX-0056 - Distinguish protocol and ClientData versions in negotiation evidence
+
+- Symptom: `session.negotiated` exposed the gophertunnel protocol package version but did not show the game version or device OS reported inside each login's `ClientData`, making a local parity mismatch easy to miss.
+- Root cause: the event used `Conn.Proto().Ver()` for its two game-version fields and omitted the login metadata comparison even though both connection snapshots were available immediately afterward.
+- Implementation: retain the existing protocol fields and add downstream/upstream `ClientData` game-version and device-OS fields plus explicit match booleans. The analysis summary exposes the same optional values while remaining compatible with older captures.
+- Evidence and validation: focused analysis and proxy integration assertions cover both matching and mismatching metadata shapes. This is a capture-observability change and does not alter forwarded packet bytes.
+- Status: implemented with no wire-behavior change.
+
 ## Ordering safety contract
 
 The deferred-packet change is deliberately narrow. `expectedIDs` remains the only authority for what the current login state accepts. The queue scan selects the earliest packet that is currently expected, leaves packets for later states queued, and never mutates or reorders bytes on the wire. The regression tests cover canonical resource-pack order, featured early `ResourcePacksInfo`, a later-phase packet queued ahead of the current phase, and all six permutations of the three login packets.

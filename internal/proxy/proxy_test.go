@@ -572,6 +572,7 @@ func TestRunnerForwardsBidirectionalPacketsAndCapturesSession(t *testing.T) {
 		}
 	}
 	var negotiated, spawned, closed bool
+	var negotiatedClientData bool
 	var connectionViews, loginSkinMetadataViews, gameDataViews int
 	type decodedPacketKey struct {
 		direction capture.Direction
@@ -616,6 +617,21 @@ func TestRunnerForwardsBidirectionalPacketsAndCapturesSession(t *testing.T) {
 		switch event.Kind {
 		case "session.negotiated":
 			negotiated = true
+			var data struct {
+				DownstreamVersion string            `json:"downstream_client_data_game_version"`
+				UpstreamVersion   string            `json:"upstream_client_data_game_version"`
+				VersionMatch      bool              `json:"client_data_game_version_match"`
+				DownstreamOS      protocol.DeviceOS `json:"downstream_client_data_device_os"`
+				UpstreamOS        protocol.DeviceOS `json:"upstream_client_data_device_os"`
+				OSMatch           bool              `json:"client_data_device_os_match"`
+			}
+			if err := json.Unmarshal(event.Data, &data); err != nil {
+				return err
+			}
+			if data.DownstreamVersion != expectedClientData.GameVersion || data.UpstreamVersion != expectedClientData.GameVersion || !data.VersionMatch || data.DownstreamOS != expectedClientData.DeviceOS || data.UpstreamOS != expectedClientData.DeviceOS || !data.OSMatch {
+				return fmt.Errorf("session negotiated client data = %+v", data)
+			}
+			negotiatedClientData = true
 		case "session.connection_metadata":
 			connectionViews++
 			if bytes.Contains(event.Data, []byte(expectedClientData.SkinID)) && bytes.Contains(event.Data, []byte(expectedClientData.SkinData)) &&
@@ -684,8 +700,8 @@ func TestRunnerForwardsBidirectionalPacketsAndCapturesSession(t *testing.T) {
 	}); err != nil {
 		t.Fatal(err)
 	}
-	if !negotiated || !spawned || !closed || connectionViews != 2 || loginSkinMetadataViews != 2 || gameDataViews != 1 {
-		t.Fatalf("session evidence negotiated=%t spawned=%t closed=%t connection_views=%d login_skin_metadata_views=%d game_data_views=%d", negotiated, spawned, closed, connectionViews, loginSkinMetadataViews, gameDataViews)
+	if !negotiated || !negotiatedClientData || !spawned || !closed || connectionViews != 2 || loginSkinMetadataViews != 2 || gameDataViews != 1 {
+		t.Fatalf("session evidence negotiated=%t negotiated_client_data=%t spawned=%t closed=%t connection_views=%d login_skin_metadata_views=%d game_data_views=%d", negotiated, negotiatedClientData, spawned, closed, connectionViews, loginSkinMetadataViews, gameDataViews)
 	}
 	if !downstreamPacksRequired {
 		t.Error("downstream resource-pack acceptance policy was not captured")

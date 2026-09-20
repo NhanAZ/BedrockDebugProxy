@@ -35,6 +35,7 @@ Decoded packet fields are stored in the optional `data` object. Each struct carr
 Gophertunnel consumes some login and spawn packets before the normal forwarding loops can return them. The packet hook still retains their exact payloads as `packet.raw`. BedrockDebugProxy also records derived snapshots so later analysis does not have to decode every pre-play packet again.
 
 - `session.connection_metadata` records the downstream or upstream role, authentication state, negotiated protocol, identity data, and decoded `ClientData` fields exposed by the active gophertunnel connection.
+- `session.negotiated` records both the protocol package versions and the game version and device OS reported inside each connection's `ClientData`. The `client_data_*_match` booleans make a login metadata mismatch explicit without replacing the detailed connection snapshots.
 - `session.game_data` records a bounded decoded view of the `GameData` structure obtained from the upstream connection immediately before the same in-memory value is passed to downstream `StartGame`.
 - `session.spawned` records the latency, client-cache state, and chunk radius exposed for both connections when the spawn handshake completes.
 
