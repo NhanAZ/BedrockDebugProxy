@@ -66,6 +66,12 @@ The relevance is architectural: featured servers do not necessarily share one lo
 
 The [upstream issue](https://github.com/Sandertv/gophertunnel/issues/273) was opened on December 2, 2024 and remains open. It reports invisible blocks on Hive and CubeCraft and shows that decoding and re-encoding `LevelChunk` data can make them visible. This is evidence of a real gophertunnel representation problem on featured servers, not evidence of a cheat signal.
 
+### Issue #350 - Hive subchunk offset
+
+The [upstream issue](https://github.com/Sandertv/gophertunnel/issues/350) was opened on October 3, 2025 and remains open. It reports Hive subchunks arriving four subchunks below their vanilla position when using gophertunnel, while an official client does not show the offset. The report does not identify whether the cause is a decoder interpretation, a world-generation version mismatch, or another session difference.
+
+BedrockDebugProxy does not apply the issue's proposed decode-and-reencode workaround. Its same-protocol bridge forwards the original packet bytes and only decodes a clone for capture. `TestRunnerForwardsBidirectionalPacketsAndCapturesSession` verifies that the raw `LevelChunk` payload hash is present on both bridge channels and remains unchanged. This local evidence means the current proxy does not introduce the specific re-encoding mutation described by issue #273, but it does not prove that a public Hive session has no other chunk or world-generation incompatibility.
+
 ### Issue #407 - authenticated MITM identity binding
 
 The [upstream issue](https://github.com/Sandertv/gophertunnel/issues/407) is a separate but highly relevant class of problem. It documents BDS 1.26.10.4, protocol 944, where the OIDC multiplayer token's `cpk` is cryptographically bound to the client's key pair. The report concludes that a MITM proxy cannot simultaneously preserve the player's identity and use its own encryption key, and lists token rebinding or a different handshake architecture as possible directions. The issue is closed and does not document a general identity-preserving solution.
