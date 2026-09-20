@@ -430,6 +430,14 @@ Every new entry should state the symptom, root cause, implementation commits, ev
 - Evidence and validation: the viewer asset test checks the dynamic sizing hook and CSS contract. Browser smoke validation must open a large capture on a page containing a five-digit sequence and confirm the complete value is visible without an ellipsis.
 - Status: implemented with viewer-only impact. The width follows the current page and may change when navigating between pages.
 
+### FIX-0053 - Wrap long event details
+
+- Symptom: long error summaries in the Details column were clipped with an ellipsis, hiding the address and reason returned by the server.
+- Root cause: every event table cell inherited single-line ellipsis styling, including the Details column.
+- Implementation: mark Details cells explicitly and allow their text to wrap at normal boundaries or inside long unbroken values while preserving ellipsis behavior for the other compact columns.
+- Evidence and validation: the viewer asset test checks the Details class and wrapping declarations. Browser smoke validation must open the Hive ban event on the large capture and confirm its full error summary continues on additional lines without the ellipsis.
+- Status: implemented with viewer-only impact. A wrapped Details message increases that event row's height.
+
 ## Ordering safety contract
 
 The deferred-packet change is deliberately narrow. `expectedIDs` remains the only authority for what the current login state accepts. The queue scan selects the earliest packet that is currently expected, leaves packets for later states queued, and never mutates or reorders bytes on the wire. The regression tests cover canonical resource-pack order, featured early `ResourcePacksInfo`, a later-phase packet queued ahead of the current phase, and all six permutations of the three login packets.
