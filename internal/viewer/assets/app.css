@@ -298,6 +298,16 @@ h2 { font-size: var(--font-size); letter-spacing: 0.03em; }
 
 .event-panel, .detail-panel, .bytes-panel { min-width: 0; display: grid; grid-template-rows: auto minmax(0, 1fr); }
 
+.panel-title {
+  min-width: 0;
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+}
+.panel-title .eyebrow { margin-bottom: 0; }
+.panel-title h2 { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.panel-title-separator { flex: 0 0 auto; color: var(--subtle); }
+
 .panel-heading {
   min-height: 57px;
   padding: 11px 14px;
