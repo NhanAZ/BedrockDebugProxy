@@ -246,6 +246,14 @@ Every new entry should state the symptom, root cause, implementation commits, ev
 - Evidence and validation: the viewer asset test checks the head links, manifest response, content types, and PNG/ICO signatures. Browser smoke validation must confirm the page loads the favicon and manifest without console errors.
 - Status: implemented with viewer-only impact. The icons are static presentation assets and do not affect captures, packet handling, or viewer data.
 
+### FIX-0030 - Use favicon package logo in viewer brand mark
+
+- Symptom: the browser tab used the supplied favicon while the viewer header still displayed the older CSS gradient logo.
+- Root cause: the header brand mark was a CSS-only decoration and was not connected to the favicon package.
+- Implementation: serve the package's original logo asset and render it in the header at the existing 38px mark size.
+- Evidence and validation: the viewer asset test checks the header image, logo response, PNG signature, and CSS image rendering rule. Browser smoke validation must confirm the header mark matches the favicon artwork.
+- Status: implemented with viewer-only impact. The logo is static presentation content and does not affect captures, packet handling, or viewer data.
+
 ## Ordering safety contract
 
 The deferred-packet change is deliberately narrow. `expectedIDs` remains the only authority for what the current login state accepts. The queue scan selects the earliest packet that is currently expected, leaves packets for later states queued, and never mutates or reorders bytes on the wire. The regression tests cover canonical resource-pack order, featured early `ResourcePacksInfo`, a later-phase packet queued ahead of the current phase, and all six permutations of the three login packets.
