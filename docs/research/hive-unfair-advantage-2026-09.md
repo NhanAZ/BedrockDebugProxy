@@ -15,6 +15,8 @@ The affected capture is `captures/session-20260920T135412Z`.
 - The upstream selector is `experience:The Hive`, resolved through RakNet at `geo.hivebedrock.network:19132`.
 - The proxy recorded the upstream identity display name `SrDuck84` and the downstream identity display name `NhanAZ` in separate login metadata events.
 - The server sent `You are banned from The Hive` with reason `Unfair Advantage` and an expiry of approximately seven days. The capture records the server response; it does not identify the server-side detector.
+- The client error panel also shows `InitialConnection-55`. No public Hive or Mojang mapping for `InitialConnection-55` was found. In this screenshot it is a client-side diagnostic label shown alongside the ban response, not an independent explanation of the punishment.
+- The same panel reports `RakNet:2193`, which is the transport and Bedrock protocol metadata. It is not itself a ban code. `NetworkType`, `Connection`, `WorldSession`, and `Client` are diagnostic fields whose exact meanings are not publicly documented; their values are intentionally omitted from this note.
 - Same-protocol traffic was forwarded through the raw path. The capture does not show an intentional gameplay mutation, injection, replay, or transfer-address rewrite before the ban.
 
 ## Comparative capture evidence
@@ -73,6 +75,7 @@ No indexed public result was found that names BedrockDebugProxy, `SrDuck84`, or 
 3. Whether the cause was a server-side rollout, client behavior, proxy identity presentation, or a combination.
 4. Whether any code-only change could make this proxy path acceptable under Hive policy.
 5. Whether the community reports share a detector, connection condition, or enforcement rollout with this incident.
+6. The internal meaning of the client's `InitialConnection-55` diagnostic code.
 
 ## Maintainer decision and follow-up
 
