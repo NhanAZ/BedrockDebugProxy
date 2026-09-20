@@ -31,6 +31,7 @@ Detailed rationale remains in [`docs/audits/`](docs/audits/).
 - The search field no longer shows a decorative magnifier, and its Ctrl F hint now uses the same pixel font as the rest of the viewer.
 - The event pager now accepts a page number so large captures can be opened directly without stepping through every page.
 - The event stream keeps wheel and keyboard scrolling but hides its nested scrollbar for a cleaner right edge.
+- The event stream now uses the same thin, theme-colored scrollbar as the Packet and Kind filter menus.
 - Packet filter menus now expand to fit longer packet names before applying a viewport-safe maximum width.
 - Packet filter menus now use a thin, theme-colored scrollbar instead of the browser default.
 - The compact capture overview now vertically centers each metric label and value within the header row.

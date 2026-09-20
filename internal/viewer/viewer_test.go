@@ -174,10 +174,13 @@ func TestViewerServesEmbeddedFontAssets(t *testing.T) {
 	if strings.Contains(string(css), "grid-template-rows: auto auto auto minmax(0, 1fr) auto") || strings.Contains(string(css), "  overflow: hidden;\n}\n\nbutton, input, select") {
 		t.Fatal("CSS still keeps the page inside a workspace-only scroll container")
 	}
-	for _, source := range []string{".select-trigger", ".select-menu", ".select-option", "width: max-content", "max-width: min(480px, calc(100vw - 16px))", "scrollbar-width: thin", ".select-menu::-webkit-scrollbar", ".select-menu::-webkit-scrollbar-thumb", ".bytes-panel.collapsed", ".panel-heading-toggle", ".panel-title {", ".panel-title-separator", ".brand-name", ".table-wrap::-webkit-scrollbar", "scrollbar-width: none"} {
+	for _, source := range []string{".select-trigger", ".select-menu", ".select-option", "width: max-content", "max-width: min(480px, calc(100vw - 16px))", "scrollbar-width: thin", ".select-menu::-webkit-scrollbar", ".select-menu::-webkit-scrollbar-thumb", ".table-wrap::-webkit-scrollbar", ".table-wrap::-webkit-scrollbar-thumb", ".bytes-panel.collapsed", ".panel-heading-toggle", ".panel-title {", ".panel-title-separator", ".brand-name"} {
 		if !strings.Contains(string(css), source) {
 			t.Fatalf("CSS does not contain themed dropdown selector %s", source)
 		}
+	}
+	if strings.Contains(string(css), "scrollbar-width: none") || strings.Contains(string(css), ".table-wrap::-webkit-scrollbar { display: none; }") {
+		t.Fatal("CSS still hides the event stream scrollbar")
 	}
 	for _, source := range []string{"--gold: #ffaa00", "tbody tr.problem.decode-pending", ".decode-pending-text"} {
 		if !strings.Contains(string(css), source) {
