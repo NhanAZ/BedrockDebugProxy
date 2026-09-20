@@ -258,9 +258,17 @@ Every new entry should state the symptom, root cause, implementation commits, ev
 
 - Symptom: the capture viewer used a separate overview strip for four summary metrics, consuming a full horizontal row before the filters and event stream.
 - Root cause: the overview section was laid out as a standalone page grid row with tall metric cards.
-- Implementation: move the existing overview section into the topbar, render its four metrics as compact horizontal label/value pairs, and reduce the page grid to its four actual children. Existing metric IDs, values, accessibility label, and capture data remain unchanged.
+- Implementation: move the existing overview section into the topbar, render its four metrics as compact horizontal label/value pairs, reduce the page grid to its four actual children, and keep auto page tracks content-sized so the footer remains after the complete workspace. Existing metric IDs, values, accessibility label, and capture data remain unchanged.
 - Evidence and validation: the viewer HTTP test verifies that the overview is inside the header and that the compact topbar grid is present. Browser smoke validation must confirm the brand, metrics, status, and capture ID share one row without clipping.
 - Status: implemented with viewer-only impact. Long generator values and capture IDs may ellipsize in narrow windows.
+
+### FIX-0032 - Keep viewer footer below the inspector
+
+- Symptom: the page footer could appear between decoded details and Blob bytes when the inspector content overflowed the initial viewport.
+- Root cause: the body and workspace grid tracks were allowed to shrink below the content-sized inspector, so the footer was placed at the viewport track while the inspector continued painting below it.
+- Implementation: size the page tracks and workspace from their max-content height so the footer follows the full workspace while retaining the page-level scrollbar.
+- Evidence and validation: the viewer asset test checks the content-sized page grid contract. Browser smoke validation confirms the footer remains below Blob bytes after selecting an event and expanding the details.
+- Status: implemented with viewer-only impact. Long decoded events still increase the page scroll height by design.
 
 ## Ordering safety contract
 
