@@ -231,6 +231,12 @@ func TestRunnerForwardsBidirectionalPacketsAndCapturesSession(t *testing.T) {
 			serverErrors <- fmt.Errorf("upstream identity = %#v, want downstream identity", identity)
 			return
 		}
+		clientData := serverConn.ClientData()
+		if clientData.SkinID != "integration-login-skin" || clientData.SkinData != base64.StdEncoding.EncodeToString([]byte{1, 2, 3, 4}) ||
+			clientData.CapeID != "integration-login-cape" || clientData.CapeData != base64.StdEncoding.EncodeToString([]byte{5, 6, 7, 8}) {
+			serverErrors <- fmt.Errorf("upstream client data did not preserve downstream skin metadata: %#v", clientData)
+			return
+		}
 		if startErr := serverConn.StartGame(minecraft.GameData{
 			WorldName:       "BedrockDebugProxy integration",
 			EntityUniqueID:  1,
