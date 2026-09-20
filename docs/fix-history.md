@@ -254,6 +254,14 @@ Every new entry should state the symptom, root cause, implementation commits, ev
 - Evidence and validation: the viewer asset test checks the header image, logo response, PNG signature, and CSS image rendering rule. Browser smoke validation must confirm the header mark matches the favicon artwork.
 - Status: implemented with viewer-only impact. The logo is static presentation content and does not affect captures, packet handling, or viewer data.
 
+### FIX-0031 - Compact capture overview in viewer header
+
+- Symptom: the capture viewer used a separate overview strip for four summary metrics, consuming a full horizontal row before the filters and event stream.
+- Root cause: the overview section was laid out as a standalone page grid row with tall metric cards.
+- Implementation: move the existing overview section into the topbar, render its four metrics as compact horizontal label/value pairs, and reduce the page grid to its four actual children. Existing metric IDs, values, accessibility label, and capture data remain unchanged.
+- Evidence and validation: the viewer HTTP test verifies that the overview is inside the header and that the compact topbar grid is present. Browser smoke validation must confirm the brand, metrics, status, and capture ID share one row without clipping.
+- Status: implemented with viewer-only impact. Long generator values and capture IDs may ellipsize in narrow windows.
+
 ## Ordering safety contract
 
 The deferred-packet change is deliberately narrow. `expectedIDs` remains the only authority for what the current login state accepts. The queue scan selects the earliest packet that is currently expected, leaves packets for later states queued, and never mutates or reorders bytes on the wire. The regression tests cover canonical resource-pack order, featured early `ResourcePacksInfo`, a later-phase packet queued ahead of the current phase, and all six permutations of the three login packets.

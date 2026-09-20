@@ -23,6 +23,7 @@ Detailed rationale remains in [`docs/audits/`](docs/audits/).
 - The capture viewer now keeps Blob bytes collapsed by default and provides an accessible toggle for expanding the raw hexdump when needed.
 - The capture viewer now includes the supplied favicon, touch icon, and dark themed web manifest assets.
 - The capture viewer header now uses the same supplied logo artwork as its favicon package.
+- The capture viewer now places Events, Blobs, Duration, and Generator in one compact header row instead of a separate overview strip.
 - The contributor validation workflow now requires viewer asset, HTTP, JavaScript, and browser smoke checks in the same change whenever a web-facing change could affect the page.
 
 ## [0.2.1] - 2026-09-17
