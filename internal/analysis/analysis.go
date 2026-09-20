@@ -44,13 +44,19 @@ type Build struct {
 }
 
 type Protocol struct {
-	ConfiguredID       string `json:"configured_id,omitempty"`
-	ConfiguredVersion  string `json:"configured_version,omitempty"`
-	DownstreamID       int32  `json:"downstream_id,omitempty"`
-	DownstreamVersion  string `json:"downstream_version,omitempty"`
-	UpstreamID         int32  `json:"upstream_id,omitempty"`
-	UpstreamVersion    string `json:"upstream_version,omitempty"`
-	PackDecryptEnabled bool   `json:"resource_pack_decryption_enabled"`
+	ConfiguredID                 string `json:"configured_id,omitempty"`
+	ConfiguredVersion            string `json:"configured_version,omitempty"`
+	DownstreamID                 int32  `json:"downstream_id,omitempty"`
+	DownstreamVersion            string `json:"downstream_version,omitempty"`
+	UpstreamID                   int32  `json:"upstream_id,omitempty"`
+	UpstreamVersion              string `json:"upstream_version,omitempty"`
+	DownstreamClientDataVersion  string `json:"downstream_client_data_version,omitempty"`
+	UpstreamClientDataVersion    string `json:"upstream_client_data_version,omitempty"`
+	ClientDataVersionMatch       *bool  `json:"client_data_version_match,omitempty"`
+	DownstreamClientDataDeviceOS int32  `json:"downstream_client_data_device_os,omitempty"`
+	UpstreamClientDataDeviceOS   int32  `json:"upstream_client_data_device_os,omitempty"`
+	ClientDataDeviceOSMatch      *bool  `json:"client_data_device_os_match,omitempty"`
+	PackDecryptEnabled           bool   `json:"resource_pack_decryption_enabled"`
 }
 
 type Session struct {
@@ -190,10 +196,16 @@ func Analyze(root string) (Summary, error) {
 		case "session.negotiated":
 			summary.Session.Negotiated = true
 			var negotiated struct {
-				DownstreamID      int32  `json:"downstream_protocol_id"`
-				DownstreamVersion string `json:"downstream_game_version"`
-				UpstreamID        int32  `json:"upstream_protocol_id"`
-				UpstreamVersion   string `json:"upstream_game_version"`
+				DownstreamID                 int32  `json:"downstream_protocol_id"`
+				DownstreamVersion            string `json:"downstream_game_version"`
+				UpstreamID                   int32  `json:"upstream_protocol_id"`
+				UpstreamVersion              string `json:"upstream_game_version"`
+				DownstreamClientDataVersion  string `json:"downstream_client_data_game_version"`
+				UpstreamClientDataVersion    string `json:"upstream_client_data_game_version"`
+				ClientDataVersionMatch       *bool  `json:"client_data_game_version_match"`
+				DownstreamClientDataDeviceOS int32  `json:"downstream_client_data_device_os"`
+				UpstreamClientDataDeviceOS   int32  `json:"upstream_client_data_device_os"`
+				ClientDataDeviceOSMatch      *bool  `json:"client_data_device_os_match"`
 			}
 			if err := json.Unmarshal(event.Data, &negotiated); err != nil {
 				return fmt.Errorf("decode session negotiation event %d: %w", event.Sequence, err)
@@ -202,6 +214,12 @@ func Analyze(root string) (Summary, error) {
 			summary.Protocol.DownstreamVersion = negotiated.DownstreamVersion
 			summary.Protocol.UpstreamID = negotiated.UpstreamID
 			summary.Protocol.UpstreamVersion = negotiated.UpstreamVersion
+			summary.Protocol.DownstreamClientDataVersion = negotiated.DownstreamClientDataVersion
+			summary.Protocol.UpstreamClientDataVersion = negotiated.UpstreamClientDataVersion
+			summary.Protocol.ClientDataVersionMatch = negotiated.ClientDataVersionMatch
+			summary.Protocol.DownstreamClientDataDeviceOS = negotiated.DownstreamClientDataDeviceOS
+			summary.Protocol.UpstreamClientDataDeviceOS = negotiated.UpstreamClientDataDeviceOS
+			summary.Protocol.ClientDataDeviceOSMatch = negotiated.ClientDataDeviceOSMatch
 		case "session.spawned":
 			summary.Session.Spawned = true
 		case "session.close":

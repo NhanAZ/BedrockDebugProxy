@@ -25,7 +25,7 @@ func TestAnalyzeAndExplainCapture(t *testing.T) {
 	}}); err != nil {
 		t.Fatal(err)
 	}
-	negotiatedData := []byte(`{"downstream_protocol_id":900,"downstream_game_version":"1.2.3","upstream_protocol_id":900,"upstream_game_version":"1.2.3"}`)
+	negotiatedData := []byte(`{"downstream_protocol_id":900,"downstream_game_version":"1.2.3","upstream_protocol_id":900,"upstream_game_version":"1.2.3","downstream_client_data_game_version":"1.2.4","upstream_client_data_game_version":"1.2.3","client_data_game_version_match":false,"downstream_client_data_device_os":7,"upstream_client_data_device_os":1,"client_data_device_os_match":false}`)
 	for _, event := range []capture.Event{
 		{Kind: "upstream.connected", Direction: capture.DirectionInternal},
 		{Kind: "session.negotiated", Direction: capture.DirectionInternal, Data: negotiatedData},
@@ -72,6 +72,9 @@ func TestAnalyzeAndExplainCapture(t *testing.T) {
 	}
 	if summary.Build.Commit != "0123456789abcdef0123456789abcdef01234567" || !summary.Protocol.PackDecryptEnabled || summary.Protocol.DownstreamID != 900 {
 		t.Fatalf("build and protocol summary = %#v %#v", summary.Build, summary.Protocol)
+	}
+	if summary.Protocol.DownstreamClientDataVersion != "1.2.4" || summary.Protocol.UpstreamClientDataVersion != "1.2.3" || summary.Protocol.ClientDataVersionMatch == nil || *summary.Protocol.ClientDataVersionMatch || summary.Protocol.DownstreamClientDataDeviceOS != 7 || summary.Protocol.UpstreamClientDataDeviceOS != 1 || summary.Protocol.ClientDataDeviceOSMatch == nil || *summary.Protocol.ClientDataDeviceOSMatch {
+		t.Fatalf("client data protocol summary = %#v", summary.Protocol)
 	}
 	if !summary.Session.UpstreamConnected || !summary.Session.Negotiated || !summary.Session.Spawned || !summary.Session.Closed || summary.Session.GameDataViews != 1 || summary.Session.RawPacketEvents != 1 || summary.Session.ErrorEvents != 1 {
 		t.Fatalf("session summary = %#v", summary.Session)
