@@ -66,7 +66,7 @@ func TestViewerServesFilteredEventsAndBlobPreview(t *testing.T) {
 	if response.StatusCode != http.StatusOK || !strings.Contains(string(index), "Capture Viewer") {
 		t.Fatalf("index status = %d, body = %s", response.StatusCode, index)
 	}
-	for _, marker := range []string{`href="assets/app.css"`, `src="assets/app.js"`, `id="direction"`, `id="packet"`, `id="kind"`, `id="channel"`, `id="bytes-panel"`, `id="bytes-toggle"`, `aria-expanded="false"`, `id="hex-view" class="hex-view" hidden`, "BedrockDebugProxy", "Ordered stream", "Decoded view", "Raw evidence"} {
+	for _, marker := range []string{`href="assets/app.css"`, `src="assets/app.js"`, `href="assets/favicon-32x32.png"`, `href="assets/favicon.ico"`, `href="assets/apple-touch-icon.png"`, `href="assets/site.webmanifest"`, `id="direction"`, `id="packet"`, `id="kind"`, `id="channel"`, `id="bytes-panel"`, `id="bytes-toggle"`, `aria-expanded="false"`, `id="hex-view" class="hex-view" hidden`, "BedrockDebugProxy", "Ordered stream", "Decoded view", "Raw evidence"} {
 		if !strings.Contains(string(index), marker) {
 			t.Fatalf("index is missing viewer marker %q", marker)
 		}
@@ -200,13 +200,25 @@ func TestViewerServesEmbeddedFontAssets(t *testing.T) {
 		prefix      string
 		sha256      string
 	}{
+		{path: "favicon-16x16.png", contentType: "image/png", prefix: "\x89PNG\r\n\x1a\n", sha256: "221dc39a54736e4858934b808210f8cdec08b2eeb86f73b919705aab48166fcc"},
+		{path: "favicon-32x32.png", contentType: "image/png", prefix: "\x89PNG\r\n\x1a\n", sha256: "a665788fd84c8a293a25719101354b411d951bebf7cc958200f245b279ac55ee"},
+		{path: "favicon.ico", contentType: "image/x-icon", prefix: "\x00\x00\x01\x00", sha256: "18fa56a2443be147555797ce573e5922cd371183cf81acfe5f40e760335d0763"},
+		{path: "apple-touch-icon.png", contentType: "image/png", prefix: "\x89PNG\r\n\x1a\n", sha256: "f5012c266c3f17118b9bc2aea0a231b667d800c683f422ce30680e8dcac47d56"},
+		{path: "android-chrome-192x192.png", contentType: "image/png", prefix: "\x89PNG\r\n\x1a\n", sha256: "60e1934ee8c6ddf03d55d6cf73304ba7b2d61a39c0f768df4a834b9e6c1757db"},
+		{path: "android-chrome-512x512.png", contentType: "image/png", prefix: "\x89PNG\r\n\x1a\n", sha256: "21b1cbd71b4a8f46320e80a3f121010e49acdcf74afdfe1001a75ea7498253a0"},
+		{path: "android-chrome-512x512-maskable.png", contentType: "image/png", prefix: "\x89PNG\r\n\x1a\n", sha256: "21b1cbd71b4a8f46320e80a3f121010e49acdcf74afdfe1001a75ea7498253a0"},
+		{path: "site.webmanifest", contentType: "application/manifest+json", prefix: "{", sha256: ""},
 		{path: "Monocraft.ttf", contentType: "font/ttf", prefix: "\x00\x01\x00\x00", sha256: "262e31822e0a75be567b02320bfa092143d871e8a273e529d1c5ab0c04cd215f"},
 		{path: "Minecraft-Bold.otf", contentType: "font/otf", prefix: "OTTO", sha256: "2a7216d047fd2991aa8a2fcbc002e0782a903d68de3cc248092ffa88aa941b4f"},
 		{path: "OFL-1.1.txt", contentType: "text/plain; charset=utf-8", prefix: "Monocraft\n"},
 	}
 	for _, test := range tests {
 		t.Run(test.path, func(t *testing.T) {
-			response := get(t, server.URL+"/font-token/assets/fonts/"+test.path)
+			assetPath := "/font-token/assets/fonts/" + test.path
+			if !strings.HasSuffix(test.path, ".ttf") && !strings.HasSuffix(test.path, ".otf") && test.path != "OFL-1.1.txt" {
+				assetPath = "/font-token/assets/" + test.path
+			}
+			response := get(t, server.URL+assetPath)
 			body, err := io.ReadAll(response.Body)
 			if err != nil {
 				t.Fatal(err)
@@ -231,6 +243,15 @@ func TestViewerServesEmbeddedFontAssets(t *testing.T) {
 				t.Fatalf("Content-Security-Policy = %q, want a self-only font source", got)
 			}
 		})
+	}
+	manifestResponse := get(t, server.URL+"/font-token/assets/site.webmanifest")
+	manifest, err := io.ReadAll(manifestResponse.Body)
+	if err != nil {
+		t.Fatal(err)
+	}
+	_ = manifestResponse.Body.Close()
+	if !strings.Contains(string(manifest), `"start_url": "../"`) || !strings.Contains(string(manifest), `"scope": "../"`) || !strings.Contains(string(manifest), `"theme_color": "#080c14"`) {
+		t.Fatalf("manifest does not target the token-scoped dark viewer root: %s", manifest)
 	}
 }
 
