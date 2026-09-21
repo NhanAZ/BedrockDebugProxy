@@ -88,7 +88,39 @@ func (n Network) DialContextIdentity(ctx context.Context, address, token string,
 }
 
 func (n Network) PingContext(ctx context.Context, address string) ([]byte, error) {
-	return n.transport().PingContext(ctx, address)
+	started := time.Now()
+	response, operationErr := n.transport().PingContext(ctx, address)
+	data, _ := json.Marshal(map[string]any{
+		"address":        address,
+		"response_bytes": len(response),
+		"duration_nano":  time.Since(started).Nanoseconds(),
+	})
+	event := capture.Event{
+		SessionID:    n.SessionID,
+		ConnectionID: n.connectionID(),
+		Hop:          n.hop(),
+		Kind:         "transport.ping",
+		Severity:     capture.SeverityInfo,
+		Direction:    capture.DirectionInternal,
+		Channel:      n.Channel,
+		Stage:        "post_transport_ping",
+		Data:         data,
+	}
+	if operationErr != nil {
+		event.Severity = capture.SeverityError
+		event.Error = captureError("ping", operationErr)
+	}
+	_, captureErr := n.Recorder.Record(context.Background(), capture.Record{
+		Event:          event,
+		Raw:            response,
+		MediaType:      "application/octet-stream",
+		Representation: "bedrock_transport_ping",
+	})
+	if captureErr != nil {
+		n.Failures.Set(captureErr)
+		captureErr = fmt.Errorf("capture transport ping: %w", captureErr)
+	}
+	return response, errors.Join(operationErr, captureErr)
 }
 
 func (n Network) Listen(address string) (minecraft.NetworkListener, error) {

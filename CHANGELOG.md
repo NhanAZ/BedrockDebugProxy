@@ -35,6 +35,7 @@ Detailed rationale remains in [`docs/audits/`](docs/audits/).
 - URL-prefetched resource-pack requests now stop when their connection context is canceled, so closed sessions do not keep CDN fetches alive through the outer timeout.
 - Early-login resource-pack and upstream work now uses the listener connection context before the observing wrapper is accepted, so a client disconnect during login cancels in-flight work promptly.
 - The observing transport wrapper now preserves NetherNet's authenticated public-key capability so gophertunnel can retain its transport-to-login identity check.
+- Transport status-ping responses are now retained as raw `transport.ping` evidence, including partial responses and operation errors.
 - Downstream resource-pack offers now retain per-pack content identity, sub-pack, script, addon, and RTX metadata while still rebuilding entries from proxy-served archives.
 - Terminating bridges now retain and reuse raw `DimensionData` and `ItemRegistry` startup packets when the downstream protocol matches, avoiding wire differences caused by typed re-serialization of NBT maps.
 - Terminating bridges now forward each observed downstream `RequestChunkRadius` to the paired upstream connection while retaining the existing 16/16 initial fallback.

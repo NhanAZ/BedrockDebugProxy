@@ -14,6 +14,7 @@ import (
 	"time"
 
 	"github.com/NhanAZ/BedrockDebugProxy/internal/capture"
+	"github.com/sandertv/gophertunnel/minecraft"
 )
 
 func TestObservedConnPreservesPacketReadsContextAndLatency(t *testing.T) {
@@ -190,6 +191,94 @@ func TestObservedConnPreservesTransportCapabilities(t *testing.T) {
 	}
 }
 
+func TestNetworkPingCapturesResponseBytes(t *testing.T) {
+	root := filepath.Join(t.TempDir(), "capture")
+	recorder, err := capture.New(root, capture.Options{})
+	if err != nil {
+		t.Fatal(err)
+	}
+	response := []byte("MCPE;local;1;2;3;4;5;6;7;19132;")
+	network := Network{
+		Transport:    &fakePingNetwork{response: response},
+		Recorder:     recorder,
+		Failures:     &FailureSink{},
+		SessionID:    "session-test",
+		ConnectionID: "connection-test",
+		Channel:      "upstream",
+		Hop:          2,
+	}
+	got, err := network.PingContext(context.Background(), "example.test:19132")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if string(got) != string(response) {
+		t.Fatalf("ping response = %q, want %q", got, response)
+	}
+	if err := recorder.Close("closed", nil); err != nil {
+		t.Fatal(err)
+	}
+
+	var event capture.Event
+	if err := capture.ScanEvents(root, func(candidate capture.Event) error {
+		if candidate.Kind == "transport.ping" {
+			event = candidate
+		}
+		return nil
+	}); err != nil {
+		t.Fatal(err)
+	}
+	if event.Kind != "transport.ping" || event.Direction != capture.DirectionInternal || event.Channel != "upstream" || event.Hop != 2 {
+		t.Fatalf("ping event = %#v", event)
+	}
+	if event.Blob == nil || event.Blob.Size != int64(len(response)) || event.Blob.Representation != "bedrock_transport_ping" {
+		t.Fatalf("ping blob = %#v", event.Blob)
+	}
+	var data map[string]any
+	if err := json.Unmarshal(event.Data, &data); err != nil {
+		t.Fatal(err)
+	}
+	if data["address"] != "example.test:19132" || data["response_bytes"] != float64(len(response)) {
+		t.Fatalf("ping data = %#v", data)
+	}
+}
+
+func TestNetworkPingCapturesFailure(t *testing.T) {
+	root := filepath.Join(t.TempDir(), "capture")
+	recorder, err := capture.New(root, capture.Options{})
+	if err != nil {
+		t.Fatal(err)
+	}
+	pingErr := errors.New("ping timeout")
+	network := Network{
+		Transport: &fakePingNetwork{response: []byte("partial"), err: pingErr},
+		Recorder:  recorder,
+		Failures:  &FailureSink{},
+	}
+	response, err := network.PingContext(context.Background(), "example.test:19132")
+	if !errors.Is(err, pingErr) {
+		t.Fatalf("ping error = %v", err)
+	}
+	if string(response) != "partial" {
+		t.Fatalf("partial response = %q", response)
+	}
+	if err := recorder.Close("closed", pingErr); err != nil {
+		t.Fatal(err)
+	}
+
+	var event capture.Event
+	if err := capture.ScanEvents(root, func(candidate capture.Event) error {
+		if candidate.Kind == "transport.ping" {
+			event = candidate
+		}
+		return nil
+	}); err != nil {
+		t.Fatal(err)
+	}
+	if event.Severity != capture.SeverityError || event.Error == nil || event.Error.Operation != "ping" {
+		t.Fatalf("ping failure event = %#v", event)
+	}
+}
+
 func TestObservedConnReportsTransferredBytesWhenCaptureFails(t *testing.T) {
 	recorder, err := capture.New(filepath.Join(t.TempDir(), "capture"), capture.Options{})
 	if err != nil {
@@ -242,6 +331,23 @@ type fakeCapabilityConn struct {
 func (*fakeCapabilityConn) BatchHeader() []byte           { return nil }
 func (*fakeCapabilityConn) DisableEncryption() bool       { return true }
 func (c *fakeCapabilityConn) PublicKey() *ecdsa.PublicKey { return c.publicKey }
+
+type fakePingNetwork struct {
+	response []byte
+	err      error
+}
+
+func (*fakePingNetwork) DialContext(context.Context, string) (net.Conn, error) {
+	return nil, errors.New("fake ping network does not dial")
+}
+
+func (n *fakePingNetwork) PingContext(context.Context, string) ([]byte, error) {
+	return append([]byte(nil), n.response...), n.err
+}
+
+func (*fakePingNetwork) Listen(string) (minecraft.NetworkListener, error) {
+	return nil, errors.New("fake ping network does not listen")
+}
 
 func (c *fakePacketConn) Read(buffer []byte) (int, error) {
 	if c.closed {
