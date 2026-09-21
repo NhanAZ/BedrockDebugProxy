@@ -646,6 +646,14 @@ Every new entry should state the symptom, root cause, implementation commits, ev
 - Evidence and validation: `TestRunnerPreservesMixedResourcePackOfferOrder` now supplies non-default metadata for URL and RakNet entries and verifies every preserved field across the proxy boundary. The resource-pack negotiation research note records the matching boundary.
 - Status: implemented with focused automated coverage. Real-client encrypted and mixed-offer validation remains pending.
 
+### FIX-0081 - Record client cache parity boundary
+
+- Symptom: completed Windows client captures consistently showed `ClientCacheStatus=true` downstream and `false` upstream.
+- Root cause: the listener learns the downstream cache value only after sending `ResourcePacksInfo`, while the upstream Dialer must send its value before receiving upstream `ResourcePacksInfo`. The proxy leaves `Dialer.EnableClientCache` at its false zero value.
+- Implementation: add [`docs/research/client-cache-parity.md`](research/client-cache-parity.md) with raw packet evidence, the gophertunnel source path, and the startup ordering boundary. No runtime behavior is changed.
+- Evidence and validation: `captures/session-20260921T122228Z` contains downstream ID 129 payload `01` and upstream ID 129 payload `00`; the closed session also records both booleans in `session.spawned`. This is a documentation-only research update.
+- Status: confirmed parity difference, intentionally left as an explicit architecture boundary until an owner-controlled cache-enabled loopback can validate a safe redesign.
+
 ## Ordering safety contract
 
 The deferred-packet change is deliberately narrow. `expectedIDs` remains the only authority for what the current login state accepts. The queue scan selects the earliest packet that is currently expected, leaves packets for later states queued, and never mutates or reorders bytes on the wire. The regression tests cover canonical resource-pack order, featured early `ResourcePacksInfo`, a later-phase packet queued ahead of the current phase, and all six permutations of the three login packets.
