@@ -582,6 +582,14 @@ Every new entry should state the symptom, root cause, implementation commits, ev
 - Evidence and validation: the build script's dirty-tree guard reports these exact files before the change. No runtime code, capture data, or protocol behavior changes.
 - Status: implemented as a workflow-only correction.
 
+### FIX-0072 - Remove operator-specific LAN address examples
+
+- Symptom: copy-paste validation and transfer examples used `192.168.1.10`, which may not exist on the operator's machine and causes the listener bind to fail.
+- Root cause: documentation used one historical LAN address instead of a placeholder that requires the current host address.
+- Implementation: replace the hardcoded address in README, validation, and release examples with `<LAN_IP>` while retaining wildcard and loopback examples where their semantics are intentional.
+- Evidence and validation: the documented bind error occurs when an address is not assigned locally. This is documentation-only and does not change listener validation or network behavior.
+- Status: implemented as a documentation correction.
+
 ## Ordering safety contract
 
 The deferred-packet change is deliberately narrow. `expectedIDs` remains the only authority for what the current login state accepts. The queue scan selects the earliest packet that is currently expected, leaves packets for later states queued, and never mutates or reorders bytes on the wire. The regression tests cover canonical resource-pack order, featured early `ResourcePacksInfo`, a later-phase packet queued ahead of the current phase, and all six permutations of the three login packets.
