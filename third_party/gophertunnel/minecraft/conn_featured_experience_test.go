@@ -175,6 +175,72 @@ func TestHandleKeepsLaterPhasePacketsUntilTheirState(t *testing.T) {
 	}
 }
 
+func TestHandleStartGamePreservesCompletePacketForBridge(t *testing.T) {
+	conn := newLoginTestConn()
+	conn.expectedIDs.Store([]uint32{packet.IDStartGame})
+	original := &packet.StartGame{
+		WorldName:                    "complete-start-game",
+		Generator:                    3,
+		AchievementsDisabled:         false,
+		EducationFeaturesEnabled:     false,
+		MultiPlayerGame:              false,
+		LANBroadcastEnabled:          false,
+		CommandsEnabled:              false,
+		ExperimentsPreviouslyToggled: true,
+		BonusChestEnabled:            true,
+		StartWithMapEnabled:          true,
+		ServerChunkTickRadius:        7,
+		HasLockedBehaviourPack:       true,
+		LevelID:                      "level-id",
+		TemplateContentIdentity:      "template-id",
+		Trial:                        true,
+		EnchantmentSeed:              17,
+		MultiPlayerCorrelationID:     "correlation-id",
+		GameVersion:                  "1.26.51",
+		ServerAuthoritativeSound:     true,
+		ServerID:                     "server-id",
+		ScenarioID:                   "scenario-id",
+		WorldID:                      "world-id",
+		OwnerID:                      "owner-id",
+	}
+
+	if err := conn.handle(wirePacketData(t, original)); err != nil {
+		t.Fatalf("handle StartGame: %v", err)
+	}
+	got := conn.GameData().StartGamePacket
+	if got == nil {
+		t.Fatal("GameData.StartGamePacket is nil")
+	}
+	for name, value := range map[string][2]any{
+		"WorldName":                    {got.WorldName, original.WorldName},
+		"Generator":                    {got.Generator, original.Generator},
+		"EducationFeaturesEnabled":     {got.EducationFeaturesEnabled, original.EducationFeaturesEnabled},
+		"MultiPlayerGame":              {got.MultiPlayerGame, original.MultiPlayerGame},
+		"LANBroadcastEnabled":          {got.LANBroadcastEnabled, original.LANBroadcastEnabled},
+		"CommandsEnabled":              {got.CommandsEnabled, original.CommandsEnabled},
+		"ExperimentsPreviouslyToggled": {got.ExperimentsPreviouslyToggled, original.ExperimentsPreviouslyToggled},
+		"BonusChestEnabled":            {got.BonusChestEnabled, original.BonusChestEnabled},
+		"StartWithMapEnabled":          {got.StartWithMapEnabled, original.StartWithMapEnabled},
+		"ServerChunkTickRadius":        {got.ServerChunkTickRadius, original.ServerChunkTickRadius},
+		"HasLockedBehaviourPack":       {got.HasLockedBehaviourPack, original.HasLockedBehaviourPack},
+		"LevelID":                      {got.LevelID, original.LevelID},
+		"TemplateContentIdentity":      {got.TemplateContentIdentity, original.TemplateContentIdentity},
+		"Trial":                        {got.Trial, original.Trial},
+		"EnchantmentSeed":              {got.EnchantmentSeed, original.EnchantmentSeed},
+		"MultiPlayerCorrelationID":     {got.MultiPlayerCorrelationID, original.MultiPlayerCorrelationID},
+		"GameVersion":                  {got.GameVersion, original.GameVersion},
+		"ServerAuthoritativeSound":     {got.ServerAuthoritativeSound, original.ServerAuthoritativeSound},
+		"ServerID":                     {got.ServerID, original.ServerID},
+		"ScenarioID":                   {got.ScenarioID, original.ScenarioID},
+		"WorldID":                      {got.WorldID, original.WorldID},
+		"OwnerID":                      {got.OwnerID, original.OwnerID},
+	} {
+		if value[0] != value[1] {
+			t.Fatalf("preserved StartGame field %s = %v, want %v", name, value[0], value[1])
+		}
+	}
+}
+
 func newLoginTestConn() *Conn {
 	return &Conn{
 		ctx:   context.Background(),
