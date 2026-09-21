@@ -19,6 +19,7 @@ Detailed rationale remains in [`docs/audits/`](docs/audits/).
 - Terminating bridges now retain and reuse the complete decoded upstream `StartGame` packet when sending world-start data downstream, instead of replacing fields outside the compact `GameData` view with proxy defaults.
 - Startup `JigsawStructureData` and `VoxelShapes` packets are now retained from the upstream login and sent once with their original decoded contents instead of being duplicated around the generated spawn sequence.
 - Terminating bridges now retain and reuse the complete upstream `ResourcePackStack`, preserving its pack order, base game version, experiments, and stack flags instead of appending local exempted packs.
+- Terminating bridges now preserve decoded upstream `ResourcePacksInfo` offer metadata while rebuilding downstream pack entries from archive-backed resources that the proxy can serve.
 - The capture viewer retains the OFL-licensed fan-made font assets without contacting a font CDN. Visible text uses regular Monocraft and can resolve a separately installed Minecraft Ten before the embedded fallback.
 - The capture viewer now uses one 12px normal-weight scale for all visible text, removes forced uppercase styling, and keeps labels in natural casing.
 - The capture viewer now stacks the event stream, decoded details, and raw evidence in one scrollable column instead of splitting the workspace into two columns.

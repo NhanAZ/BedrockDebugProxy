@@ -494,6 +494,14 @@ Every new entry should state the symptom, root cause, implementation commits, ev
 - Evidence and validation: [`docs/research/resource-pack-stack-parity.md`](research/resource-pack-stack-parity.md), the nested retention test, and the proxy loopback integration test with non-default stack metadata.
 - Status: implemented for the exact stack boundary. `ResourcePacksInfo` offer-policy mirroring remains a separate documented limitation.
 
+### FIX-0062 - Preserve upstream resource-pack offer metadata
+
+- Symptom: the owner-controlled PocketMine capture `session-20260921T003441Z` carried an upstream `ResourcePacksInfo` payload whose `TexturePackRequired` flag was false, while the downstream listener-generated payload forced it to true.
+- Root cause: the dialled connection decoded `ResourcePacksInfo` for pack delivery but discarded its offer metadata. The listener therefore used only its static required and vibrant-visuals policy.
+- Implementation: retain a cloned upstream `ResourcePacksInfo` on dialled `GameData`, add a listener callback for per-connection offer metadata, and have the proxy preserve the metadata while rebuilding only the archive-backed `TexturePacks` entries that it can serve.
+- Evidence and validation: the local capture above, the proxy loopback integration test with non-default optional-offer metadata, and the resource-pack negotiation research note.
+- Status: implemented for decoded offer metadata. URL entries remain intentionally removed from downstream copies because the proxy delivers pack bytes over its own RakNet connection.
+
 ## Ordering safety contract
 
 The deferred-packet change is deliberately narrow. `expectedIDs` remains the only authority for what the current login state accepts. The queue scan selects the earliest packet that is currently expected, leaves packets for later states queued, and never mutates or reorders bytes on the wire. The regression tests cover canonical resource-pack order, featured early `ResourcePacksInfo`, a later-phase packet queued ahead of the current phase, and all six permutations of the three login packets.

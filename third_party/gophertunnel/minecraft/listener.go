@@ -103,6 +103,12 @@ type ListenConfig struct {
 	// If set, it will be called before sending the ResourcePacksInfo packet. The returned resource packs
 	// will be forwarded to the client in place of the Listener's current ones.
 	FetchResourcePacks func(identityData login.IdentityData, clientData login.ClientData, current []*resource.Pack) []*resource.Pack
+	// FetchResourcePacksInfo selects metadata for the ResourcePacksInfo packet
+	// sent to a client. When non-nil, the returned metadata is preserved while
+	// the TexturePacks list is rebuilt from the packs selected by
+	// FetchResourcePacks. This allows a terminating bridge to retain upstream
+	// offer policy without forwarding unusable URLs or stale pack entries.
+	FetchResourcePacksInfo func(identityData login.IdentityData, clientData login.ClientData) *packet.ResourcePacksInfo
 	// FetchResourcePackStack determines the ResourcePackStack sent after the
 	// client has downloaded the offered packs. If it returns nil, the listener
 	// builds its normal stack from the downloaded packs.
@@ -436,6 +442,7 @@ func (listener *Listener) createConn(netConn net.Conn) {
 	conn.forceDisableVibrantVisuals = listener.cfg.ForceDisableVibrantVisuals
 	conn.resourcePacks = packs
 	conn.fetchResourcePacks = listener.cfg.FetchResourcePacks
+	conn.fetchResourcePacksInfo = listener.cfg.FetchResourcePacksInfo
 	conn.fetchResourcePackStack = listener.cfg.FetchResourcePackStack
 	conn.resourcePackDelivery = listener.cfg.ResourcePackDelivery.normalized()
 	conn.gameData.WorldName = listener.status().ServerName

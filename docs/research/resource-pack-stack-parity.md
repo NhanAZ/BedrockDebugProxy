@@ -30,4 +30,4 @@ The retained value is cloned at both connection boundaries. The fix preserves te
 
 ## Limitations
 
-`ResourcePacksInfo` remains subject to the explicit downstream delivery policy because the public listener API does not expose every upstream offer flag. URL offers still require archive-backed downstream delivery so the client receives bytes through the proxy connection. These are separate resource-pack boundaries from `ResourcePackStack` preservation.
+`ResourcePacksInfo` metadata is now retained on dialled `GameData` and can be supplied to the listener through a narrow callback. The listener still rebuilds the pack entries from archive-backed resources so it does not forward stale URLs or entries it cannot serve. Standalone listener callers without an upstream offer continue to use their configured policy. These are separate resource-pack boundaries from `ResourcePackStack` preservation.
