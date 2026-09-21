@@ -36,6 +36,10 @@ After the fix was rebuilt into `bin/bedrock-debug-proxy.exe`, the real Windows B
 
 The closed ProxyFingerprint report for this run contained no `auth_client_playfab_mismatch` signal. Its only heuristic signals were `non_public_peer` and `non_full_authentication`, both expected for the loopback server configured with `xbox-auth=off` and `verify-xuid=false`. The upstream self-signed identity fields were empty while the forwarded ClientData remained structurally valid. This is evidence that the local offline identity-parity defect is fixed for a real vanilla client. It is not evidence about a public server's anti-cheat or acceptance policy.
 
+## Authenticated upstream boundary
+
+The authenticated path has a separate, source-backed boundary. Sandertv/gophertunnel at immutable commit [`7a556a07335b663744b50d38062636ad8283f314`](https://github.com/Sandertv/gophertunnel/blob/7a556a07335b663744b50d38062636ad8283f314/minecraft/dial.go) still calls `setAndroidData` before encoding an authenticated login because the XBL chain's title ID cannot be edited. That dialer creates a new signed upstream session from the token source. Preserving the downstream device metadata without also changing the signed chain would create an internal metadata contradiction, not a vanilla-equivalent login. This project therefore keeps the upstream behavior and treats authenticated two-session parity as an architectural limitation requiring an authorized server-side test, not a target for heuristic evasion.
+
 ## Validation
 
 - `go test ./internal/proxy -run '^TestRunnerForwardsBidirectionalPacketsAndCapturesSession$' -count=1 -v` passed after the regression assertion was added.
