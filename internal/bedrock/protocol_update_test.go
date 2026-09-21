@@ -9,16 +9,16 @@ import (
 	"github.com/sandertv/gophertunnel/minecraft/protocol/packet"
 )
 
-func TestProtocolVersion12650(t *testing.T) {
+func TestProtocolVersion12651(t *testing.T) {
 	if got, want := protocol.CurrentProtocol, 2193; got != want {
 		t.Fatalf("protocol ID = %d, want %d", got, want)
 	}
-	if got, want := protocol.CurrentVersion, "1.26.50"; got != want {
+	if got, want := protocol.CurrentVersion, "1.26.51"; got != want {
 		t.Fatalf("game version = %q, want %q", got, want)
 	}
 }
 
-func TestProtocol12650PacketRegistration(t *testing.T) {
+func TestProtocol12651PacketRegistration(t *testing.T) {
 	if got, want := packet.IDSetPlayerFurnaceOptions, 351; got != want {
 		t.Fatalf("SetPlayerFurnaceOptions packet ID = %d, want %d", got, want)
 	}

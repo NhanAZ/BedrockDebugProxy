@@ -13,6 +13,7 @@ Detailed rationale remains in [`docs/audits/`](docs/audits/).
 ### Changed
 
 - `session.negotiated` capture events now distinguish the protocol implementation version from the game version and device OS reported in each connection's `ClientData`, including explicit mismatch booleans for local parity investigations.
+- Updated the compiled Bedrock game-version metadata to 1.26.51 while retaining protocol 2193 and the reviewed 1.26.50 packet definitions. Mojang's 1.26.51 release reports no packet changes, so authenticated upstream login metadata now advertises 1.26.51 without changing forwarded packet bytes.
 - Unauthenticated upstream dials now preserve the downstream client's identity instead of falling back to gophertunnel's default `Steve` identity. Xbox-authenticated dials continue to use the identity from the authentication chain.
 - The capture viewer retains the OFL-licensed fan-made font assets without contacting a font CDN. Visible text uses regular Monocraft and can resolve a separately installed Minecraft Ten before the embedded fallback.
 - The capture viewer now uses one 12px normal-weight scale for all visible text, removes forced uppercase styling, and keeps labels in natural casing.

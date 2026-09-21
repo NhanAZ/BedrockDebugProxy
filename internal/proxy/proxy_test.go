@@ -96,7 +96,7 @@ func isIntegrationPlayerSkin(skin *packet.PlayerSkin) bool {
 func integrationClientData() login.ClientData {
 	return login.ClientData{
 		DeviceOS:         protocol.DeviceAndroid,
-		GameVersion:      "1.26.50",
+		GameVersion:      "1.26.51",
 		LanguageCode:     "en_GB",
 		DeviceID:         login.DeviceID("0123456789abcdef0123456789abcdef"),
 		SelfSignedID:     "22222222-2222-4222-8222-222222222222",
@@ -240,7 +240,7 @@ func TestRunnerForwardsBidirectionalPacketsAndCapturesSession(t *testing.T) {
 			return
 		}
 		clientData := serverConn.ClientData()
-		if clientData.DeviceOS != protocol.DeviceAndroid || clientData.GameVersion != "1.26.50" ||
+		if clientData.DeviceOS != protocol.DeviceAndroid || clientData.GameVersion != "1.26.51" ||
 			clientData.LanguageCode != "en_GB" || clientData.DeviceID != login.DeviceID("0123456789abcdef0123456789abcdef") ||
 			clientData.SelfSignedID != "22222222-2222-4222-8222-222222222222" || clientData.PlayFabID != "0123456789abcdef" ||
 			clientData.CurrentInputMode != 2 || clientData.DefaultInputMode != 2 ||
