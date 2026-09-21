@@ -379,6 +379,14 @@ func (r *Runner) Run(ctx context.Context) error {
 			}
 			return state.slot.conn.GameData().ResourcePacksInfo
 		},
+		FetchRawResourcePacksInfo: func(login.IdentityData, login.ClientData) ([]byte, int32) {
+			state := getAcceptState()
+			if state.slot.conn == nil {
+				return nil, 0
+			}
+			gameData := state.slot.conn.GameData()
+			return gameData.RawResourcePacksInfo, gameData.RawProtocolID
+		},
 		FetchResourcePackStack: func(login.IdentityData, login.ClientData) *packet.ResourcePackStack {
 			state := getAcceptState()
 			if state.slot.conn == nil {

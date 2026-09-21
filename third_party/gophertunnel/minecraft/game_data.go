@@ -48,6 +48,11 @@ type GameData struct {
 	// terminating bridge can preserve the offer metadata while rebuilding the
 	// pack entries for downstream delivery.
 	ResourcePacksInfo *packet.ResourcePacksInfo
+	// RawResourcePacksInfo contains the complete wire representation of the
+	// ResourcePacksInfo packet observed during a dialled server's login
+	// exchange. A terminating bridge may use it only when its prepared
+	// downstream offer is equivalent and the protocol matches.
+	RawResourcePacksInfo []byte
 	// ResourcePackStack contains the complete stack packet observed during a
 	// dialled server's login exchange. It is retained so a terminating bridge
 	// can offer the same stack to its downstream client.

@@ -11,6 +11,7 @@ import (
 	"testing"
 
 	"github.com/sandertv/gophertunnel/minecraft/protocol"
+	"github.com/sandertv/gophertunnel/minecraft/protocol/login"
 	"github.com/sandertv/gophertunnel/minecraft/protocol/packet"
 )
 
@@ -106,6 +107,52 @@ func TestDeferredResourcePackOfferWaitsForClientCacheStatus(t *testing.T) {
 				t.Fatalf("unexpected login state after deferred offer: %#v", conn.expectedIDs.Load())
 			}
 		})
+	}
+}
+
+func TestResourcePacksInfoRetainsAndReusesEquivalentRawBytes(t *testing.T) {
+	info := &packet.ResourcePacksInfo{
+		TexturePackRequired:        false,
+		HasAddons:                  true,
+		HasScripts:                 true,
+		ForceDisableVibrantVisuals: true,
+	}
+	raw := wirePacketData(t, info)
+
+	dialled := newLoginTestConn()
+	if err := dialled.handleResourcePacksInfo(info, raw); err != nil {
+		t.Fatalf("handle ResourcePacksInfo: %v", err)
+	}
+	if !bytes.Equal(dialled.gameData.RawResourcePacksInfo, raw.full) {
+		t.Fatal("dialled connection did not retain ResourcePacksInfo bytes")
+	}
+
+	listener := newLoginTestConn()
+	listener.fetchResourcePacksInfo = func(login.IdentityData, login.ClientData) *packet.ResourcePacksInfo {
+		return info
+	}
+	listener.fetchRawResourcePacksInfo = func(login.IdentityData, login.ClientData) ([]byte, int32) {
+		return raw.full, DefaultProtocol.ID()
+	}
+	if err := listener.sendResourcePackOffer(); err != nil {
+		t.Fatalf("send ResourcePacksInfo: %v", err)
+	}
+	if len(listener.bufferedSend) != 1 || !bytes.Equal(listener.bufferedSend[0], raw.full) {
+		t.Fatalf("listener offer bytes = %x, want retained %x", listener.bufferedSend, raw.full)
+	}
+
+	fallback := newLoginTestConn()
+	fallback.fetchResourcePacksInfo = func(login.IdentityData, login.ClientData) *packet.ResourcePacksInfo {
+		return &packet.ResourcePacksInfo{TexturePackRequired: true}
+	}
+	fallback.fetchRawResourcePacksInfo = func(login.IdentityData, login.ClientData) ([]byte, int32) {
+		return raw.full, DefaultProtocol.ID()
+	}
+	if err := fallback.sendResourcePackOffer(); err != nil {
+		t.Fatalf("send changed ResourcePacksInfo: %v", err)
+	}
+	if len(fallback.bufferedSend) != 1 || bytes.Equal(fallback.bufferedSend[0], raw.full) {
+		t.Fatal("changed typed offer incorrectly reused retained raw bytes")
 	}
 }
 
