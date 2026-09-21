@@ -5,6 +5,7 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
 	"net/http"
@@ -278,6 +279,35 @@ func TestURLResourcePackCacheMergePreservesMixedOfferOrder(t *testing.T) {
 		if merged[index].UUID() != want {
 			t.Fatalf("merged pack %d = %s, want %s", index, merged[index].UUID(), want)
 		}
+	}
+}
+
+func TestURLResourcePackCacheStoreClearsPreviousPrefetchError(t *testing.T) {
+	packUUID := uuid.MustParse("11111111-1111-1111-1111-111111111111")
+	archive := testURLResourcePackArchive(t)
+	pack, err := resource.Read(bytes.NewReader(archive))
+	if err != nil {
+		t.Fatal(err)
+	}
+	key := minecraft.ResourcePackCacheKey{UUID: packUUID, Version: "1.0.0", Size: uint64(len(archive))}
+	if !key.Matches(pack) {
+		t.Fatalf("test pack does not match key: %#v", key)
+	}
+
+	cache := newURLResourcePackCache(context.Background())
+	cache.mu.Lock()
+	cache.errors[key] = errors.New("synthetic URL prefetch failure")
+	cache.mu.Unlock()
+
+	if err := cache.Store(context.Background(), key, pack); err != nil {
+		t.Fatalf("store fallback pack: %v", err)
+	}
+	got, err := cache.Load(context.Background(), key)
+	if err != nil {
+		t.Fatalf("load stored fallback pack: %v", err)
+	}
+	if got == nil || !key.Matches(got) {
+		t.Fatalf("loaded fallback pack = %#v, want a matching pack", got)
 	}
 }
 

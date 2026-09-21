@@ -846,6 +846,14 @@ Every new entry should state the symptom, root cause, implementation commits, ev
 - Evidence and validation: the listener callback boundary and retained-stack source path establish that the prepared value is the authority for the current connection. Focused nested tests cover exact raw reuse with trailing bytes and typed fallback for a changed stack. No capture schema or packet policy changed.
 - Status: implemented with deterministic local coverage. Real-client validation remains pending for current stamped binaries.
 
+### FIX-0106 - Clear recovered resource-pack cache failures
+
+- Symptom: after a URL resource-pack download failed, a later RakNet fallback could store a valid matching archive while the per-connection cache still returned the stale URL error for that key.
+- Root cause: `urlResourcePackCache.Store` replaced the pack map entry but did not remove the corresponding non-fatal error recorded by the URL prefetch worker.
+- Implementation: delete the cached error when `Store` accepts a matching pack. The normal gophertunnel fallback remains unchanged, and the original URL failure stays visible in the operator warning and raw offer evidence.
+- Evidence and validation: the `ResourcePackCache` contract defines load errors as non-fatal misses and successful stores as future cache hits. A focused regression test stores a valid pack after a synthetic prefetch error and verifies that `Load` returns the pack without an error.
+- Status: implemented with deterministic local coverage. Real-client URL-failure and RakNet-fallback validation remains pending.
+
 ## Ordering safety contract
 
 The deferred-packet change is deliberately narrow. `expectedIDs` remains the only authority for what the current login state accepts. The queue scan selects the earliest packet that is currently expected, leaves packets for later states queued, and never mutates or reorders bytes on the wire. The regression tests cover canonical resource-pack order, featured early `ResourcePacksInfo`, a later-phase packet queued ahead of the current phase, and all six permutations of the three login packets.
