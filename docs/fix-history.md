@@ -846,6 +846,14 @@ Every new entry should state the symptom, root cause, implementation commits, ev
 - Evidence and validation: the existing resource-pack stack boundary and same-protocol raw-forwarding decision establish the safety constraints. Nested gophertunnel tests cover retention and exact reuse, and the root loopback integration test verifies downstream raw bytes. No capture schema or packet policy changed.
 - Status: implemented with deterministic local coverage. Mixed URL and encrypted real-client resource-pack validation remains pending.
 
+### FIX-0105 - Validate retained resource-pack stack fields
+
+- Symptom: the listener selected retained `ResourcePackStack` bytes solely from protocol provenance, so a callback that prepared a different typed stack could still send stale retained fields.
+- Root cause: the raw stack path validated only the packet ID and protocol. It did not compare the retained known fields with the stack selected for the current downstream connection.
+- Implementation: decode the known stack fields before raw reuse and require them to match the prepared typed stack. Allow unread trailing bytes so fields introduced by a newer protocol revision remain observable and are forwarded unchanged. Use the existing typed path when the known fields differ or decoding fails.
+- Evidence and validation: the listener callback boundary and retained-stack source path establish that the prepared value is the authority for the current connection. Focused nested tests cover exact raw reuse with trailing bytes and typed fallback for a changed stack. No capture schema or packet policy changed.
+- Status: implemented with deterministic local coverage. Real-client validation remains pending for current stamped binaries.
+
 ## Ordering safety contract
 
 The deferred-packet change is deliberately narrow. `expectedIDs` remains the only authority for what the current login state accepts. The queue scan selects the earliest packet that is currently expected, leaves packets for later states queued, and never mutates or reorders bytes on the wire. The regression tests cover canonical resource-pack order, featured early `ResourcePacksInfo`, a later-phase packet queued ahead of the current phase, and all six permutations of the three login packets.

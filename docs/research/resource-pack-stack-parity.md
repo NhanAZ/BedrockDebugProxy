@@ -18,6 +18,8 @@ The retained value is cloned at both connection boundaries. The fix preserves te
 
 The bridge also retains the complete encoded packet and the protocol ID that produced it. The listener stores that source protocol separately from its downstream `GameData` and, when the upstream and downstream protocol IDs match, validates the packet ID and writes those original bytes. A protocol mismatch selects the cloned typed stack, while an invalid retained packet logs a warning and then uses that same fallback. `ResourcePacksInfo` has the same raw-preservation capability when its prepared downstream payload is equivalent, while URL or offer changes still require its typed rebuild boundary.
 
+Before reusing a retained stack, the listener now decodes and compares the fields known by the current protocol revision with the prepared typed stack. A changed callback result therefore uses the typed fallback instead of sending stale retained bytes. Unread trailing bytes are intentionally allowed after the known fields so a newer optional field remains observable and is forwarded unchanged.
+
 ## Evidence and provenance
 
 - Affected capture: local Hive capture `captures/session-20260920T135412Z`, sequences 979 and 1,183, packet ID 7. The capture remains local sensitive evidence and is not committed.
@@ -27,7 +29,7 @@ The bridge also retains the complete encoded packet and the protocol ID that pro
 ## Validation
 
 - The nested gophertunnel unit test verifies complete-stack retention and slice ownership.
-- The nested gophertunnel unit test verifies complete-stack retention, slice ownership, and exact response bytes.
+- The nested gophertunnel unit test verifies complete-stack retention, slice ownership, exact response bytes, and typed fallback when the prepared stack differs from the retained one.
 - The proxy loopback integration test configures a non-default stack upstream and verifies the same decoded values and retained wire bytes downstream.
 - No public server was contacted for the fix. The capture evidence is a protocol observation, not evidence about any server-side enforcement decision.
 

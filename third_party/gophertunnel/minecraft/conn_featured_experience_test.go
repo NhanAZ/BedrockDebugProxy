@@ -635,6 +635,46 @@ func TestResourcePackResponseWritesRetainedStackBytes(t *testing.T) {
 	}
 }
 
+func TestResourcePackResponseFallsBackWhenRetainedStackDiffers(t *testing.T) {
+	retained := &packet.ResourcePackStack{
+		TexturePackRequired: true,
+		TexturePacks:        []protocol.StackResourcePack{{UUID: "retained-stack", Version: "1"}},
+		BaseGameVersion:     "1.26.51-retained",
+	}
+	prepared := cloneResourcePackStack(retained)
+	prepared.BaseGameVersion = "1.26.51-prepared"
+	raw := wirePacketData(t, retained)
+	var output bytes.Buffer
+	conn := &Conn{
+		ctx:                            context.Background(),
+		log:                            slog.Default(),
+		proto:                          DefaultProtocol,
+		enc:                            packet.NewEncoder(&output),
+		hdr:                            &packet.Header{},
+		resourcePackStack:              prepared,
+		rawResourcePackStack:           append([]byte(nil), raw.full...),
+		rawResourcePackStackProtocolID: DefaultProtocol.ID(),
+	}
+
+	if err := conn.handleResourcePackClientResponse(&packet.ResourcePackClientResponse{Response: packet.PackResponseAllPacksDownloaded}); err != nil {
+		t.Fatalf("handle all-packs-downloaded response: %v", err)
+	}
+	if err := conn.Flush(); err != nil {
+		t.Fatal(err)
+	}
+	decoded, err := packet.NewDecoder(bytes.NewReader(output.Bytes())).Decode()
+	if err != nil {
+		t.Fatalf("decode resource-pack stack: %v", err)
+	}
+	want := wirePacketData(t, prepared)
+	if len(decoded) != 1 || !bytes.Equal(decoded[0], want.full) {
+		t.Fatalf("resource-pack stack bytes = %x, want typed fallback %x", decoded, want.full)
+	}
+	if bytes.Equal(decoded[0], raw.full) {
+		t.Fatal("changed retained ResourcePackStack was forwarded as raw bytes")
+	}
+}
+
 func TestStartGameWritesRetainedStartupPacketBytes(t *testing.T) {
 	jigsaw := &packet.JigsawStructureData{StructureData: map[string]any{
 		"jigsaws": []any{map[string]any{"identifier": "integration:jigsaw"}},
