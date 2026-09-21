@@ -1076,9 +1076,7 @@ func (r *Runner) forward(source, destination *minecraft.Conn, failures *bedrock.
 				rawForward = false
 				rewritten, target, rewriteErr := transferForProxyAddress(transfer, localAddress)
 				if rewriteErr != nil {
-					rawRead.Release()
-					captureErr := r.finishForwardAtHop("bridge.transfer_rewrite_error", direction, sourceChannel, connectionID, hop, "rewrite Transfer", rewriteErr, shuttingDown)
-					return errors.Join(&transferRewriteError{err: rewriteErr}, captureErr)
+					return r.finishTransferRewriteErrorAtHop(rawRead, direction, sourceChannel, connectionID, hop, rewriteErr, shuttingDown)
 				}
 				outgoing = rewritten
 				if err := r.recordTransferRewrite(transfer, rewritten, target, connectionID, hop); err != nil {
@@ -1128,6 +1126,14 @@ func (r *Runner) forward(source, destination *minecraft.Conn, failures *bedrock.
 			}
 		}
 	}
+}
+
+func (r *Runner) finishTransferRewriteErrorAtHop(rawRead *minecraft.PacketRead, direction capture.Direction, sourceChannel, connectionID string, hop int, rewriteErr error, shuttingDown *atomic.Bool) error {
+	if rawRead != nil {
+		rawRead.Release()
+	}
+	captureErr := r.finishForwardAtHop("bridge.transfer_rewrite_error", direction, sourceChannel, connectionID, hop, "rewrite Transfer", rewriteErr, shuttingDown)
+	return errors.Join(&transferRewriteError{err: rewriteErr}, captureErr)
 }
 
 func (r *Runner) finishForward(kind string, direction capture.Direction, sourceChannel, connectionID, operation string, operationErr error, shuttingDown *atomic.Bool) error {

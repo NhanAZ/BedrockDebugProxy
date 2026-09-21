@@ -64,6 +64,8 @@ The observing transport wrapper preserves error provenance at the read and write
 
 The same rule applies when a connection-open event cannot be recorded. The wrapper still closes the newly opened transport and joins any close error with the recorder failure, so a capture failure does not hide a lower-layer shutdown problem.
 
+Transfer rewrite failures follow the same error-preservation rule. The bridge releases a retained raw packet only when one exists, records `bridge.transfer_rewrite_error`, and returns the wrapped rewrite failure. Typed forwarding and raw reads that already exposed a decoded packet have no retained `PacketRead`; they now terminate through the same captured error path without a nil dereference.
+
 ## Representative packet-family coverage
 
 The loopback regression test `TestRunnerForwardsBidirectionalPacketsAndCapturesSession` sends representative packets through both sides of the proxy and checks both forwarding and capture. It covers `PlayerSkin` with skin and cape bytes, `AddActor`, `LevelChunk`, `SubChunkRequest`, `UpdateBlock`, `InventoryContent`, `InventoryTransaction`, `MovePlayer`, and `Emote`.

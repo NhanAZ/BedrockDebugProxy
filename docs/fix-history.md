@@ -878,6 +878,14 @@ Every new entry should state the symptom, root cause, implementation commits, ev
 - Evidence and validation: the wrapper owns the open-event failure path and the regression test uses a closed recorder plus an independent transport close error to verify both remain discoverable.
 - Status: implemented with deterministic local coverage. Live transport-failure behavior remains unverified.
 
+### FIX-0109 - Preserve typed Transfer rewrite failures without a nil raw read
+
+- Symptom: a malformed or unreachable listener address during opt-in Transfer following could panic while handling the rewrite failure when the packet had already been decoded or the typed forwarding path was active.
+- Root cause: the rewrite-error branch unconditionally called `rawRead.Release()`, even though `rawRead` is nil for typed forwarding and for raw reads that already exposed a decoded packet.
+- Implementation: release the raw packet only when one is retained, then record `bridge.transfer_rewrite_error` and return the wrapped rewrite failure.
+- Evidence and validation: the forwarding path sets `rawRead` to nil after a decoded raw read and never initializes it on typed forwarding. A deterministic regression test invokes the same error finalization with no raw packet and verifies the wrapped error and capture event.
+- Status: implemented with deterministic local coverage. Live Transfer rewrite failures remain unverified.
+
 ## Ordering safety contract
 
 The deferred-packet change is deliberately narrow. `expectedIDs` remains the only authority for what the current login state accepts. The queue scan selects the earliest packet that is currently expected, leaves packets for later states queued, and never mutates or reorders bytes on the wire. The regression tests cover canonical resource-pack order, featured early `ResourcePacksInfo`, a later-phase packet queued ahead of the current phase, and all six permutations of the three login packets.
