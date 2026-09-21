@@ -470,6 +470,14 @@ Every new entry should state the symptom, root cause, implementation commits, ev
 - Evidence and validation: the local 1.26.51 ProxyFingerprint report, the `EncodeOffline` and `tokenClaims` source path, `TestClearXBLIdentityDataRemovesAuthenticationBoundFields`, and the focused proxy integration test. This change is limited to unauthenticated upstream dials.
 - Status: implemented for local offline identity parity. It does not infer public-server anti-cheat behavior or bypass server policy.
 
+### FIX-0059 - Preserve complete StartGame world metadata
+
+- Symptom: a terminating bridge reconstructed the downstream `StartGame` packet from gophertunnel's compact `GameData` view, so fields not represented by that view were replaced with proxy defaults or omitted.
+- Root cause: the upstream dialer decoded `StartGame` into `GameData`, which intentionally exposes only a subset of the packet. The bridge then called the listener's `StartGame`, whose serializer filled values such as generator, command, education, broadcast, level, and telemetry fields independently.
+- Implementation: retain a copy of the complete decoded `packet.StartGame` in `GameData` for dialled connections. Listener `StartGame` reuses that packet when present and keeps the existing compact-data construction for callers that create `GameData` directly.
+- Evidence and validation: the complete-packet regression test and the proxy loopback integration test use non-default `StartGame` fields and verify that the downstream client receives them unchanged. [`docs/research/start-game-parity.md`](research/start-game-parity.md) records the source boundary and remaining login-packet limitations.
+- Status: implemented for decoded `StartGame` field parity. Dimension, Jigsaw, VoxelShapes, and ItemRegistry handling remain separate login-boundary behaviors and are not claimed to be byte-identical.
+
 ## Ordering safety contract
 
 The deferred-packet change is deliberately narrow. `expectedIDs` remains the only authority for what the current login state accepts. The queue scan selects the earliest packet that is currently expected, leaves packets for later states queued, and never mutates or reorders bytes on the wire. The regression tests cover canonical resource-pack order, featured early `ResourcePacksInfo`, a later-phase packet queued ahead of the current phase, and all six permutations of the three login packets.

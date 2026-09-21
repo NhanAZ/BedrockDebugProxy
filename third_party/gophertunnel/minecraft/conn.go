@@ -1215,7 +1215,7 @@ func (conn *Conn) startGame() {
 		},
 	})
 	_ = conn.WritePacket(&packet.VoxelShapes{})
-	_ = conn.WritePacket(&packet.StartGame{
+	startGamePacket := packet.StartGame{
 		Difficulty:                   data.Difficulty,
 		EntityUniqueID:               data.EntityUniqueID,
 		EntityRuntimeID:              data.EntityRuntimeID,
@@ -1258,7 +1258,11 @@ func (conn *Conn) startGame() {
 		GameVersion:                  protocol.CurrentVersion,
 		UseBlockNetworkIDHashes:      data.UseBlockNetworkIDHashes,
 		PropertyData:                 data.PropertyData,
-	})
+	}
+	if data.StartGamePacket != nil {
+		startGamePacket = *data.StartGamePacket
+	}
+	_ = conn.WritePacket(&startGamePacket)
 	_ = conn.WritePacket(&packet.ItemRegistry{Items: data.Items})
 	_ = conn.Flush()
 	conn.expect(packet.IDRequestChunkRadius, packet.IDSetLocalPlayerAsInitialised)
@@ -1452,7 +1456,9 @@ func (conn *Conn) handleDimensionData(pk *packet.DimensionData) error {
 // handleStartGame handles an incoming StartGame packet. It is the signal that the player has been added to a
 // world, and it obtains most of its dedicated properties.
 func (conn *Conn) handleStartGame(pk *packet.StartGame) error {
+	startGamePacket := *pk
 	conn.gameData = GameData{
+		StartGamePacket:              &startGamePacket,
 		Difficulty:                   pk.Difficulty,
 		WorldName:                    pk.WorldName,
 		WorldSeed:                    pk.WorldSeed,

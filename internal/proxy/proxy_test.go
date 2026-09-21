@@ -253,6 +253,21 @@ func TestRunnerForwardsBidirectionalPacketsAndCapturesSession(t *testing.T) {
 			WorldName:       "BedrockDebugProxy integration",
 			EntityUniqueID:  1,
 			EntityRuntimeID: 1,
+			StartGamePacket: &packet.StartGame{
+				WorldName:                "BedrockDebugProxy complete integration",
+				EntityUniqueID:           1,
+				EntityRuntimeID:          1,
+				Generator:                2,
+				EducationFeaturesEnabled: false,
+				MultiPlayerGame:          false,
+				LANBroadcastEnabled:      false,
+				CommandsEnabled:          false,
+				LevelID:                  "integration-level",
+				EnchantmentSeed:          17,
+				GameVersion:              "1.26.51",
+				ServerAuthoritativeSound: true,
+				ServerID:                 "integration-server",
+			},
 		}); startErr != nil {
 			serverErrors <- fmt.Errorf("start upstream game: %w", startErr)
 			return
@@ -421,6 +436,15 @@ func TestRunnerForwardsBidirectionalPacketsAndCapturesSession(t *testing.T) {
 	if err := client.DoSpawnContext(ctx); err != nil {
 		_ = client.Close()
 		t.Fatal(err)
+	}
+	startGamePacket := client.GameData().StartGamePacket
+	if startGamePacket == nil || startGamePacket.WorldName != "BedrockDebugProxy complete integration" ||
+		startGamePacket.Generator != 2 || startGamePacket.EducationFeaturesEnabled || startGamePacket.MultiPlayerGame ||
+		startGamePacket.LANBroadcastEnabled || startGamePacket.CommandsEnabled || startGamePacket.LevelID != "integration-level" ||
+		startGamePacket.EnchantmentSeed != 17 || startGamePacket.GameVersion != "1.26.51" ||
+		!startGamePacket.ServerAuthoritativeSound || startGamePacket.ServerID != "integration-server" {
+		_ = client.Close()
+		t.Fatalf("downstream StartGame did not preserve complete packet: %#v", startGamePacket)
 	}
 	for _, outgoing := range []packet.Packet{
 		integrationPlayerSkin(),

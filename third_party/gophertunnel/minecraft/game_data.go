@@ -3,11 +3,19 @@ package minecraft
 import (
 	"github.com/go-gl/mathgl/mgl32"
 	"github.com/sandertv/gophertunnel/minecraft/protocol"
+	"github.com/sandertv/gophertunnel/minecraft/protocol/packet"
 )
 
 // GameData is a loose wrapper around a part of the data found in the StartGame packet. It holds data sent
 // specifically at the start of the game, such as the position of the player, the game mode, etc.
 type GameData struct {
+	// StartGamePacket contains the complete decoded StartGame packet when this
+	// data was obtained from a dialled server. It preserves fields that are not
+	// represented by the compatibility-oriented fields below when a bridge
+	// passes server world data to another connection. It may be nil for callers
+	// constructing GameData directly.
+	StartGamePacket *packet.StartGame
+
 	// WorldName is the name of the world that the player spawns in. This name will be displayed at the top of
 	// the player list when opening the in-game menu. It may contain colour codes and does not have to be an
 	// actual world name, but instead, can be the server name.
