@@ -37,7 +37,7 @@ The public `Protocol` interface separates packet pools, readers, writers, and co
 
 The current resource-pack path downloads upstream packs, retains the advertised content key, supports a cache interface, and sends listener packs sequentially. `FetchResourcePacks` can choose packs after the connecting client's identity and client data are known. This enables a fixed-target proxy to establish the upstream connection during downstream login, capture the upstream packs, and then offer those packs to the client through public APIs.
 
-The `Network` interface warns that wrappers must preserve optional packet transport capabilities. The current observing network keeps the transport-specific `BatchHeader`, `DisableEncryption`, and `ReadPacket` methods through `observedConn`, so the same path can observe RakNet and NetherNet connections without assuming ordinary `net.Conn` framing. Unit tests confirm the wrapper contract and the NetherNet connection declares those capabilities. A live NetherNet capture remains unverified.
+The `Network` interface warns that wrappers must preserve optional packet transport capabilities. The current observing network keeps the transport-specific `BatchHeader`, `DisableEncryption`, `PublicKey`, and `ReadPacket` methods through `observedConn`, so the same path can observe RakNet and NetherNet connections without assuming ordinary `net.Conn` framing. `PublicKey` is required by gophertunnel's authenticated NetherNet path when it compares the transport identity with the login identity before enabling packet encryption. Unit tests confirm the wrapper contract and the NetherNet connection declares those capabilities. A live NetherNet capture remains unverified.
 
 ### Sandertv go-raknet
 

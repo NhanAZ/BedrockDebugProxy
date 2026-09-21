@@ -2,6 +2,9 @@ package bedrock
 
 import (
 	"context"
+	"crypto/ecdsa"
+	"crypto/elliptic"
+	"crypto/rand"
 	"encoding/json"
 	"errors"
 	"io"
@@ -171,12 +174,19 @@ func TestNetworkWrapReportsTransportContext(t *testing.T) {
 }
 
 func TestObservedConnPreservesTransportCapabilities(t *testing.T) {
-	conn := &observedConn{Conn: &fakeCapabilityConn{fakePacketConn: fakePacketConn{}}}
+	key, err := ecdsa.GenerateKey(elliptic.P256(), rand.Reader)
+	if err != nil {
+		t.Fatal(err)
+	}
+	conn := &observedConn{Conn: &fakeCapabilityConn{fakePacketConn: fakePacketConn{}, publicKey: &key.PublicKey}}
 	if got := conn.BatchHeader(); got != nil {
 		t.Fatalf("BatchHeader() = %x, want nil", got)
 	}
 	if !conn.DisableEncryption() {
 		t.Fatal("DisableEncryption() = false")
+	}
+	if got := conn.PublicKey(); got != &key.PublicKey {
+		t.Fatal("PublicKey() did not preserve the transport key")
 	}
 }
 
@@ -226,10 +236,12 @@ type fakePacketConn struct {
 
 type fakeCapabilityConn struct {
 	fakePacketConn
+	publicKey *ecdsa.PublicKey
 }
 
-func (*fakeCapabilityConn) BatchHeader() []byte     { return nil }
-func (*fakeCapabilityConn) DisableEncryption() bool { return true }
+func (*fakeCapabilityConn) BatchHeader() []byte           { return nil }
+func (*fakeCapabilityConn) DisableEncryption() bool       { return true }
+func (c *fakeCapabilityConn) PublicKey() *ecdsa.PublicKey { return c.publicKey }
 
 func (c *fakePacketConn) Read(buffer []byte) (int, error) {
 	if c.closed {
