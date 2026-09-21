@@ -97,6 +97,7 @@ type Conn struct {
 	compressionSelector  func(proto Protocol) packet.Compression
 	compressionThreshold int
 	maxDecompressedLen   int
+	networkSettings      *packet.NetworkSettings
 	readerLimits         bool
 
 	disconnectOnUnknownPacket bool
@@ -291,6 +292,16 @@ func (conn *Conn) GameData() GameData {
 // Proto returns the protocol of the connection.
 func (conn *Conn) Proto() Protocol {
 	return conn.proto
+}
+
+// NetworkSettings returns the network settings exchanged during the login
+// sequence. The boolean is false when this connection has not completed that
+// part of negotiation yet.
+func (conn *Conn) NetworkSettings() (packet.NetworkSettings, bool) {
+	if conn.networkSettings == nil {
+		return packet.NetworkSettings{}, false
+	}
+	return *conn.networkSettings, true
 }
 
 // StartGame starts the game for a client that connected to the server. StartGame should be called for a Conn
@@ -879,10 +890,12 @@ func (conn *Conn) handleRequestNetworkSettings(pk *packet.RequestNetworkSettings
 	}
 
 	conn.expect(packet.IDLogin)
-	if err := conn.WritePacket(&packet.NetworkSettings{
+	settings := &packet.NetworkSettings{
 		CompressionThreshold: uint16(conn.compressionThreshold),
 		CompressionAlgorithm: conn.compression.EncodeCompression(),
-	}); err != nil {
+	}
+	conn.networkSettings = settings
+	if err := conn.WritePacket(settings); err != nil {
 		return fmt.Errorf("send NetworkSettings: %w", err)
 	}
 	_ = conn.Flush()
@@ -899,6 +912,8 @@ func (conn *Conn) handleNetworkSettings(pk *packet.NetworkSettings) error {
 	if !ok {
 		return fmt.Errorf("unknown compression algorithm %v", pk.CompressionAlgorithm)
 	}
+	settings := *pk
+	conn.networkSettings = &settings
 	conn.encMu.Lock()
 	conn.enc.EnableCompression(alg, int(pk.CompressionThreshold))
 	conn.encMu.Unlock()

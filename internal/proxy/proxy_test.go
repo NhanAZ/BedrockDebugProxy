@@ -753,18 +753,29 @@ func TestRunnerForwardsBidirectionalPacketsAndCapturesSession(t *testing.T) {
 		switch event.Kind {
 		case "session.negotiated":
 			negotiated = true
+			type networkSettingsView struct {
+				CompressionThreshold    uint16  `json:"compression_threshold"`
+				CompressionAlgorithm    uint16  `json:"compression_algorithm"`
+				ClientThrottle          bool    `json:"client_throttle"`
+				ClientThrottleThreshold uint8   `json:"client_throttle_threshold"`
+				ClientThrottleScalar    float32 `json:"client_throttle_scalar"`
+			}
 			var data struct {
-				DownstreamVersion string            `json:"downstream_client_data_game_version"`
-				UpstreamVersion   string            `json:"upstream_client_data_game_version"`
-				VersionMatch      bool              `json:"client_data_game_version_match"`
-				DownstreamOS      protocol.DeviceOS `json:"downstream_client_data_device_os"`
-				UpstreamOS        protocol.DeviceOS `json:"upstream_client_data_device_os"`
-				OSMatch           bool              `json:"client_data_device_os_match"`
+				DownstreamVersion         string              `json:"downstream_client_data_game_version"`
+				UpstreamVersion           string              `json:"upstream_client_data_game_version"`
+				VersionMatch              bool                `json:"client_data_game_version_match"`
+				DownstreamOS              protocol.DeviceOS   `json:"downstream_client_data_device_os"`
+				UpstreamOS                protocol.DeviceOS   `json:"upstream_client_data_device_os"`
+				OSMatch                   bool                `json:"client_data_device_os_match"`
+				DownstreamNetworkSettings networkSettingsView `json:"downstream_network_settings"`
+				UpstreamNetworkSettings   networkSettingsView `json:"upstream_network_settings"`
+				NetworkSettingsAvailable  bool                `json:"network_settings_available"`
+				NetworkSettingsMatch      bool                `json:"network_settings_match"`
 			}
 			if err := json.Unmarshal(event.Data, &data); err != nil {
 				return err
 			}
-			if data.DownstreamVersion != expectedClientData.GameVersion || data.UpstreamVersion != expectedClientData.GameVersion || !data.VersionMatch || data.DownstreamOS != expectedClientData.DeviceOS || data.UpstreamOS != expectedClientData.DeviceOS || !data.OSMatch {
+			if data.DownstreamVersion != expectedClientData.GameVersion || data.UpstreamVersion != expectedClientData.GameVersion || !data.VersionMatch || data.DownstreamOS != expectedClientData.DeviceOS || data.UpstreamOS != expectedClientData.DeviceOS || !data.OSMatch || !data.NetworkSettingsAvailable || !data.NetworkSettingsMatch || data.DownstreamNetworkSettings != data.UpstreamNetworkSettings {
 				return fmt.Errorf("session negotiated client data = %+v", data)
 			}
 			negotiatedClientData = true
