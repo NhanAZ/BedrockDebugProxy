@@ -291,7 +291,11 @@ func (r *Runner) Run(ctx context.Context) error {
 			state := getAcceptState()
 			request, err := decodeRequestChunkRadius(payload)
 			if err != nil {
-				_ = r.recordPacketDecodeErrorAtHop(header.PacketID, "RequestChunkRadius", "*packet.RequestChunkRadius", capture.DirectionClientToServer, "downstream", state.downstreamID, state.hop, "decode RequestChunkRadius for forwarding", err)
+				_ = r.recordPacketDecodeErrorAtHop(capture.PacketInfo{
+					ID: header.PacketID, Name: "RequestChunkRadius", GoType: "*packet.RequestChunkRadius",
+					SenderSubClient: header.SenderSubClient, TargetSubClient: header.TargetSubClient,
+					DecodeStatus: "decode_error",
+				}, capture.DirectionClientToServer, "downstream", state.downstreamID, state.hop, "decode RequestChunkRadius for forwarding", err)
 				return
 			}
 			// The upstream dial completes before the downstream StartGame sequence
@@ -1269,7 +1273,7 @@ func (r *Runner) recordNetworkErrorAtHop(kind string, direction capture.Directio
 	return err
 }
 
-func (r *Runner) recordPacketDecodeErrorAtHop(packetID uint32, name, goType string, direction capture.Direction, channel, connectionID string, hop int, operation string, operationErr error) error {
+func (r *Runner) recordPacketDecodeErrorAtHop(packetInfo capture.PacketInfo, direction capture.Direction, channel, connectionID string, hop int, operation string, operationErr error) error {
 	_, err := r.config.Recorder.Record(context.Background(), capture.Record{Event: capture.Event{
 		SessionID:    sessionID,
 		ConnectionID: connectionID,
@@ -1279,7 +1283,7 @@ func (r *Runner) recordPacketDecodeErrorAtHop(packetID uint32, name, goType stri
 		Direction:    direction,
 		Channel:      channel,
 		Stage:        "bridge",
-		Packet:       &capture.PacketInfo{ID: packetID, Name: name, GoType: goType, DecodeStatus: "decode_error"},
+		Packet:       &packetInfo,
 		Error:        networkError(operation, operationErr),
 	}})
 	return err

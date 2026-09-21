@@ -686,6 +686,14 @@ Every new entry should state the symptom, root cause, implementation commits, ev
 - Evidence and validation: strict decoder tests cover truncation and trailing bytes; a recorder regression test verifies packet context and the manifest decode-error counter. The behavior is derived from the existing raw observer and capture schema.
 - Status: implemented with focused automated coverage. The initial upstream 16/16 request and later-request ordering limitation remain documented in [`docs/research/chunk-radius-parity.md`](research/chunk-radius-parity.md).
 
+### FIX-0086 - Preserve chunk-radius decode header context
+
+- Symptom: the new malformed `RequestChunkRadius` decode event identified the packet type but omitted the sender and target sub-client header values that were already retained by the raw packet event.
+- Root cause: the helper constructed a reduced `PacketInfo` from only the packet ID and typed name instead of carrying the full observed header context.
+- Implementation: pass the complete `PacketInfo` into the decode-error recorder so the event preserves both sub-client routing bytes and decode status without changing the raw payload or forwarding decision.
+- Evidence and validation: the capture schema defines `SenderSubClient` and `TargetSubClient` on `PacketInfo`, and the regression test now asserts non-zero values survive the event boundary.
+- Status: implemented as a capture-context correction. No wire behavior, protocol ordering, or authentication behavior changes.
+
 ## Ordering safety contract
 
 The deferred-packet change is deliberately narrow. `expectedIDs` remains the only authority for what the current login state accepts. The queue scan selects the earliest packet that is currently expected, leaves packets for later states queued, and never mutates or reorders bytes on the wire. The regression tests cover canonical resource-pack order, featured early `ResourcePacksInfo`, a later-phase packet queued ahead of the current phase, and all six permutations of the three login packets.
