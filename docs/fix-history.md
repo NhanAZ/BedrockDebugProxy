@@ -726,6 +726,14 @@ Every new entry should state the symptom, root cause, implementation commits, ev
 - Evidence and validation: the focused gophertunnel test now proves the output includes the retained trailing byte, and the proxy loopback integration remains green. This is a local source and test correction; no live server was contacted.
 - Status: implemented with automated coverage. Real-client mixed and encrypted resource-pack validation remains pending for the current stamped binary.
 
+### FIX-0091 - Forward the observed client cache capability
+
+- Symptom: completed local vanilla-shaped captures advertised `ClientCacheStatus=true` downstream while the upstream Dialer sent `false`, even though both sessions used the same client capability boundary.
+- Root cause: BedrockDebugProxy started the upstream login from the listener's dynamic resource-pack callback before the listener had consumed the downstream cache-status packet. The Dialer therefore used its false zero value.
+- Implementation: add an opt-in listener mode that sends `PlayStatus(LoginSuccess)`, waits for `ClientCacheStatus`, and then runs the existing resource-pack callbacks. BedrockDebugProxy passes the observed boolean to `Dialer.EnableClientCache`; listeners without the mode retain the previous ordering.
+- Evidence and validation: the client-cache parity capture and research note provide the confirmed wire difference and source ordering. The root loopback integration test now enables the cache on its client, verifies the upstream connection reports it, and checks that `session.spawned` records parity on both sides.
+- Status: implemented with automated local coverage. A controlled local server that sends cache-blob and miss-response packets remains pending. Public-server policy or enforcement conclusions are out of scope.
+
 ## Ordering safety contract
 
 The deferred-packet change is deliberately narrow. `expectedIDs` remains the only authority for what the current login state accepts. The queue scan selects the earliest packet that is currently expected, leaves packets for later states queued, and never mutates or reorders bytes on the wire. The regression tests cover canonical resource-pack order, featured early `ResourcePacksInfo`, a later-phase packet queued ahead of the current phase, and all six permutations of the three login packets.

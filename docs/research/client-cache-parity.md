@@ -64,10 +64,13 @@ client response afterward. This local source review matches the captured
 downstream order and does not establish a universal server order.
 
 Changing the value unconditionally would make clients that report false use a
-server path they do not support. Waiting for the downstream value before
-starting the upstream exchange would require a new startup design and could
-deadlock the resource-pack negotiation. Guessing from device metadata would
-also turn an observed capability into an inference.
+server path they do not support. Guessing from device metadata would also turn
+an observed capability into an inference. The bridge now uses a narrow startup
+ordering change instead. Its listener sends `PlayStatus(LoginSuccess)`, waits
+for the client's `ClientCacheStatus`, and only then runs the existing upstream
+and resource-pack callbacks. The upstream Dialer receives that exact boolean
+through `EnableClientCache`. Listeners that do not opt into this deferred offer
+mode retain their existing ordering.
 
 ## Evidence classification
 
@@ -79,27 +82,29 @@ also turn an observed capability into an inference.
   client-reported capability and does not provide a platform default.
 - Confirmed: the owner-controlled PocketMine login path sends its resource-pack
   offer before it can observe the client's cache status.
+- Confirmed: the owner-controlled loopback integration now sends a cache-enabled
+  client through the deferred offer path and observes `true` on both the
+  downstream and upstream connection metadata.
 - Inferred: when an upstream server honours the capability, the mismatch can
   change `LevelChunk.CacheEnabled`, blob-cache packets, and later transport
   payload boundaries.
 - Unknown: whether a particular server uses the cache capability for any policy
   decision, and whether matching it improves compatibility for all supported
   client platforms.
-- Unknown: a safe generic startup design that learns the downstream status
-  before upstream resource-pack negotiation without changing valid packet order.
 
 ## Current decision
 
-No runtime change is made from this evidence alone. Keeping the upstream value
-false avoids claiming a capability that has not been observed for the upstream
-connection and avoids sending cache-enabled chunks to a downstream client that
-may not support them. The mismatch remains visible in raw evidence and session
-metadata instead of being hidden or normalized.
+For the BedrockDebugProxy listener, defer the dynamic resource-pack offer until
+the downstream capability is observed, then pass that boolean to the upstream
+Dialer. This preserves the client's declared capability without choosing a
+platform default, and it keeps the existing offer and archive-delivery path
+unchanged after the observation point. The raw status packets and both
+connection values remain visible in the capture.
 
 ## Follow-up
 
 Use an owner-controlled local server that deliberately sends cache-enabled
-`LevelChunk` and `ClientCacheBlobStatus` traffic to test any future startup
-redesign. Compare direct and proxied captures for packet order, cache hashes,
-miss responses, and spawn completion. Do not infer a public-server policy from
-this local capability difference.
+`LevelChunk` and `ClientCacheBlobStatus` traffic to validate the current
+forwarding path. Compare direct and proxied captures for packet order, cache
+hashes, miss responses, and spawn completion. Do not infer a public-server
+policy from this local capability difference.

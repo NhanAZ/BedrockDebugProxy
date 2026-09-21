@@ -468,6 +468,10 @@ func TestRunnerForwardsBidirectionalPacketsAndCapturesSession(t *testing.T) {
 			serverErrors <- fmt.Errorf("upstream client data did not preserve downstream metadata: %#v", clientData)
 			return
 		}
+		if !serverConn.ClientCacheEnabled() {
+			serverErrors <- fmt.Errorf("upstream client cache disabled despite downstream capability")
+			return
+		}
 		if startErr := serverConn.StartGame(minecraft.GameData{
 			WorldName:                        "BedrockDebugProxy integration",
 			EntityUniqueID:                   1,
@@ -664,7 +668,8 @@ func TestRunnerForwardsBidirectionalPacketsAndCapturesSession(t *testing.T) {
 			Identity:    "11111111-1111-1111-1111-111111111111",
 			DisplayName: "Integration",
 		},
-		ClientData: integrationClientData(),
+		ClientData:        integrationClientData(),
+		EnableClientCache: true,
 		RequestChunkRadiusProvider: func() (packet.RequestChunkRadius, bool) {
 			return packet.RequestChunkRadius{ChunkRadius: 24, MaxChunkRadius: 28}, true
 		},
@@ -898,6 +903,7 @@ func TestRunnerForwardsBidirectionalPacketsAndCapturesSession(t *testing.T) {
 		}
 	}
 	var negotiated, spawned, closed bool
+	var spawnedCacheParity bool
 	var negotiatedClientData bool
 	var decodeErrorObserved, unknownDecodeObserved bool
 	var connectionViews, loginSkinMetadataViews, gameDataViews int
@@ -932,6 +938,7 @@ func TestRunnerForwardsBidirectionalPacketsAndCapturesSession(t *testing.T) {
 		id        uint32
 	}
 	expectedRaw := map[rawPacketKey]struct{}{
+		{capture.DirectionClientToServer, packet.IDClientCacheStatus}:    {},
 		{capture.DirectionClientToServer, packet.IDEmote}:                {},
 		{capture.DirectionClientToServer, packet.IDPlayerSkin}:           {},
 		{capture.DirectionClientToServer, packet.IDMovePlayer}:           {},
@@ -1010,6 +1017,14 @@ func TestRunnerForwardsBidirectionalPacketsAndCapturesSession(t *testing.T) {
 			gameDataViews++
 		case "session.spawned":
 			spawned = true
+			var data struct {
+				Downstream bool `json:"downstream_client_cache_enabled"`
+				Upstream   bool `json:"upstream_client_cache_enabled"`
+			}
+			if err := json.Unmarshal(event.Data, &data); err != nil {
+				return err
+			}
+			spawnedCacheParity = data.Downstream && data.Upstream
 		case "session.close":
 			closed = true
 		case "packet.raw":
@@ -1085,8 +1100,8 @@ func TestRunnerForwardsBidirectionalPacketsAndCapturesSession(t *testing.T) {
 	}); err != nil {
 		t.Fatal(err)
 	}
-	if !negotiated || !negotiatedClientData || !spawned || !closed || !decodeErrorObserved || !unknownDecodeObserved || connectionViews != 2 || loginSkinMetadataViews != 2 || gameDataViews != 1 {
-		t.Fatalf("session evidence negotiated=%t negotiated_client_data=%t spawned=%t closed=%t decode_error=%t unknown_decode=%t connection_views=%d login_skin_metadata_views=%d game_data_views=%d", negotiated, negotiatedClientData, spawned, closed, decodeErrorObserved, unknownDecodeObserved, connectionViews, loginSkinMetadataViews, gameDataViews)
+	if !negotiated || !negotiatedClientData || !spawned || !spawnedCacheParity || !closed || !decodeErrorObserved || !unknownDecodeObserved || connectionViews != 2 || loginSkinMetadataViews != 2 || gameDataViews != 1 {
+		t.Fatalf("session evidence negotiated=%t negotiated_client_data=%t spawned=%t spawned_cache_parity=%t closed=%t decode_error=%t unknown_decode=%t connection_views=%d login_skin_metadata_views=%d game_data_views=%d", negotiated, negotiatedClientData, spawned, spawnedCacheParity, closed, decodeErrorObserved, unknownDecodeObserved, connectionViews, loginSkinMetadataViews, gameDataViews)
 	}
 	if downstream := transportMetadataObserved["downstream"]; !downstream.encryptionEnabled || !downstream.compressionNegotiated {
 		t.Fatalf("downstream transport metadata = %#v", downstream)

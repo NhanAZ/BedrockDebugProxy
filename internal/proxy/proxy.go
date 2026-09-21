@@ -281,8 +281,9 @@ func (r *Runner) Run(ctx context.Context) error {
 		TexturePacksRequired:   true,
 		AllowUnknownPackets:    true,
 		AllowInvalidPackets:    true,
-		StatusProvider:         minecraft.NewStatusProvider("BedrockDebugProxy", r.config.UpstreamAddress),
-		MaxDecompressedLen:     r.config.MaxDecompressedBytes,
+		DeferResourcePackOfferUntilClientCacheStatus: true,
+		StatusProvider:     minecraft.NewStatusProvider("BedrockDebugProxy", r.config.UpstreamAddress),
+		MaxDecompressedLen: r.config.MaxDecompressedBytes,
 		PacketFunc: func(header packet.Header, payload []byte, source, destination net.Addr) {
 			downstreamPacketFunc(header, payload, source, destination)
 			if header.PacketID != packet.IDRequestChunkRadius {
@@ -338,7 +339,11 @@ func (r *Runner) Run(ctx context.Context) error {
 						return transportMetadata(state.upstreamConn.Load())
 					},
 				}
-				state.slot.conn, state.slot.resourcePacks, state.slot.err = r.connectUpstream(connectCtx, state.target, state.upstreamNetwork, observer, state.upstreamID, state.hop, state.upstreamLogger, live, identityData, clientData, state.transferLocalAddr != nil, state.transferRouteProbed, func(conn *minecraft.Conn) {
+				enableClientCache := false
+				if downstream := state.downstreamConn.Load(); downstream != nil {
+					enableClientCache = downstream.ClientCacheEnabled()
+				}
+				state.slot.conn, state.slot.resourcePacks, state.slot.err = r.connectUpstream(connectCtx, state.target, state.upstreamNetwork, observer, state.upstreamID, state.hop, state.upstreamLogger, live, identityData, clientData, enableClientCache, state.transferLocalAddr != nil, state.transferRouteProbed, func(conn *minecraft.Conn) {
 					state.upstreamConn.Store(conn)
 				})
 			})
@@ -709,7 +714,7 @@ func (r *Runner) probeTransferRoute(ctx context.Context, target string, localAdd
 	return nil
 }
 
-func (r *Runner) connectUpstream(ctx context.Context, target string, network bedrock.Network, observer *bedrock.Observer, connectionID string, hop int, logger *slog.Logger, live *liveReporter, identityData login.IdentityData, clientData login.ClientData, transferRoute, routeProbed bool, onConnection func(*minecraft.Conn)) (*minecraft.Conn, []*resource.Pack, error) {
+func (r *Runner) connectUpstream(ctx context.Context, target string, network bedrock.Network, observer *bedrock.Observer, connectionID string, hop int, logger *slog.Logger, live *liveReporter, identityData login.IdentityData, clientData login.ClientData, enableClientCache, transferRoute, routeProbed bool, onConnection func(*minecraft.Conn)) (*minecraft.Conn, []*resource.Pack, error) {
 	if err := r.recordAtHop("upstream.dial_start", capture.SeverityInfo, map[string]any{"address": target}, hop); err != nil {
 		return nil, nil, err
 	}
@@ -719,10 +724,11 @@ func (r *Runner) connectUpstream(ctx context.Context, target string, network bed
 	urlResourcePacks := newURLResourcePackCache(dialCtx)
 	recordPacket := observer.PacketFunc("upstream", connectionID)
 	dialer := minecraft.Dialer{
-		TokenSource:  r.config.TokenSource,
-		IdentityData: identityData,
-		ClientData:   clientData,
-		ErrorLog:     logger,
+		TokenSource:       r.config.TokenSource,
+		IdentityData:      identityData,
+		ClientData:        clientData,
+		EnableClientCache: enableClientCache,
+		ErrorLog:          logger,
 		// A pre-probe can happen several seconds before Minecraft reconnects.
 		// Always perform a fresh bounded ping on the actual hop-2 dial so the
 		// featured-experience route is active when RakNet starts its handshake.

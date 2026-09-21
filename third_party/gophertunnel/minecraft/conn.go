@@ -184,6 +184,9 @@ type Conn struct {
 	// fetchResourcePacks is an optional function passed from a Listener. If set, the returned resource packs from the function
 	// will determine which resource packs to send to the client based on its identity and client data.
 	fetchResourcePacks func(identityData login.IdentityData, clientData login.ClientData, current []*resource.Pack) []*resource.Pack
+	// deferResourcePackOfferUntilClientCacheStatus delays a listener's dynamic resource-pack callbacks until the
+	// client has reported its cache capability after LoginSuccess.
+	deferResourcePackOfferUntilClientCacheStatus bool
 	// fetchResourcePacksInfo selects upstream offer metadata for a listener
 	// connection.
 	fetchResourcePacksInfo func(identityData login.IdentityData, clientData login.ClientData) *packet.ResourcePacksInfo
@@ -201,6 +204,7 @@ type Conn struct {
 	resourcePackDelivery ResourcePackDeliveryConfig
 
 	cacheEnabled               bool
+	resourcePackOfferPending   bool
 	requestChunkRadiusProvider func() (packet.RequestChunkRadius, bool)
 
 	// allow filters what connections are allowed to connect to the Server. The
@@ -1004,7 +1008,16 @@ func (conn *Conn) handleClientToServerHandshake() error {
 	if err := conn.WritePacket(&packet.PlayStatus{Status: packet.PlayStatusLoginSuccess}); err != nil {
 		return fmt.Errorf("send PlayStatus (Status=LoginSuccess): %w", err)
 	}
+	if conn.deferResourcePackOfferUntilClientCacheStatus {
+		conn.resourcePackOfferPending = true
+		return nil
+	}
+	return conn.sendResourcePackOffer()
+}
 
+// sendResourcePackOffer selects and sends the resource-pack offer after the listener has enough
+// information to run its configured callbacks.
+func (conn *Conn) sendResourcePackOffer() error {
 	if conn.fetchResourcePacks != nil {
 		conn.resourcePacks = conn.fetchResourcePacks(conn.identityData, conn.clientData, slices.Clone(conn.resourcePacks))
 	}
@@ -1127,6 +1140,15 @@ func (conn *Conn) handleServerToClientHandshake(pk *packet.ServerToClientHandsha
 // has support for the client blob cache.
 func (conn *Conn) handleClientCacheStatus(pk *packet.ClientCacheStatus) error {
 	conn.cacheEnabled = pk.Enabled
+	if conn.resourcePackOfferPending {
+		conn.resourcePackOfferPending = false
+		if err := conn.sendResourcePackOffer(); err != nil {
+			return err
+		}
+		// The cache status has now been consumed. The next login packet must be
+		// the response to the offer just sent.
+		conn.expect(packet.IDResourcePackClientResponse)
+	}
 	return nil
 }
 
