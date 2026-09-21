@@ -282,6 +282,9 @@ func (r *Runner) Run(ctx context.Context) error {
 		StatusProvider:         minecraft.NewStatusProvider("BedrockDebugProxy", r.config.UpstreamAddress),
 		MaxDecompressedLen:     r.config.MaxDecompressedBytes,
 		PacketFunc:             observer.PacketFuncDynamic("downstream", func() string { return getAcceptState().downstreamID }),
+		ConnectionFunc: func(conn *minecraft.Conn) {
+			getAcceptState().downstreamConn.Store(conn)
+		},
 		FetchResourcePacks: func(identityData login.IdentityData, clientData login.ClientData, _ []*resource.Pack) []*resource.Pack {
 			state := getAcceptState()
 			state.slot.once.Do(func() {
@@ -306,10 +309,9 @@ func (r *Runner) Run(ctx context.Context) error {
 						return transportMetadata(state.upstreamConn.Load())
 					},
 				}
-				state.slot.conn, state.slot.resourcePacks, state.slot.err = r.connectUpstream(connectCtx, state.target, state.upstreamNetwork, observer, state.upstreamID, state.hop, state.upstreamLogger, live, identityData, clientData, state.transferLocalAddr != nil, state.transferRouteProbed)
-				if state.slot.conn != nil {
-					state.upstreamConn.Store(state.slot.conn)
-				}
+				state.slot.conn, state.slot.resourcePacks, state.slot.err = r.connectUpstream(connectCtx, state.target, state.upstreamNetwork, observer, state.upstreamID, state.hop, state.upstreamLogger, live, identityData, clientData, state.transferLocalAddr != nil, state.transferRouteProbed, func(conn *minecraft.Conn) {
+					state.upstreamConn.Store(conn)
+				})
 			})
 			if state.slot.err != nil || state.slot.conn == nil {
 				return nil
@@ -670,7 +672,7 @@ func (r *Runner) probeTransferRoute(ctx context.Context, target string, localAdd
 	return nil
 }
 
-func (r *Runner) connectUpstream(ctx context.Context, target string, network bedrock.Network, observer *bedrock.Observer, connectionID string, hop int, logger *slog.Logger, live *liveReporter, identityData login.IdentityData, clientData login.ClientData, transferRoute, routeProbed bool) (*minecraft.Conn, []*resource.Pack, error) {
+func (r *Runner) connectUpstream(ctx context.Context, target string, network bedrock.Network, observer *bedrock.Observer, connectionID string, hop int, logger *slog.Logger, live *liveReporter, identityData login.IdentityData, clientData login.ClientData, transferRoute, routeProbed bool, onConnection func(*minecraft.Conn)) (*minecraft.Conn, []*resource.Pack, error) {
 	if err := r.recordAtHop("upstream.dial_start", capture.SeverityInfo, map[string]any{"address": target}, hop); err != nil {
 		return nil, nil, err
 	}
@@ -698,6 +700,7 @@ func (r *Runner) connectUpstream(ctx context.Context, target string, network bed
 			recordPacket(header, payload, src, dst)
 			urlResourcePacks.Observe(header, payload)
 		},
+		ConnectionFunc:             onConnection,
 		ResourcePackCache:          urlResourcePacks,
 		DisconnectOnUnknownPackets: false,
 		DisconnectOnInvalidPackets: false,

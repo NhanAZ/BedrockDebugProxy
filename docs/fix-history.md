@@ -542,6 +542,14 @@ Every new entry should state the symptom, root cause, implementation commits, ev
 - Evidence and validation: the capture sequence above, the nested listener suppression test, and the root proxy loopback integration test that sends a non-empty upstream CreativeContent packet and matches its raw hash across both channels.
 - Status: implemented for the observed terminating-bridge boundary. Direct vanilla-client validation remains pending. This change does not filter, mutate, or reorder an upstream packet.
 
+### FIX-0068 - Capture transport state during login
+
+- Symptom: transport payload events during the login sequence had no connection-derived compression or encryption state because the proxy stored each `*minecraft.Conn` only after the login boundary completed.
+- Root cause: the observed transport wrapper records bytes before the listener or dialer returns its connection to the proxy, while gophertunnel did not expose the connection object at creation time.
+- Implementation: add opt-in listener and dialer connection callbacks and use them to associate the connection with its hop before the first login packet. Existing per-payload metadata now reports the state that has actually been negotiated at that boundary, while the raw payload remains unchanged.
+- Evidence and validation: the root loopback integration test now requires negotiated compression metadata on both channels before `session.negotiated`, proving that login-time payloads receive the state. The change is limited to capture observability and does not alter wire behavior.
+- Status: implemented as a capture-observability correction. The first payload can still be `not_negotiated` before NetworkSettings is processed, and raw UDP or RakNet framing remains outside this observation boundary.
+
 ## Ordering safety contract
 
 The deferred-packet change is deliberately narrow. `expectedIDs` remains the only authority for what the current login state accepts. The queue scan selects the earliest packet that is currently expected, leaves packets for later states queued, and never mutates or reorders bytes on the wire. The regression tests cover canonical resource-pack order, featured early `ResourcePacksInfo`, a later-phase packet queued ahead of the current phase, and all six permutations of the three login packets.
