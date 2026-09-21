@@ -822,6 +822,14 @@ Every new entry should state the symptom, root cause, implementation commits, ev
 - Evidence and validation: FIX-0091 and FIX-0092 describe the implementation and deterministic cache exchange. This documentation-only correction does not change runtime behavior, packet bytes, or capture schema.
 - Status: documentation-only provenance clarification. Real-client cache storage and reuse remain unverified.
 
+### FIX-0103 - Mark chunk-radius mismatch evidence as historical
+
+- Symptom: the chunk-radius research note used a capture created before FIX-0083 without explicitly stating that the later typed-forwarding path was absent from that capture.
+- Root cause: the note preserved the original wire evidence but did not distinguish the historical initial-request mismatch from the current loopback behavior covered by the FIX-0083 regression test.
+- Implementation: mark the capture as pre-FIX-0083, classify its values as historical, and link the deterministic 16/16-then-24/28 forwarding evidence in the note.
+- Evidence and validation: FIX-0083 through FIX-0086 and the current `internal/proxy/proxy_test.go` loopback assertions establish the forwarding and failure-recording behavior. This documentation-only correction does not change runtime behavior, packet bytes, or capture schema.
+- Status: documentation-only provenance clarification. The approved radius after a later request remains server-controlled and public-server validation is pending.
+
 ## Ordering safety contract
 
 The deferred-packet change is deliberately narrow. `expectedIDs` remains the only authority for what the current login state accepts. The queue scan selects the earliest packet that is currently expected, leaves packets for later states queued, and never mutates or reorders bytes on the wire. The regression tests cover canonical resource-pack order, featured early `ResourcePacksInfo`, a later-phase packet queued ahead of the current phase, and all six permutations of the three login packets.
