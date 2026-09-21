@@ -2,11 +2,13 @@ package proxy
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"net"
 	"path/filepath"
 	"reflect"
 	"strconv"
+	"strings"
 	"testing"
 	"time"
 
@@ -15,6 +17,40 @@ import (
 	"github.com/sandertv/gophertunnel/minecraft/protocol/login"
 	"github.com/sandertv/gophertunnel/minecraft/protocol/packet"
 )
+
+func TestFinishTransferRewriteErrorAtHopAllowsDecodedPacketWithoutRawRead(t *testing.T) {
+	root := filepath.Join(t.TempDir(), "capture")
+	recorder, err := capture.New(root, capture.Options{SyncEachEvent: true})
+	if err != nil {
+		t.Fatal(err)
+	}
+	runner := &Runner{config: Config{Recorder: recorder}}
+	rewriteErr := errors.New("proxy listener address is not reachable")
+	gotErr := runner.finishTransferRewriteErrorAtHop(nil, capture.DirectionServerToClient, "upstream", "upstream-1", 1, rewriteErr, nil)
+	var typedErr *transferRewriteError
+	if !errors.As(gotErr, &typedErr) || !errors.Is(gotErr, rewriteErr) {
+		t.Fatalf("rewrite error = %v, want wrapped rewrite error %v", gotErr, rewriteErr)
+	}
+	if err := recorder.Close("closed", nil); err != nil {
+		t.Fatal(err)
+	}
+	var found bool
+	if err := capture.ScanEvents(root, func(event capture.Event) error {
+		if event.Kind != "bridge.transfer_rewrite_error" {
+			return nil
+		}
+		found = true
+		if event.Error == nil || event.Error.Operation != "rewrite Transfer" || !strings.Contains(event.Error.Message, rewriteErr.Error()) {
+			t.Fatalf("rewrite error event = %#v", event.Error)
+		}
+		return nil
+	}); err != nil {
+		t.Fatal(err)
+	}
+	if !found {
+		t.Fatal("transfer rewrite error event not found")
+	}
+}
 
 func TestTransferForProxyAddressPreservesSemantics(t *testing.T) {
 	original := &packet.Transfer{Address: "[2001:db8::20]", Port: 19133, ReloadWorld: true}
