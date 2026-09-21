@@ -806,6 +806,14 @@ Every new entry should state the symptom, root cause, implementation commits, ev
 - Evidence and validation: the in-tree `minecraft/raw_packet.go`, `minecraft/packet.go`, `minecraft/conn.go`, and `minecraft/protocol.go` source paths were reviewed. The current identity conversion and the packet-hook ordering are confirmed; future adapter usage remains unknown.
 - Status: documentation-only research clarification. No live or public-server validation was performed.
 
+### FIX-0101 - Document independent spawn acknowledgements
+
+- Symptom: a local parity scan reported that the downstream server-to-client stream placed `ChunkRadiusUpdated` and `PlayStatusPlayerSpawn` before packets that appeared earlier on the upstream stream.
+- Root cause: the proxy owns two independent login state machines. The dialled upstream connection consumes its own spawn acknowledgements, while the listener emits equivalent responses for the downstream client's separate `RequestChunkRadius` before ordinary forwarding begins.
+- Implementation: update [`docs/research/start-game-parity.md`](research/start-game-parity.md) with the exact capture sequences, raw hashes, source handlers, and the independent-session classification. No runtime code, packet bytes, capture schema, or forwarding policy changed.
+- Evidence and validation: owner-controlled capture `captures/session-20260921T122228Z` shows ID 70 and the spawn-status ID 2 with matching raw hashes on both channels. The in-tree `minecraft/conn.go` handlers and `internal/proxy/proxy.go:startGame` establish the consumption and generation boundary.
+- Status: documentation-only clarification. A future state-machine change requires a deterministic fixture proving that consumed upstream acknowledgements can be substituted without delaying or duplicating the downstream spawn handshake.
+
 ## Ordering safety contract
 
 The deferred-packet change is deliberately narrow. `expectedIDs` remains the only authority for what the current login state accepts. The queue scan selects the earliest packet that is currently expected, leaves packets for later states queued, and never mutates or reorders bytes on the wire. The regression tests cover canonical resource-pack order, featured early `ResourcePacksInfo`, a later-phase packet queued ahead of the current phase, and all six permutations of the three login packets.
