@@ -606,6 +606,14 @@ Every new entry should state the symptom, root cause, implementation commits, ev
 - Evidence and validation: the low-memory quality gate, PowerShell syntax checks, and `git diff --check` pass. No runtime, protocol, capture, or binary behavior changes.
 - Status: implemented as a local workflow safeguard.
 
+### FIX-0075 - Preserve mixed resource-pack offer order
+
+- Symptom: an upstream `ResourcePacksInfo` offer containing both URL-advertised and RakNet-delivered packs could lose an entry when the proxy replaced the completed upstream list with a cache-completion list.
+- Root cause: `connectUpstream` treated `urlResourcePackCache.Packs()` as a complete resource-pack list, even though that method reports cache completion order and does not encode the complete `ResourcePacksInfo` offer order. The replacement could omit an entry that was not yet cached and also discarded the original offer order.
+- Implementation: record the complete advertised cache-key order and merge prefetched URL packs with gophertunnel's normal resource-pack list. The merge prefers the validated archive for a URL key, retains non-URL entries, and preserves the offer order. Failed URL downloads still fall back to the normal gophertunnel pack entry and remain observable through existing warnings and raw evidence.
+- Evidence and validation: source-path review of `internal/proxy/proxy.go` and `resource_pack_url.go`, plus `TestURLResourcePackCacheMergePreservesMixedOfferOrder`, which exercises URL, RakNet, URL ordering. Focused proxy tests and the full low-memory quality gate must pass before commit.
+- Status: implemented for mixed URL and RakNet offers. Real-client validation with an owner-controlled mixed offer remains pending.
+
 ## Ordering safety contract
 
 The deferred-packet change is deliberately narrow. `expectedIDs` remains the only authority for what the current login state accepts. The queue scan selects the earliest packet that is currently expected, leaves packets for later states queued, and never mutates or reorders bytes on the wire. The regression tests cover canonical resource-pack order, featured early `ResourcePacksInfo`, a later-phase packet queued ahead of the current phase, and all six permutations of the three login packets.

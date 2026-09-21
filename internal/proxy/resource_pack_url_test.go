@@ -19,6 +19,7 @@ import (
 	"github.com/sandertv/gophertunnel/minecraft"
 	"github.com/sandertv/gophertunnel/minecraft/protocol"
 	"github.com/sandertv/gophertunnel/minecraft/protocol/packet"
+	"github.com/sandertv/gophertunnel/minecraft/resource"
 )
 
 func TestURLResourcePackCacheLoadsAdvertisedPack(t *testing.T) {
@@ -155,6 +156,50 @@ func TestURLResourcePackCacheDownloadsPacksConcurrentlyInOfferOrder(t *testing.T
 	}
 	if packs[0].UUID() != firstUUID || packs[1].UUID() != secondUUID {
 		t.Fatalf("prefetched pack order = %s, %s, want %s, %s", packs[0].UUID(), packs[1].UUID(), firstUUID, secondUUID)
+	}
+}
+
+func TestURLResourcePackCacheMergePreservesMixedOfferOrder(t *testing.T) {
+	firstUUID := uuid.MustParse("11111111-1111-1111-1111-111111111111")
+	middleUUID := uuid.MustParse("22222222-2222-2222-2222-222222222222")
+	lastUUID := uuid.MustParse("33333333-3333-4333-8333-333333333333")
+	archives := map[string][]byte{
+		"/first.zip":  testURLResourcePackArchiveWith(t, firstUUID, "1.0.0"),
+		"/middle.zip": testURLResourcePackArchiveWith(t, middleUUID, "2.0.0"),
+		"/last.zip":   testURLResourcePackArchiveWith(t, lastUUID, "3.0.0"),
+	}
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		archive, ok := archives[r.URL.Path]
+		if !ok {
+			http.NotFound(w, r)
+			return
+		}
+		_, _ = w.Write(archive)
+	}))
+	defer server.Close()
+
+	info := &packet.ResourcePacksInfo{TexturePacks: []protocol.TexturePackInfo{
+		{UUID: firstUUID, Version: "1.0.0", Size: uint64(len(archives["/first.zip"])), DownloadURL: server.URL + "/first.zip"},
+		{UUID: middleUUID, Version: "2.0.0", Size: uint64(len(archives["/middle.zip"]))},
+		{UUID: lastUUID, Version: "3.0.0", Size: uint64(len(archives["/last.zip"])), DownloadURL: server.URL + "/last.zip"},
+	}}
+	cache := newURLResourcePackCache(context.Background())
+	cache.Observe(packet.Header{PacketID: packet.IDResourcePacksInfo}, encodeResourcePacksInfo(t, info))
+	if !cache.WaitForOffer(context.Background()) {
+		t.Fatal("resource-pack offer was not observed")
+	}
+	middlePack, err := resource.Read(bytes.NewReader(archives["/middle.zip"]))
+	if err != nil {
+		t.Fatal(err)
+	}
+	merged := cache.Merge([]*resource.Pack{middlePack})
+	if len(merged) != 3 {
+		t.Fatalf("merged packs = %d, want 3", len(merged))
+	}
+	for index, want := range []uuid.UUID{firstUUID, middleUUID, lastUUID} {
+		if merged[index].UUID() != want {
+			t.Fatalf("merged pack %d = %s, want %s", index, merged[index].UUID(), want)
+		}
 	}
 }
 

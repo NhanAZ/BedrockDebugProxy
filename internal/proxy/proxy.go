@@ -741,9 +741,7 @@ func (r *Runner) connectUpstream(ctx context.Context, target string, network bed
 	// login path because the URL offer is observed on the same decoder goroutine.
 	// The connection's pack list is therefore authoritative at this point.
 	resourcePacks := conn.ResourcePacks()
-	if prefetched := urlResourcePacks.Packs(); len(prefetched) != 0 {
-		resourcePacks = prefetched
-	}
+	resourcePacks = urlResourcePacks.Merge(resourcePacks)
 	if err := bedrock.RecordResourcePacks(ctx, r.config.Recorder, sessionID, connectionID, hop, conn.RemoteAddr(), conn.LocalAddr(), resourcePacks, bedrock.ResourcePackCaptureOptions{
 		Decrypt: r.config.DecryptResourcePacks,
 	}); err != nil {
