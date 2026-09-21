@@ -3,6 +3,7 @@ package resource
 import (
 	"archive/zip"
 	"bytes"
+	"context"
 	"crypto/sha256"
 	"fmt"
 	"io"
@@ -51,7 +52,7 @@ func ReadPath(path string) (*Pack, error) {
 // zip archive where the manifest.json file is inside a subdirectory rather than the root itself. If the resource
 // pack is not a valid zip or there is no manifest.json file, an error is returned.
 func ReadURL(url string) (*Pack, error) {
-	return readURL(url, 0, false)
+	return readURL(context.Background(), url, 0, false)
 }
 
 // ReadURLLimited downloads a resource pack from url while allowing at most
@@ -60,14 +61,27 @@ func ReadURL(url string) (*Pack, error) {
 // has a server-advertised archive size that must bound local disk and memory
 // use before the archive is parsed.
 func ReadURLLimited(url string, maxBytes int64) (*Pack, error) {
+	return ReadURLLimitedContext(context.Background(), url, maxBytes)
+}
+
+// ReadURLLimitedContext is the context-aware form of ReadURLLimited. The
+// request and body read stop when ctx is canceled.
+func ReadURLLimitedContext(ctx context.Context, url string, maxBytes int64) (*Pack, error) {
 	if maxBytes < 0 {
 		return nil, fmt.Errorf("resource pack download limit must not be negative: %d", maxBytes)
 	}
-	return readURL(url, maxBytes, true)
+	if ctx == nil {
+		ctx = context.Background()
+	}
+	return readURL(ctx, url, maxBytes, true)
 }
 
-func readURL(url string, maxBytes int64, limited bool) (*Pack, error) {
-	resp, err := http.Get(url)
+func readURL(ctx context.Context, url string, maxBytes int64, limited bool) (*Pack, error) {
+	request, err := http.NewRequestWithContext(ctx, http.MethodGet, url, nil)
+	if err != nil {
+		return nil, fmt.Errorf("create resource pack request: %w", err)
+	}
+	resp, err := http.DefaultClient.Do(request)
 	if err != nil {
 		return nil, fmt.Errorf("download resource pack: %w", err)
 	}
