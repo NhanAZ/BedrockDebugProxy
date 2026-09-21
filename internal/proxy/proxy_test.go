@@ -115,6 +115,17 @@ func integrationClientData() login.ClientData {
 	}
 }
 
+func integrationRawPacket(t *testing.T, pk packet.Packet) []byte {
+	t.Helper()
+	var full bytes.Buffer
+	header := packet.Header{PacketID: pk.ID()}
+	if err := header.Write(&full); err != nil {
+		t.Fatal(err)
+	}
+	pk.Marshal(minecraft.DefaultProtocol.NewWriter(&full, 0))
+	return full.Bytes()
+}
+
 func integrationEntityMetadata() protocol.EntityMetadata {
 	metadata := protocol.NewEntityMetadata()
 	metadata[protocol.EntityDataKeyName] = "integration-entity"
@@ -223,6 +234,19 @@ func TestRunnerForwardsBidirectionalPacketsAndCapturesSession(t *testing.T) {
 		WorldTemplateUUID:          uuid.MustParse("33333333-3333-4333-8333-333333333333"),
 		WorldTemplateVersion:       "integration-template",
 	}
+	integrationItemRegistry := &packet.ItemRegistry{Items: []protocol.ItemEntry{{
+		Name:           "integration:item",
+		RuntimeID:      42,
+		ComponentBased: true,
+		Version:        1,
+		Data: map[string]any{
+			"components": map[string]any{
+				"integration:first":  "one",
+				"integration:second": "two",
+			},
+		},
+	}}}
+	integrationItemRegistryRaw := integrationRawPacket(t, integrationItemRegistry)
 	upstreamListener, err := (minecraft.ListenConfig{
 		AuthenticationDisabled: true,
 		AllowUnknownPackets:    true,
@@ -274,6 +298,8 @@ func TestRunnerForwardsBidirectionalPacketsAndCapturesSession(t *testing.T) {
 			WorldName:       "BedrockDebugProxy integration",
 			EntityUniqueID:  1,
 			EntityRuntimeID: 1,
+			RawProtocolID:   serverConn.Proto().ID(),
+			RawItemRegistry: append([]byte(nil), integrationItemRegistryRaw...),
 			StartGamePacket: &packet.StartGame{
 				WorldName:                "BedrockDebugProxy complete integration",
 				EntityUniqueID:           1,
@@ -503,6 +529,10 @@ func TestRunnerForwardsBidirectionalPacketsAndCapturesSession(t *testing.T) {
 		info.WorldTemplateVersion != integrationResourcePacksInfo.WorldTemplateVersion {
 		_ = client.Close()
 		t.Fatalf("downstream resource-pack offer metadata was not preserved: %#v", info)
+	}
+	if !bytes.Equal(client.GameData().RawItemRegistry, integrationItemRegistryRaw) {
+		_ = client.Close()
+		t.Fatal("downstream ItemRegistry wire bytes were not preserved")
 	}
 	for _, outgoing := range []packet.Packet{
 		integrationPlayerSkin(),

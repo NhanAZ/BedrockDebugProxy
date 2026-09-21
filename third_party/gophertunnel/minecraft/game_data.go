@@ -9,6 +9,20 @@ import (
 // GameData is a loose wrapper around a part of the data found in the StartGame packet. It holds data sent
 // specifically at the start of the game, such as the position of the player, the game mode, etc.
 type GameData struct {
+	// RawProtocolID identifies the negotiated protocol used by the retained raw
+	// startup packets below. A listener may only write those bytes when its
+	// downstream connection negotiated the same protocol.
+	RawProtocolID int32
+	// RawDimensionData contains the complete wire representation of a
+	// DimensionData packet observed during a dialled server's login exchange.
+	// It is retained so a terminating bridge can preserve the original bytes
+	// when the downstream protocol matches.
+	RawDimensionData []byte
+	// RawItemRegistry contains the complete wire representation of an
+	// ItemRegistry packet observed during a dialled server's login exchange.
+	// It is retained so a terminating bridge can preserve the original bytes
+	// when the downstream protocol matches.
+	RawItemRegistry []byte
 	// ResourcePacksInfo contains the complete decoded resource-pack offer
 	// observed during a dialled server's login exchange. It is retained so a
 	// terminating bridge can preserve the offer metadata while rebuilding the

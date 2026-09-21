@@ -721,7 +721,7 @@ func (conn *Conn) handle(pkData *packetData) error {
 	if err != nil {
 		return err
 	}
-	if err := conn.handleMultiple(pks); err != nil {
+	if err := conn.handleMultiple(pks, pkData); err != nil {
 		return err
 	}
 	return nil
@@ -752,7 +752,7 @@ func (conn *Conn) handleDeferredPackets() error {
 		if err != nil {
 			return err
 		}
-		if err := conn.handleMultiple(pks); err != nil {
+		if err := conn.handleMultiple(pks, data); err != nil {
 			return err
 		}
 	}
@@ -780,10 +780,14 @@ func (conn *Conn) takeExpectedDeferredPacket() (*packetData, bool) {
 
 // handleMultiple handles multiple packets and returns an error if at least one of those packets could not be handled
 // successfully.
-func (conn *Conn) handleMultiple(pks []packet.Packet) error {
+func (conn *Conn) handleMultiple(pks []packet.Packet, raw *packetData) error {
 	var err error
-	for _, pk := range pks {
-		if e := conn.handlePacket(pk); e != nil {
+	for index, pk := range pks {
+		var packetRaw *packetData
+		if index == 0 {
+			packetRaw = raw
+		}
+		if e := conn.handlePacket(pk, packetRaw); e != nil {
 			err = fmt.Errorf("handle %T: %w", pk, e)
 		}
 	}
@@ -792,7 +796,7 @@ func (conn *Conn) handleMultiple(pks []packet.Packet) error {
 
 // handlePacket handles an incoming packet. It returns an error if any of the data found in the packet was not
 // valid or if handling failed for any other reason.
-func (conn *Conn) handlePacket(pk packet.Packet) error {
+func (conn *Conn) handlePacket(pk packet.Packet, raw *packetData) error {
 	defer func() {
 		_ = conn.Flush()
 	}()
@@ -833,11 +837,11 @@ func (conn *Conn) handlePacket(pk packet.Packet) error {
 	case *packet.StartGame:
 		return conn.handleStartGame(pk)
 	case *packet.ItemRegistry:
-		return conn.handleItemRegistry(pk)
+		return conn.handleItemRegistry(pk, raw)
 	case *packet.ChunkRadiusUpdated:
 		return conn.handleChunkRadiusUpdated(pk)
 	case *packet.DimensionData:
-		return conn.handleDimensionData(pk)
+		return conn.handleDimensionData(pk, raw)
 	case *packet.JigsawStructureData:
 		return conn.handleJigsawStructureData(pk)
 	case *packet.VoxelShapes:
@@ -1253,7 +1257,12 @@ func (conn *Conn) handleResourcePackClientResponse(pk *packet.ResourcePackClient
 // startGame sends a StartGame packet using the game data of the connection.
 func (conn *Conn) startGame() {
 	data := conn.gameData
-	if len(data.Dimensions) > 0 {
+	if len(data.RawDimensionData) > 0 && data.RawProtocolID == conn.proto.ID() {
+		if err := conn.writeRawStartupPacket(data.RawDimensionData, packet.IDDimensionData); err != nil {
+			conn.log.Warn("write retained DimensionData bytes", "err", err)
+			_ = conn.WritePacket(&packet.DimensionData{Definitions: data.Dimensions})
+		}
+	} else if len(data.Dimensions) > 0 {
 		_ = conn.WritePacket(&packet.DimensionData{Definitions: data.Dimensions})
 	}
 	jigsawStructureData := &packet.JigsawStructureData{
@@ -1324,9 +1333,27 @@ func (conn *Conn) startGame() {
 		startGamePacket = *data.StartGamePacket
 	}
 	_ = conn.WritePacket(&startGamePacket)
-	_ = conn.WritePacket(&packet.ItemRegistry{Items: data.Items})
+	if len(data.RawItemRegistry) > 0 && data.RawProtocolID == conn.proto.ID() {
+		if err := conn.writeRawStartupPacket(data.RawItemRegistry, packet.IDItemRegistry); err != nil {
+			conn.log.Warn("write retained ItemRegistry bytes", "err", err)
+			_ = conn.WritePacket(&packet.ItemRegistry{Items: data.Items})
+		}
+	} else {
+		_ = conn.WritePacket(&packet.ItemRegistry{Items: data.Items})
+	}
 	_ = conn.Flush()
 	conn.expect(packet.IDRequestChunkRadius, packet.IDSetLocalPlayerAsInitialised)
+}
+
+func (conn *Conn) writeRawStartupPacket(raw []byte, expectedID uint32) error {
+	data, err := parseData(append([]byte(nil), raw...), nil)
+	if err != nil {
+		return err
+	}
+	if data.h.PacketID != expectedID {
+		return fmt.Errorf("retained packet ID %d, expected %d", data.h.PacketID, expectedID)
+	}
+	return conn.WriteRawPacket(packetReadFromData(data))
 }
 
 // nextResourcePackDownload moves to the next resource pack to download and sends a resource pack data info
@@ -1509,8 +1536,12 @@ func waitResourcePackChunkSendDelay(ctx context.Context, delay time.Duration) er
 	}
 }
 
-func (conn *Conn) handleDimensionData(pk *packet.DimensionData) error {
-	conn.gameData.Dimensions = pk.Definitions
+func (conn *Conn) handleDimensionData(pk *packet.DimensionData, raw *packetData) error {
+	conn.gameData.Dimensions = slices.Clone(pk.Definitions)
+	conn.gameData.RawProtocolID = conn.proto.ID()
+	if raw != nil {
+		conn.gameData.RawDimensionData = append([]byte(nil), raw.full...)
+	}
 	return nil
 }
 
@@ -1531,6 +1562,9 @@ func (conn *Conn) handleVoxelShapes(pk *packet.VoxelShapes) error {
 func (conn *Conn) handleStartGame(pk *packet.StartGame) error {
 	startGamePacket := *pk
 	conn.gameData = GameData{
+		RawProtocolID:                conn.gameData.RawProtocolID,
+		RawDimensionData:             slices.Clone(conn.gameData.RawDimensionData),
+		RawItemRegistry:              slices.Clone(conn.gameData.RawItemRegistry),
 		ResourcePacksInfo:            conn.gameData.ResourcePacksInfo,
 		ResourcePackStack:            conn.gameData.ResourcePackStack,
 		StartGamePacket:              &startGamePacket,
@@ -1579,8 +1613,12 @@ func (conn *Conn) handleStartGame(pk *packet.StartGame) error {
 
 // handleItemRegistry handles an incoming ItemRegistry packet. It contains the item definitions that the client
 // should use, including the shield ID which is necessary for reading and writing items in the future.
-func (conn *Conn) handleItemRegistry(pk *packet.ItemRegistry) error {
-	conn.gameData.Items = pk.Items
+func (conn *Conn) handleItemRegistry(pk *packet.ItemRegistry, raw *packetData) error {
+	conn.gameData.Items = slices.Clone(pk.Items)
+	conn.gameData.RawProtocolID = conn.proto.ID()
+	if raw != nil {
+		conn.gameData.RawItemRegistry = append([]byte(nil), raw.full...)
+	}
 	for _, item := range pk.Items {
 		if item.Name == "minecraft:shield" {
 			conn.shieldID.Store(int32(item.RuntimeID))

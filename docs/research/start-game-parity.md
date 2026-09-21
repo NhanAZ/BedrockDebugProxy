@@ -16,6 +16,8 @@ This was an observable protocol-boundary discrepancy even when gameplay packets 
 
 The same capture review found that packet ID 313 (`JigsawStructureData`) and packet ID 337 (`VoxelShapes`) were decoded during upstream login but were not retained by the connection state. The listener therefore generated empty versions and the deferred upstream packets were forwarded later, producing two downstream copies. The login state now accepts and retains both packet types after resource-pack negotiation, and the listener reuses them when present.
 
+The local capture `captures/session-20260921T003441Z` also contained an `ItemRegistry` packet with equal upstream and downstream sizes but different wire hashes. Decoding both packets produced 2,076 entries with equal semantic values. The first difference was inside an NBT compound, which shows that typed re-encoding can change map-entry order even when the decoded registry is unchanged. The bridge now retains the complete raw `DimensionData` and `ItemRegistry` packets and writes them unchanged when the downstream protocol matches.
+
 In the affected local capture `captures/session-20260921T005313Z`, the upstream packet IDs occurred at sequences 40 and 41, while the downstream stream contained generated copies at 254 and 255 and later forwarded copies at 1019 and 1022. The affected Hive capture `captures/session-20260920T135412Z` showed the same shape with upstream packets at 983 and 985 and downstream copies at 1397, 1401, 4017, and 4023. These are capture observations of startup duplication, not an inference about any server-side policy.
 
 ## Evidence and provenance
@@ -23,6 +25,7 @@ In the affected local capture `captures/session-20260921T005313Z`, the upstream 
 - Vendored implementation: `third_party/gophertunnel/minecraft/game_data.go`, `conn.go`, and `internal/proxy/proxy.go` at the project revision that introduced FIX-0059.
 - Upstream gophertunnel `GameData` remains a partial wrapper at commit [`7a556a07335b663744b50d38062636ad8283f314`](https://github.com/Sandertv/gophertunnel/blob/7a556a07335b663744b50d38062636ad8283f314/minecraft/game_data.go), reviewed 2026-09-21.
 - The packet definition and serialization order are in the same upstream revision's [`StartGame`](https://github.com/Sandertv/gophertunnel/blob/7a556a07335b663744b50d38062636ad8283f314/minecraft/protocol/packet/start_game.go) type.
+- The raw startup retention path is implemented in the vendored `minecraft.GameData`, `Conn` login handlers, and listener-side startup writer. It validates the packet ID and negotiated protocol before writing retained bytes.
 
 ## Validation
 
@@ -30,8 +33,9 @@ In the affected local capture `captures/session-20260921T005313Z`, the upstream 
 - `go test ./internal/proxy -run '^TestRunnerForwardsBidirectionalPacketsAndCapturesSession$' -count=1 -v` passed.
 - The proxy integration test sends non-default `StartGame` fields from an owner-controlled loopback server and verifies them through the downstream decoded packet.
 - The same integration test sends non-empty Jigsaw and VoxelShapes data and verifies that the downstream client retains one decoded copy of each.
+- The same integration test supplies a non-default raw `ItemRegistry` and verifies that the downstream connection retains the exact startup wire bytes.
 - No public server was contacted. No account, server policy, or enforcement behavior was changed or tested.
 
 ## Limitations
 
-This preserves decoded `StartGame`, JigsawStructureData, and VoxelShapes fields through the terminating bridge for the observed pre-spawn ordering. It does not make the two authenticated login chains identical, and it does not claim byte identity for the separate DimensionData, ItemRegistry, or spawn-handshake packets. Packets that first arrive after the connection is fully spawned remain ordinary forwarded traffic.
+This preserves decoded `StartGame`, JigsawStructureData, and VoxelShapes fields through the terminating bridge for the observed pre-spawn ordering, and preserves raw `DimensionData` and `ItemRegistry` bytes when protocol IDs match. It does not make the two authenticated login chains identical, and it does not claim byte identity for `StartGame`, Jigsaw, VoxelShapes, or the spawn-handshake packets. Packets that first arrive after the connection is fully spawned remain ordinary forwarded traffic.
