@@ -502,6 +502,14 @@ Every new entry should state the symptom, root cause, implementation commits, ev
 - Evidence and validation: the local capture above, the proxy loopback integration test with non-default optional-offer metadata, and the resource-pack negotiation research note.
 - Status: implemented for decoded offer metadata. URL entries remain intentionally removed from downstream copies because the proxy delivers pack bytes over its own RakNet connection.
 
+### FIX-0063 - Preserve raw dimension and item startup packets
+
+- Symptom: the local capture `session-20260921T003441Z` contained an `ItemRegistry` packet with the same upstream and downstream size but a different wire hash. Decoding both packets produced equal semantic registries, so the difference was in typed re-serialization rather than the item values.
+- Root cause: the terminating listener reconstructed `DimensionData` and `ItemRegistry` from decoded `GameData`. NBT maps inside item components can serialize in a different key order even when their decoded values are unchanged.
+- Implementation: retain the complete raw packets and negotiated protocol ID during the dialled login exchange. The listener validates the packet ID and protocol before writing the retained bytes, and keeps the existing typed reconstruction as a fallback. Raw bytes are copied before the login buffer is released.
+- Evidence and validation: the local capture above, the raw packet semantic probe showing 2,076 equal `ItemRegistry` entries, nested gophertunnel raw-retention and startup-writer tests, and the proxy loopback integration test that verifies exact downstream `ItemRegistry` bytes.
+- Status: implemented for `DimensionData` and `ItemRegistry` when protocol IDs match. Other startup packets remain separate parity boundaries.
+
 ## Ordering safety contract
 
 The deferred-packet change is deliberately narrow. `expectedIDs` remains the only authority for what the current login state accepts. The queue scan selects the earliest packet that is currently expected, leaves packets for later states queued, and never mutates or reorders bytes on the wire. The regression tests cover canonical resource-pack order, featured early `ResourcePacksInfo`, a later-phase packet queued ahead of the current phase, and all six permutations of the three login packets.

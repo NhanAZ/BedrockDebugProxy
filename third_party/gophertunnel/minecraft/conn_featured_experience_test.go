@@ -297,6 +297,92 @@ func TestHandlePreservesResourcePackStackForBridge(t *testing.T) {
 	}
 }
 
+func TestHandlePreservesRawStartupPacketsForBridge(t *testing.T) {
+	conn := newLoginTestConn()
+	dimension := &packet.DimensionData{Definitions: []protocol.DimensionDefinition{{
+		Name:          "integration:dimension",
+		MinimumY:      -64,
+		HeightRange:   384,
+		Generator:     protocol.GeneratorOverworld,
+		DimensionType: 1000,
+		DefaultBiome:  "integration:biome",
+	}}}
+	conn.expectedIDs.Store([]uint32{packet.IDDimensionData})
+	dimensionRaw := wirePacketData(t, dimension)
+	if err := conn.handle(dimensionRaw); err != nil {
+		t.Fatalf("handle DimensionData: %v", err)
+	}
+
+	itemRegistry := &packet.ItemRegistry{Items: []protocol.ItemEntry{{
+		Name:           "integration:item",
+		RuntimeID:      42,
+		ComponentBased: true,
+		Version:        1,
+		Data: map[string]any{
+			"components": map[string]any{
+				"integration:first":  "one",
+				"integration:second": "two",
+			},
+		},
+	}}}
+	conn.expectedIDs.Store([]uint32{packet.IDItemRegistry})
+	itemRaw := wirePacketData(t, itemRegistry)
+	if err := conn.handle(itemRaw); err != nil {
+		t.Fatalf("handle ItemRegistry: %v", err)
+	}
+
+	data := conn.GameData()
+	if data.RawProtocolID != DefaultProtocol.ID() {
+		t.Fatalf("raw protocol ID = %d, want %d", data.RawProtocolID, DefaultProtocol.ID())
+	}
+	if !bytes.Equal(data.RawDimensionData, dimensionRaw.full) {
+		t.Fatal("retained DimensionData bytes differ from input")
+	}
+	if !bytes.Equal(data.RawItemRegistry, itemRaw.full) {
+		t.Fatal("retained ItemRegistry bytes differ from input")
+	}
+}
+
+func TestStartGameWritesRetainedItemRegistryBytes(t *testing.T) {
+	itemRegistry := &packet.ItemRegistry{Items: []protocol.ItemEntry{{
+		Name:           "integration:item",
+		RuntimeID:      42,
+		ComponentBased: true,
+		Version:        1,
+		Data: map[string]any{
+			"components": map[string]any{
+				"integration:first":  "one",
+				"integration:second": "two",
+			},
+		},
+	}}}
+	raw := wirePacketData(t, itemRegistry)
+	var output bytes.Buffer
+	conn := &Conn{
+		ctx:   context.Background(),
+		log:   slog.Default(),
+		proto: DefaultProtocol,
+		enc:   packet.NewEncoder(&output),
+		hdr:   &packet.Header{},
+		gameData: GameData{
+			RawProtocolID:   DefaultProtocol.ID(),
+			RawItemRegistry: append([]byte(nil), raw.full...),
+		},
+	}
+
+	conn.startGame()
+	decoded, err := packet.NewDecoder(bytes.NewReader(output.Bytes())).Decode()
+	if err != nil {
+		t.Fatalf("decode startup packets: %v", err)
+	}
+	if len(decoded) != 4 {
+		t.Fatalf("startup packet count = %d, want 4", len(decoded))
+	}
+	if !bytes.Equal(decoded[len(decoded)-1], raw.full) {
+		t.Fatal("StartGame did not write retained ItemRegistry bytes")
+	}
+}
+
 func newLoginTestConn() *Conn {
 	return &Conn{
 		ctx:   context.Background(),
