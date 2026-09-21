@@ -66,6 +66,7 @@ Detailed rationale remains in [`docs/audits/`](docs/audits/).
 - Live capture refreshes now preserve the open filter menu's scroll position while its options are rebuilt.
 - The compact capture overview now vertically centers each metric label and value within the header row.
 - The contributor validation workflow now requires viewer asset, HTTP, JavaScript, and browser smoke checks in the same change whenever a web-facing change could affect the page.
+- Validation reports now preserve capture start and end timestamps as invariant UTC ISO 8601 values instead of locale-formatted strings.
 
 ### Fixed
 
