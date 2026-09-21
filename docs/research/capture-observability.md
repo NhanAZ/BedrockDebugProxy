@@ -31,6 +31,8 @@ The clear local capture gaps were decoded connection metadata and upstream GameD
 
 Transport payload events now supplement the application-batch blob with per-connection Bedrock boundary state as soon as the connection object is created, including during login. `raknet_client_guid` is retained when the active connection exposes a non-zero RakNet client identity. `bedrock_compression_state` is `negotiated` or `not_negotiated`, and negotiated events include the numeric compression threshold and algorithm. `bedrock_encryption_state` is `enabled`, `disabled`, or `not_enabled`. These fields describe the connection state observed by the proxy. The GUID is sensitive transport identity metadata and remains in the local capture. These fields do not decode RakNet datagrams, identify a cipher outside the connection API, or replace the raw transport payload.
 
+Transport lifecycle events also retain the optional RakNet GUID and public-key capability at connection open or close when the underlying `net.Conn` exposes them. Only public-key capability and presence booleans are stored. This records the identity boundary needed for local parity analysis without persisting the key itself.
+
 ## Representative packet-family coverage
 
 The loopback regression test `TestRunnerForwardsBidirectionalPacketsAndCapturesSession` sends representative packets through both sides of the proxy and checks both forwarding and capture. It covers `PlayerSkin` with skin and cape bytes, `AddActor`, `LevelChunk`, `SubChunkRequest`, `UpdateBlock`, `InventoryContent`, `InventoryTransaction`, `MovePlayer`, and `Emote`.

@@ -191,6 +191,48 @@ func TestObservedConnPreservesTransportCapabilities(t *testing.T) {
 	}
 }
 
+func TestRecordConnectionCapturesTransportIdentityMetadata(t *testing.T) {
+	key, err := ecdsa.GenerateKey(elliptic.P256(), rand.Reader)
+	if err != nil {
+		t.Fatal(err)
+	}
+	root := filepath.Join(t.TempDir(), "capture")
+	recorder, err := capture.New(root, capture.Options{})
+	if err != nil {
+		t.Fatal(err)
+	}
+	network := Network{
+		Recorder:     recorder,
+		Failures:     &FailureSink{},
+		SessionID:    "session-test",
+		ConnectionID: "connection-test",
+		Channel:      "upstream",
+		Hop:          2,
+	}
+	conn := &fakeCapabilityConn{fakePacketConn: fakePacketConn{}, publicKey: &key.PublicKey, clientGUID: 1234}
+	if err := network.recordConnection("transport.connection_open", conn, nil); err != nil {
+		t.Fatal(err)
+	}
+	if err := recorder.Close("closed", nil); err != nil {
+		t.Fatal(err)
+	}
+	if err := capture.ScanEvents(root, func(event capture.Event) error {
+		if event.Kind != "transport.connection_open" {
+			return nil
+		}
+		var data map[string]any
+		if err := json.Unmarshal(event.Data, &data); err != nil {
+			return err
+		}
+		if data["raknet_client_guid"] != float64(1234) || data["transport_public_key_capability"] != true || data["transport_public_key_present"] != true {
+			t.Fatalf("connection metadata = %#v", data)
+		}
+		return nil
+	}); err != nil {
+		t.Fatal(err)
+	}
+}
+
 func TestNetworkPingCapturesResponseBytes(t *testing.T) {
 	root := filepath.Join(t.TempDir(), "capture")
 	recorder, err := capture.New(root, capture.Options{})
@@ -325,12 +367,14 @@ type fakePacketConn struct {
 
 type fakeCapabilityConn struct {
 	fakePacketConn
-	publicKey *ecdsa.PublicKey
+	publicKey  *ecdsa.PublicKey
+	clientGUID int64
 }
 
 func (*fakeCapabilityConn) BatchHeader() []byte           { return nil }
 func (*fakeCapabilityConn) DisableEncryption() bool       { return true }
 func (c *fakeCapabilityConn) PublicKey() *ecdsa.PublicKey { return c.publicKey }
+func (c *fakeCapabilityConn) ClientGUID() int64           { return c.clientGUID }
 
 type fakePingNetwork struct {
 	response []byte

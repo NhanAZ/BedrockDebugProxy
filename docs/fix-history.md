@@ -798,6 +798,14 @@ Every new entry should state the symptom, root cause, implementation commits, ev
 - Evidence and validation: gophertunnel's `Conn.RakNetClientGUID` delegates to the transport's optional `ClientGUID` method, and the proxy already preserves that value for transfer routing. The local integration test now verifies GUID metadata on the dialled upstream channel; the listener-side connection may legitimately omit it when its transport does not expose a non-zero client GUID. No network or public server was contacted.
 - Status: implemented as a capture-observability correction. The GUID is sensitive local transport identity metadata; raw UDP and RakNet recovery frames remain outside the current boundary.
 
+### FIX-0099 - Record transport identity at connection boundaries
+
+- Symptom: connection-open and connection-close events retained endpoints but not the optional RakNet GUID or public-key capability already visible on the underlying transport.
+- Root cause: `Network.recordConnection` populated only generic lifecycle fields, while payload metadata was the first place to classify some connection state.
+- Implementation: add bounded `data` metadata for a non-zero RakNet client GUID and for the presence of the optional public-key method and value. The public key itself is never serialized, and transport errors retain their existing lifecycle semantics.
+- Evidence and validation: gophertunnel and the observing wrapper expose `ClientGUID` and `PublicKey` at the `net.Conn` boundary. The bedrock network regression test verifies both fields on `transport.connection_open`; no network or public server was contacted.
+- Status: implemented as a capture-observability correction. The fields describe capabilities, not a transport fingerprint or raw datagram behavior.
+
 ## Ordering safety contract
 
 The deferred-packet change is deliberately narrow. `expectedIDs` remains the only authority for what the current login state accepts. The queue scan selects the earliest packet that is currently expected, leaves packets for later states queued, and never mutates or reorders bytes on the wire. The regression tests cover canonical resource-pack order, featured early `ResourcePacksInfo`, a later-phase packet queued ahead of the current phase, and all six permutations of the three login packets.

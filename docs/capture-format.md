@@ -32,6 +32,8 @@ Event kinds are namespaced strings such as `session.open`, `session.connection_m
 
 `transport.ping` records the response returned by the selected transport's status-ping operation. Its `data` object contains the requested address, response byte count, and elapsed duration. A successful response is retained as a raw blob with representation `bedrock_transport_ping`; a failed operation retains any partial response and records the transport error. This is the transport API response, not a raw UDP or RakNet datagram, and the ping request bytes remain outside this observation boundary.
 
+`transport.connection_open`, `transport.connection_error`, and `transport.connection_close` may include transport identity metadata in `data`. A non-zero `raknet_client_guid` is retained when the underlying connection exposes it. A `transport_public_key_capability` and `transport_public_key_present` pair is retained when the connection exposes the optional public-key method, without storing the key itself. These fields describe capabilities at the transport boundary and do not prove a specific transport implementation.
+
 Connection and protocol context remains explicit through session ID, connection ID, hop, channel, logical direction, stage, source, and destination fields. A parent sequence can link a derived event to an earlier observation when the adapter can prove the relationship.
 
 Decoded packet fields are stored in the optional `data` object. Each struct carries its Go type. Binary fields are summarized with their size, SHA-256 digest, and an optional short preview. The exact packet payload remains available through the raw packet event and blob reference.

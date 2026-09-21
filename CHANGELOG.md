@@ -38,6 +38,7 @@ Detailed rationale remains in [`docs/audits/`](docs/audits/).
 - Transport status-ping responses are now retained as raw `transport.ping` evidence, including partial responses and operation errors.
 - Transfer route probes now use the observing network boundary, retaining their status-ping responses alongside the route-probe result.
 - Transport payload events now retain non-zero RakNet client GUID metadata when the connection exposes it.
+- Transport connection lifecycle events now retain bounded RakNet GUID and public-key capability metadata without storing public-key material.
 - Downstream resource-pack offers now retain per-pack content identity, sub-pack, script, addon, and RTX metadata while still rebuilding entries from proxy-served archives.
 - Terminating bridges now retain and reuse raw `DimensionData` and `ItemRegistry` startup packets when the downstream protocol matches, avoiding wire differences caused by typed re-serialization of NBT maps.
 - Terminating bridges now forward each observed downstream `RequestChunkRadius` to the paired upstream connection while retaining the existing 16/16 initial fallback.
