@@ -758,6 +758,14 @@ Every new entry should state the symptom, root cause, implementation commits, ev
 - Evidence and validation: the strict decoder follows the existing `RequestChunkRadius` boundary check. A regression test appends a trailing byte to an otherwise valid empty offer and requires an error with no decoded value. No network or public server was contacted.
 - Status: implemented with deterministic local coverage. URL-prefetch side effects are now gated on a complete typed offer.
 
+### FIX-0095 - Preserve the NetherNet transport public key
+
+- Symptom: the observing `net.Conn` wrapper preserved most optional transport methods but hid NetherNet's `PublicKey` capability from gophertunnel.
+- Root cause: `observedConn` exposed `BatchHeader`, encryption state, packet reads, context, latency, and client GUID explicitly, but had no forwarding method for the authenticated transport key. Gophertunnel therefore could not perform its optional transport-to-login public-key comparison through the wrapper.
+- Implementation: forward `PublicKey() *ecdsa.PublicKey` when the underlying transport provides it and return nil for transports without that capability. No packet bytes or authentication tokens are rewritten; gophertunnel's existing transport-to-login check is restored.
+- Evidence and validation: the gophertunnel `publicKeyConn` boundary and go-nethernet `Conn.PublicKey` implementation establish the method contract. The bedrock network regression test now verifies pointer preservation through `observedConn`. No network or public server was contacted.
+- Status: implemented with deterministic local coverage. A live NetherNet capture remains unverified.
+
 ## Ordering safety contract
 
 The deferred-packet change is deliberately narrow. `expectedIDs` remains the only authority for what the current login state accepts. The queue scan selects the earliest packet that is currently expected, leaves packets for later states queued, and never mutates or reorders bytes on the wire. The regression tests cover canonical resource-pack order, featured early `ResourcePacksInfo`, a later-phase packet queued ahead of the current phase, and all six permutations of the three login packets.

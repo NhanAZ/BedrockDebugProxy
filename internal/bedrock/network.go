@@ -237,6 +237,16 @@ func (c *observedConn) DisableEncryption() bool {
 	return false
 }
 
+// PublicKey preserves the authenticated transport key exposed by NetherNet.
+// gophertunnel uses this optional capability to compare the transport identity
+// with the login identity before enabling packet encryption.
+func (c *observedConn) PublicKey() *ecdsa.PublicKey {
+	if source, ok := c.Conn.(interface{ PublicKey() *ecdsa.PublicKey }); ok {
+		return source.PublicKey()
+	}
+	return nil
+}
+
 func (c *observedConn) Write(payload []byte) (int, error) {
 	n, err := c.Conn.Write(payload)
 	if captureErr := c.recordPayload("write", payload, len(payload), n, err); captureErr != nil {
