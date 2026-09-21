@@ -558,6 +558,14 @@ Every new entry should state the symptom, root cause, implementation commits, ev
 - Evidence and validation: `internal/bedrock/network.go`, `internal/bedrock/network_test.go`, `internal/experience/target.go`, and the vendored NetherNet capability assertion show the supported path. The focused network tests pass.
 - Status: documentation correction only. A live controlled NetherNet capture is still pending.
 
+### FIX-0070 - Correct transport-state limitation metadata
+
+- Symptom: newly opened manifests still claimed that transport payload compression and encryption state was not classified per event after the capture path began recording that state during login.
+- Root cause: the CLI limitation string was not updated when transport metadata observability was implemented.
+- Implementation: centralize the CLI limitation list and describe the narrower boundary that very early payloads may precede connection-state availability. Add a regression test for the wording.
+- Evidence and validation: `internal/proxy/proxy_test.go` and `internal/bedrock/network_test.go` cover negotiated transport metadata, while the new CLI test prevents the stale limitation from returning. No forwarding or capture bytes change.
+- Status: implemented as a capture metadata correction. Raw UDP and RakNet recovery frames remain outside the supported observation boundary.
+
 ## Ordering safety contract
 
 The deferred-packet change is deliberately narrow. `expectedIDs` remains the only authority for what the current login state accepts. The queue scan selects the earliest packet that is currently expected, leaves packets for later states queued, and never mutates or reorders bytes on the wire. The regression tests cover canonical resource-pack order, featured early `ResourcePacksInfo`, a later-phase packet queued ahead of the current phase, and all six permutations of the three login packets.

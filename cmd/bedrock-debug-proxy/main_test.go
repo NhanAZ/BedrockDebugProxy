@@ -91,6 +91,16 @@ func TestRunRejectsExperienceWithoutDeviceAuthentication(t *testing.T) {
 	}
 }
 
+func TestCaptureLimitationsDescribeTransportStateBoundary(t *testing.T) {
+	limitations := strings.Join(captureLimitations(false, false), "\n")
+	if strings.Contains(limitations, "not yet classified per event") {
+		t.Fatalf("stale transport limitation = %s", limitations)
+	}
+	if !strings.Contains(limitations, "Early transport payloads may not expose compression or encryption state") {
+		t.Fatalf("transport boundary limitation missing = %s", limitations)
+	}
+}
+
 func TestCaptureInspectionAnalysisExplanationAndExportCommands(t *testing.T) {
 	root := filepath.Join(t.TempDir(), "capture")
 	recorder, err := capture.New(root, capture.Options{CaptureID: "command-test"})
