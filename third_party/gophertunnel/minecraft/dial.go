@@ -577,11 +577,15 @@ func setAndroidData(data *login.ClientData) {
 	data.GameVersion = protocol.CurrentVersion
 }
 
-// clearXBLIdentityData clears data from the login.IdentityData that is only set when a player is logged into
-// XBOX Live.
+// clearXBLIdentityData clears authentication-bound data before an offline login.
+// The PlayFab fields are carried in the multiplayer token as well as the legacy
+// chain, so retaining them would mix an authenticated identity with a self-signed
+// request.
 func clearXBLIdentityData(data *login.IdentityData) {
 	data.XUID = ""
 	data.TitleID = ""
+	data.PlayFabTitleID = ""
+	data.PlayFabID = ""
 }
 
 // defaultIdentityData edits the IdentityData passed to have defaults set to all fields that were left
