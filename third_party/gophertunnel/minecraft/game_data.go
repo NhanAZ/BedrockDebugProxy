@@ -18,6 +18,21 @@ type GameData struct {
 	// It is retained so a terminating bridge can preserve the original bytes
 	// when the downstream protocol matches.
 	RawDimensionData []byte
+	// RawJigsawStructureData contains the complete wire representation of a
+	// JigsawStructureData packet observed during a dialled server's login
+	// exchange. It is retained so a terminating bridge can preserve the
+	// original bytes when the downstream protocol matches.
+	RawJigsawStructureData []byte
+	// RawStartGame contains the complete wire representation of a StartGame
+	// packet observed during a dialled server's login exchange. It is retained
+	// so a terminating bridge can preserve the original bytes when the
+	// downstream protocol matches.
+	RawStartGame []byte
+	// RawVoxelShapes contains the complete wire representation of a VoxelShapes
+	// packet observed during a dialled server's login exchange. It is retained
+	// so a terminating bridge can preserve the original bytes when the
+	// downstream protocol matches.
+	RawVoxelShapes []byte
 	// RawItemRegistry contains the complete wire representation of an
 	// ItemRegistry packet observed during a dialled server's login exchange.
 	// It is retained so a terminating bridge can preserve the original bytes

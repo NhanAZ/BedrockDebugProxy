@@ -247,6 +247,31 @@ func TestRunnerForwardsBidirectionalPacketsAndCapturesSession(t *testing.T) {
 		},
 	}}}
 	integrationItemRegistryRaw := integrationRawPacket(t, integrationItemRegistry)
+	integrationStartGame := &packet.StartGame{
+		WorldName:                "BedrockDebugProxy complete integration",
+		EntityUniqueID:           1,
+		EntityRuntimeID:          1,
+		Generator:                2,
+		EducationFeaturesEnabled: false,
+		MultiPlayerGame:          false,
+		LANBroadcastEnabled:      false,
+		CommandsEnabled:          false,
+		LevelID:                  "integration-level",
+		EnchantmentSeed:          17,
+		GameVersion:              "1.26.51",
+		ServerAuthoritativeSound: true,
+		ServerID:                 "integration-server",
+	}
+	integrationStartGameRaw := integrationRawPacket(t, integrationStartGame)
+	integrationJigsaw := &packet.JigsawStructureData{StructureData: map[string]any{
+		"jigsaws": []any{map[string]any{"identifier": "integration:jigsaw"}},
+	}}
+	integrationJigsawRaw := integrationRawPacket(t, integrationJigsaw)
+	integrationVoxelShapes := &packet.VoxelShapes{
+		NameMap:          []protocol.VoxelShapeNameEntry{{Name: "integration:shape", ID: 7}},
+		CustomShapeCount: 7,
+	}
+	integrationVoxelShapesRaw := integrationRawPacket(t, integrationVoxelShapes)
 	upstreamListener, err := (minecraft.ListenConfig{
 		AuthenticationDisabled: true,
 		AllowUnknownPackets:    true,
@@ -295,33 +320,17 @@ func TestRunnerForwardsBidirectionalPacketsAndCapturesSession(t *testing.T) {
 			return
 		}
 		if startErr := serverConn.StartGame(minecraft.GameData{
-			WorldName:       "BedrockDebugProxy integration",
-			EntityUniqueID:  1,
-			EntityRuntimeID: 1,
-			RawProtocolID:   serverConn.Proto().ID(),
-			RawItemRegistry: append([]byte(nil), integrationItemRegistryRaw...),
-			StartGamePacket: &packet.StartGame{
-				WorldName:                "BedrockDebugProxy complete integration",
-				EntityUniqueID:           1,
-				EntityRuntimeID:          1,
-				Generator:                2,
-				EducationFeaturesEnabled: false,
-				MultiPlayerGame:          false,
-				LANBroadcastEnabled:      false,
-				CommandsEnabled:          false,
-				LevelID:                  "integration-level",
-				EnchantmentSeed:          17,
-				GameVersion:              "1.26.51",
-				ServerAuthoritativeSound: true,
-				ServerID:                 "integration-server",
-			},
-			JigsawStructureData: &packet.JigsawStructureData{StructureData: map[string]any{
-				"jigsaws": []any{map[string]any{"identifier": "integration:jigsaw"}},
-			}},
-			VoxelShapes: &packet.VoxelShapes{
-				NameMap:          []protocol.VoxelShapeNameEntry{{Name: "integration:shape", ID: 7}},
-				CustomShapeCount: 7,
-			},
+			WorldName:              "BedrockDebugProxy integration",
+			EntityUniqueID:         1,
+			EntityRuntimeID:        1,
+			RawProtocolID:          serverConn.Proto().ID(),
+			RawItemRegistry:        append([]byte(nil), integrationItemRegistryRaw...),
+			RawStartGame:           append([]byte(nil), integrationStartGameRaw...),
+			RawJigsawStructureData: append([]byte(nil), integrationJigsawRaw...),
+			RawVoxelShapes:         append([]byte(nil), integrationVoxelShapesRaw...),
+			StartGamePacket:        integrationStartGame,
+			JigsawStructureData:    integrationJigsaw,
+			VoxelShapes:            integrationVoxelShapes,
 		}); startErr != nil {
 			serverErrors <- fmt.Errorf("start upstream game: %w", startErr)
 			return
@@ -533,6 +542,12 @@ func TestRunnerForwardsBidirectionalPacketsAndCapturesSession(t *testing.T) {
 	if !bytes.Equal(client.GameData().RawItemRegistry, integrationItemRegistryRaw) {
 		_ = client.Close()
 		t.Fatal("downstream ItemRegistry wire bytes were not preserved")
+	}
+	if !bytes.Equal(client.GameData().RawStartGame, integrationStartGameRaw) ||
+		!bytes.Equal(client.GameData().RawJigsawStructureData, integrationJigsawRaw) ||
+		!bytes.Equal(client.GameData().RawVoxelShapes, integrationVoxelShapesRaw) {
+		_ = client.Close()
+		t.Fatal("downstream startup packet wire bytes were not preserved")
 	}
 	for _, outgoing := range []packet.Packet{
 		integrationPlayerSkin(),

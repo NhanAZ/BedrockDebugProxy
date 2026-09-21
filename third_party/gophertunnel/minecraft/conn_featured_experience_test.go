@@ -206,12 +206,16 @@ func TestHandleStartGamePreservesCompletePacketForBridge(t *testing.T) {
 		OwnerID:                      "owner-id",
 	}
 
-	if err := conn.handle(wirePacketData(t, original)); err != nil {
+	raw := wirePacketData(t, original)
+	if err := conn.handle(raw); err != nil {
 		t.Fatalf("handle StartGame: %v", err)
 	}
 	got := conn.GameData().StartGamePacket
 	if got == nil {
 		t.Fatal("GameData.StartGamePacket is nil")
+	}
+	if !bytes.Equal(conn.GameData().RawStartGame, raw.full) {
+		t.Fatal("retained StartGame bytes differ from input")
 	}
 	for name, value := range map[string][2]any{
 		"WorldName":                    {got.WorldName, original.WorldName},
@@ -254,10 +258,12 @@ func TestHandlePreservesStartupWorldPacketsForBridge(t *testing.T) {
 		CustomShapeCount: 7,
 	}
 
-	if err := conn.handle(wirePacketData(t, jigsaw)); err != nil {
+	jigsawRaw := wirePacketData(t, jigsaw)
+	if err := conn.handle(jigsawRaw); err != nil {
 		t.Fatalf("handle JigsawStructureData: %v", err)
 	}
-	if err := conn.handle(wirePacketData(t, voxelShapes)); err != nil {
+	voxelRaw := wirePacketData(t, voxelShapes)
+	if err := conn.handle(voxelRaw); err != nil {
 		t.Fatalf("handle VoxelShapes: %v", err)
 	}
 	data := conn.GameData()
@@ -266,6 +272,12 @@ func TestHandlePreservesStartupWorldPacketsForBridge(t *testing.T) {
 	}
 	if data.VoxelShapes == nil || !reflect.DeepEqual(data.VoxelShapes.NameMap, voxelShapes.NameMap) || data.VoxelShapes.CustomShapeCount != voxelShapes.CustomShapeCount {
 		t.Fatalf("preserved VoxelShapes = %#v, want %#v", data.VoxelShapes, voxelShapes)
+	}
+	if !bytes.Equal(data.RawJigsawStructureData, jigsawRaw.full) {
+		t.Fatal("retained JigsawStructureData bytes differ from input")
+	}
+	if !bytes.Equal(data.RawVoxelShapes, voxelRaw.full) {
+		t.Fatal("retained VoxelShapes bytes differ from input")
 	}
 }
 
@@ -380,6 +392,53 @@ func TestStartGameWritesRetainedItemRegistryBytes(t *testing.T) {
 	}
 	if !bytes.Equal(decoded[len(decoded)-1], raw.full) {
 		t.Fatal("StartGame did not write retained ItemRegistry bytes")
+	}
+}
+
+func TestStartGameWritesRetainedStartupPacketBytes(t *testing.T) {
+	jigsaw := &packet.JigsawStructureData{StructureData: map[string]any{
+		"jigsaws": []any{map[string]any{"identifier": "integration:jigsaw"}},
+	}}
+	voxelShapes := &packet.VoxelShapes{
+		NameMap:          []protocol.VoxelShapeNameEntry{{Name: "integration:shape", ID: 7}},
+		CustomShapeCount: 7,
+	}
+	startGame := &packet.StartGame{
+		WorldName:       "retained-start-game",
+		EntityUniqueID:  1,
+		EntityRuntimeID: 1,
+		GameVersion:     "1.26.51",
+	}
+	jigsawRaw := wirePacketData(t, jigsaw)
+	voxelRaw := wirePacketData(t, voxelShapes)
+	startGameRaw := wirePacketData(t, startGame)
+	var output bytes.Buffer
+	conn := &Conn{
+		ctx:   context.Background(),
+		log:   slog.Default(),
+		proto: DefaultProtocol,
+		enc:   packet.NewEncoder(&output),
+		hdr:   &packet.Header{},
+		gameData: GameData{
+			RawProtocolID:          DefaultProtocol.ID(),
+			RawJigsawStructureData: append([]byte(nil), jigsawRaw.full...),
+			RawStartGame:           append([]byte(nil), startGameRaw.full...),
+			RawVoxelShapes:         append([]byte(nil), voxelRaw.full...),
+		},
+	}
+
+	conn.startGame()
+	decoded, err := packet.NewDecoder(bytes.NewReader(output.Bytes())).Decode()
+	if err != nil {
+		t.Fatalf("decode startup packets: %v", err)
+	}
+	if len(decoded) != 4 {
+		t.Fatalf("startup packet count = %d, want 4", len(decoded))
+	}
+	for index, want := range [][]byte{jigsawRaw.full, voxelRaw.full, startGameRaw.full} {
+		if !bytes.Equal(decoded[index], want) {
+			t.Fatalf("startup packet %d differs from retained bytes", index)
+		}
 	}
 }
 
