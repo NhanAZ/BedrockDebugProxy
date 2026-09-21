@@ -27,6 +27,7 @@ Detailed rationale remains in [`docs/audits/`](docs/audits/).
 - Startup `JigsawStructureData` and `VoxelShapes` packets are now retained from the upstream login and sent once with their original decoded contents instead of being duplicated around the generated spawn sequence.
 - Terminating bridges now retain and reuse the complete upstream `ResourcePackStack`, preserving its pack order, base game version, experiments, and stack flags instead of appending local exempted packs.
 - Terminating bridges now preserve decoded upstream `ResourcePacksInfo` offer metadata while rebuilding downstream pack entries from archive-backed resources that the proxy can serve.
+- URL-prefetched resource packs are now merged with non-URL packs in the upstream offer order instead of replacing the complete list and dropping RakNet-delivered entries.
 - Terminating bridges now retain and reuse raw `DimensionData` and `ItemRegistry` startup packets when the downstream protocol matches, avoiding wire differences caused by typed re-serialization of NBT maps.
 - Terminating bridges now also retain and reuse raw `JigsawStructureData`, `StartGame`, and `VoxelShapes` startup packets when the downstream protocol matches, preserving the observed world-start bytes while keeping typed fallback behavior.
 - Terminating bridges no longer add an empty compatibility `CreativeContent` packet when the upstream server's own packet will be forwarded after spawn, avoiding the observed duplicate startup packet while retaining the upstream raw bytes.

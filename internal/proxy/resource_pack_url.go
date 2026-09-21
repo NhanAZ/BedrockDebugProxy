@@ -37,16 +37,17 @@ const urlResourcePackDownloadConcurrency = 3
 type urlResourcePackCache struct {
 	ctx context.Context
 
-	mu        sync.Mutex
-	packs     map[minecraft.ResourcePackCacheKey]*resource.Pack
-	packOrder []minecraft.ResourcePackCacheKey
-	errors    map[minecraft.ResourcePackCacheKey]error
-	observed  map[minecraft.ResourcePackCacheKey]struct{}
-	offered   chan struct{}
-	ready     chan struct{}
-	offerOnce sync.Once
-	readyOnce sync.Once
-	urlCount  int
+	mu         sync.Mutex
+	packs      map[minecraft.ResourcePackCacheKey]*resource.Pack
+	packOrder  []minecraft.ResourcePackCacheKey
+	offerOrder []minecraft.ResourcePackCacheKey
+	errors     map[minecraft.ResourcePackCacheKey]error
+	observed   map[minecraft.ResourcePackCacheKey]struct{}
+	offered    chan struct{}
+	ready      chan struct{}
+	offerOnce  sync.Once
+	readyOnce  sync.Once
+	urlCount   int
 }
 
 func newURLResourcePackCache(ctx context.Context) *urlResourcePackCache {
@@ -54,13 +55,14 @@ func newURLResourcePackCache(ctx context.Context) *urlResourcePackCache {
 		ctx = context.Background()
 	}
 	return &urlResourcePackCache{
-		ctx:       ctx,
-		packs:     make(map[minecraft.ResourcePackCacheKey]*resource.Pack),
-		packOrder: make([]minecraft.ResourcePackCacheKey, 0),
-		errors:    make(map[minecraft.ResourcePackCacheKey]error),
-		observed:  make(map[minecraft.ResourcePackCacheKey]struct{}),
-		offered:   make(chan struct{}),
-		ready:     make(chan struct{}),
+		ctx:        ctx,
+		packs:      make(map[minecraft.ResourcePackCacheKey]*resource.Pack),
+		packOrder:  make([]minecraft.ResourcePackCacheKey, 0),
+		offerOrder: make([]minecraft.ResourcePackCacheKey, 0),
+		errors:     make(map[minecraft.ResourcePackCacheKey]error),
+		observed:   make(map[minecraft.ResourcePackCacheKey]struct{}),
+		offered:    make(chan struct{}),
+		ready:      make(chan struct{}),
 	}
 }
 
@@ -78,11 +80,23 @@ func (cache *urlResourcePackCache) Observe(header packet.Header, payload []byte)
 		return
 	}
 	urlCount := 0
+	offerOrder := make([]minecraft.ResourcePackCacheKey, 0, len(info.TexturePacks))
 	for _, advertised := range info.TexturePacks {
+		key := minecraft.ResourcePackCacheKey{
+			UUID:    advertised.UUID,
+			Version: advertised.Version,
+			Size:    advertised.Size,
+		}
+		offerOrder = append(offerOrder, key)
 		if advertised.DownloadURL != "" {
 			urlCount++
 		}
 	}
+	cache.mu.Lock()
+	if len(cache.offerOrder) == 0 {
+		cache.offerOrder = append(cache.offerOrder, offerOrder...)
+	}
+	cache.mu.Unlock()
 	cache.offerOnce.Do(func() {
 		cache.mu.Lock()
 		cache.urlCount = urlCount
@@ -157,6 +171,72 @@ func (cache *urlResourcePackCache) Observe(header packet.Header, payload []byte)
 		}
 	}
 	cache.mu.Unlock()
+}
+
+// Merge returns the upstream resource-pack list in the order advertised by
+// ResourcePacksInfo. Cached entries are preferred over any same-key entry
+// returned by gophertunnel. Entries not present in the complete offer order
+// are retained at the end so this method does not discard observed data.
+func (cache *urlResourcePackCache) Merge(existing []*resource.Pack) []*resource.Pack {
+	cache.mu.Lock()
+	offerOrder := append([]minecraft.ResourcePackCacheKey(nil), cache.offerOrder...)
+	packOrder := append([]minecraft.ResourcePackCacheKey(nil), cache.packOrder...)
+	prefetched := make(map[minecraft.ResourcePackCacheKey]*resource.Pack, len(cache.packs))
+	for key, pack := range cache.packs {
+		prefetched[key] = pack
+	}
+	cache.mu.Unlock()
+
+	merged := make([]*resource.Pack, 0, len(existing)+len(prefetched))
+	usedExisting := make([]bool, len(existing))
+	usedPrefetched := make(map[minecraft.ResourcePackCacheKey]bool, len(prefetched))
+	appendExisting := func(key minecraft.ResourcePackCacheKey) bool {
+		for index, pack := range existing {
+			if usedExisting[index] || pack == nil || resourcePackKey(pack) != key {
+				continue
+			}
+			usedExisting[index] = true
+			merged = append(merged, pack)
+			return true
+		}
+		return false
+	}
+	for _, key := range offerOrder {
+		if pack := prefetched[key]; pack != nil && !usedPrefetched[key] {
+			usedPrefetched[key] = true
+			for index, existingPack := range existing {
+				if !usedExisting[index] && existingPack != nil && resourcePackKey(existingPack) == key {
+					usedExisting[index] = true
+					break
+				}
+			}
+			merged = append(merged, pack)
+			continue
+		}
+		appendExisting(key)
+	}
+	for index, pack := range existing {
+		if !usedExisting[index] && pack != nil {
+			merged = append(merged, pack)
+		}
+	}
+	for _, key := range packOrder {
+		if !usedPrefetched[key] {
+			if pack := prefetched[key]; pack != nil {
+				usedPrefetched[key] = true
+				merged = append(merged, pack)
+			}
+		}
+	}
+	return merged
+}
+
+func resourcePackKey(pack *resource.Pack) minecraft.ResourcePackCacheKey {
+	size := pack.Len()
+	if size < 0 {
+		return minecraft.ResourcePackCacheKey{}
+	}
+	return minecraft.ResourcePackCacheKey{UUID: pack.UUID(), Version: pack.Version(), Size: uint64(size)}
 }
 
 func (cache *urlResourcePackCache) download(advertised protocol.TexturePackInfo) (*resource.Pack, error) {
@@ -275,9 +355,9 @@ func (cache *urlResourcePackCache) WaitForOffer(ctx context.Context) bool {
 	}
 }
 
-// Packs returns the successfully prefetched URL packs in ResourcePacksInfo
-// order. It is used while gophertunnel is still completing its own packet
-// handler and therefore conn.ResourcePacks may not yet contain the entries.
+// Packs returns cached packs in cache completion order. It is retained for
+// diagnostics and tests. The connection path uses Merge instead because
+// completion order is not the complete ResourcePacksInfo offer order.
 func (cache *urlResourcePackCache) Packs() []*resource.Pack {
 	cache.mu.Lock()
 	defer cache.mu.Unlock()
