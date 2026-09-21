@@ -10,6 +10,11 @@ The Bedrock `NetworkSettings` packet carries the compression threshold, compress
 
 The owner-controlled capture `captures/session-20260921T003441Z` recorded different settings on the two sides before the startup parity fixes. The upstream payload began with `01-00-00-00`, which decodes to a compression threshold of `1` and algorithm `0`. The downstream payload began with `00-01-00-00`, which decodes to a threshold of `256` and algorithm `0`. The remaining fields in both payloads were zero. This is a confirmed wire difference, not a decoder inference.
 
+The local upstream value is also confirmed by the PocketMine source used for the controlled fixture. Its
+`src/network/mcpe/handler/SessionStartPacketHandler.php` sends `NetworkSettingsPacket::COMPRESS_EVERYTHING`, which
+encodes the threshold `1`. The proxy's vendored gophertunnel listener defaults `ListenConfig.CompressionThreshold` to
+`256` in `minecraft/listener.go`. This explains the local pair without generalizing the value to every Bedrock server.
+
 ## Root-cause boundary
 
 The listener sends its `NetworkSettings` response as soon as it handles the downstream `RequestNetworkSettings` packet. BedrockDebugProxy currently opens the upstream dial later, after downstream login metadata is available and resource-pack setup begins. Therefore the upstream settings are not available at the point where the listener chooses its response. Changing the downstream threshold dynamically would require a separate connection-start design decision and must not be guessed from one server capture.
@@ -24,6 +29,7 @@ Each gophertunnel connection now retains the decoded `NetworkSettings` exchanged
 - Confirmed: the current capture now records both structured settings when both login paths complete negotiation.
 - Inferred: a threshold difference can affect later compression and transport payload boundaries because the packet encoder applies the threshold to batches.
 - Unknown: whether any public server treats a particular threshold or batching profile as a policy signal, and whether matching it would improve compatibility.
+- Unknown: a safe generic way to select the upstream threshold before the downstream client receives `NetworkSettings`; the current handshake requires that response before the client sends its `Login` metadata.
 
 ## Validation
 
@@ -33,4 +39,4 @@ Each gophertunnel connection now retains the decoded `NetworkSettings` exchanged
 
 ## Follow-up
 
-Use a stamped local capture or an explicitly authorized owner-controlled server to compare settings across supported server categories. Do not change the listener handshake or attempt to normalize settings until a reproducible compatibility need and a safe per-connection design are established.
+Use a stamped local capture or an explicitly authorized owner-controlled server to compare settings across supported server categories. Do not change the listener handshake or attempt to normalize settings until a reproducible compatibility need and a safe per-connection design are established. The PocketMine `COMPRESS_EVERYTHING` result is evidence for that local server only, not a default to apply globally.
