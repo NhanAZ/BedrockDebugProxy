@@ -590,6 +590,14 @@ Every new entry should state the symptom, root cause, implementation commits, ev
 - Evidence and validation: the documented bind error occurs when an address is not assigned locally. This is documentation-only and does not change listener validation or network behavior.
 - Status: implemented as a documentation correction.
 
+### FIX-0073 - Compare parity lifecycle timing
+
+- Symptom: the local ProxyFingerprint tool recorded lifecycle timing for each labeled session, but its comparison command ignored that data and reported only identity fields, packet order, and packet counts.
+- Root cause: `ComparisonEngine` had no lifecycle comparison view even though `SessionRecord` retained ordered milestone timestamps and total duration.
+- Implementation: ProxyFingerprint commit [`323aa03de`](https://github.com/NhanAZ/PocketMine-MP/commit/323aa03de) adds a versioned `lifecycle_timing` comparison containing duration deltas, event-prefix alignment, occurrence counts, and elapsed microseconds for each milestone. The original session reports remain unchanged.
+- Evidence and validation: the plugin self-test and PHP syntax checks pass. The timing output is explicitly documented as an observation aid and does not infer server enforcement behavior.
+- Status: implemented in the owner-controlled local parity tool. Existing reports can still be read, but comparisons generated before this change do not contain the new view.
+
 ## Ordering safety contract
 
 The deferred-packet change is deliberately narrow. `expectedIDs` remains the only authority for what the current login state accepts. The queue scan selects the earliest packet that is currently expected, leaves packets for later states queued, and never mutates or reorders bytes on the wire. The regression tests cover canonical resource-pack order, featured early `ResourcePacksInfo`, a later-phase packet queued ahead of the current phase, and all six permutations of the three login packets.

@@ -47,6 +47,7 @@ An independent upstream report, [gophertunnel issue #407](https://github.com/San
 - `go test ./internal/proxy -run '^TestRunnerForwardsBidirectionalPacketsAndCapturesSession$' -count=1 -v` passed after the regression assertion was added.
 - A temporary loopback run against PocketMine with `xbox-auth=off` completed direct and proxied login, resource-pack exchange, spawn, and report capture. The temporary client and server setting were removed or restored after the run.
 - The rebuilt-binary comparison used labeled `direct` and `bedrockdebugproxy` reports. The comparison showed zero field differences and zero packet-count differences.
+- ProxyFingerprint commit [`323aa03de`](https://github.com/NhanAZ/PocketMine-MP/commit/323aa03de) now includes lifecycle milestone timing in comparison output. The timing view is an observation aid for repeated local runs and is not treated as an identity signal or evidence of a third-party enforcement rule.
 - `TestClearXBLIdentityDataRemovesAuthenticationBoundFields` passes in the nested gophertunnel module, and the proxy forwarding regression remains green.
 - The upstream issue was reviewed on 2026-09-21 as an external interoperability report. No source code was copied and no public server was contacted.
 
