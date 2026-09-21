@@ -16,6 +16,8 @@ Dialled connections now retain a copy of the complete `ResourcePackStack` in `Ga
 
 The retained value is cloned at both connection boundaries. The fix preserves texture-pack order, base game version, experiments, and editor and toggle flags without changing resource-pack archive bytes or adding a second transfer path.
 
+The bridge also retains the complete encoded packet and the protocol ID that produced it. When the upstream and downstream protocol IDs match, the listener validates the packet ID and writes those original bytes. A protocol mismatch selects the cloned typed stack, while an invalid retained packet logs a warning and then uses that same fallback. `ResourcePacksInfo` remains a separate typed rebuild boundary because its downstream URLs must point to archives that the bridge can serve.
+
 ## Evidence and provenance
 
 - Affected capture: local Hive capture `captures/session-20260920T135412Z`, sequences 979 and 1,183, packet ID 7. The capture remains local sensitive evidence and is not committed.
@@ -25,7 +27,8 @@ The retained value is cloned at both connection boundaries. The fix preserves te
 ## Validation
 
 - The nested gophertunnel unit test verifies complete-stack retention and slice ownership.
-- The proxy loopback integration test configures a non-default stack upstream and verifies the same decoded values downstream.
+- The nested gophertunnel unit test verifies complete-stack retention, slice ownership, and exact response bytes.
+- The proxy loopback integration test configures a non-default stack upstream and verifies the same decoded values and retained wire bytes downstream.
 - No public server was contacted for the fix. The capture evidence is a protocol observation, not evidence about any server-side enforcement decision.
 
 ## Limitations

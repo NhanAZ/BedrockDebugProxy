@@ -113,6 +113,11 @@ type ListenConfig struct {
 	// client has downloaded the offered packs. If it returns nil, the listener
 	// builds its normal stack from the downloaded packs.
 	FetchResourcePackStack func(identityData login.IdentityData, clientData login.ClientData) *packet.ResourcePackStack
+	// FetchRawResourcePackStack selects the exact wire representation and
+	// protocol ID of the ResourcePackStack sent after the client has downloaded
+	// the offered packs. The bytes are used only when their packet ID and
+	// negotiated protocol are valid. A nil result keeps the typed stack path.
+	FetchRawResourcePackStack func(identityData login.IdentityData, clientData login.ClientData) ([]byte, int32)
 	// ResourcePackDelivery controls how resource pack data is sent to clients. The zero value keeps the
 	// conservative default chunk size and pacing.
 	ResourcePackDelivery ResourcePackDeliveryConfig
@@ -448,6 +453,7 @@ func (listener *Listener) createConn(netConn net.Conn) {
 	conn.fetchResourcePacks = listener.cfg.FetchResourcePacks
 	conn.fetchResourcePacksInfo = listener.cfg.FetchResourcePacksInfo
 	conn.fetchResourcePackStack = listener.cfg.FetchResourcePackStack
+	conn.fetchRawResourcePackStack = listener.cfg.FetchRawResourcePackStack
 	conn.resourcePackDelivery = listener.cfg.ResourcePackDelivery.normalized()
 	conn.gameData.WorldName = listener.status().ServerName
 	conn.authEnabled = !listener.cfg.AuthenticationDisabled

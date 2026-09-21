@@ -166,6 +166,12 @@ type Conn struct {
 	// resourcePackStack is an optional exact stack selected for this listener
 	// connection after the offered packs have been downloaded.
 	resourcePackStack *packet.ResourcePackStack
+	// rawResourcePackStack is an optional exact wire stack selected for this
+	// listener connection after the offered packs have been downloaded.
+	rawResourcePackStack []byte
+	// rawResourcePackStackProtocolID identifies the protocol used to encode
+	// rawResourcePackStack.
+	rawResourcePackStackProtocolID int32
 	// texturePacksRequired specifies if clients that join must accept the texture pack in order for them to
 	// be able to join the server. If they don't accept, they can only leave the server.
 	texturePacksRequired bool
@@ -183,6 +189,9 @@ type Conn struct {
 	fetchResourcePacksInfo func(identityData login.IdentityData, clientData login.ClientData) *packet.ResourcePacksInfo
 	// fetchResourcePackStack selects an exact stack for the listener connection.
 	fetchResourcePackStack func(identityData login.IdentityData, clientData login.ClientData) *packet.ResourcePackStack
+	// fetchRawResourcePackStack selects an exact wire stack and protocol for the
+	// listener connection.
+	fetchRawResourcePackStack func(identityData login.IdentityData, clientData login.ClientData) ([]byte, int32)
 	// ignoredResourcePacks is a slice of resource packs that are not being downloaded due to the downloadResourcePack
 	// func returning false for the specific pack.
 	ignoredResourcePacks []exemptedResourcePack
@@ -858,7 +867,7 @@ func (conn *Conn) handlePacket(pk packet.Packet, raw *packetData) error {
 	case *packet.ResourcePackChunkData:
 		return conn.handleResourcePackChunkData(pk)
 	case *packet.ResourcePackStack:
-		return conn.handleResourcePackStack(pk)
+		return conn.handleResourcePackStack(pk, raw)
 	case *packet.StartGame:
 		return conn.handleStartGame(pk, raw)
 	case *packet.ItemRegistry:
@@ -1003,6 +1012,11 @@ func (conn *Conn) handleClientToServerHandshake() error {
 		if stack := conn.fetchResourcePackStack(conn.identityData, conn.clientData); stack != nil {
 			conn.resourcePackStack = cloneResourcePackStack(stack)
 		}
+	}
+	if conn.fetchRawResourcePackStack != nil {
+		raw, protocolID := conn.fetchRawResourcePackStack(conn.identityData, conn.clientData)
+		conn.rawResourcePackStack = append([]byte(nil), raw...)
+		conn.rawResourcePackStackProtocolID = protocolID
 	}
 	pk := &packet.ResourcePacksInfo{TexturePackRequired: conn.texturePacksRequired, ForceDisableVibrantVisuals: conn.forceDisableVibrantVisuals}
 	var advertisedPacks []protocol.TexturePackInfo
@@ -1212,8 +1226,12 @@ func cloneResourcePacksInfo(pk *packet.ResourcePacksInfo) *packet.ResourcePacksI
 
 // handleResourcePackStack handles a ResourcePackStack packet sent by the server. The stack defines the order
 // that resource packs are applied in.
-func (conn *Conn) handleResourcePackStack(pk *packet.ResourcePackStack) error {
+func (conn *Conn) handleResourcePackStack(pk *packet.ResourcePackStack, raw *packetData) error {
 	conn.gameData.ResourcePackStack = cloneResourcePackStack(pk)
+	conn.gameData.RawProtocolID = conn.proto.ID()
+	if raw != nil {
+		conn.gameData.RawResourcePackStack = append([]byte(nil), raw.full...)
+	}
 	// We currently don't apply resource packs in any way, so instead we just check if all resource packs in
 	// the stacks are also downloaded.
 	for _, pack := range pk.TexturePacks {
@@ -1299,7 +1317,14 @@ func (conn *Conn) handleResourcePackClientResponse(pk *packet.ResourcePackClient
 				})
 			}
 		}
-		if err := conn.WritePacket(cloneResourcePackStack(stack)); err != nil {
+		if len(conn.rawResourcePackStack) > 0 && conn.gameData.RawProtocolID == conn.proto.ID() {
+			if err := conn.writeRawStartupPacket(conn.rawResourcePackStack, packet.IDResourcePackStack); err != nil {
+				conn.log.Warn("write retained ResourcePackStack bytes", "err", err)
+				if err := conn.WritePacket(cloneResourcePackStack(stack)); err != nil {
+					return fmt.Errorf("send ResourcePackStack: %w", err)
+				}
+			}
+		} else if err := conn.WritePacket(cloneResourcePackStack(stack)); err != nil {
 			return fmt.Errorf("send ResourcePackStack: %w", err)
 		}
 	case packet.PackResponseCompleted:
@@ -1665,6 +1690,7 @@ func (conn *Conn) handleStartGame(pk *packet.StartGame, raw *packetData) error {
 		RawStartGame:                     slices.Clone(conn.gameData.RawStartGame),
 		RawVoxelShapes:                   slices.Clone(conn.gameData.RawVoxelShapes),
 		RawItemRegistry:                  slices.Clone(conn.gameData.RawItemRegistry),
+		RawResourcePackStack:             slices.Clone(conn.gameData.RawResourcePackStack),
 		ResourcePacksInfo:                conn.gameData.ResourcePacksInfo,
 		ResourcePackStack:                conn.gameData.ResourcePackStack,
 		StartGamePacket:                  &startGamePacket,
