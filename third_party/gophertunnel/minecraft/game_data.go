@@ -9,6 +9,11 @@ import (
 // GameData is a loose wrapper around a part of the data found in the StartGame packet. It holds data sent
 // specifically at the start of the game, such as the position of the player, the game mode, etc.
 type GameData struct {
+	// SuppressGeneratedCreativeContent prevents a listener from emitting its
+	// empty compatibility CreativeContent packet during spawn. A terminating
+	// bridge can use this when the upstream connection will forward the
+	// server's own CreativeContent packet after spawn.
+	SuppressGeneratedCreativeContent bool
 	// RawProtocolID identifies the negotiated protocol used by the retained raw
 	// startup packets below. A listener may only write those bytes when its
 	// downstream connection negotiated the same protocol.

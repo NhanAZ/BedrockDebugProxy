@@ -75,6 +75,34 @@ func TestConnEncryptionStateReportsTransportBoundary(t *testing.T) {
 	}
 }
 
+func TestHandleRequestChunkRadiusCanSuppressGeneratedCreativeContent(t *testing.T) {
+	var output bytes.Buffer
+	conn := newLoginTestConn()
+	conn.enc = packet.NewEncoder(&output)
+	conn.gameData.EntityRuntimeID = 42
+	conn.gameData.SuppressGeneratedCreativeContent = true
+
+	if err := conn.handleRequestChunkRadius(&packet.RequestChunkRadius{ChunkRadius: 8}); err != nil {
+		t.Fatalf("handle RequestChunkRadius: %v", err)
+	}
+	if err := conn.Flush(); err != nil {
+		t.Fatalf("flush spawn packets: %v", err)
+	}
+	decoded, err := packet.NewDecoder(bytes.NewReader(output.Bytes())).Decode()
+	if err != nil {
+		t.Fatalf("decode spawn packets: %v", err)
+	}
+	for _, raw := range decoded {
+		data, err := parseData(raw, nil)
+		if err != nil {
+			t.Fatalf("parse spawn packet: %v", err)
+		}
+		if data.h.PacketID == packet.IDCreativeContent {
+			t.Fatal("suppressed listener still emitted CreativeContent")
+		}
+	}
+}
+
 func TestHandleDrainsResourcePacksInfoDeferredBeforePlayStatus(t *testing.T) {
 	conn := &Conn{
 		ctx:   context.Background(),

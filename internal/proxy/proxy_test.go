@@ -156,6 +156,25 @@ func integrationInventoryTransaction() *packet.InventoryTransaction {
 	}}
 }
 
+func integrationCreativeContent() *packet.CreativeContent {
+	return &packet.CreativeContent{
+		Groups: []protocol.CreativeGroup{{
+			Category: protocol.CreativeCategoryNature,
+			Name:     "integration-creative-group",
+		}},
+		Items: []protocol.CreativeItem{{
+			CreativeItemNetworkID: 7,
+			Item: protocol.ItemStack{
+				ItemType:      protocol.ItemType{NetworkID: 1},
+				Count:         1,
+				CanBePlacedOn: []string{},
+				CanBreak:      []string{},
+			},
+			GroupIndex: 0,
+		}},
+	}
+}
+
 func (w *listeningAddressWriter) Write(p []byte) (int, error) {
 	w.mu.Lock()
 	defer w.mu.Unlock()
@@ -320,19 +339,24 @@ func TestRunnerForwardsBidirectionalPacketsAndCapturesSession(t *testing.T) {
 			return
 		}
 		if startErr := serverConn.StartGame(minecraft.GameData{
-			WorldName:              "BedrockDebugProxy integration",
-			EntityUniqueID:         1,
-			EntityRuntimeID:        1,
-			RawProtocolID:          serverConn.Proto().ID(),
-			RawItemRegistry:        append([]byte(nil), integrationItemRegistryRaw...),
-			RawStartGame:           append([]byte(nil), integrationStartGameRaw...),
-			RawJigsawStructureData: append([]byte(nil), integrationJigsawRaw...),
-			RawVoxelShapes:         append([]byte(nil), integrationVoxelShapesRaw...),
-			StartGamePacket:        integrationStartGame,
-			JigsawStructureData:    integrationJigsaw,
-			VoxelShapes:            integrationVoxelShapes,
+			WorldName:                        "BedrockDebugProxy integration",
+			EntityUniqueID:                   1,
+			EntityRuntimeID:                  1,
+			SuppressGeneratedCreativeContent: true,
+			RawProtocolID:                    serverConn.Proto().ID(),
+			RawItemRegistry:                  append([]byte(nil), integrationItemRegistryRaw...),
+			RawStartGame:                     append([]byte(nil), integrationStartGameRaw...),
+			RawJigsawStructureData:           append([]byte(nil), integrationJigsawRaw...),
+			RawVoxelShapes:                   append([]byte(nil), integrationVoxelShapesRaw...),
+			StartGamePacket:                  integrationStartGame,
+			JigsawStructureData:              integrationJigsaw,
+			VoxelShapes:                      integrationVoxelShapes,
 		}); startErr != nil {
 			serverErrors <- fmt.Errorf("start upstream game: %w", startErr)
+			return
+		}
+		if writeErr := serverConn.WritePacket(integrationCreativeContent()); writeErr != nil {
+			serverErrors <- fmt.Errorf("write upstream creative content: %w", writeErr)
 			return
 		}
 		expectedClientPackets := map[string]bool{
@@ -598,6 +622,7 @@ func TestRunnerForwardsBidirectionalPacketsAndCapturesSession(t *testing.T) {
 	}
 	expectedServerPackets := map[string]bool{
 		"Text":             false,
+		"CreativeContent":  false,
 		"PlayerSkin":       false,
 		"AddActor":         false,
 		"LevelChunk":       false,
@@ -614,6 +639,12 @@ func TestRunnerForwardsBidirectionalPacketsAndCapturesSession(t *testing.T) {
 		case *packet.JigsawStructureData, *packet.VoxelShapes:
 			_ = client.Close()
 			t.Fatalf("downstream received duplicate startup packet after spawn: %T", typed)
+		case *packet.CreativeContent:
+			if !reflect.DeepEqual(typed, integrationCreativeContent()) {
+				_ = client.Close()
+				t.Fatalf("downstream creative content was changed: %#v", typed)
+			}
+			expectedServerPackets["CreativeContent"] = true
 		case *packet.Text:
 			if typed.Message != "server-to-client" {
 				_ = client.Close()
@@ -720,6 +751,7 @@ func TestRunnerForwardsBidirectionalPacketsAndCapturesSession(t *testing.T) {
 		{capture.DirectionClientToServer, "SubChunkRequest"}:      nil,
 		{capture.DirectionClientToServer, "InventoryTransaction"}: {[]byte("integration-inventory"), []byte(`"HotBarSlot":3`)},
 		{capture.DirectionServerToClient, "Text"}:                 {[]byte("server-to-client")},
+		{capture.DirectionServerToClient, "CreativeContent"}:      {[]byte("integration-creative-group")},
 		{capture.DirectionServerToClient, "PlayerSkin"}:           {[]byte("integration-skin"), []byte(`"preview_hex":"01020304"`), []byte(`"preview_hex":"05060708"`)},
 		{capture.DirectionServerToClient, "AddActor"}:             {[]byte("integration-entity")},
 		{capture.DirectionServerToClient, "LevelChunk"}:           {[]byte(`"preview_hex":"010203"`)},
@@ -744,6 +776,7 @@ func TestRunnerForwardsBidirectionalPacketsAndCapturesSession(t *testing.T) {
 		{capture.DirectionServerToClient, packet.IDItemRegistry}:         {},
 		{capture.DirectionServerToClient, packet.IDJigsawStructureData}:  {},
 		{capture.DirectionServerToClient, packet.IDVoxelShapes}:          {},
+		{capture.DirectionServerToClient, packet.IDCreativeContent}:      {},
 		{capture.DirectionServerToClient, packet.IDText}:                 {},
 		{capture.DirectionServerToClient, packet.IDPlayerSkin}:           {},
 		{capture.DirectionServerToClient, packet.IDAddActor}:             {},
