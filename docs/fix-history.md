@@ -566,6 +566,14 @@ Every new entry should state the symptom, root cause, implementation commits, ev
 - Evidence and validation: `internal/proxy/proxy_test.go` and `internal/bedrock/network_test.go` cover negotiated transport metadata, while the new CLI test prevents the stale limitation from returning. No forwarding or capture bytes change.
 - Status: implemented as a capture metadata correction. Raw UDP and RakNet recovery frames remain outside the supported observation boundary.
 
+### FIX-0071 - Ignore local runtime logs
+
+- Symptom: the canonical validation build refused to stamp the current committed source because operator-created `proxy-agent-*.log` and `server.log` files appeared as unrelated untracked changes.
+- Root cause: the repository ignored captures and build output but did not ignore the local runtime log names used by the documented development workflow.
+- Implementation: add root-scoped ignore patterns for those generated logs. Existing files are preserved and are not removed or modified.
+- Evidence and validation: the build script's dirty-tree guard reports these exact files before the change. No runtime code, capture data, or protocol behavior changes.
+- Status: implemented as a workflow-only correction.
+
 ## Ordering safety contract
 
 The deferred-packet change is deliberately narrow. `expectedIDs` remains the only authority for what the current login state accepts. The queue scan selects the earliest packet that is currently expected, leaves packets for later states queued, and never mutates or reorders bytes on the wire. The regression tests cover canonical resource-pack order, featured early `ResourcePacksInfo`, a later-phase packet queued ahead of the current phase, and all six permutations of the three login packets.
