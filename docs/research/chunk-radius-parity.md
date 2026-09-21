@@ -21,10 +21,17 @@ The in-tree gophertunnel copy at commit `283a5a97dfe65da94bcc0b401807f6aefa9e72e
 
 The proxy cannot wait for the real downstream request while dialing the upstream server. The upstream login and resource-pack exchange happen before the terminating bridge starts the downstream `StartGame` sequence. Waiting at that boundary caused a five-second timeout and preserved the old 16/16 request. The runtime fix therefore leaves the normal initial request in place and, when the downstream connection emits packet 69, decodes the request and writes the same typed values to the paired upstream connection. The downstream raw packet remains captured before this forwarding step. The focused loopback test verifies that the upstream observes the original 16/16 request followed by the downstream 24/28 request.
 
+Forwarding failures are now recorded as `bridge.write_error` events with the
+operation `forward RequestChunkRadius`. This includes the race where the
+paired upstream connection is unavailable or closes between the downstream
+packet observation and the typed write. The original downstream raw packet is
+still retained, so a failed forward is visible rather than silently discarded.
+
 ## Classification
 
 - Confirmed: packet ID 69 and the two payloads above differ in the owner-controlled capture.
 - Confirmed: the current gophertunnel default is 16/16, and the listener can observe the downstream request before the bridge forwards ordinary gameplay packets.
+- Confirmed: a failed later forward is represented in the capture as a bridge write error instead of being ignored by the listener packet callback.
 - Inferred: forwarding a later `RequestChunkRadius` is the safest generic parity improvement available without redesigning the login/resource-pack barrier. Bedrock servers may retain their previously approved radius when handling a later request.
 - Unknown: whether a particular public server uses the initial request, a later request, or an internal policy when selecting the approved radius. A public-server result requires a fresh stamped capture and must be reported separately from this local evidence.
 

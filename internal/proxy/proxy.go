@@ -293,11 +293,17 @@ func (r *Runner) Run(ctx context.Context) error {
 				return
 			}
 			state := getAcceptState()
-			if upstream := state.upstreamConn.Load(); upstream != nil {
-				// The upstream dial completes before the downstream StartGame sequence
-				// exposes this request, so forward the observed client value as a later
-				// request instead of blocking the login and resource-pack barrier.
-				_ = upstream.WritePacket(&request)
+			// The upstream dial completes before the downstream StartGame sequence
+			// exposes this request, so forward the observed client value as a later
+			// request instead of blocking the login and resource-pack barrier.
+			var forwardErr error
+			if upstream := state.upstreamConn.Load(); upstream == nil {
+				forwardErr = errors.New("upstream connection unavailable")
+			} else {
+				forwardErr = forwardRequestChunkRadius(upstream, request)
+			}
+			if forwardErr != nil {
+				_ = r.recordNetworkErrorAtHop("bridge.write_error", capture.DirectionClientToServer, "upstream", state.upstreamID, state.hop, "forward RequestChunkRadius", forwardErr)
 			}
 		},
 		ConnectionFunc: func(conn *minecraft.Conn) {
@@ -841,6 +847,14 @@ func startGame(client, server *minecraft.Conn, gameData minecraft.GameData) erro
 		return errors.Join(first, second)
 	}
 	return nil
+}
+
+type packetWriter interface {
+	WritePacket(packet.Packet) error
+}
+
+func forwardRequestChunkRadius(writer packetWriter, request packet.RequestChunkRadius) error {
+	return writer.WritePacket(&request)
 }
 
 // decodeRequestChunkRadius validates the complete packet body before forwarding
