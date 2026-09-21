@@ -22,6 +22,14 @@ In the affected local capture `captures/session-20260921T005313Z`, the upstream 
 
 The same local capture exposed a separate CreativeContent boundary. Packet ID 145 arrived from the upstream server at sequence 65 with a 49,283-byte raw payload. The downstream stream then contained a generated 2-byte packet at sequence 455 followed by the original 49,283-byte payload at sequence 1077. The 2-byte packet is gophertunnel's listener compatibility response from `handleRequestChunkRadius`, while the later packet is the upstream server packet forwarded after spawn. This is confirmed proxy-generated duplication, not a server-policy signal.
 
+## Post-fix vanilla-client loopback
+
+On 2026-09-21, a real Windows Bedrock 1.26.51 client completed a controlled loopback session through the binary built from commit `d272805fd571525cca6f7473b166fb1129bafd48`. The upstream was the owner-controlled local PocketMine server with Xbox authentication temporarily disabled for this test and restored afterward. The client completed login, resource-pack negotiation, spawn, normal play, and quit.
+
+The closed capture `captures/session-20260921T122228Z` contains 10,645 events and 4,222 blobs. It has zero dropped events, write errors, truncation, or decode errors. The analysis view reports protocol 2193 and game version 1.26.51 on both connections, matching ClientData game version and device OS, and a complete negotiated, spawned, and closed lifecycle. Raw packet counts match for every packet ID and direction between upstream and downstream. The retained startup payloads are byte-identical across the two channels for JigsawStructureData (ID 313, 209,307 bytes), VoxelShapes (ID 337, 23,178 bytes), StartGame (ID 11, 73,081 bytes), ItemRegistry (ID 162, 113,448 bytes), and CreativeContent (ID 145, 49,283 bytes).
+
+This is confirmed local fidelity evidence for the current same-protocol terminating path. The different sequence numbers reflect the two independent login chains and the listener's bounded login buffering; they are not evidence that the proxy changed the startup payloads. The run does not establish authenticated public-server behavior, raw UDP or RakNet parity, or mixed URL resource-pack offer behavior.
+
 ## Evidence and provenance
 
 - Vendored implementation: `third_party/gophertunnel/minecraft/game_data.go`, `conn.go`, and `internal/proxy/proxy.go` at the project revision that introduced FIX-0059.
