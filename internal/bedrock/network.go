@@ -161,8 +161,7 @@ func (n rakNetNetwork) Listen(address string) (minecraft.NetworkListener, error)
 func (n Network) wrap(conn net.Conn) (net.Conn, error) {
 	n.Observer.SetFlow(n.Channel, conn.LocalAddr(), conn.RemoteAddr())
 	if err := n.recordConnection("transport.connection_open", conn, nil); err != nil {
-		_ = conn.Close()
-		return nil, err
+		return nil, errors.Join(err, conn.Close())
 	}
 	observed := &observedConn{Conn: conn, network: n}
 	if n.ConnectionContextFunc != nil {
