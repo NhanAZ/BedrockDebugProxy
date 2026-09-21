@@ -323,6 +323,13 @@ func TestDecodeResourcePacksInfoMalformedPayloadDoesNotPanic(t *testing.T) {
 	}
 }
 
+func TestDecodeResourcePacksInfoRejectsTrailingBytes(t *testing.T) {
+	payload := append(encodeResourcePacksInfo(t, &packet.ResourcePacksInfo{}), 0x00)
+	if info, err := decodeResourcePacksInfo(payload); err == nil || info != nil {
+		t.Fatalf("decode result = %#v, err = %v", info, err)
+	}
+}
+
 func encodeResourcePacksInfo(t *testing.T, info *packet.ResourcePacksInfo) []byte {
 	t.Helper()
 	var payload bytes.Buffer
