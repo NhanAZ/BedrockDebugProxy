@@ -732,7 +732,15 @@ Every new entry should state the symptom, root cause, implementation commits, ev
 - Root cause: BedrockDebugProxy started the upstream login from the listener's dynamic resource-pack callback before the listener had consumed the downstream cache-status packet. The Dialer therefore used its false zero value.
 - Implementation: add an opt-in listener mode that sends `PlayStatus(LoginSuccess)`, waits for `ClientCacheStatus`, and then runs the existing resource-pack callbacks. BedrockDebugProxy passes the observed boolean to `Dialer.EnableClientCache`; listeners without the mode retain the previous ordering.
 - Evidence and validation: the client-cache parity capture and research note provide the confirmed wire difference and source ordering. The focused gophertunnel state-machine test covers both `ClientCacheStatus=false` and `true`, while the root loopback integration test enables the cache on its client, verifies the upstream connection reports it, and checks that `session.spawned` records parity on both sides.
-- Status: implemented with automated local coverage. A controlled local server that sends cache-blob and miss-response packets remains pending. Public-server policy or enforcement conclusions are out of scope.
+- Status: implemented with automated local coverage, including a controlled loopback cache-blob and miss-response exchange. Real-client cache storage and reuse remain pending. Public-server policy or enforcement conclusions are out of scope.
+
+### FIX-0092 - Validate client cache blob forwarding
+
+- Symptom: the client-cache parity fix aligned the login capability but had no regression coverage for the later `LevelChunk` blob-cache and miss-response exchange.
+- Root cause: the existing loopback fixture stopped after ordinary startup and gameplay packets, so it could not prove that cache-enabled metadata, client miss hashes, and server blob payloads survived the same-protocol raw forwarding path.
+- Implementation: extend the owner-controlled loopback integration with a cache-enabled `LevelChunk`, a `ClientCacheBlobStatus` miss, and a `ClientCacheMissResponse`. Assert typed values, raw packet presence, and payload hash preservation on both channels.
+- Evidence and validation: the deterministic proxy integration test exercises the complete local exchange and the capture scanner checks the new raw packet IDs. This does not model a real client's cache storage decisions or public-server behavior.
+- Status: implemented with automated local coverage. A real vanilla-client local capture remains useful for cache hit and reuse behavior.
 
 ## Ordering safety contract
 

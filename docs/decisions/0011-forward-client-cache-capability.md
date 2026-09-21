@@ -53,7 +53,8 @@ mode keep their previous ordering.
 
 ## Limitations
 
-The local test exercises the cache capability and login ordering but does not
-prove how any public server uses blob-cache packets. A controlled local server
-that emits `LevelChunk` cache blobs and miss responses is still needed to
-compare cache payloads and spawn behavior end to end.
+The local integration fixture exercises the cache capability, login ordering,
+`LevelChunk` cache metadata, and the miss-response exchange with raw payload
+preservation. It does not prove that a real vanilla client stores or reuses
+those blobs, nor how any public server uses the capability. A real-client
+local capture remains useful for that behavior.
