@@ -79,3 +79,32 @@ func TestReadPacketDataCloneCanBeDecodedAfterOriginalRelease(t *testing.T) {
 		t.Fatalf("decoded packet = %#v", decoded)
 	}
 }
+
+func TestDecodePacketReadRetainsOriginalAfterAllowedTrailingData(t *testing.T) {
+	data := append(testWirePacket(t), 0xff)
+	parsed, err := parseData(data, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	conn := &Conn{
+		ctx:        context.Background(),
+		proto:      DefaultProtocol,
+		pool:       packet.NewServerPool(),
+		additional: make(chan packet.Packet, 8),
+	}
+	original := packetReadFromData(parsed)
+	clone, err := original.Clone()
+	if err != nil {
+		t.Fatal(err)
+	}
+	decoded, err := conn.DecodePacketRead(clone)
+	if err == nil {
+		t.Fatal("DecodePacketRead accepted trailing data")
+	}
+	if decoded != nil {
+		t.Fatalf("decoded packet = %#v, want nil on invalid data", decoded)
+	}
+	if !bytes.Equal(original.Data, data) || !bytes.Equal(original.Payload, data[1:]) {
+		t.Fatalf("original raw read changed after clone decode: data=%x payload=%x", original.Data, original.Payload)
+	}
+}

@@ -38,6 +38,7 @@ Detailed rationale remains in [`docs/audits/`](docs/audits/).
 - Malformed observed chunk-radius requests now record packet decode errors with typed packet context while retaining their raw evidence.
 - Chunk-radius decode errors now retain sender and target sub-client header context in addition to the raw packet.
 - Same-protocol raw-forward decode failures now appear as packet decode errors instead of generic bridge read errors.
+- Same-protocol packets whose derived decode fails now remain raw-forwarded with an explicit unknown view instead of closing the bridge.
 - Terminating bridges now also retain and reuse raw `JigsawStructureData`, `StartGame`, and `VoxelShapes` startup packets when the downstream protocol matches, preserving the observed world-start bytes while keeping typed fallback behavior.
 - Terminating bridges no longer add an empty compatibility `CreativeContent` packet when the upstream server's own packet will be forwarded after spawn, avoiding the observed duplicate startup packet while retaining the upstream raw bytes.
 - The capture viewer retains the OFL-licensed fan-made font assets without contacting a font CDN. Visible text uses regular Monocraft and can resolve a separately installed Minecraft Ten before the embedded fallback.

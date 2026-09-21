@@ -19,11 +19,19 @@ When both bridge endpoints expose the project-specific raw packet adapter and ne
 3. Forward the original packet bytes through the destination encoder without decoding and re-marshalling them.
 4. Keep the existing typed path for protocol mismatches, packets already consumed and returned as decoded values by the login state machine, and the `Transfer` rewrite used by `--follow-transfers`.
 
+If decoding the owned capture clone fails while the original raw read remains
+valid, record `packet.decode_error`, use an explicit `packet.Unknown` derived
+view, and continue forwarding the original bytes. The protocol decoder may
+discard a partially decoded value when it returns the error, so the unknown
+view is deliberate. A clone or transport error
+that prevents this boundary from retaining the original read still terminates
+the bridge through its existing error path.
+
 The raw adapter is limited to the current gophertunnel protocol boundary. It does not bypass encryption, authentication, batching, compression, RakNet, or server policy. It also does not mutate, drop, inject, or replay gameplay packets.
 
 ## Consequences
 
-Same-protocol gameplay and resource-pack packets now retain their observed wire representation across the bridge while remaining available as decoded capture views. The capture records the raw packet once, and the forward timing event identifies whether raw or typed forwarding was used.
+Same-protocol gameplay and resource-pack packets now retain their observed wire representation across the bridge while remaining available as decoded capture views. The capture records the raw packet once, and the forward timing event identifies whether raw or typed forwarding was used. A packet whose derived decode fails remains an explicit unknown view and does not close the bridge when its raw bytes are still available.
 
 Protocol conversion and intentional transfer-address rewriting still use the typed path and therefore remain visible exceptions. A raw forwarding success is not proof of vanilla identity, and it does not make proxy use permitted by any server. The Galaxite result must be re-tested with a stamped binary before this change is considered live-compatible.
 
