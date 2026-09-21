@@ -774,6 +774,14 @@ Every new entry should state the symptom, root cause, implementation commits, ev
 - Evidence and validation: the gophertunnel `publicKeyConn` boundary and go-nethernet `Conn.PublicKey` implementation establish the method contract. The bedrock network regression test now verifies pointer preservation through `observedConn`. No network or public server was contacted.
 - Status: implemented with deterministic local coverage. A live NetherNet capture remains unverified.
 
+### FIX-0096 - Retain transport status-ping responses
+
+- Symptom: gophertunnel's dial and transfer paths received status-ping response bytes, including redirect-port metadata, but the observing network discarded them after returning from `PingContext`.
+- Root cause: `Network.PingContext` delegated directly to the selected transport and had no capture event for the returned response or its failure timing.
+- Implementation: record `transport.ping` with the requested address, response size, elapsed duration, operation error, and any returned response bytes. The event records the transport API boundary and does not claim raw UDP or RakNet request evidence.
+- Evidence and validation: gophertunnel `Dialer.prepareDialAddress` consumes the returned pong to select a redirected port, while transfer routing uses the same network boundary. Network tests cover successful response blobs, partial response on error, and error metadata. No network or public server was contacted.
+- Status: implemented with deterministic local coverage. Raw ping request and datagram-level evidence remain outside the current boundary.
+
 ## Ordering safety contract
 
 The deferred-packet change is deliberately narrow. `expectedIDs` remains the only authority for what the current login state accepts. The queue scan selects the earliest packet that is currently expected, leaves packets for later states queued, and never mutates or reorders bytes on the wire. The regression tests cover canonical resource-pack order, featured early `ResourcePacksInfo`, a later-phase packet queued ahead of the current phase, and all six permutations of the three login packets.
