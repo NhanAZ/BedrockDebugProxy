@@ -470,6 +470,14 @@ Every new entry should state the symptom, root cause, implementation commits, ev
 - Evidence and validation: [`docs/research/protocol-1.26.51.md`](research/protocol-1.26.51.md), the affected closed capture, Mojang release commit `8667debe0adad27de6c692c88942c489a1193206`, focused metadata and proxy tests, and the project quality gate. This correction does not establish the cause of the Hive punishment and does not bypass any server enforcement.
 - Status: implemented as a narrow metadata compatibility update. Authenticated vanilla-client and public-server validation remain pending and unauthorized by the current research record.
 
+### FIX-0058 - Remove authenticated PlayFab identity from offline upstream logins
+
+- Symptom: a 1.26.51 vanilla client connected through an unauthenticated local upstream produced a self-signed token with a `mid` claim copied from the downstream identity while its `ClientData.PlayFabId` remained the client value. The local ProxyFingerprint report flagged `auth_client_playfab_mismatch`; a direct vanilla login did not include `mid`.
+- Root cause: the offline gophertunnel dial path cleared XUID and legacy title ID but retained the PlayFab identity fields introduced by the downstream authenticated login.
+- Implementation: clear `IdentityData.PlayFabID` and `IdentityData.PlayFabTitleID` together with XUID and legacy title ID before calling `EncodeOffline`. The downstream display name, UUID, and ClientData remain available for the operator-controlled unauthenticated server.
+- Evidence and validation: the local 1.26.51 ProxyFingerprint report, the `EncodeOffline` and `tokenClaims` source path, `TestClearXBLIdentityDataRemovesAuthenticationBoundFields`, and the focused proxy integration test. This change is limited to unauthenticated upstream dials.
+- Status: implemented for local offline identity parity. It does not infer public-server anti-cheat behavior or bypass server policy.
+
 ## Ordering safety contract
 
 The deferred-packet change is deliberately narrow. `expectedIDs` remains the only authority for what the current login state accepts. The queue scan selects the earliest packet that is currently expected, leaves packets for later states queued, and never mutates or reorders bytes on the wire. The regression tests cover canonical resource-pack order, featured early `ResourcePacksInfo`, a later-phase packet queued ahead of the current phase, and all six permutations of the three login packets.

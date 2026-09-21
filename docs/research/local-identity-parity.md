@@ -26,11 +26,16 @@ This was a local protocol and identity-parity defect, not evidence about any pub
 
 The local PocketMine console also emitted `Unexpected JSON property` warnings for `PlayFabId` in ClientData and `ipt`/`tid` in the self-signed token. PocketMine's local JSON models do not declare those fields in this revision, while gophertunnel includes them. The warnings were identical on direct and proxied connections, and both connections completed successfully. They are therefore parser-compatibility observations, not evidence that the proxy caused a ban or that the local server rejected the login.
 
+## Follow-up identity finding
+
+The 1.26.51 vanilla-client loopback run on 2026-09-21 exposed a second local parity issue. The proxied offline login contained a self-signed token `mid` derived from the forwarded `IdentityData.PlayFabID`, while the forwarded `ClientData.PlayFabId` remained the client value. ProxyFingerprint therefore reported `auth_client_playfab_mismatch`. The direct vanilla shape has no authenticated `mid` claim in this offline path. The unauthenticated dial helper cleared XUID and legacy title ID but not the two PlayFab identity fields. The focused fix clears all four authentication-bound fields before `EncodeOffline` and leaves the operator's display name and UUID intact.
+
 ## Validation
 
 - `go test ./internal/proxy -run '^TestRunnerForwardsBidirectionalPacketsAndCapturesSession$' -count=1 -v` passed after the regression assertion was added.
 - A temporary loopback run against PocketMine with `xbox-auth=off` completed direct and proxied login, resource-pack exchange, spawn, and report capture. The temporary client and server setting were removed or restored after the run.
 - The rebuilt-binary comparison used labeled `direct` and `bedrockdebugproxy` reports. The comparison showed zero field differences and zero packet-count differences.
+- `TestClearXBLIdentityDataRemovesAuthenticationBoundFields` passes in the nested gophertunnel module, and the proxy forwarding regression remains green.
 
 ## Limitations
 
