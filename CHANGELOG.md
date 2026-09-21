@@ -13,6 +13,7 @@ Detailed rationale remains in [`docs/audits/`](docs/audits/).
 ### Changed
 
 - LAN listener examples now use an explicit `<LAN_IP>` placeholder instead of an operator-specific address.
+- The quality gate now offers `-LowMemory` to bound local Go worker and package parallelism without changing the default CI profile.
 - The owner-controlled ProxyFingerprint parity tool now compares lifecycle milestone timing in addition to identity, packet-order, and packet-count observations.
 - Capture manifests now describe early transport-state availability accurately instead of claiming compression and encryption state is never classified per event.
 - Transport payload events now include bounded per-connection compression and encryption state when that state is observable, while retaining the original raw application-batch blob.

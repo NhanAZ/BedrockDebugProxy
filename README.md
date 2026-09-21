@@ -186,6 +186,8 @@ Run the shared quality gate before committing or declaring a code change complet
 .\tools\quality.ps1
 ```
 
+If local Go builds need a bounded memory profile, use `.\tools\quality.ps1 -LowMemory`. This temporarily limits Go to two runtime workers and one package at a time, then restores the caller's environment.
+
 Use `tools\format.ps1` for deterministic Go formatting. CI runs the quality gate with the race detector on Linux and repeats tests and builds on Windows.
 
 Use the document that matches your task.

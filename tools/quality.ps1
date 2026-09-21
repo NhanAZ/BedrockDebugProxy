@@ -1,6 +1,7 @@
 [CmdletBinding()]
 param(
-    [switch]$Race
+    [switch]$Race,
+    [switch]$LowMemory
 )
 
 $ErrorActionPreference = "Stop"
@@ -9,6 +10,16 @@ Set-StrictMode -Version Latest
 $golangCILintVersion = "v2.13.2"
 $govulncheckVersion = "v1.1.4"
 $projectRoot = (Resolve-Path (Join-Path $PSScriptRoot "..")).Path
+$previousGoMaxProcs = [Environment]::GetEnvironmentVariable("GOMAXPROCS", "Process")
+$previousGoFlags = [Environment]::GetEnvironmentVariable("GOFLAGS", "Process")
+
+if ($LowMemory) {
+    $env:GOMAXPROCS = "2"
+    $existingGoFlags = if ($null -eq $previousGoFlags) { "" } else { $previousGoFlags }
+    $goFlagsWithoutParallelism = [regex]::Replace($existingGoFlags, "(^|\s)-p=\S+", '$1').Trim()
+    $env:GOFLAGS = if ([string]::IsNullOrWhiteSpace($goFlagsWithoutParallelism)) { "-p=1" } else { "$goFlagsWithoutParallelism -p=1" }
+    Write-Host "==> low-memory Go settings (GOMAXPROCS=2, package parallelism=1)"
+}
 
 function Invoke-QualityCommand {
     param(
@@ -108,6 +119,18 @@ try {
 
     Invoke-QualityCommand "whitespace errors" "git" @("diff", "--check", "HEAD")
 } finally {
+    if ($LowMemory) {
+        if ($null -eq $previousGoMaxProcs) {
+            Remove-Item Env:GOMAXPROCS -ErrorAction SilentlyContinue
+        } else {
+            $env:GOMAXPROCS = $previousGoMaxProcs
+        }
+        if ($null -eq $previousGoFlags) {
+            Remove-Item Env:GOFLAGS -ErrorAction SilentlyContinue
+        } else {
+            $env:GOFLAGS = $previousGoFlags
+        }
+    }
     Pop-Location
 }
 
