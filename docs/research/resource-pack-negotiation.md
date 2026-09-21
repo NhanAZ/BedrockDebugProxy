@@ -37,3 +37,19 @@ An owner-controlled PocketMine capture from `session-20260921T003441Z` provided 
 The source review found a separate confirmed boundary in the URL prefetch adapter. `internal/proxy/proxy.go` previously replaced `conn.ResourcePacks()` with `urlResourcePackCache.Packs()` whenever at least one URL pack was prefetched. `Packs()` reports cache completion order rather than the complete `ResourcePacksInfo` offer order. If the offer mixed URL and non-URL entries, or if one entry was not yet present in the cache, replacing the connection list could omit an entry and would discard the original offer order.
 
 The adapter now records the complete advertised cache-key order and merges prefetched URL archives with the normal gophertunnel list. A validated URL archive wins for its key, non-URL packs remain present, and the original offer order is retained. The unit test covers URL, RakNet, URL ordering, and the root proxy loopback test drives the same mixed offer through the listener and verifies the downstream metadata and stack order. The loopback client declines pack downloads so the test isolates negotiation metadata and does not claim archive application or public-server behavior. This is a confirmed source-level defect and regression fix. No live mixed-offer capture has been run yet, so the frequency of this server behavior is unknown and the real-client result remains pending.
+
+## Login cancellation boundary
+
+The listener's dynamic resource-pack callback runs during the login sequence,
+before `Listener.Accept` returns. The observing network wrapper therefore cannot
+be the only source of the downstream context: its `ConnectionContextFunc` runs
+when `Network.wrap` surrounds the accepted connection, after the callback has
+already started upstream preparation. The listener connection itself already
+owns the transport context, so the proxy uses that context as an early-login
+fallback and prefers the observed wrapper context once it is available.
+
+This is confirmed by the gophertunnel listener and network call order. It keeps
+URL prefetch, upstream dialing, and resource-pack recording cancellable when a
+client disconnects during login, without changing packet order or archive
+selection. A local unit test covers both the pre-`Accept` fallback and the
+post-`Accept` tracked context. No public-server behavior is inferred.

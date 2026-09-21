@@ -742,6 +742,14 @@ Every new entry should state the symptom, root cause, implementation commits, ev
 - Evidence and validation: the deterministic proxy integration test exercises the complete local exchange and the capture scanner checks the new raw packet IDs. This does not model a real client's cache storage decisions or public-server behavior.
 - Status: implemented with automated local coverage. A real vanilla-client local capture remains useful for cache hit and reuse behavior.
 
+### FIX-0093 - Cancel early-login resource-pack work with the downstream connection
+
+- Symptom: a downstream disconnect during login could leave an in-flight URL resource-pack fetch or upstream dial attached only to the proxy run context until the outer timeout.
+- Root cause: the listener's dynamic resource-pack callback runs before `Listener.Accept` returns, while the observing network wrapper reports its context through `ConnectionContextFunc` only when it wraps the accepted connection. The proxy therefore saw no tracked downstream context during early login even though the listener `Conn` already owned the cancellable transport context.
+- Implementation: prefer the tracked observed context after accept, and fall back to the listener connection's `Context()` during the login callback. This keeps upstream login and URL prefetch cancellation tied to the physical client without changing packet ordering or resource-pack selection.
+- Evidence and validation: gophertunnel `Listener.createConn`, `Network.wrap`, and the proxy callback call order establish the timing boundary. Focused unit tests cover both the pre-`Accept` fallback and the post-`Accept` tracked context. The resource-pack documentation records the lifecycle boundary.
+- Status: implemented with deterministic local coverage. No public server or external account was contacted for this change.
+
 ## Ordering safety contract
 
 The deferred-packet change is deliberately narrow. `expectedIDs` remains the only authority for what the current login state accepts. The queue scan selects the earliest packet that is currently expected, leaves packets for later states queued, and never mutates or reorders bytes on the wire. The regression tests cover canonical resource-pack order, featured early `ResourcePacksInfo`, a later-phase packet queued ahead of the current phase, and all six permutations of the three login packets.

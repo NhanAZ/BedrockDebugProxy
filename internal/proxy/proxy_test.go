@@ -179,6 +179,33 @@ func TestLinkedConnectionContextCancelsWhenClientDisconnects(t *testing.T) {
 	}
 }
 
+type testContextProvider struct {
+	ctx context.Context
+}
+
+func (p testContextProvider) Context() context.Context { return p.ctx }
+
+func TestConnectionLifecycleContextFallsBackBeforeObservedAccept(t *testing.T) {
+	tracked := new(connectionContext)
+	connection := context.Background()
+	if got := connectionLifecycleContext(tracked, testContextProvider{ctx: connection}); got != connection {
+		t.Fatalf("fallback connection context = %v, want %v", got, connection)
+	}
+}
+
+func TestConnectionLifecycleContextPrefersTrackedTransport(t *testing.T) {
+	tracked := new(connectionContext)
+	trackedContext, cancelTracked := context.WithCancel(context.Background())
+	defer cancelTracked()
+	if tracked.Set(trackedContext) == 0 {
+		t.Fatal("tracked connection context did not receive a generation")
+	}
+	fallback := context.Background()
+	if got := connectionLifecycleContext(tracked, testContextProvider{ctx: fallback}); got != trackedContext {
+		t.Fatalf("tracked connection context = %v, want %v", got, trackedContext)
+	}
+}
+
 func integrationPlayerSkin() *packet.PlayerSkin {
 	return &packet.PlayerSkin{
 		UUID: uuid.MustParse("11111111-1111-1111-1111-111111111111"),
