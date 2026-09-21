@@ -268,6 +268,13 @@ func TestRunnerForwardsBidirectionalPacketsAndCapturesSession(t *testing.T) {
 				ServerAuthoritativeSound: true,
 				ServerID:                 "integration-server",
 			},
+			JigsawStructureData: &packet.JigsawStructureData{StructureData: map[string]any{
+				"jigsaws": []any{map[string]any{"identifier": "integration:jigsaw"}},
+			}},
+			VoxelShapes: &packet.VoxelShapes{
+				NameMap:          []protocol.VoxelShapeNameEntry{{Name: "integration:shape", ID: 7}},
+				CustomShapeCount: 7,
+			},
 		}); startErr != nil {
 			serverErrors <- fmt.Errorf("start upstream game: %w", startErr)
 			return
@@ -446,6 +453,15 @@ func TestRunnerForwardsBidirectionalPacketsAndCapturesSession(t *testing.T) {
 		_ = client.Close()
 		t.Fatalf("downstream StartGame did not preserve complete packet: %#v", startGamePacket)
 	}
+	if clientData := client.GameData(); clientData.JigsawStructureData == nil ||
+		!reflect.DeepEqual(clientData.JigsawStructureData.StructureData, map[string]any{
+			"jigsaws": []any{map[string]any{"identifier": "integration:jigsaw"}},
+		}) || clientData.VoxelShapes == nil ||
+		!reflect.DeepEqual(clientData.VoxelShapes.NameMap, []protocol.VoxelShapeNameEntry{{Name: "integration:shape", ID: 7}}) ||
+		clientData.VoxelShapes.CustomShapeCount != 7 {
+		_ = client.Close()
+		t.Fatalf("downstream startup world packets were not preserved: jigsaw=%#v voxel=%#v", clientData.JigsawStructureData, clientData.VoxelShapes)
+	}
 	for _, outgoing := range []packet.Packet{
 		integrationPlayerSkin(),
 		&packet.MovePlayer{
@@ -508,6 +524,9 @@ func TestRunnerForwardsBidirectionalPacketsAndCapturesSession(t *testing.T) {
 			t.Fatal(readErr)
 		}
 		switch typed := received.(type) {
+		case *packet.JigsawStructureData, *packet.VoxelShapes:
+			_ = client.Close()
+			t.Fatalf("downstream received duplicate startup packet after spawn: %T", typed)
 		case *packet.Text:
 			if typed.Message != "server-to-client" {
 				_ = client.Close()

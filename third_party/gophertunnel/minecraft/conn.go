@@ -830,6 +830,10 @@ func (conn *Conn) handlePacket(pk packet.Packet) error {
 		return conn.handleChunkRadiusUpdated(pk)
 	case *packet.DimensionData:
 		return conn.handleDimensionData(pk)
+	case *packet.JigsawStructureData:
+		return conn.handleJigsawStructureData(pk)
+	case *packet.VoxelShapes:
+		return conn.handleVoxelShapes(pk)
 	}
 	return nil
 }
@@ -1124,7 +1128,7 @@ func (conn *Conn) handleResourcePackStack(pk *packet.ResourcePackStack) error {
 			return fmt.Errorf("texture pack (UUID=%v, version=%v) not downloaded", pack.UUID, pack.Version)
 		}
 	}
-	conn.expect(packet.IDDimensionData, packet.IDStartGame)
+	conn.expect(packet.IDDimensionData, packet.IDStartGame, packet.IDJigsawStructureData, packet.IDVoxelShapes)
 	_ = conn.WritePacket(&packet.ResourcePackClientResponse{Response: packet.PackResponseCompleted})
 	return nil
 }
@@ -1206,15 +1210,26 @@ func (conn *Conn) startGame() {
 	if len(data.Dimensions) > 0 {
 		_ = conn.WritePacket(&packet.DimensionData{Definitions: data.Dimensions})
 	}
-	_ = conn.WritePacket(&packet.JigsawStructureData{
+	jigsawStructureData := &packet.JigsawStructureData{
 		StructureData: map[string]any{
 			"processors":     make([]map[string]any, 0),
 			"template_pools": make([]map[string]any, 0),
 			"jigsaws":        make([]map[string]any, 0),
 			"structure_sets": make([]map[string]any, 0),
 		},
-	})
-	_ = conn.WritePacket(&packet.VoxelShapes{})
+	}
+	if data.JigsawStructureData != nil {
+		jigsaw := *data.JigsawStructureData
+		jigsawStructureData = &jigsaw
+	}
+	_ = conn.WritePacket(jigsawStructureData)
+
+	voxelShapes := &packet.VoxelShapes{}
+	if data.VoxelShapes != nil {
+		shapes := *data.VoxelShapes
+		voxelShapes = &shapes
+	}
+	_ = conn.WritePacket(voxelShapes)
 	startGamePacket := packet.StartGame{
 		Difficulty:                   data.Difficulty,
 		EntityUniqueID:               data.EntityUniqueID,
@@ -1453,12 +1468,26 @@ func (conn *Conn) handleDimensionData(pk *packet.DimensionData) error {
 	return nil
 }
 
+func (conn *Conn) handleJigsawStructureData(pk *packet.JigsawStructureData) error {
+	jigsaw := *pk
+	conn.gameData.JigsawStructureData = &jigsaw
+	return nil
+}
+
+func (conn *Conn) handleVoxelShapes(pk *packet.VoxelShapes) error {
+	voxelShapes := *pk
+	conn.gameData.VoxelShapes = &voxelShapes
+	return nil
+}
+
 // handleStartGame handles an incoming StartGame packet. It is the signal that the player has been added to a
 // world, and it obtains most of its dedicated properties.
 func (conn *Conn) handleStartGame(pk *packet.StartGame) error {
 	startGamePacket := *pk
 	conn.gameData = GameData{
 		StartGamePacket:              &startGamePacket,
+		JigsawStructureData:          conn.gameData.JigsawStructureData,
+		VoxelShapes:                  conn.gameData.VoxelShapes,
 		Difficulty:                   pk.Difficulty,
 		WorldName:                    pk.WorldName,
 		WorldSeed:                    pk.WorldSeed,
@@ -1496,7 +1525,7 @@ func (conn *Conn) handleStartGame(pk *packet.StartGame) error {
 		PropertyData:                 pk.PropertyData,
 		Dimensions:                   conn.gameData.Dimensions,
 	}
-	conn.expect(packet.IDItemRegistry)
+	conn.expect(packet.IDItemRegistry, packet.IDJigsawStructureData, packet.IDVoxelShapes)
 	return nil
 }
 
@@ -1511,7 +1540,7 @@ func (conn *Conn) handleItemRegistry(pk *packet.ItemRegistry) error {
 	}
 
 	_ = conn.WritePacket(&packet.RequestChunkRadius{ChunkRadius: 16, MaxChunkRadius: 16})
-	conn.expect(packet.IDChunkRadiusUpdated, packet.IDPlayStatus)
+	conn.expect(packet.IDChunkRadiusUpdated, packet.IDPlayStatus, packet.IDJigsawStructureData, packet.IDVoxelShapes)
 	return nil
 }
 
@@ -1539,7 +1568,7 @@ func (conn *Conn) handleChunkRadiusUpdated(pk *packet.ChunkRadiusUpdated) error 
 	if pk.ChunkRadius < 1 {
 		return fmt.Errorf("expected chunk radius of at least 1, got %v", pk.ChunkRadius)
 	}
-	conn.expect(packet.IDPlayStatus)
+	conn.expect(packet.IDPlayStatus, packet.IDJigsawStructureData, packet.IDVoxelShapes)
 
 	conn.gameData.ChunkRadius = pk.ChunkRadius
 	conn.gameDataReceived.Store(true)
