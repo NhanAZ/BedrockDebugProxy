@@ -740,6 +740,7 @@ func TestRunnerForwardsBidirectionalPacketsAndCapturesSession(t *testing.T) {
 		compressionNegotiated bool
 	}
 	transportMetadataObserved := map[string]transportMetadataState{}
+	earlyTransportMetadataObserved := map[string]bool{}
 	type decodedPacketKey struct {
 		direction capture.Direction
 		name      string
@@ -801,6 +802,9 @@ func TestRunnerForwardsBidirectionalPacketsAndCapturesSession(t *testing.T) {
 			state.encryptionEnabled = state.encryptionEnabled || data.EncryptionState == "enabled"
 			state.compressionNegotiated = state.compressionNegotiated || data.CompressionState == "negotiated"
 			transportMetadataObserved[event.Channel] = state
+			if !negotiated && data.CompressionState == "negotiated" {
+				earlyTransportMetadataObserved[event.Channel] = true
+			}
 		case "session.negotiated":
 			negotiated = true
 			type networkSettingsView struct {
@@ -914,6 +918,11 @@ func TestRunnerForwardsBidirectionalPacketsAndCapturesSession(t *testing.T) {
 	}
 	if upstream := transportMetadataObserved["upstream"]; !upstream.encryptionEnabled || !upstream.compressionNegotiated {
 		t.Fatalf("upstream transport metadata = %#v", upstream)
+	}
+	for _, channel := range []string{"downstream", "upstream"} {
+		if !earlyTransportMetadataObserved[channel] {
+			t.Errorf("%s transport metadata did not expose negotiated compression before session.negotiated", channel)
+		}
 	}
 	if !downstreamPacksPolicyPreserved {
 		t.Error("downstream resource-pack offer policy was not captured")

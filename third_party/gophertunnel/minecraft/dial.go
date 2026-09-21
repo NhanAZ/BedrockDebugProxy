@@ -85,6 +85,10 @@ type Dialer struct {
 	// Login packet. The function is called with the header of the packet and its raw payload, the address
 	// from which the packet originated, and the destination address.
 	PacketFunc func(header packet.Header, payload []byte, src, dst net.Addr)
+	// ConnectionFunc is called after a connection has been configured and before the first login packet is
+	// sent. It can be used by an observer to associate transport-level evidence with the connection while login
+	// is still in progress. The callback must not mutate protocol state or block the login sequence.
+	ConnectionFunc func(*Conn)
 
 	// DownloadResourcePack is called individually for every texture and behaviour pack sent by the connection when
 	// using Dialer.Dial(), and can be used to stop the pack from being downloaded. The function is called with the UUID
@@ -313,6 +317,9 @@ func (d Dialer) DialContextNetwork(ctx context.Context, network Network, address
 	conn.disconnectOnInvalidPacket = d.DisconnectOnInvalidPackets
 	conn.disconnectOnUnknownPacket = d.DisconnectOnUnknownPackets
 	conn.maxDecompressedLen = math.MaxInt
+	if d.ConnectionFunc != nil {
+		d.ConnectionFunc(conn)
+	}
 
 	defaultIdentityData(&conn.identityData)
 	defaultClientData(address, conn.identityData.DisplayName, &conn.clientData)

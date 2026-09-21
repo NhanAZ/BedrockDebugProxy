@@ -122,6 +122,10 @@ type ListenConfig struct {
 	// Login packet. The function is called with the header of the packet and its raw payload, the address
 	// from which the packet originated, and the destination address.
 	PacketFunc func(header packet.Header, payload []byte, src, dst net.Addr)
+	// ConnectionFunc is called after a connection has been configured but before its login sequence starts.
+	// It can be used by an observer to associate transport-level evidence with the connection while login is
+	// still in progress. The callback must not mutate protocol state or block the login sequence.
+	ConnectionFunc func(*Conn)
 
 	// MaxDecompressedLen is the maximum length of a decompressed packet to prevent potential exploits. If 0,
 	// the default value is 16MB (16 * 1024 * 1024). Setting this to a negative integer disables the limit.
@@ -459,6 +463,9 @@ func (listener *Listener) createConn(netConn net.Conn) {
 	}
 	listener.playerCount.Add(1)
 	listener.updatePongData()
+	if listener.cfg.ConnectionFunc != nil {
+		listener.cfg.ConnectionFunc(conn)
+	}
 
 	go listener.handleConn(conn)
 }
