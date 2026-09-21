@@ -25,6 +25,11 @@ BedrockDebugProxy marks the initial downstream `ResourcePacksInfo` offer as requ
 
 The patched connection API now retains the decoded upstream `ResourcePacksInfo` on dialled `GameData`. BedrockDebugProxy uses that value to mirror offer metadata downstream while rebuilding the pack entries from the archive-backed resources it can serve. The upstream URL list is therefore not forwarded verbatim, and a listener without an upstream offer still uses its configured policy. A real Minecraft client still has to validate the visible prompt on each release candidate.
 
+The rebuilt downstream entries now preserve the per-pack `ContentIdentity`, `SubPackName`, `HasScripts`, `AddonPack`, and
+`RTXEnabled` fields by matching each served archive to its advertised UUID, version, and compressed size. The
+downstream `DownloadURL` remains controlled by the archive-backed delivery path and is not copied from the upstream
+offer. This closes a confirmed metadata-loss boundary without changing archive bytes or pack order.
+
 An owner-controlled PocketMine capture from `session-20260921T003441Z` provided a local regression fixture for this boundary. Its upstream `ResourcePacksInfo` payload began with `0x00`, while the pre-fix downstream payload began with `0x01`. The local server therefore exposed a concrete optional-offer mismatch. This is protocol metadata evidence from a local test server, not evidence about any public server's enforcement behavior.
 
 ## Mixed URL and RakNet offers

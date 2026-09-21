@@ -646,6 +646,14 @@ Every new entry should state the symptom, root cause, implementation commits, ev
 - Evidence and validation: the loopback cache regression holds an HTTP response open, cancels the cache context, and confirms the worker exits with a context-canceled error. The size-bound test and existing URL offer tests remain unchanged.
 - Status: implemented in the source tree with focused automated coverage. Real-client HTTP resource-pack validation remains pending.
 
+### FIX-0080 - Preserve per-pack resource-pack metadata
+
+- Symptom: when a listener rebuilt downstream `ResourcePacksInfo` entries from archive-backed packs, it retained UUID, version, and size but dropped per-pack `ContentIdentity`, `SubPackName`, `HasScripts`, `AddonPack`, and `RTXEnabled` values from the upstream offer.
+- Root cause: `Conn.handleClientToServerHandshake` cleared the retained offer's texture-pack list and reconstructed each entry from `resource.Pack`, whose archive object does not carry all wire-level offer metadata.
+- Implementation: match served archives to the retained advertised entries by UUID, version, and compressed size, then copy the per-pack metadata while keeping downstream URL handling and archive delivery unchanged. Encrypted packs retain their current-connection content key, with the advertised key used as a fallback for archive entries without one.
+- Evidence and validation: `TestRunnerPreservesMixedResourcePackOfferOrder` now supplies non-default metadata for URL and RakNet entries and verifies every preserved field across the proxy boundary. The resource-pack negotiation research note records the matching boundary.
+- Status: implemented with focused automated coverage. Real-client encrypted and mixed-offer validation remains pending.
+
 ## Ordering safety contract
 
 The deferred-packet change is deliberately narrow. `expectedIDs` remains the only authority for what the current login state accepts. The queue scan selects the earliest packet that is currently expected, leaves packets for later states queued, and never mutates or reorders bytes on the wire. The regression tests cover canonical resource-pack order, featured early `ResourcePacksInfo`, a later-phase packet queued ahead of the current phase, and all six permutations of the three login packets.
