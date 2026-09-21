@@ -172,6 +172,10 @@ func (n Network) wrap(conn net.Conn) (net.Conn, error) {
 }
 
 func (n Network) recordConnection(kind string, conn net.Conn, operationErr error) error {
+	var data []byte
+	if metadata := transportConnectionMetadata(conn); len(metadata) > 0 {
+		data, _ = json.Marshal(metadata)
+	}
 	event := capture.Event{
 		SessionID:    n.SessionID,
 		ConnectionID: n.connectionID(),
@@ -181,6 +185,7 @@ func (n Network) recordConnection(kind string, conn net.Conn, operationErr error
 		Direction:    capture.DirectionInternal,
 		Channel:      n.Channel,
 		Stage:        "post_transport_connection",
+		Data:         data,
 	}
 	if conn != nil {
 		event.Source = endpoint(conn.LocalAddr())
@@ -195,6 +200,23 @@ func (n Network) recordConnection(kind string, conn net.Conn, operationErr error
 		n.Failures.Set(err)
 	}
 	return err
+}
+
+func transportConnectionMetadata(conn net.Conn) map[string]any {
+	if conn == nil {
+		return nil
+	}
+	metadata := map[string]any{}
+	if source, ok := conn.(interface{ ClientGUID() int64 }); ok {
+		if clientGUID := source.ClientGUID(); clientGUID != 0 {
+			metadata["raknet_client_guid"] = clientGUID
+		}
+	}
+	if source, ok := conn.(interface{ PublicKey() *ecdsa.PublicKey }); ok {
+		metadata["transport_public_key_capability"] = true
+		metadata["transport_public_key_present"] = source.PublicKey() != nil
+	}
+	return metadata
 }
 
 type observedListener struct {
