@@ -93,6 +93,12 @@ func TestRunRejectsExperienceWithoutDeviceAuthentication(t *testing.T) {
 
 func TestCaptureLimitationsDescribeTransportStateBoundary(t *testing.T) {
 	limitations := strings.Join(captureLimitations(false, false), "\n")
+	if strings.Contains(limitations, "cannot mirror an upstream optional-pack policy") {
+		t.Fatalf("stale resource-pack limitation = %s", limitations)
+	}
+	if !strings.Contains(limitations, "Upstream resource-pack offer metadata is preserved") {
+		t.Fatalf("resource-pack offer limitation missing = %s", limitations)
+	}
 	if strings.Contains(limitations, "not yet classified per event") {
 		t.Fatalf("stale transport limitation = %s", limitations)
 	}

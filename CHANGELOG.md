@@ -16,6 +16,7 @@ Detailed rationale remains in [`docs/audits/`](docs/audits/).
 - The quality gate now offers `-LowMemory` to bound local Go worker and package parallelism without changing the default CI profile.
 - The owner-controlled ProxyFingerprint parity tool now compares lifecycle milestone timing in addition to identity, packet-order, and packet-count observations.
 - Capture manifests now describe early transport-state availability accurately instead of claiming compression and encryption state is never classified per event.
+- Capture manifests now describe the current resource-pack offer boundary accurately. Upstream offer metadata is preserved while URL entries are rebuilt from proxy-served archives.
 - Transport payload events now include bounded per-connection compression and encryption state when that state is observable, while retaining the original raw application-batch blob.
 - Transport payload metadata is now available during the login sequence as soon as the corresponding connection object exists, while the first pre-negotiation payload remains explicitly marked as not negotiated.
 - `session.negotiated` capture events now distinguish the protocol implementation version from the game version and device OS reported in each connection's `ClientData`, including explicit mismatch booleans for local parity investigations.

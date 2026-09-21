@@ -315,7 +315,7 @@ func runProxy(args []string, stdout, stderr io.Writer) int {
 func captureLimitations(followTransfers, decryptResourcePacks bool) []string {
 	limitations := []string{
 		"Raw UDP datagrams and RakNet acknowledgement or retransmission frames are not captured",
-		"Downstream clients must accept offered resource packs; the current adapter cannot mirror an upstream optional-pack policy",
+		"Upstream resource-pack offer metadata is preserved; URL entries are replaced with proxy-served archives and failed retrieval remains observable",
 		"Early transport payloads may not expose compression or encryption state before the connection object is available",
 	}
 	if followTransfers {
