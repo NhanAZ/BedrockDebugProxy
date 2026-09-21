@@ -5,9 +5,11 @@ import (
 	"context"
 	"io"
 	"log/slog"
+	"reflect"
 	"strings"
 	"testing"
 
+	"github.com/sandertv/gophertunnel/minecraft/protocol"
 	"github.com/sandertv/gophertunnel/minecraft/protocol/packet"
 )
 
@@ -238,6 +240,32 @@ func TestHandleStartGamePreservesCompletePacketForBridge(t *testing.T) {
 		if value[0] != value[1] {
 			t.Fatalf("preserved StartGame field %s = %v, want %v", name, value[0], value[1])
 		}
+	}
+}
+
+func TestHandlePreservesStartupWorldPacketsForBridge(t *testing.T) {
+	conn := newLoginTestConn()
+	conn.expectedIDs.Store([]uint32{packet.IDJigsawStructureData, packet.IDVoxelShapes})
+	jigsaw := &packet.JigsawStructureData{StructureData: map[string]any{
+		"jigsaws": []any{map[string]any{"identifier": "integration:jigsaw"}},
+	}}
+	voxelShapes := &packet.VoxelShapes{
+		NameMap:          []protocol.VoxelShapeNameEntry{{Name: "integration:shape", ID: 7}},
+		CustomShapeCount: 7,
+	}
+
+	if err := conn.handle(wirePacketData(t, jigsaw)); err != nil {
+		t.Fatalf("handle JigsawStructureData: %v", err)
+	}
+	if err := conn.handle(wirePacketData(t, voxelShapes)); err != nil {
+		t.Fatalf("handle VoxelShapes: %v", err)
+	}
+	data := conn.GameData()
+	if data.JigsawStructureData == nil || !reflect.DeepEqual(data.JigsawStructureData.StructureData, jigsaw.StructureData) {
+		t.Fatalf("preserved JigsawStructureData = %#v, want %#v", data.JigsawStructureData, jigsaw)
+	}
+	if data.VoxelShapes == nil || !reflect.DeepEqual(data.VoxelShapes.NameMap, voxelShapes.NameMap) || data.VoxelShapes.CustomShapeCount != voxelShapes.CustomShapeCount {
+		t.Fatalf("preserved VoxelShapes = %#v, want %#v", data.VoxelShapes, voxelShapes)
 	}
 }
 

@@ -15,6 +15,14 @@ type GameData struct {
 	// passes server world data to another connection. It may be nil for callers
 	// constructing GameData directly.
 	StartGamePacket *packet.StartGame
+	// JigsawStructureData contains the complete decoded startup packet when it
+	// was supplied by a dialled server. It may be nil when the server did not
+	// send one or when callers construct GameData directly.
+	JigsawStructureData *packet.JigsawStructureData
+	// VoxelShapes contains the complete decoded startup packet when it was
+	// supplied by a dialled server. It may be nil when the server did not send
+	// one or when callers construct GameData directly.
+	VoxelShapes *packet.VoxelShapes
 
 	// WorldName is the name of the world that the player spawns in. This name will be displayed at the top of
 	// the player list when opening the in-game menu. It may contain colour codes and does not have to be an

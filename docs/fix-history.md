@@ -478,6 +478,14 @@ Every new entry should state the symptom, root cause, implementation commits, ev
 - Evidence and validation: the complete-packet regression test and the proxy loopback integration test use non-default `StartGame` fields and verify that the downstream client receives them unchanged. [`docs/research/start-game-parity.md`](research/start-game-parity.md) records the source boundary and remaining login-packet limitations.
 - Status: implemented for decoded `StartGame` field parity. Dimension, Jigsaw, VoxelShapes, and ItemRegistry handling remain separate login-boundary behaviors and are not claimed to be byte-identical.
 
+### FIX-0060 - Preserve startup Jigsaw and VoxelShapes packets
+
+- Symptom: captures showed the proxy sending an empty `JigsawStructureData` and empty `VoxelShapes` downstream, followed later by the non-empty upstream packets. The client therefore received duplicate startup packets in a different boundary sequence from the server.
+- Root cause: gophertunnel deferred these packet IDs during login without retaining them in `GameData`. The listener-side `StartGame` path always generated empty replacements, and the deferred upstream packets were later exposed to the bridge as normal traffic.
+- Implementation: accept and retain both packet types across the bounded post-resource-pack login states. Listener `StartGame` now sends the retained decoded packets when available and keeps empty defaults only when the upstream did not supply them.
+- Evidence and validation: The Hive and local loopback captures contain packet IDs 313 and 337 in the upstream login and two downstream occurrences before this fix. New unit and proxy loopback tests verify decoded contents and one startup delivery path. [`docs/research/start-game-parity.md`](research/start-game-parity.md) records the capture evidence and boundary.
+- Status: implemented for the observed startup packet ordering. Packets arriving only after the connection is fully spawned remain normal forwarded traffic and require separate ordering evidence before changing the state machine.
+
 ## Ordering safety contract
 
 The deferred-packet change is deliberately narrow. `expectedIDs` remains the only authority for what the current login state accepts. The queue scan selects the earliest packet that is currently expected, leaves packets for later states queued, and never mutates or reorders bytes on the wire. The regression tests cover canonical resource-pack order, featured early `ResourcePacksInfo`, a later-phase packet queued ahead of the current phase, and all six permutations of the three login packets.
