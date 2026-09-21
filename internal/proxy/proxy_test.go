@@ -1064,6 +1064,7 @@ func TestRunnerForwardsBidirectionalPacketsAndCapturesSession(t *testing.T) {
 	type transportMetadataState struct {
 		encryptionEnabled     bool
 		compressionNegotiated bool
+		raknetClientGUID      int64
 	}
 	transportMetadataObserved := map[string]transportMetadataState{}
 	earlyTransportMetadataObserved := map[string]bool{}
@@ -1123,6 +1124,7 @@ func TestRunnerForwardsBidirectionalPacketsAndCapturesSession(t *testing.T) {
 			var data struct {
 				EncryptionState  string `json:"bedrock_encryption_state"`
 				CompressionState string `json:"bedrock_compression_state"`
+				RakNetClientGUID int64  `json:"raknet_client_guid"`
 			}
 			if err := json.Unmarshal(event.Data, &data); err != nil {
 				return err
@@ -1130,6 +1132,9 @@ func TestRunnerForwardsBidirectionalPacketsAndCapturesSession(t *testing.T) {
 			state := transportMetadataObserved[event.Channel]
 			state.encryptionEnabled = state.encryptionEnabled || data.EncryptionState == "enabled"
 			state.compressionNegotiated = state.compressionNegotiated || data.CompressionState == "negotiated"
+			if data.RakNetClientGUID != 0 {
+				state.raknetClientGUID = data.RakNetClientGUID
+			}
 			transportMetadataObserved[event.Channel] = state
 			if !negotiated && data.CompressionState == "negotiated" {
 				earlyTransportMetadataObserved[event.Channel] = true
@@ -1264,6 +1269,9 @@ func TestRunnerForwardsBidirectionalPacketsAndCapturesSession(t *testing.T) {
 	}
 	if upstream := transportMetadataObserved["upstream"]; !upstream.encryptionEnabled || !upstream.compressionNegotiated {
 		t.Fatalf("upstream transport metadata = %#v", upstream)
+	}
+	if upstream := transportMetadataObserved["upstream"]; upstream.raknetClientGUID == 0 {
+		t.Fatalf("upstream transport metadata did not retain RakNet client GUID: %#v", upstream)
 	}
 	for _, channel := range []string{"downstream", "upstream"} {
 		if !earlyTransportMetadataObserved[channel] {

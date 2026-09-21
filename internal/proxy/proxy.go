@@ -952,6 +952,9 @@ func transportMetadata(conn *minecraft.Conn) map[string]any {
 		return nil
 	}
 	metadata := map[string]any{}
+	if clientGUID, ok := conn.RakNetClientGUID(); ok {
+		metadata["raknet_client_guid"] = clientGUID
+	}
 	switch {
 	case conn.EncryptionDisabled():
 		metadata["bedrock_encryption_state"] = "disabled"
