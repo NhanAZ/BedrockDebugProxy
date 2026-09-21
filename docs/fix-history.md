@@ -678,6 +678,14 @@ Every new entry should state the symptom, root cause, implementation commits, ev
 - Evidence and validation: source review of the packet callback and the local chunk-radius parity capture identified the silent error path. Focused success and write-error tests cover typed value preservation and error propagation.
 - Status: implemented as a capture-observability correction. The initial 16/16 request and the later-request ordering boundary remain unchanged.
 
+### FIX-0085 - Preserve chunk-radius forwarding decode failures
+
+- Symptom: the listener retained a raw downstream `RequestChunkRadius` body but silently returned when the strict typed forwarding decoder rejected truncation or trailing bytes.
+- Root cause: the forwarding callback treated its validation error as a local control-flow result and did not emit a capture decode event.
+- Implementation: record `packet.decode_error` with the packet ID, `RequestChunkRadius` type, operation, and underlying error before leaving the raw packet unchanged. The callback still does not mutate, suppress, or close the connection because of this observation-only failure.
+- Evidence and validation: strict decoder tests cover truncation and trailing bytes; a recorder regression test verifies packet context and the manifest decode-error counter. The behavior is derived from the existing raw observer and capture schema.
+- Status: implemented with focused automated coverage. The initial upstream 16/16 request and later-request ordering limitation remain documented in [`docs/research/chunk-radius-parity.md`](research/chunk-radius-parity.md).
+
 ## Ordering safety contract
 
 The deferred-packet change is deliberately narrow. `expectedIDs` remains the only authority for what the current login state accepts. The queue scan selects the earliest packet that is currently expected, leaves packets for later states queued, and never mutates or reorders bytes on the wire. The regression tests cover canonical resource-pack order, featured early `ResourcePacksInfo`, a later-phase packet queued ahead of the current phase, and all six permutations of the three login packets.

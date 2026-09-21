@@ -89,6 +89,48 @@ func TestForwardRequestChunkRadiusReturnsWriteError(t *testing.T) {
 	}
 }
 
+func TestRecordPacketDecodeErrorRetainsPacketContext(t *testing.T) {
+	root := filepath.Join(t.TempDir(), "capture")
+	recorder, err := capture.New(root, capture.Options{})
+	if err != nil {
+		t.Fatal(err)
+	}
+	runner := &Runner{config: Config{Recorder: recorder}}
+	operationErr := errors.New("decode RequestChunkRadius: 1 unread bytes")
+	if err := runner.recordPacketDecodeErrorAtHop(packet.IDRequestChunkRadius, "RequestChunkRadius", "*packet.RequestChunkRadius", capture.DirectionClientToServer, "downstream", "downstream-1", 1, "decode RequestChunkRadius for forwarding", operationErr); err != nil {
+		t.Fatalf("record packet decode error: %v", err)
+	}
+	if err := recorder.Close("closed", nil); err != nil {
+		t.Fatal(err)
+	}
+	manifest, err := capture.ReadManifest(root)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if manifest.Counts.DecodeErrors != 1 {
+		t.Fatalf("decode error count = %d, want 1", manifest.Counts.DecodeErrors)
+	}
+	var found bool
+	if err := capture.ScanEvents(root, func(event capture.Event) error {
+		if event.Kind != "packet.decode_error" {
+			return nil
+		}
+		found = true
+		if event.Packet == nil || event.Packet.ID != packet.IDRequestChunkRadius || event.Packet.Name != "RequestChunkRadius" || event.Packet.GoType != "*packet.RequestChunkRadius" || event.Packet.DecodeStatus != "decode_error" {
+			t.Fatalf("packet context = %#v", event.Packet)
+		}
+		if event.Error == nil || event.Error.Operation != "decode RequestChunkRadius for forwarding" || !strings.Contains(event.Error.Message, operationErr.Error()) {
+			t.Fatalf("error context = %#v", event.Error)
+		}
+		return nil
+	}); err != nil {
+		t.Fatal(err)
+	}
+	if !found {
+		t.Fatal("packet decode error event not found")
+	}
+}
+
 type listeningAddressWriter struct {
 	mu      sync.Mutex
 	buffer  strings.Builder
