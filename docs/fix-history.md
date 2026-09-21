@@ -862,6 +862,14 @@ Every new entry should state the symptom, root cause, implementation commits, ev
 - Evidence and validation: the `ResourcePackCache` contract defines load errors as non-fatal misses and successful stores as future cache hits. A focused regression test stores a valid pack after a synthetic prefetch error and verifies that `Load` returns the pack without an error.
 - Status: implemented with deterministic local coverage. Real-client URL-failure and RakNet-fallback validation remains pending.
 
+### FIX-0107 - Preserve transport and capture errors together
+
+- Symptom: when an observed transport read or write returned an error while the capture recorder also failed, the wrapper returned only the capture error and a partial read could be reported as zero bytes.
+- Root cause: `observedConn` replaced the underlying operation result whenever `recordPayload` failed, discarding the transport error and transferred byte count at the wrapper boundary.
+- Implementation: return the original byte count and join the transport and capture errors for `Read`, `ReadPacket`, and `Write`. The raw payload and event error metadata remain unchanged.
+- Evidence and validation: the transport wrapper is the shared boundary for all observed connections, and the recorder already stores the operation error in the event. A deterministic regression test uses a closed recorder plus independent read and write errors and verifies both errors and transferred counts remain visible.
+- Status: implemented with deterministic local coverage. Live transport failure behavior remains unverified.
+
 ## Ordering safety contract
 
 The deferred-packet change is deliberately narrow. `expectedIDs` remains the only authority for what the current login state accepts. The queue scan selects the earliest packet that is currently expected, leaves packets for later states queued, and never mutates or reorders bytes on the wire. The regression tests cover canonical resource-pack order, featured early `ResourcePacksInfo`, a later-phase packet queued ahead of the current phase, and all six permutations of the three login packets.

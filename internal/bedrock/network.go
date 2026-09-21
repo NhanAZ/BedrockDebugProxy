@@ -258,7 +258,7 @@ type observedConn struct {
 func (c *observedConn) Read(buffer []byte) (int, error) {
 	n, err := c.Conn.Read(buffer)
 	if captureErr := c.recordPayload("read", buffer[:n], n, n, err); captureErr != nil {
-		return 0, captureErr
+		return n, errors.Join(err, captureErr)
 	}
 	return n, err
 }
@@ -272,7 +272,7 @@ func (c *observedConn) ReadPacket() ([]byte, error) {
 	}
 	payload, err := reader.ReadPacket()
 	if captureErr := c.recordPayload("read", payload, len(payload), len(payload), err); captureErr != nil {
-		return nil, captureErr
+		return payload, errors.Join(err, captureErr)
 	}
 	return payload, err
 }
@@ -304,7 +304,7 @@ func (c *observedConn) PublicKey() *ecdsa.PublicKey {
 func (c *observedConn) Write(payload []byte) (int, error) {
 	n, err := c.Conn.Write(payload)
 	if captureErr := c.recordPayload("write", payload, len(payload), n, err); captureErr != nil {
-		return n, captureErr
+		return n, errors.Join(err, captureErr)
 	}
 	return n, err
 }

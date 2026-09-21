@@ -344,6 +344,37 @@ func TestObservedConnReportsTransferredBytesWhenCaptureFails(t *testing.T) {
 	}
 }
 
+func TestObservedConnPreservesTransportErrorWhenCaptureFails(t *testing.T) {
+	recorder, err := capture.New(filepath.Join(t.TempDir(), "capture"), capture.Options{})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := recorder.Close("closed", nil); err != nil {
+		t.Fatal(err)
+	}
+	readErr := errors.New("transport read failed")
+	writeErr := errors.New("transport write failed")
+	conn := &observedConn{Conn: &fakePacketConn{
+		readPayload: []byte{1, 2, 3},
+		readErr:     readErr,
+		writeErr:    writeErr,
+	}, network: Network{
+		Recorder:       recorder,
+		Failures:       &FailureSink{},
+		ReadDirection:  capture.DirectionServerToClient,
+		WriteDirection: capture.DirectionClientToServer,
+	}}
+	buffer := make([]byte, 8)
+	read, err := conn.Read(buffer)
+	if read != 3 || !errors.Is(err, readErr) || !errors.Is(err, capture.ErrClosed) {
+		t.Fatalf("Read() = %d, %v, want transferred bytes and both errors", read, err)
+	}
+	written, err := conn.Write([]byte{4, 5})
+	if written != 2 || !errors.Is(err, writeErr) || !errors.Is(err, capture.ErrClosed) {
+		t.Fatalf("Write() = %d, %v, want transferred bytes and both errors", written, err)
+	}
+}
+
 func TestFailureSinkNotifiesOnce(t *testing.T) {
 	notifications := 0
 	sink := NewFailureSink(func() { notifications++ })
@@ -361,6 +392,8 @@ func TestFailureSinkNotifiesOnce(t *testing.T) {
 type fakePacketConn struct {
 	ctx         context.Context
 	readPayload []byte
+	readErr     error
+	writeErr    error
 	latency     time.Duration
 	closed      bool
 }
@@ -400,7 +433,7 @@ func (c *fakePacketConn) Read(buffer []byte) (int, error) {
 	if len(c.readPayload) == 0 {
 		return 0, io.EOF
 	}
-	return copy(buffer, c.readPayload), nil
+	return copy(buffer, c.readPayload), c.readErr
 }
 
 func (c *fakePacketConn) ReadPacket() ([]byte, error) {
@@ -417,7 +450,7 @@ func (c *fakePacketConn) Write(payload []byte) (int, error) {
 	if c.closed {
 		return 0, net.ErrClosed
 	}
-	return len(payload), nil
+	return len(payload), c.writeErr
 }
 
 func (c *fakePacketConn) Close() error {
