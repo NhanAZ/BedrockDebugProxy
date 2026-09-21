@@ -378,8 +378,11 @@ func decodeResourcePacksInfo(payload []byte) (info *packet.ResourcePacksInfo, er
 		}
 	}()
 	info = &packet.ResourcePacksInfo{}
-	reader := protocol.NewReader(bytes.NewReader(payload), 0, true)
-	info.Marshal(reader)
+	reader := bytes.NewReader(payload)
+	info.Marshal(protocol.NewReader(reader, 0, true))
+	if reader.Len() != 0 {
+		return nil, fmt.Errorf("decode ResourcePacksInfo: %d unread bytes", reader.Len())
+	}
 	return info, nil
 }
 

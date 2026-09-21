@@ -758,6 +758,14 @@ Every new entry should state the symptom, root cause, implementation commits, ev
 - Evidence and validation: gophertunnel `Listener.createConn`, `Network.wrap`, and the proxy callback call order establish the timing boundary. Focused unit tests cover both the pre-`Accept` fallback and the post-`Accept` tracked context. The resource-pack documentation records the lifecycle boundary.
 - Status: implemented with deterministic local coverage. No public server or external account was contacted for this change.
 
+### FIX-0094 - Reject incomplete URL resource-pack offers before side effects
+
+- Symptom: the URL resource-pack adapter could parse a valid prefix of a malformed or trailing `ResourcePacksInfo` body and start downloads even though the canonical packet decoder would later reject the complete body.
+- Root cause: the auxiliary decoder checked for panics but did not verify that the packet reader consumed every byte.
+- Implementation: require the `ResourcePacksInfo` reader to reach the end of the observed body before URL entries are scheduled. The raw packet observer remains unchanged, so malformed bytes and their decode outcome stay available as capture evidence.
+- Evidence and validation: the strict decoder follows the existing `RequestChunkRadius` boundary check. A regression test appends a trailing byte to an otherwise valid empty offer and requires an error with no decoded value. No network or public server was contacted.
+- Status: implemented with deterministic local coverage. URL-prefetch side effects are now gated on a complete typed offer.
+
 ## Ordering safety contract
 
 The deferred-packet change is deliberately narrow. `expectedIDs` remains the only authority for what the current login state accepts. The queue scan selects the earliest packet that is currently expected, leaves packets for later states queued, and never mutates or reorders bytes on the wire. The regression tests cover canonical resource-pack order, featured early `ResourcePacksInfo`, a later-phase packet queued ahead of the current phase, and all six permutations of the three login packets.
