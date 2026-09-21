@@ -12,6 +12,7 @@ import (
 	"io"
 	"log/slog"
 	"net"
+	"reflect"
 	"slices"
 	"strings"
 	"sync"
@@ -1372,7 +1373,7 @@ func (conn *Conn) handleResourcePackClientResponse(pk *packet.ResourcePackClient
 				})
 			}
 		}
-		if len(conn.rawResourcePackStack) > 0 && conn.rawResourcePackStackProtocolID == conn.proto.ID() {
+		if len(conn.rawResourcePackStack) > 0 && conn.rawResourcePackStackProtocolID == conn.proto.ID() && conn.rawResourcePackStackMatchesTyped(conn.rawResourcePackStack, stack) {
 			if err := conn.writeRawStartupPacket(conn.rawResourcePackStack, packet.IDResourcePackStack); err != nil {
 				conn.log.Warn("write retained ResourcePackStack bytes", "err", err)
 				if err := conn.WritePacket(cloneResourcePackStack(stack)); err != nil {
@@ -1388,6 +1389,29 @@ func (conn *Conn) handleResourcePackClientResponse(pk *packet.ResourcePackClient
 		return fmt.Errorf("unknown ResourcePackClientResponse response type %v", pk.Response)
 	}
 	return nil
+}
+
+// rawResourcePackStackMatchesTyped validates the known ResourcePackStack
+// fields before reusing retained bytes. The decoder intentionally allows
+// trailing bytes so newer optional fields remain observable and can still be
+// forwarded without typed re-encoding.
+func (conn *Conn) rawResourcePackStackMatchesTyped(raw []byte, expected *packet.ResourcePackStack) (matches bool) {
+	if len(raw) == 0 || expected == nil || conn.proto == nil {
+		return false
+	}
+	defer func() {
+		if recover() != nil {
+			matches = false
+		}
+	}()
+	data, err := parseData(append([]byte(nil), raw...), nil)
+	if err != nil || data.h.PacketID != packet.IDResourcePackStack {
+		return false
+	}
+	decoded := &packet.ResourcePackStack{}
+	reader := conn.proto.NewReader(data.payload, conn.shieldID.Load(), conn.readerLimits)
+	decoded.Marshal(reader)
+	return reflect.DeepEqual(decoded, expected)
 }
 
 // startGame sends a StartGame packet using the game data of the connection.
