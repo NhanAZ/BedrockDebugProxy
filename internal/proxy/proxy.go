@@ -543,6 +543,8 @@ func (r *Runner) runHop(runCtx context.Context, localAddress string, state *hopS
 	}
 	downstreamClientData := clientConn.ClientData()
 	upstreamClientData := serverConn.ClientData()
+	downstreamNetworkSettings, downstreamNetworkSettingsOK := clientConn.NetworkSettings()
+	upstreamNetworkSettings, upstreamNetworkSettingsOK := serverConn.NetworkSettings()
 	if err := r.recordAtHop("session.negotiated", capture.SeverityInfo, map[string]any{
 		"downstream_protocol_id": clientConn.Proto().ID(), "downstream_game_version": clientConn.Proto().Ver(),
 		"upstream_protocol_id": serverConn.Proto().ID(), "upstream_game_version": serverConn.Proto().Ver(),
@@ -552,6 +554,10 @@ func (r *Runner) runHop(runCtx context.Context, localAddress string, state *hopS
 		"downstream_client_data_device_os":    downstreamClientData.DeviceOS,
 		"upstream_client_data_device_os":      upstreamClientData.DeviceOS,
 		"client_data_device_os_match":         downstreamClientData.DeviceOS == upstreamClientData.DeviceOS,
+		"downstream_network_settings":         networkSettingsMetadata(downstreamNetworkSettings, downstreamNetworkSettingsOK),
+		"upstream_network_settings":           networkSettingsMetadata(upstreamNetworkSettings, upstreamNetworkSettingsOK),
+		"network_settings_available":          downstreamNetworkSettingsOK && upstreamNetworkSettingsOK,
+		"network_settings_match":              downstreamNetworkSettingsOK && upstreamNetworkSettingsOK && downstreamNetworkSettings == upstreamNetworkSettings,
 		"resource_pack_count":                 len(serverConn.ResourcePacks()), "target": state.target,
 	}, state.hop); err != nil {
 		return err
@@ -811,6 +817,19 @@ func newConnectionMetadata(role string, conn *minecraft.Conn) connectionMetadata
 			TitleID: identity.TitleID, PlayFabTitleID: identity.PlayFabTitleID, PlayFabID: identity.PlayFabID,
 		},
 		ClientData: conn.ClientData(),
+	}
+}
+
+func networkSettingsMetadata(settings packet.NetworkSettings, available bool) map[string]any {
+	if !available {
+		return nil
+	}
+	return map[string]any{
+		"compression_threshold":     settings.CompressionThreshold,
+		"compression_algorithm":     settings.CompressionAlgorithm,
+		"client_throttle":           settings.ClientThrottle,
+		"client_throttle_threshold": settings.ClientThrottleThreshold,
+		"client_throttle_scalar":    settings.ClientThrottleScalar,
 	}
 }
 

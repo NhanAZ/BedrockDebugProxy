@@ -39,6 +39,25 @@ func TestHandlePlayStatusCompletesFeaturedExperienceSpawn(t *testing.T) {
 	}
 }
 
+func TestHandleNetworkSettingsRetainsNegotiatedValues(t *testing.T) {
+	conn := newLoginTestConn()
+	conn.dec = packet.NewDecoder(bytes.NewReader(nil))
+	want := &packet.NetworkSettings{
+		CompressionThreshold:    17,
+		CompressionAlgorithm:    packet.CompressionAlgorithmFlate,
+		ClientThrottle:          true,
+		ClientThrottleThreshold: 9,
+		ClientThrottleScalar:    0.5,
+	}
+	if err := conn.handleNetworkSettings(want); err != nil {
+		t.Fatalf("handle NetworkSettings: %v", err)
+	}
+	got, ok := conn.NetworkSettings()
+	if !ok || !reflect.DeepEqual(&got, want) {
+		t.Fatalf("retained NetworkSettings = %#v, available=%t, want %#v", got, ok, want)
+	}
+}
+
 func TestHandleDrainsResourcePacksInfoDeferredBeforePlayStatus(t *testing.T) {
 	conn := &Conn{
 		ctx:   context.Background(),

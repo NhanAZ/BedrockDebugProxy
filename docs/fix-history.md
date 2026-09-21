@@ -526,6 +526,14 @@ Every new entry should state the symptom, root cause, implementation commits, ev
 - Evidence and validation: focused probe of owner-controlled capture `captures/session-20260921T003441Z`, nested raw-retention tests, and the root proxy loopback integration test that verifies exact bytes for all four retained world-start packet types.
 - Status: implemented for the supported same-protocol pre-spawn boundary. Exact-revision real-client validation remains pending.
 
+### FIX-0065 - Index per-connection NetworkSettings
+
+- Symptom: the capture retained raw `NetworkSettings` packets, but `session.negotiated` did not expose the compression threshold, compression algorithm, or client-throttle values for either connection.
+- Root cause: gophertunnel applied the settings directly to its encoder and decoder and then discarded the decoded packet. The listener and dialler therefore had no structured comparison surface.
+- Implementation: retain a copy of the negotiated `NetworkSettings` on each connection and add bounded downstream and upstream metadata plus an explicit match boolean to `session.negotiated`. No wire behavior, compression policy, batching, or forwarding path is changed.
+- Evidence and validation: owner-controlled capture `captures/session-20260921T003441Z` showed upstream threshold `1` and downstream threshold `256`, nested retention tests cover all fields, and the root loopback integration test verifies the structured comparison.
+- Status: implemented as a capture-observability correction. Choosing a different downstream compression policy remains an open design question and is not inferred from this observation.
+
 ## Ordering safety contract
 
 The deferred-packet change is deliberately narrow. `expectedIDs` remains the only authority for what the current login state accepts. The queue scan selects the earliest packet that is currently expected, leaves packets for later states queued, and never mutates or reorders bytes on the wire. The regression tests cover canonical resource-pack order, featured early `ResourcePacksInfo`, a later-phase packet queued ahead of the current phase, and all six permutations of the three login packets.
