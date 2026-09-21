@@ -598,6 +598,14 @@ Every new entry should state the symptom, root cause, implementation commits, ev
 - Evidence and validation: the plugin self-test and PHP syntax checks pass. The timing output is explicitly documented as an observation aid and does not infer server enforcement behavior.
 - Status: implemented in the owner-controlled local parity tool. Existing reports can still be read, but comparisons generated before this change do not contain the new view.
 
+### FIX-0074 - Bound local quality-gate memory use
+
+- Symptom: running the full quality gate with the host's default Go parallelism can consume excessive memory on a development workstation.
+- Root cause: `tools/quality.ps1` had no opt-in way to bound Go runtime workers and package build parallelism, even though the same checks are safe at lower concurrency.
+- Implementation: add `tools/quality.ps1 -LowMemory`, which temporarily sets `GOMAXPROCS=2` and `GOFLAGS=-p=1` for child Go commands and restores the caller's environment afterward. The default and CI profiles remain unchanged.
+- Evidence and validation: the low-memory quality gate, PowerShell syntax checks, and `git diff --check` pass. No runtime, protocol, capture, or binary behavior changes.
+- Status: implemented as a local workflow safeguard.
+
 ## Ordering safety contract
 
 The deferred-packet change is deliberately narrow. `expectedIDs` remains the only authority for what the current login state accepts. The queue scan selects the earliest packet that is currently expected, leaves packets for later states queued, and never mutates or reorders bytes on the wire. The regression tests cover canonical resource-pack order, featured early `ResourcePacksInfo`, a later-phase packet queued ahead of the current phase, and all six permutations of the three login packets.
