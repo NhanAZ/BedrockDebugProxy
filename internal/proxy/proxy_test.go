@@ -56,6 +56,39 @@ func TestDecodeRequestChunkRadius(t *testing.T) {
 	}
 }
 
+type chunkRadiusPacketWriter struct {
+	packet packet.Packet
+	err    error
+}
+
+func (w *chunkRadiusPacketWriter) WritePacket(pk packet.Packet) error {
+	w.packet = pk
+	return w.err
+}
+
+func TestForwardRequestChunkRadiusPreservesTypedValues(t *testing.T) {
+	writer := new(chunkRadiusPacketWriter)
+	want := packet.RequestChunkRadius{ChunkRadius: 24, MaxChunkRadius: 28}
+	if err := forwardRequestChunkRadius(writer, want); err != nil {
+		t.Fatalf("forward request chunk radius: %v", err)
+	}
+	got, ok := writer.packet.(*packet.RequestChunkRadius)
+	if !ok {
+		t.Fatalf("forwarded packet type = %T, want *packet.RequestChunkRadius", writer.packet)
+	}
+	if *got != want {
+		t.Fatalf("forwarded request = %#v, want %#v", *got, want)
+	}
+}
+
+func TestForwardRequestChunkRadiusReturnsWriteError(t *testing.T) {
+	wantErr := errors.New("upstream closed")
+	writer := &chunkRadiusPacketWriter{err: wantErr}
+	if err := forwardRequestChunkRadius(writer, packet.RequestChunkRadius{ChunkRadius: 24, MaxChunkRadius: 28}); !errors.Is(err, wantErr) {
+		t.Fatalf("forward error = %v, want %v", err, wantErr)
+	}
+}
+
 type listeningAddressWriter struct {
 	mu      sync.Mutex
 	buffer  strings.Builder

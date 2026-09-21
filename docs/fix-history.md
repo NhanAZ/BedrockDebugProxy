@@ -670,6 +670,14 @@ Every new entry should state the symptom, root cause, implementation commits, ev
 - Evidence and validation: `docs/research/chunk-radius-parity.md` records the capture payloads and timing boundary. The loopback integration test observes upstream 16/16 followed by 24/28, and focused malformed-decoder and dependency tests cover the new path.
 - Status: implemented for observed request forwarding. The approved server radius after a later request remains server-controlled, and public-server validation is pending.
 
+### FIX-0084 - Preserve chunk-radius forward failures
+
+- Symptom: the listener packet callback attempted to forward a downstream `RequestChunkRadius` to the paired upstream connection but discarded a missing-connection or `WritePacket` error.
+- Root cause: the request forwarding path was added as a best-effort callback with no capture error record when the upstream connection was unavailable or closed during the write.
+- Implementation: retain the typed request forwarding helper and record `bridge.write_error` with the operation `forward RequestChunkRadius` when the write cannot be completed. The downstream raw packet and its original evidence remain unchanged.
+- Evidence and validation: source review of the packet callback and the local chunk-radius parity capture identified the silent error path. Focused success and write-error tests cover typed value preservation and error propagation.
+- Status: implemented as a capture-observability correction. The initial 16/16 request and the later-request ordering boundary remain unchanged.
+
 ## Ordering safety contract
 
 The deferred-packet change is deliberately narrow. `expectedIDs` remains the only authority for what the current login state accepts. The queue scan selects the earliest packet that is currently expected, leaves packets for later states queued, and never mutates or reorders bytes on the wire. The regression tests cover canonical resource-pack order, featured early `ResourcePacksInfo`, a later-phase packet queued ahead of the current phase, and all six permutations of the three login packets.
