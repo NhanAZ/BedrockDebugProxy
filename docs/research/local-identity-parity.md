@@ -40,12 +40,15 @@ The closed ProxyFingerprint report for this run contained no `auth_client_playfa
 
 The authenticated path has a separate, source-backed boundary. Sandertv/gophertunnel at immutable commit [`7a556a07335b663744b50d38062636ad8283f314`](https://github.com/Sandertv/gophertunnel/blob/7a556a07335b663744b50d38062636ad8283f314/minecraft/dial.go) still calls `setAndroidData` before encoding an authenticated login because the XBL chain's title ID cannot be edited. That dialer creates a new signed upstream session from the token source. Preserving the downstream device metadata without also changing the signed chain would create an internal metadata contradiction, not a vanilla-equivalent login. This project therefore keeps the upstream behavior and treats authenticated two-session parity as an architectural limitation requiring an authorized server-side test, not a target for heuristic evasion.
 
+An independent upstream report, [gophertunnel issue #407](https://github.com/Sandertv/gophertunnel/issues/407), describes a related key-binding boundary in a later BDS OIDC flow. The report says the multiplayer token's `cpk` was bound to the client key, while a proxy needed its own key to decrypt the second connection. It records that raw login forwarding reached world generation but then failed because the encryption keys did not match. The report covers BDS protocol 944 and is not evidence about The Hive, protocol 2193, or any server-side enforcement decision. It is useful corroborating evidence that copying or re-signing authenticated login metadata is not a safe parity fix without a protocol-supported design.
+
 ## Validation
 
 - `go test ./internal/proxy -run '^TestRunnerForwardsBidirectionalPacketsAndCapturesSession$' -count=1 -v` passed after the regression assertion was added.
 - A temporary loopback run against PocketMine with `xbox-auth=off` completed direct and proxied login, resource-pack exchange, spawn, and report capture. The temporary client and server setting were removed or restored after the run.
 - The rebuilt-binary comparison used labeled `direct` and `bedrockdebugproxy` reports. The comparison showed zero field differences and zero packet-count differences.
 - `TestClearXBLIdentityDataRemovesAuthenticationBoundFields` passes in the nested gophertunnel module, and the proxy forwarding regression remains green.
+- The upstream issue was reviewed on 2026-09-21 as an external interoperability report. No source code was copied and no public server was contacted.
 
 ## Limitations
 
