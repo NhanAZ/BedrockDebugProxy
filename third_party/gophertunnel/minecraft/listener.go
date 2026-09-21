@@ -103,6 +103,10 @@ type ListenConfig struct {
 	// If set, it will be called before sending the ResourcePacksInfo packet. The returned resource packs
 	// will be forwarded to the client in place of the Listener's current ones.
 	FetchResourcePacks func(identityData login.IdentityData, clientData login.ClientData, current []*resource.Pack) []*resource.Pack
+	// DeferResourcePackOfferUntilClientCacheStatus delays FetchResourcePacks and the related offer callbacks
+	// until the client reports its ClientCacheStatus after LoginSuccess. This is useful for a terminating bridge
+	// that must pass the observed capability to a paired upstream connection before beginning its own login.
+	DeferResourcePackOfferUntilClientCacheStatus bool
 	// FetchResourcePacksInfo selects metadata for the ResourcePacksInfo packet
 	// sent to a client. When non-nil, the returned metadata is preserved while
 	// the TexturePacks list is rebuilt from the packs selected by
@@ -451,6 +455,7 @@ func (listener *Listener) createConn(netConn net.Conn) {
 	conn.forceDisableVibrantVisuals = listener.cfg.ForceDisableVibrantVisuals
 	conn.resourcePacks = packs
 	conn.fetchResourcePacks = listener.cfg.FetchResourcePacks
+	conn.deferResourcePackOfferUntilClientCacheStatus = listener.cfg.DeferResourcePackOfferUntilClientCacheStatus
 	conn.fetchResourcePacksInfo = listener.cfg.FetchResourcePacksInfo
 	conn.fetchResourcePackStack = listener.cfg.FetchResourcePackStack
 	conn.fetchRawResourcePackStack = listener.cfg.FetchRawResourcePackStack
