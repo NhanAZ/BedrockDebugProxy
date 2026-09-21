@@ -29,9 +29,10 @@ still retained, so a failed forward is visible rather than silently discarded.
 
 If the observed body cannot be decoded as a complete `RequestChunkRadius`, the
 proxy now records a `packet.decode_error` event with the packet ID and typed
-context before leaving the raw packet untouched. This keeps strict forwarding
-validation visible without treating an untrusted malformed body as a reason to
-rewrite or suppress the packet.
+context, including the packet header's sub-client routing bytes, before leaving
+the raw packet untouched. This keeps strict forwarding validation visible
+without treating an untrusted malformed body as a reason to rewrite or suppress
+the packet.
 
 ## Classification
 
@@ -39,6 +40,7 @@ rewrite or suppress the packet.
 - Confirmed: the current gophertunnel default is 16/16, and the listener can observe the downstream request before the bridge forwards ordinary gameplay packets.
 - Confirmed: a failed later forward is represented in the capture as a bridge write error instead of being ignored by the listener packet callback.
 - Confirmed: a malformed or trailing-byte later request is represented as a packet decode error with its raw packet still retained.
+- Confirmed: the decode-error event preserves the request header's sender and target sub-client values alongside the raw packet.
 - Inferred: forwarding a later `RequestChunkRadius` is the safest generic parity improvement available without redesigning the login/resource-pack barrier. Bedrock servers may retain their previously approved radius when handling a later request.
 - Unknown: whether a particular public server uses the initial request, a later request, or an internal policy when selecting the approved radius. A public-server result requires a fresh stamped capture and must be reported separately from this local evidence.
 

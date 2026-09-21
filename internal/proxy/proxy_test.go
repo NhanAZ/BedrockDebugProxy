@@ -97,7 +97,10 @@ func TestRecordPacketDecodeErrorRetainsPacketContext(t *testing.T) {
 	}
 	runner := &Runner{config: Config{Recorder: recorder}}
 	operationErr := errors.New("decode RequestChunkRadius: 1 unread bytes")
-	if err := runner.recordPacketDecodeErrorAtHop(packet.IDRequestChunkRadius, "RequestChunkRadius", "*packet.RequestChunkRadius", capture.DirectionClientToServer, "downstream", "downstream-1", 1, "decode RequestChunkRadius for forwarding", operationErr); err != nil {
+	if err := runner.recordPacketDecodeErrorAtHop(capture.PacketInfo{
+		ID: packet.IDRequestChunkRadius, Name: "RequestChunkRadius", GoType: "*packet.RequestChunkRadius",
+		SenderSubClient: 2, TargetSubClient: 3, DecodeStatus: "decode_error",
+	}, capture.DirectionClientToServer, "downstream", "downstream-1", 1, "decode RequestChunkRadius for forwarding", operationErr); err != nil {
 		t.Fatalf("record packet decode error: %v", err)
 	}
 	if err := recorder.Close("closed", nil); err != nil {
@@ -116,7 +119,7 @@ func TestRecordPacketDecodeErrorRetainsPacketContext(t *testing.T) {
 			return nil
 		}
 		found = true
-		if event.Packet == nil || event.Packet.ID != packet.IDRequestChunkRadius || event.Packet.Name != "RequestChunkRadius" || event.Packet.GoType != "*packet.RequestChunkRadius" || event.Packet.DecodeStatus != "decode_error" {
+		if event.Packet == nil || event.Packet.ID != packet.IDRequestChunkRadius || event.Packet.Name != "RequestChunkRadius" || event.Packet.GoType != "*packet.RequestChunkRadius" || event.Packet.DecodeStatus != "decode_error" || event.Packet.SenderSubClient != 2 || event.Packet.TargetSubClient != 3 {
 			t.Fatalf("packet context = %#v", event.Packet)
 		}
 		if event.Error == nil || event.Error.Operation != "decode RequestChunkRadius for forwarding" || !strings.Contains(event.Error.Message, operationErr.Error()) {
