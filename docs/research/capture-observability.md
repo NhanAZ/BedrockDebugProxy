@@ -15,6 +15,33 @@ The pinned gophertunnel source establishes the following boundaries.
 - [`minecraft/conn.go`](https://github.com/Sandertv/gophertunnel/blob/283a5a97dfe65da94bcc0b401807f6aefa9e72ee/minecraft/conn.go) exposes `IdentityData`, `ClientData`, authentication state, `GameData`, latency, client-cache state, and chunk radius. Login and StartGame are partly consumed before normal forwarding, so these decoded values were observable but not previously indexed as structured session evidence.
 - [`minecraft/network.go`](https://github.com/Sandertv/gophertunnel/blob/283a5a97dfe65da94bcc0b401807f6aefa9e72ee/minecraft/network.go) confirms that the current network wrapper is above the reliable transport connection. It cannot prove UDP datagrams, RakNet acknowledgements, fragmentation, loss, or retransmission behavior.
 
+### Protocol conversion and pre-bridge packets
+
+The current protocol implementation in the in-tree gophertunnel composite uses an
+identity `ConvertToLatest` and `ConvertFromLatest` path for protocol 2193. A
+normal same-protocol packet therefore remains eligible for the raw read and raw
+write boundary described below. The connection API still permits a protocol
+adapter to return more than one latest-protocol packet for one input packet.
+
+`ReadPacketDataWithTime` returns a typed `PacketRead.Packet` without `Data` when
+the connection has already decoded a packet during its login state machine or
+has queued an additional packet produced by protocol conversion. Such a packet
+cannot be reconstructed as raw bytes at that later bridge read. This does not
+erase the canonical evidence: the gophertunnel packet hook runs after the packet
+header is read and before decode, so BedrockDebugProxy has already recorded the
+original raw packet when the hook was available. The bridge forwards the typed
+value in this case and the capture keeps the decoded view separate from the raw
+event.
+
+Confirmed for the current tree: protocol 2193 does not currently produce
+additional packets through conversion. Confirmed as an API boundary: a future
+version adapter may produce them, and the dependency associates the original raw
+packet only with the first converted value. Unknown: whether any supported
+future protocol will use that multi-packet conversion path. The project must not
+fabricate raw bytes for a typed additional packet; a future implementation that
+uses this path should add an explicit derived-view annotation and regression
+fixture before changing forwarding behavior.
+
 ## Public bedrocktool comparison
 
 The original public repository was used for use-case comparison, not protocol authority. Its [`handlers/capture.go`](https://github.com/bedrock-tool/bedrocktool/blob/d7788b57acbdd3eb93ac1efdd4f1107b78aea9b0/handlers/capture.go) retains raw packet records and downloaded resource-pack archives, while [`utils/proxy/session.go`](https://github.com/bedrock-tool/bedrocktool/blob/d7788b57acbdd3eb93ac1efdd4f1107b78aea9b0/utils/proxy/session.go) handles pre-play packets, StartGame state, cache blobs, transfers, and gameplay packets. It also contains specialized world, skin, and utility handlers.
