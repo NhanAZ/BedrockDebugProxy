@@ -174,7 +174,7 @@ Current known boundaries include the following.
 - The default capture path applies blocking backpressure and closes each content-addressed blob before forwarding continues. It avoids a durable disk flush per event for normal responsiveness. `--sync-each-event` provides stronger crash and power-loss durability at a substantial latency cost.
 - Raw UDP datagrams and RakNet acknowledgement, fragmentation, retransmission, and loss details are outside the current capture boundary.
 - Transport payloads are captured at the post-transport application boundary.
-- Downstream clients must accept offered resource packs. The current adapter cannot mirror an upstream optional-pack policy.
+- Upstream resource-pack offer metadata is retained. URL-advertised entries are replaced with proxy-served archives for the downstream connection, and failed URL retrieval remains observable in the capture and operator warnings.
 - Opt-in resource-pack decryption supports only the documented AES-256-CFB8 contents format. Original and supported plaintext ZIPs appear under `artifacts/packs/`, without unpacking their entries.
 - Automatic artifact folders add background CPU and disk work. They can lag during play and have explicit view limits. Check `artifacts/status.json` after shutdown.
 
