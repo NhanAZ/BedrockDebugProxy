@@ -312,6 +312,11 @@ func (cache *urlResourcePackCache) Store(ctx context.Context, key minecraft.Reso
 	cache.mu.Lock()
 	_, alreadyStored := cache.packs[key]
 	cache.packs[key] = pack
+	// A successful RakNet fallback supersedes a previous URL-prefetch
+	// failure for the same advertised key. ResourcePackCache treats Load
+	// errors as non-fatal misses, so retaining the stale error would make a
+	// later cache lookup fail even though Store has completed successfully.
+	delete(cache.errors, key)
 	if !alreadyStored {
 		cache.packOrder = append(cache.packOrder, key)
 	}
