@@ -814,6 +814,14 @@ Every new entry should state the symptom, root cause, implementation commits, ev
 - Evidence and validation: owner-controlled capture `captures/session-20260921T122228Z` shows ID 70 and the spawn-status ID 2 with matching raw hashes on both channels. The in-tree `minecraft/conn.go` handlers and `internal/proxy/proxy.go:startGame` establish the consumption and generation boundary.
 - Status: documentation-only clarification. A future state-machine change requires a deterministic fixture proving that consumed upstream acknowledgements can be substituted without delaying or duplicating the downstream spawn handshake.
 
+### FIX-0102 - Mark client-cache mismatch evidence as historical
+
+- Symptom: the client-cache research note described a pre-fix capture with downstream `true` and upstream `false` without clearly marking that the capture predates the deferred-offer implementation.
+- Root cause: the note retained the original wire evidence but did not distinguish historical capture state from the current proxy path, allowing a later reader to mistake the old mismatch for a current regression.
+- Implementation: label the capture as pre-FIX-0091, update the source-path description to name the current capability handoff, and state the current loopback parity evidence separately.
+- Evidence and validation: FIX-0091 and FIX-0092 describe the implementation and deterministic cache exchange. This documentation-only correction does not change runtime behavior, packet bytes, or capture schema.
+- Status: documentation-only provenance clarification. Real-client cache storage and reuse remain unverified.
+
 ## Ordering safety contract
 
 The deferred-packet change is deliberately narrow. `expectedIDs` remains the only authority for what the current login state accepts. The queue scan selects the earliest packet that is currently expected, leaves packets for later states queued, and never mutates or reorders bytes on the wire. The regression tests cover canonical resource-pack order, featured early `ResourcePacksInfo`, a later-phase packet queued ahead of the current phase, and all six permutations of the three login packets.
