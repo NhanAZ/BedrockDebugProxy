@@ -31,6 +31,7 @@ Detailed rationale remains in [`docs/audits/`](docs/audits/).
 - URL-prefetched resource packs are now merged with non-URL packs in the upstream offer order instead of replacing the complete list and dropping RakNet-delivered entries.
 - URL-prefetched resource packs now bound the HTTP response body to the advertised compressed size before parsing, including responses without a trustworthy Content-Length.
 - URL-prefetched resource-pack requests now stop when their connection context is canceled, so closed sessions do not keep CDN fetches alive through the outer timeout.
+- Downstream resource-pack offers now retain per-pack content identity, sub-pack, script, addon, and RTX metadata while still rebuilding entries from proxy-served archives.
 - Terminating bridges now retain and reuse raw `DimensionData` and `ItemRegistry` startup packets when the downstream protocol matches, avoiding wire differences caused by typed re-serialization of NBT maps.
 - Terminating bridges now also retain and reuse raw `JigsawStructureData`, `StartGame`, and `VoxelShapes` startup packets when the downstream protocol matches, preserving the observed world-start bytes while keeping typed fallback behavior.
 - Terminating bridges no longer add an empty compatibility `CreativeContent` packet when the upstream server's own packet will be forwarded after spawn, avoiding the observed duplicate startup packet while retaining the upstream raw bytes.

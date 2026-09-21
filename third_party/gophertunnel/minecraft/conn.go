@@ -1004,15 +1004,18 @@ func (conn *Conn) handleClientToServerHandshake() error {
 		}
 	}
 	pk := &packet.ResourcePacksInfo{TexturePackRequired: conn.texturePacksRequired, ForceDisableVibrantVisuals: conn.forceDisableVibrantVisuals}
+	var advertisedPacks []protocol.TexturePackInfo
 	if conn.fetchResourcePacksInfo != nil {
 		if info := conn.fetchResourcePacksInfo(conn.identityData, conn.clientData); info != nil {
 			pk = cloneResourcePacksInfo(info)
+			advertisedPacks = slices.Clone(info.TexturePacks)
 			// The downstream entries must describe the archive-backed packs that
 			// this listener can actually serve. Preserve the upstream metadata
 			// fields above, but never forward stale URLs or an unavailable list.
 			pk.TexturePacks = nil
 		}
 	}
+	usedAdvertisedPacks := make([]bool, len(advertisedPacks))
 	for _, pack := range conn.resourcePacks {
 		texturePack := protocol.TexturePackInfo{
 			UUID:        pack.UUID(),
@@ -1020,9 +1023,21 @@ func (conn *Conn) handleClientToServerHandshake() error {
 			Size:        uint64(pack.Len()),
 			DownloadURL: pack.DownloadURL(),
 		}
+		if advertised, ok := matchAdvertisedTexturePack(advertisedPacks, usedAdvertisedPacks, pack); ok {
+			texturePack.SubPackName = advertised.SubPackName
+			texturePack.ContentIdentity = advertised.ContentIdentity
+			texturePack.HasScripts = advertised.HasScripts
+			texturePack.AddonPack = advertised.AddonPack
+			texturePack.RTXEnabled = advertised.RTXEnabled
+			if advertised.ContentKey != "" {
+				texturePack.ContentKey = advertised.ContentKey
+			}
+		}
 		if pack.Encrypted() {
 			texturePack.ContentKey = pack.ContentKey()
-			texturePack.ContentIdentity = pack.Manifest().Header.UUID.String()
+			if texturePack.ContentIdentity == "" {
+				texturePack.ContentIdentity = pack.Manifest().Header.UUID.String()
+			}
 		}
 		pk.TexturePacks = append(pk.TexturePacks, texturePack)
 	}
@@ -1031,6 +1046,17 @@ func (conn *Conn) handleClientToServerHandshake() error {
 		return fmt.Errorf("send ResourcePacksInfo: %w", err)
 	}
 	return nil
+}
+
+func matchAdvertisedTexturePack(advertised []protocol.TexturePackInfo, used []bool, pack *resource.Pack) (protocol.TexturePackInfo, bool) {
+	for index, candidate := range advertised {
+		if used[index] || candidate.UUID != pack.UUID() || candidate.Version != pack.Version() || candidate.Size != uint64(pack.Len()) {
+			continue
+		}
+		used[index] = true
+		return candidate, true
+	}
+	return protocol.TexturePackInfo{}, false
 }
 
 // saltClaims holds the claims for the salt sent by the server in the ServerToClientHandshake packet.

@@ -1001,9 +1001,9 @@ func TestRunnerPreservesMixedResourcePackOfferOrder(t *testing.T) {
 	}
 	packs := []*resource.Pack{firstPack, middlePack, lastPack}
 	info := &packet.ResourcePacksInfo{TexturePacks: []protocol.TexturePackInfo{
-		{UUID: firstPack.UUID(), Version: firstPack.Version(), Size: uint64(len(archives["/first.zip"])), DownloadURL: firstPack.DownloadURL()},
-		{UUID: middlePack.UUID(), Version: middlePack.Version(), Size: uint64(len(archives["/middle.zip"]))},
-		{UUID: lastPack.UUID(), Version: lastPack.Version(), Size: uint64(len(archives["/last.zip"])), DownloadURL: lastPack.DownloadURL()},
+		{UUID: firstPack.UUID(), Version: firstPack.Version(), Size: uint64(len(archives["/first.zip"])), ContentKey: "first-content-key", ContentIdentity: "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa", SubPackName: "first-subpack", HasScripts: true, AddonPack: true, RTXEnabled: true, DownloadURL: firstPack.DownloadURL()},
+		{UUID: middlePack.UUID(), Version: middlePack.Version(), Size: uint64(len(archives["/middle.zip"])), ContentKey: "middle-content-key", ContentIdentity: "bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb", SubPackName: "middle-subpack", HasScripts: true},
+		{UUID: lastPack.UUID(), Version: lastPack.Version(), Size: uint64(len(archives["/last.zip"])), ContentIdentity: "cccccccc-cccc-4ccc-8ccc-cccccccccccc", SubPackName: "last-subpack", RTXEnabled: true, DownloadURL: lastPack.DownloadURL()},
 	}}
 	stack := &packet.ResourcePackStack{
 		BaseGameVersion: "1.26.51-mixed-pack-test",
@@ -1121,6 +1121,9 @@ func TestRunnerPreservesMixedResourcePackOfferOrder(t *testing.T) {
 		got := gotInfo.TexturePacks[index]
 		if got.UUID != want.UUID || got.Version != want.Version || got.Size != want.Size || got.DownloadURL != "" {
 			t.Fatalf("downstream offer entry %d = %#v, want UUID/version/size %s/%s/%d with empty URL", index, got, want.UUID, want.Version, want.Size)
+		}
+		if got.ContentKey != want.ContentKey || got.ContentIdentity != want.ContentIdentity || got.SubPackName != want.SubPackName || got.HasScripts != want.HasScripts || got.AddonPack != want.AddonPack || got.RTXEnabled != want.RTXEnabled {
+			t.Fatalf("downstream offer metadata %d = %#v, want key/identity/subpack/flags from %#v", index, got, want)
 		}
 	}
 	gotStack := client.GameData().ResourcePackStack
