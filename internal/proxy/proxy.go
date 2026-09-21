@@ -803,6 +803,10 @@ func resourcePacksForDownstream(packs []*resource.Pack) ([]*resource.Pack, error
 }
 
 func startGame(client, server *minecraft.Conn, gameData minecraft.GameData) error {
+	// The upstream server's CreativeContent packet may arrive after its spawn
+	// signal. Do not add gophertunnel's empty compatibility packet to the
+	// downstream stream. The forwarding loop preserves the upstream packet.
+	gameData.SuppressGeneratedCreativeContent = true
 	errorsChannel := make(chan error, 2)
 	go func() { errorsChannel <- client.StartGame(gameData) }()
 	go func() { errorsChannel <- server.DoSpawn() }()

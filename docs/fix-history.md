@@ -534,6 +534,14 @@ Every new entry should state the symptom, root cause, implementation commits, ev
 - Evidence and validation: the transport wrapper unit test verifies metadata and raw blob retention, the nested connection test covers the encryption boundary accessors, and the root loopback integration test observes metadata on both proxy channels. [`docs/research/capture-observability.md`](research/capture-observability.md) records the field meanings and remaining lower-layer boundary.
 - Status: implemented as a capture-observability correction with no wire behavior change. Early login payloads may not have derived state because the connection has not exposed the relevant boundary yet.
 
+### FIX-0067 - Avoid duplicate generated CreativeContent
+
+- Symptom: owner-controlled capture `captures/session-20260921T005313Z` contained the upstream CreativeContent packet once at 49,283 bytes, followed downstream by a generated 2-byte CreativeContent packet and then the original 49,283-byte packet.
+- Root cause: the terminating listener always emitted gophertunnel's empty CreativeContent compatibility packet when handling the downstream RequestChunkRadius. The upstream server packet could arrive after the spawn signal and was then forwarded separately.
+- Implementation: add a per-GameData option for the terminating proxy to suppress only the listener-generated compatibility packet. The upstream CreativeContent packet remains on the normal forwarding and raw-capture path, and ordinary listener callers retain the existing default.
+- Evidence and validation: the capture sequence above, the nested listener suppression test, and the root proxy loopback integration test that sends a non-empty upstream CreativeContent packet and matches its raw hash across both channels.
+- Status: implemented for the observed terminating-bridge boundary. Direct vanilla-client validation remains pending. This change does not filter, mutate, or reorder an upstream packet.
+
 ## Ordering safety contract
 
 The deferred-packet change is deliberately narrow. `expectedIDs` remains the only authority for what the current login state accepts. The queue scan selects the earliest packet that is currently expected, leaves packets for later states queued, and never mutates or reorders bytes on the wire. The regression tests cover canonical resource-pack order, featured early `ResourcePacksInfo`, a later-phase packet queued ahead of the current phase, and all six permutations of the three login packets.
