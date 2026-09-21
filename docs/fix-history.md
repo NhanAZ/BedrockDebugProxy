@@ -510,6 +510,14 @@ Every new entry should state the symptom, root cause, implementation commits, ev
 - Evidence and validation: the local capture above, the raw packet semantic probe showing 2,076 equal `ItemRegistry` entries, nested gophertunnel raw-retention and startup-writer tests, and the proxy loopback integration test that verifies exact downstream `ItemRegistry` bytes.
 - Status: implemented for `DimensionData` and `ItemRegistry` when protocol IDs match. Other startup packets remain separate parity boundaries.
 
+### FIX-0064 - Preserve raw world-start startup packets
+
+- Symptom: the local startup probe found that typed re-encoding changed the wire bytes of `JigsawStructureData` and `StartGame` even when the decoded values were unchanged. `VoxelShapes` round-tripped identically in that capture, but remained part of the same startup boundary.
+- Root cause: the terminating listener reused decoded packet structs for all startup world packets, allowing map serialization and optional-field encoding to diverge from the upstream bytes.
+- Implementation: retain copied raw `JigsawStructureData`, `StartGame`, and `VoxelShapes` packets in `minecraft.GameData`. The listener validates packet IDs and the negotiated protocol before writing retained bytes and falls back to the decoded path when validation fails. Existing startup order and post-spawn forwarding are unchanged.
+- Evidence and validation: focused probe of owner-controlled capture `captures/session-20260921T003441Z`, nested raw-retention tests, and the root proxy loopback integration test that verifies exact bytes for all four retained world-start packet types.
+- Status: implemented for the supported same-protocol pre-spawn boundary. Exact-revision real-client validation remains pending.
+
 ## Ordering safety contract
 
 The deferred-packet change is deliberately narrow. `expectedIDs` remains the only authority for what the current login state accepts. The queue scan selects the earliest packet that is currently expected, leaves packets for later states queued, and never mutates or reorders bytes on the wire. The regression tests cover canonical resource-pack order, featured early `ResourcePacksInfo`, a later-phase packet queued ahead of the current phase, and all six permutations of the three login packets.
