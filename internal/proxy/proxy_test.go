@@ -20,6 +20,7 @@ import (
 	"time"
 
 	"github.com/NhanAZ/BedrockDebugProxy/internal/artifacts"
+	"github.com/NhanAZ/BedrockDebugProxy/internal/bedrock"
 	"github.com/NhanAZ/BedrockDebugProxy/internal/capture"
 	"github.com/go-gl/mathgl/mgl32"
 	"github.com/google/uuid"
@@ -38,6 +39,70 @@ func TestUpstreamDialTimeoutErrorPreservesCause(t *testing.T) {
 	if !strings.Contains(err.Error(), "upstream login and resource-pack exchange timed out after 1m0s") {
 		t.Fatalf("timeout error = %q", err)
 	}
+}
+
+func TestTransferRouteProbeCapturesPingResponse(t *testing.T) {
+	root := filepath.Join(t.TempDir(), "capture")
+	recorder, err := capture.New(root, capture.Options{})
+	if err != nil {
+		t.Fatal(err)
+	}
+	runner := &Runner{config: Config{Recorder: recorder}}
+	failures := bedrock.NewFailureSink(nil)
+	response := []byte("pong response")
+	network := bedrock.Network{
+		Transport:    &transferProbeNetwork{response: response},
+		Recorder:     recorder,
+		Failures:     failures,
+		SessionID:    sessionID,
+		ConnectionID: "upstream-2",
+		Channel:      "upstream",
+		Hop:          2,
+	}
+	localAddr := &net.UDPAddr{IP: net.IPv4(127, 0, 0, 1), Port: 40000}
+	if err := runner.probeTransferRouteNetwork(context.Background(), "example.test:19132", localAddr, 42, 2, network, newLiveReporter(io.Discard)); err != nil {
+		t.Fatal(err)
+	}
+	if err := recorder.Close("closed", nil); err != nil {
+		t.Fatal(err)
+	}
+	var pingEvent, routeEvent capture.Event
+	if err := capture.ScanEvents(root, func(event capture.Event) error {
+		switch event.Kind {
+		case "transport.ping":
+			pingEvent = event
+		case "transfer.route_probe":
+			routeEvent = event
+		}
+		return nil
+	}); err != nil {
+		t.Fatal(err)
+	}
+	if pingEvent.Kind != "transport.ping" || pingEvent.ConnectionID != "upstream-2" || pingEvent.Channel != "upstream" || pingEvent.Hop != 2 {
+		t.Fatalf("ping event = %#v", pingEvent)
+	}
+	if pingEvent.Blob == nil || pingEvent.Blob.Size != int64(len(response)) || pingEvent.Blob.Representation != "bedrock_transport_ping" {
+		t.Fatalf("ping blob = %#v", pingEvent.Blob)
+	}
+	if routeEvent.Kind != "transfer.route_probe" || routeEvent.Hop != 2 {
+		t.Fatalf("route event = %#v", routeEvent)
+	}
+}
+
+type transferProbeNetwork struct {
+	response []byte
+}
+
+func (*transferProbeNetwork) DialContext(context.Context, string) (net.Conn, error) {
+	return nil, errors.New("transfer probe test network does not dial")
+}
+
+func (n *transferProbeNetwork) PingContext(context.Context, string) ([]byte, error) {
+	return append([]byte(nil), n.response...), nil
+}
+
+func (*transferProbeNetwork) Listen(string) (minecraft.NetworkListener, error) {
+	return nil, errors.New("transfer probe test network does not listen")
 }
 
 func TestDecodeRequestChunkRadius(t *testing.T) {
