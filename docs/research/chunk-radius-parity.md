@@ -13,7 +13,7 @@ The closed capture `captures/session-20260921T122228Z` contains packet ID 69 (`R
 | downstream | `301c` | `ChunkRadius=24`, `MaxChunkRadius=28` |
 | upstream | `2010` | `ChunkRadius=16`, `MaxChunkRadius=16` |
 
-The payloads are the complete packet bodies after the packet ID. The capture also records downstream `session.spawned.chunk_radius=24` and upstream `session.spawned.chunk_radius=16`. This is a confirmed parity difference in the observed session, not evidence that 16/16 is invalid for every client.
+The payloads are the complete packet bodies after the packet ID. The capture also records downstream `session.spawned.chunk_radius=24` and upstream `session.spawned.chunk_radius=16`. This capture predates FIX-0083 and its follow-up error and context fixes, so it records the original initial-request mismatch rather than the later typed-forwarding write added afterward. It is a confirmed historical parity difference in the observed session, not evidence that current forwarding omits a later request or that 16/16 is invalid for every client.
 
 ## Source and implementation boundary
 
@@ -41,6 +41,7 @@ the packet.
 - Confirmed: a failed later forward is represented in the capture as a bridge write error instead of being ignored by the listener packet callback.
 - Confirmed: a malformed or trailing-byte later request is represented as a packet decode error with its raw packet still retained.
 - Confirmed: the decode-error event preserves the request header's sender and target sub-client values alongside the raw packet.
+- Confirmed: the deterministic FIX-0083 loopback test observes the upstream 16/16 initial request followed by the downstream client's 24/28 request.
 - Inferred: forwarding a later `RequestChunkRadius` is the safest generic parity improvement available without redesigning the login/resource-pack barrier. Bedrock servers may retain their previously approved radius when handling a later request.
 - Unknown: whether a particular public server uses the initial request, a later request, or an internal policy when selecting the approved radius. A public-server result requires a fresh stamped capture and must be reported separately from this local evidence.
 
