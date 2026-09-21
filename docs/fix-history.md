@@ -662,6 +662,14 @@ Every new entry should state the symptom, root cause, implementation commits, ev
 - Evidence and validation: the official protocol reference describes packet 129 as a client-reported login capability, and the local PocketMine source sends `ResourcePacksInfo` before observing the client response. No runtime code, capture schema, or packet behavior changes.
 - Status: implemented as a documentation-only provenance correction. A controlled cache-enabled local server test remains required before changing startup architecture.
 
+### FIX-0083 - Forward the observed downstream chunk-radius request
+
+- Symptom: an owner-controlled local capture showed downstream `RequestChunkRadius` `24/28` while the upstream connection sent the gophertunnel default `16/16`.
+- Root cause: the upstream login and resource-pack exchange completes before the terminating bridge starts the downstream `StartGame` sequence, so the upstream dialer cannot synchronously wait for the downstream request without stalling login.
+- Implementation: decode downstream packet ID 69 in the listener packet observer and write its typed `ChunkRadius` and `MaxChunkRadius` values to the paired upstream connection. The existing initial 16/16 request remains as the safe fallback. The in-tree gophertunnel dialer has an opt-in request provider used by deterministic loopback tests.
+- Evidence and validation: `docs/research/chunk-radius-parity.md` records the capture payloads and timing boundary. The loopback integration test observes upstream 16/16 followed by 24/28, and focused malformed-decoder and dependency tests cover the new path.
+- Status: implemented for observed request forwarding. The approved server radius after a later request remains server-controlled, and public-server validation is pending.
+
 ## Ordering safety contract
 
 The deferred-packet change is deliberately narrow. `expectedIDs` remains the only authority for what the current login state accepts. The queue scan selects the earliest packet that is currently expected, leaves packets for later states queued, and never mutates or reorders bytes on the wire. The regression tests cover canonical resource-pack order, featured early `ResourcePacksInfo`, a later-phase packet queued ahead of the current phase, and all six permutations of the three login packets.

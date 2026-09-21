@@ -1,6 +1,7 @@
 package proxy
 
 import (
+	"bytes"
 	"context"
 	"encoding/json"
 	"errors"
@@ -272,6 +273,7 @@ func (r *Runner) Run(ctx context.Context) error {
 		return err
 	}
 
+	downstreamPacketFunc := observer.PacketFuncDynamic("downstream", func() string { return getAcceptState().downstreamID })
 	listenerConfig := minecraft.ListenConfig{
 		ErrorLog:               downstreamLogger,
 		AuthenticationDisabled: r.config.AllowUnauthenticatedClient,
@@ -281,7 +283,23 @@ func (r *Runner) Run(ctx context.Context) error {
 		AllowInvalidPackets:    true,
 		StatusProvider:         minecraft.NewStatusProvider("BedrockDebugProxy", r.config.UpstreamAddress),
 		MaxDecompressedLen:     r.config.MaxDecompressedBytes,
-		PacketFunc:             observer.PacketFuncDynamic("downstream", func() string { return getAcceptState().downstreamID }),
+		PacketFunc: func(header packet.Header, payload []byte, source, destination net.Addr) {
+			downstreamPacketFunc(header, payload, source, destination)
+			if header.PacketID != packet.IDRequestChunkRadius {
+				return
+			}
+			request, err := decodeRequestChunkRadius(payload)
+			if err != nil {
+				return
+			}
+			state := getAcceptState()
+			if upstream := state.upstreamConn.Load(); upstream != nil {
+				// The upstream dial completes before the downstream StartGame sequence
+				// exposes this request, so forward the observed client value as a later
+				// request instead of blocking the login and resource-pack barrier.
+				_ = upstream.WritePacket(&request)
+			}
+		},
 		ConnectionFunc: func(conn *minecraft.Conn) {
 			getAcceptState().downstreamConn.Store(conn)
 		},
@@ -823,6 +841,22 @@ func startGame(client, server *minecraft.Conn, gameData minecraft.GameData) erro
 		return errors.Join(first, second)
 	}
 	return nil
+}
+
+// decodeRequestChunkRadius validates the complete packet body before forwarding
+// its typed fields. Raw bytes remain owned by the capture observer.
+func decodeRequestChunkRadius(payload []byte) (request packet.RequestChunkRadius, err error) {
+	defer func() {
+		if recovered := recover(); recovered != nil {
+			err = fmt.Errorf("decode RequestChunkRadius: %v", recovered)
+		}
+	}()
+	reader := bytes.NewReader(payload)
+	request.Marshal(minecraft.DefaultProtocol.NewReader(reader, 0, true))
+	if reader.Len() != 0 {
+		return packet.RequestChunkRadius{}, fmt.Errorf("decode RequestChunkRadius: %d unread bytes", reader.Len())
+	}
+	return request, nil
 }
 
 func newConnectionMetadata(role string, conn *minecraft.Conn) connectionMetadata {

@@ -8,6 +8,7 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"net"
 	"net/http"
 	"net/http/httptest"
 	"os"
@@ -36,6 +37,22 @@ func TestUpstreamDialTimeoutErrorPreservesCause(t *testing.T) {
 	}
 	if !strings.Contains(err.Error(), "upstream login and resource-pack exchange timed out after 1m0s") {
 		t.Fatalf("timeout error = %q", err)
+	}
+}
+
+func TestDecodeRequestChunkRadius(t *testing.T) {
+	got, err := decodeRequestChunkRadius([]byte{0x30, 0x1c})
+	if err != nil {
+		t.Fatalf("decode request chunk radius: %v", err)
+	}
+	if got != (packet.RequestChunkRadius{ChunkRadius: 24, MaxChunkRadius: 28}) {
+		t.Fatalf("decoded request = %#v", got)
+	}
+	if _, err := decodeRequestChunkRadius([]byte{0x30, 0x1c, 0x00}); err == nil {
+		t.Fatal("decode accepted trailing bytes")
+	}
+	if _, err := decodeRequestChunkRadius([]byte{0x30}); err == nil {
+		t.Fatal("decode accepted truncated payload")
 	}
 }
 
@@ -294,10 +311,24 @@ func TestRunnerForwardsBidirectionalPacketsAndCapturesSession(t *testing.T) {
 		CustomShapeCount: 7,
 	}
 	integrationVoxelShapesRaw := integrationRawPacket(t, integrationVoxelShapes)
+	upstreamChunkRadiusRequests := make(chan packet.RequestChunkRadius, 4)
 	upstreamListener, err := (minecraft.ListenConfig{
 		AuthenticationDisabled: true,
 		AllowUnknownPackets:    true,
 		AllowInvalidPackets:    true,
+		PacketFunc: func(header packet.Header, payload []byte, _, _ net.Addr) {
+			if header.PacketID != packet.IDRequestChunkRadius {
+				return
+			}
+			request, decodeErr := decodeRequestChunkRadius(payload)
+			if decodeErr != nil {
+				return
+			}
+			select {
+			case upstreamChunkRadiusRequests <- request:
+			default:
+			}
+		},
 		FetchResourcePackStack: func(login.IdentityData, login.ClientData) *packet.ResourcePackStack {
 			return integrationResourcePackStack
 		},
@@ -357,6 +388,21 @@ func TestRunnerForwardsBidirectionalPacketsAndCapturesSession(t *testing.T) {
 		}); startErr != nil {
 			serverErrors <- fmt.Errorf("start upstream game: %w", startErr)
 			return
+		}
+		for index, want := range []packet.RequestChunkRadius{
+			{ChunkRadius: 16, MaxChunkRadius: 16},
+			{ChunkRadius: 24, MaxChunkRadius: 28},
+		} {
+			select {
+			case got := <-upstreamChunkRadiusRequests:
+				if got != want {
+					serverErrors <- fmt.Errorf("upstream request chunk radius %d = %#v, want %#v", index+1, got, want)
+					return
+				}
+			case <-time.After(5 * time.Second):
+				serverErrors <- fmt.Errorf("timed out waiting for upstream request chunk radius %d", index+1)
+				return
+			}
 		}
 		if writeErr := serverConn.WritePacket(integrationCreativeContent()); writeErr != nil {
 			serverErrors <- fmt.Errorf("write upstream creative content: %w", writeErr)
@@ -519,6 +565,9 @@ func TestRunnerForwardsBidirectionalPacketsAndCapturesSession(t *testing.T) {
 			DisplayName: "Integration",
 		},
 		ClientData: integrationClientData(),
+		RequestChunkRadiusProvider: func() (packet.RequestChunkRadius, bool) {
+			return packet.RequestChunkRadius{ChunkRadius: 24, MaxChunkRadius: 28}, true
+		},
 	}).DialContext(ctx, "raknet", proxyAddress)
 	if err != nil {
 		t.Fatal(err)
@@ -1034,7 +1083,9 @@ func TestRunnerPreservesMixedResourcePackOfferOrder(t *testing.T) {
 	defer func() { _ = upstreamListener.Close() }()
 
 	serverErrors := make(chan error, 1)
+	serverDone := make(chan struct{})
 	go func() {
+		defer close(serverDone)
 		accepted, acceptErr := upstreamListener.Accept()
 		if acceptErr != nil {
 			serverErrors <- acceptErr
@@ -1149,6 +1200,16 @@ func TestRunnerPreservesMixedResourcePackOfferOrder(t *testing.T) {
 		}
 	case <-time.After(5 * time.Second):
 		t.Fatal("upstream mixed-pack session did not finish")
+	}
+	select {
+	case <-runnerDone:
+	case <-time.After(5 * time.Second):
+		t.Fatal("proxy runner did not finish shutting down")
+	}
+	select {
+	case <-serverDone:
+	case <-time.After(5 * time.Second):
+		t.Fatal("upstream mixed-pack connection did not close")
 	}
 	if err := recorder.Close("closed", nil); err != nil {
 		t.Fatal(err)
