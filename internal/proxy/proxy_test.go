@@ -134,43 +134,19 @@ func TestRecordPacketDecodeErrorRetainsPacketContext(t *testing.T) {
 	}
 }
 
-func TestFinishPacketDecodeErrorRecordsHeaderContext(t *testing.T) {
-	root := filepath.Join(t.TempDir(), "capture")
-	recorder, err := capture.New(root, capture.Options{})
-	if err != nil {
-		t.Fatal(err)
+func TestUnknownPacketFromRawReadCopiesPayload(t *testing.T) {
+	payload := []byte{0x01, 0x02, 0x03}
+	read := &minecraft.PacketRead{Header: packet.Header{PacketID: 0x123}, Payload: payload}
+	unknown := unknownPacketFromRawRead(read)
+	if unknown == nil || unknown.PacketID != 0x123 || !bytes.Equal(unknown.Payload, payload) {
+		t.Fatalf("unknown packet = %#v", unknown)
 	}
-	runner := &Runner{config: Config{Recorder: recorder}}
-	operationErr := errors.New("decode packet: malformed payload")
-	packetInfo := capture.PacketInfo{ID: packet.IDRequestChunkRadius, SenderSubClient: 4, TargetSubClient: 5, DecodeStatus: "decode_error"}
-	if err := runner.finishPacketDecodeErrorAtHop(packetInfo, capture.DirectionClientToServer, "downstream", "downstream-1", 1, "decode packet for forwarding", operationErr, nil); !errors.Is(err, operationErr) {
-		t.Fatalf("finish packet decode error = %v, want %v", err, operationErr)
+	payload[0] = 0xff
+	if unknown.Payload[0] != 0x01 {
+		t.Fatalf("unknown packet payload aliases raw payload: %#v", unknown.Payload)
 	}
-	if err := recorder.Close("closed", nil); err != nil {
-		t.Fatal(err)
-	}
-	manifest, err := capture.ReadManifest(root)
-	if err != nil {
-		t.Fatal(err)
-	}
-	if manifest.Counts.DecodeErrors != 1 {
-		t.Fatalf("decode error count = %d, want 1", manifest.Counts.DecodeErrors)
-	}
-	var found bool
-	if err := capture.ScanEvents(root, func(event capture.Event) error {
-		if event.Kind != "packet.decode_error" {
-			return nil
-		}
-		found = true
-		if event.Packet == nil || event.Packet.ID != packetInfo.ID || event.Packet.SenderSubClient != 4 || event.Packet.TargetSubClient != 5 {
-			t.Fatalf("packet header context = %#v", event.Packet)
-		}
-		return nil
-	}); err != nil {
-		t.Fatal(err)
-	}
-	if !found {
-		t.Fatal("packet decode error event not found")
+	if unknownPacketFromRawRead(nil) != nil {
+		t.Fatal("nil raw read produced an unknown packet")
 	}
 }
 
@@ -430,6 +406,7 @@ func TestRunnerForwardsBidirectionalPacketsAndCapturesSession(t *testing.T) {
 	}
 	integrationVoxelShapesRaw := integrationRawPacket(t, integrationVoxelShapes)
 	upstreamChunkRadiusRequests := make(chan packet.RequestChunkRadius, 4)
+	malformedServerText := append(integrationRawPacket(t, &packet.Text{TextType: packet.TextTypeRaw, Message: "decode-fallback"}), 0xff)
 	upstreamListener, err := (minecraft.ListenConfig{
 		AuthenticationDisabled: true,
 		AllowUnknownPackets:    true,
@@ -521,6 +498,10 @@ func TestRunnerForwardsBidirectionalPacketsAndCapturesSession(t *testing.T) {
 				serverErrors <- fmt.Errorf("timed out waiting for upstream request chunk radius %d", index+1)
 				return
 			}
+		}
+		if _, writeErr := serverConn.Write(malformedServerText); writeErr != nil {
+			serverErrors <- fmt.Errorf("write malformed server packet: %w", writeErr)
+			return
 		}
 		if writeErr := serverConn.WritePacket(integrationCreativeContent()); writeErr != nil {
 			serverErrors <- fmt.Errorf("write upstream creative content: %w", writeErr)
@@ -790,6 +771,15 @@ func TestRunnerForwardsBidirectionalPacketsAndCapturesSession(t *testing.T) {
 		_ = client.Close()
 		t.Fatal(err)
 	}
+	forwardedMalformed, err := client.ReadBytes()
+	if err != nil {
+		_ = client.Close()
+		t.Fatalf("read forwarded malformed packet: %v", err)
+	}
+	if !bytes.Equal(forwardedMalformed, malformedServerText) {
+		_ = client.Close()
+		t.Fatalf("forwarded malformed packet = %x, want %x", forwardedMalformed, malformedServerText)
+	}
 	expectedServerPackets := map[string]bool{
 		"Text":             false,
 		"CreativeContent":  false,
@@ -904,6 +894,7 @@ func TestRunnerForwardsBidirectionalPacketsAndCapturesSession(t *testing.T) {
 	}
 	var negotiated, spawned, closed bool
 	var negotiatedClientData bool
+	var decodeErrorObserved, unknownDecodeObserved bool
 	var connectionViews, loginSkinMetadataViews, gameDataViews int
 	type transportMetadataState struct {
 		encryptionEnabled     bool
@@ -1073,15 +1064,24 @@ func TestRunnerForwardsBidirectionalPacketsAndCapturesSession(t *testing.T) {
 				return fmt.Errorf("forward timing event has incomplete ancestry or data: %#v", event)
 			}
 			timingObserved[decodedPacketKey{event.Direction, event.Packet.Name}] = true
-		case "packet.decode_error", "capture.view_error":
+		case "packet.decode_error":
+			if event.Direction != capture.DirectionServerToClient || event.Packet == nil || event.Packet.ID != packet.IDText {
+				return fmt.Errorf("unexpected packet.decode_error event: %#v", event)
+			}
+			decodeErrorObserved = true
+		case "packet.unknown":
+			if event.Direction == capture.DirectionServerToClient && event.Packet != nil && event.Packet.ID == packet.IDText {
+				unknownDecodeObserved = true
+			}
+		case "capture.view_error":
 			return fmt.Errorf("unexpected %s event", event.Kind)
 		}
 		return nil
 	}); err != nil {
 		t.Fatal(err)
 	}
-	if !negotiated || !negotiatedClientData || !spawned || !closed || connectionViews != 2 || loginSkinMetadataViews != 2 || gameDataViews != 1 {
-		t.Fatalf("session evidence negotiated=%t negotiated_client_data=%t spawned=%t closed=%t connection_views=%d login_skin_metadata_views=%d game_data_views=%d", negotiated, negotiatedClientData, spawned, closed, connectionViews, loginSkinMetadataViews, gameDataViews)
+	if !negotiated || !negotiatedClientData || !spawned || !closed || !decodeErrorObserved || !unknownDecodeObserved || connectionViews != 2 || loginSkinMetadataViews != 2 || gameDataViews != 1 {
+		t.Fatalf("session evidence negotiated=%t negotiated_client_data=%t spawned=%t closed=%t decode_error=%t unknown_decode=%t connection_views=%d login_skin_metadata_views=%d game_data_views=%d", negotiated, negotiatedClientData, spawned, closed, decodeErrorObserved, unknownDecodeObserved, connectionViews, loginSkinMetadataViews, gameDataViews)
 	}
 	if downstream := transportMetadataObserved["downstream"]; !downstream.encryptionEnabled || !downstream.compressionNegotiated {
 		t.Fatalf("downstream transport metadata = %#v", downstream)

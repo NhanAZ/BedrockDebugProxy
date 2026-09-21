@@ -702,6 +702,14 @@ Every new entry should state the symptom, root cause, implementation commits, ev
 - Evidence and validation: the raw packet adapter exposes the original header separately from clone decoding, and deterministic recorder tests verify the decode-error event and manifest counter. No wire bytes or forwarding decisions change.
 - Status: implemented with automated coverage. Real-client validation remains pending for the current stamped binary.
 
+### FIX-0088 - Continue raw forwarding after derived decode failures
+
+- Symptom: after a same-protocol packet clone failed to decode, the bridge recorded the failure but still terminated both forwarding loops even though the original raw packet remained available.
+- Root cause: the raw forwarding loop treated every `DecodePacketRead` error as a terminal bridge error instead of separating the derived-view failure from the valid raw forwarding boundary.
+- Implementation: record `packet.decode_error`, create a copied `packet.Unknown` derived view containing the packet ID and payload, and continue writing the original `PacketRead` through `WriteRawPacket`. Recorder failures, clone failures, and transport failures retain their existing terminal behavior.
+- Evidence and validation: gophertunnel's packet decoder reports invalid trailing data while the raw adapter's clone decode returns the error and leaves the independently owned original header and payload available. The regression tests verify that boundary, the copied unknown fallback, and byte-preserving continuation through a loopback proxy session. No wire bytes are re-encoded or dropped.
+- Status: implemented with automated coverage. Real-client validation remains pending for the current stamped binary.
+
 ## Ordering safety contract
 
 The deferred-packet change is deliberately narrow. `expectedIDs` remains the only authority for what the current login state accepts. The queue scan selects the earliest packet that is currently expected, leaves packets for later states queued, and never mutates or reorders bytes on the wire. The regression tests cover canonical resource-pack order, featured early `ResourcePacksInfo`, a later-phase packet queued ahead of the current phase, and all six permutations of the three login packets.

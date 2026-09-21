@@ -950,7 +950,7 @@ func (r *Runner) forward(source, destination *minecraft.Conn, failures *bedrock.
 		var rawRead *minecraft.PacketRead
 		var decoded packet.Packet
 		var err error
-		decodeFailure := false
+		var decodeFailure error
 		if rawCompatible {
 			rawRead, _, err = rawReader.ReadPacketDataWithTime()
 			if err == nil && rawRead != nil {
@@ -967,7 +967,9 @@ func (r *Runner) forward(source, destination *minecraft.Conn, failures *bedrock.
 						return r.finishForwardAtHop("bridge.decode_error", direction, sourceChannel, connectionID, hop, "clone packet for decode", cloneErr, shuttingDown)
 					}
 					decoded, err = rawReader.DecodePacketRead(decodedRead)
-					decodeFailure = err != nil
+					if err != nil {
+						decodeFailure = err
+					}
 				}
 			}
 		} else {
@@ -975,17 +977,26 @@ func (r *Runner) forward(source, destination *minecraft.Conn, failures *bedrock.
 		}
 		readDuration := time.Since(readStarted)
 		if err != nil {
-			if rawRead != nil {
+			if rawRead != nil && decodeFailure != nil {
 				packetInfo := capture.PacketInfo{
 					ID: rawRead.Header.PacketID, SenderSubClient: rawRead.Header.SenderSubClient,
 					TargetSubClient: rawRead.Header.TargetSubClient, DecodeStatus: "decode_error",
 				}
-				rawRead.Release()
-				if decodeFailure {
-					return r.finishPacketDecodeErrorAtHop(packetInfo, direction, sourceChannel, connectionID, hop, "decode packet for forwarding", err, shuttingDown)
+				if captureErr := r.recordPacketDecodeErrorAtHop(packetInfo, direction, sourceChannel, connectionID, hop, "decode packet for forwarding", decodeFailure); captureErr != nil {
+					rawRead.Release()
+					return captureErr
 				}
+				// Keep the original bytes for forwarding. The unknown derived view
+				// makes the decode failure explicit without pretending that a partial
+				// packet value is trustworthy.
+				decoded = unknownPacketFromRawRead(rawRead)
+				err = nil
+			} else {
+				if rawRead != nil {
+					rawRead.Release()
+				}
+				return r.finishForwardAtHop("bridge.read_error", direction, sourceChannel, connectionID, hop, "read packet", err, shuttingDown)
 			}
-			return r.finishForwardAtHop("bridge.read_error", direction, sourceChannel, connectionID, hop, "read packet", err, shuttingDown)
 		}
 		if decoded == nil {
 			if rawRead != nil {
@@ -1298,16 +1309,11 @@ func (r *Runner) recordPacketDecodeErrorAtHop(packetInfo capture.PacketInfo, dir
 	return err
 }
 
-func (r *Runner) finishPacketDecodeErrorAtHop(packetInfo capture.PacketInfo, direction capture.Direction, channel, connectionID string, hop int, operation string, operationErr error, shuttingDown *atomic.Bool) error {
-	wasShuttingDown := false
-	if shuttingDown != nil {
-		wasShuttingDown = shuttingDown.Swap(true)
+func unknownPacketFromRawRead(read *minecraft.PacketRead) *packet.Unknown {
+	if read == nil {
+		return nil
 	}
-	if expectedShutdownError(operationErr, shuttingDown) && wasShuttingDown {
-		return operationErr
-	}
-	captureErr := r.recordPacketDecodeErrorAtHop(packetInfo, direction, channel, connectionID, hop, operation, operationErr)
-	return errors.Join(operationErr, captureErr)
+	return &packet.Unknown{PacketID: read.Header.PacketID, Payload: append([]byte(nil), read.Payload...)}
 }
 
 func (r *Runner) record(kind string, severity capture.Severity, value any) error {
