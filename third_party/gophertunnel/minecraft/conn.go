@@ -191,7 +191,8 @@ type Conn struct {
 	// resourcePackDelivery controls how a Listener connection sends resource pack data.
 	resourcePackDelivery ResourcePackDeliveryConfig
 
-	cacheEnabled bool
+	cacheEnabled               bool
+	requestChunkRadiusProvider func() (packet.RequestChunkRadius, bool)
 
 	// allow filters what connections are allowed to connect to the Server. The
 	// address, identity data, and client data of the connection are passed. If
@@ -1729,7 +1730,13 @@ func (conn *Conn) handleItemRegistry(pk *packet.ItemRegistry, raw *packetData) e
 		}
 	}
 
-	_ = conn.WritePacket(&packet.RequestChunkRadius{ChunkRadius: 16, MaxChunkRadius: 16})
+	request := packet.RequestChunkRadius{ChunkRadius: 16, MaxChunkRadius: 16}
+	if conn.requestChunkRadiusProvider != nil {
+		if provided, ok := conn.requestChunkRadiusProvider(); ok && provided.ChunkRadius >= 1 {
+			request = provided
+		}
+	}
+	_ = conn.WritePacket(&request)
 	conn.expect(packet.IDChunkRadiusUpdated, packet.IDPlayStatus, packet.IDJigsawStructureData, packet.IDVoxelShapes)
 	return nil
 }

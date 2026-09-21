@@ -103,6 +103,41 @@ func TestHandleRequestChunkRadiusCanSuppressGeneratedCreativeContent(t *testing.
 	}
 }
 
+func TestHandleItemRegistryUsesRequestChunkRadiusProvider(t *testing.T) {
+	var output bytes.Buffer
+	conn := newLoginTestConn()
+	conn.enc = packet.NewEncoder(&output)
+	conn.requestChunkRadiusProvider = func() (packet.RequestChunkRadius, bool) {
+		return packet.RequestChunkRadius{ChunkRadius: 24, MaxChunkRadius: 28}, true
+	}
+
+	if err := conn.handleItemRegistry(&packet.ItemRegistry{}, nil); err != nil {
+		t.Fatalf("handle ItemRegistry: %v", err)
+	}
+	if err := conn.Flush(); err != nil {
+		t.Fatalf("flush chunk-radius request: %v", err)
+	}
+	decoded, err := packet.NewDecoder(bytes.NewReader(output.Bytes())).Decode()
+	if err != nil {
+		t.Fatalf("decode chunk-radius request: %v", err)
+	}
+	if len(decoded) != 1 {
+		t.Fatalf("decoded packet count = %d, want 1", len(decoded))
+	}
+	data, err := parseData(decoded[0], nil)
+	if err != nil {
+		t.Fatalf("parse chunk-radius request: %v", err)
+	}
+	if data.h.PacketID != packet.IDRequestChunkRadius {
+		t.Fatalf("packet ID = %d, want %d", data.h.PacketID, packet.IDRequestChunkRadius)
+	}
+	got := &packet.RequestChunkRadius{}
+	got.Marshal(protocol.NewReader(data.payload, 0, true))
+	if got.ChunkRadius != 24 || got.MaxChunkRadius != 28 {
+		t.Fatalf("chunk-radius request = %#v, want radius 24 and max 28", got)
+	}
+}
+
 func TestHandleDrainsResourcePacksInfoDeferredBeforePlayStatus(t *testing.T) {
 	conn := &Conn{
 		ctx:   context.Background(),

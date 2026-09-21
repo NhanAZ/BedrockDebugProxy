@@ -128,6 +128,11 @@ type Dialer struct {
 	// transmitted every time, resulting in less network transmission.
 	EnableClientCache bool
 
+	// RequestChunkRadiusProvider, if non-nil, supplies the initial chunk-radius
+	// request sent after ItemRegistry. Returning false or an invalid request
+	// keeps the default 16/16 request.
+	RequestChunkRadiusProvider func() (packet.RequestChunkRadius, bool)
+
 	// KeepXBLIdentityData, if set to true, enables passing XUID and title ID to the target server
 	// if the authentication token is not set. This is technically not valid and some servers might kick
 	// the client when an XUID is present without logging in.
@@ -314,6 +319,7 @@ func (d Dialer) DialContextNetwork(ctx context.Context, network Network, address
 	conn.downloadResourcePack = d.DownloadResourcePack
 	conn.resourcePackCache = d.ResourcePackCache
 	conn.cacheEnabled = d.EnableClientCache
+	conn.requestChunkRadiusProvider = d.RequestChunkRadiusProvider
 	conn.disconnectOnInvalidPacket = d.DisconnectOnInvalidPackets
 	conn.disconnectOnUnknownPacket = d.DisconnectOnUnknownPackets
 	conn.maxDecompressedLen = math.MaxInt

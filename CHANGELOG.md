@@ -33,6 +33,7 @@ Detailed rationale remains in [`docs/audits/`](docs/audits/).
 - URL-prefetched resource-pack requests now stop when their connection context is canceled, so closed sessions do not keep CDN fetches alive through the outer timeout.
 - Downstream resource-pack offers now retain per-pack content identity, sub-pack, script, addon, and RTX metadata while still rebuilding entries from proxy-served archives.
 - Terminating bridges now retain and reuse raw `DimensionData` and `ItemRegistry` startup packets when the downstream protocol matches, avoiding wire differences caused by typed re-serialization of NBT maps.
+- Terminating bridges now forward each observed downstream `RequestChunkRadius` to the paired upstream connection while retaining the existing 16/16 initial fallback.
 - Terminating bridges now also retain and reuse raw `JigsawStructureData`, `StartGame`, and `VoxelShapes` startup packets when the downstream protocol matches, preserving the observed world-start bytes while keeping typed fallback behavior.
 - Terminating bridges no longer add an empty compatibility `CreativeContent` packet when the upstream server's own packet will be forwarded after spawn, avoiding the observed duplicate startup packet while retaining the upstream raw bytes.
 - The capture viewer retains the OFL-licensed fan-made font assets without contacting a font CDN. Visible text uses regular Monocraft and can resolve a separately installed Minecraft Ten before the embedded fallback.
