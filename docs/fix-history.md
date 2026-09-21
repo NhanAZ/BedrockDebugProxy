@@ -614,6 +614,14 @@ Every new entry should state the symptom, root cause, implementation commits, ev
 - Evidence and validation: `internal/proxy/proxy.go` supplies retained offer metadata through the listener callback, `docs/resource-packs.md` documents the boundary, and `cmd/bedrock-debug-proxy/main_test.go` rejects the stale text and checks the corrected wording. No forwarding or packet bytes change.
 - Status: implemented as a capture metadata correction. Mixed-offer real-client validation remains pending.
 
+### FIX-0077 - Preserve validation report timestamps
+
+- Symptom: `tools/create-validation-report.ps1` emitted capture `started_at` and `ended_at` using the host's locale after PowerShell parsed the analysis timestamps as `DateTime` values. The resulting report lost the original UTC suffix and fractional precision.
+- Root cause: the report converted typed timestamps with the culture-sensitive `[string]` cast instead of formatting them explicitly.
+- Implementation: add a timestamp formatter that emits invariant UTC ISO 8601 strings for `DateTime` and `DateTimeOffset` values, while preserving string inputs.
+- Evidence and validation: the report generated from `captures/session-20260921T122228Z` previously contained `09/21/2026 12:22:28`; after the fix it must retain `2026-09-21T12:22:28.3304852Z` and the corresponding end timestamp. PowerShell syntax, the low-memory quality gate, and `git diff --check` are required before commit.
+- Status: implemented as a deterministic validation-artifact correction. Existing reports are not rewritten in place.
+
 ## Ordering safety contract
 
 The deferred-packet change is deliberately narrow. `expectedIDs` remains the only authority for what the current login state accepts. The queue scan selects the earliest packet that is currently expected, leaves packets for later states queued, and never mutates or reorders bytes on the wire. The regression tests cover canonical resource-pack order, featured early `ResourcePacksInfo`, a later-phase packet queued ahead of the current phase, and all six permutations of the three login packets.

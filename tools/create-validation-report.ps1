@@ -48,6 +48,25 @@ function Get-NamedCount {
     return [uint64]0
 }
 
+function ConvertTo-IsoTimestamp {
+    param(
+        [object]$Value
+    )
+
+    if ($null -eq $Value) {
+        return ""
+    }
+    $invariant = [Globalization.CultureInfo]::InvariantCulture
+    if ($Value -is [DateTimeOffset]) {
+        return ([DateTimeOffset]$Value).ToUniversalTime().ToString("o", $invariant).Replace("+00:00", "Z")
+    }
+    if ($Value -is [DateTime]) {
+        $utc = ([DateTime]$Value).ToUniversalTime()
+        return ([DateTimeOffset]$utc).ToString("o", $invariant).Replace("+00:00", "Z")
+    }
+    return [string]$Value
+}
+
 $projectRoot = (Resolve-Path (Join-Path $PSScriptRoot "..")).Path
 Push-Location $projectRoot
 try {
@@ -199,8 +218,8 @@ try {
         target_server = $Server.Trim()
         capture = [ordered]@{
             id = [string](Get-ObjectProperty $analysis "capture_id" "")
-            started_at = [string](Get-ObjectProperty $analysis "started_at" "")
-            ended_at = [string](Get-ObjectProperty $analysis "ended_at" "")
+            started_at = ConvertTo-IsoTimestamp (Get-ObjectProperty $analysis "started_at" "")
+            ended_at = ConvertTo-IsoTimestamp (Get-ObjectProperty $analysis "ended_at" "")
             status = [string](Get-ObjectProperty $analysis "status" "")
             complete = [bool](Get-ObjectProperty $analysis "complete" $false)
             declared_limitation_count = @(Get-ObjectProperty $analysis "limitations" @()).Count
