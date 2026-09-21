@@ -58,6 +58,23 @@ func TestHandleNetworkSettingsRetainsNegotiatedValues(t *testing.T) {
 	}
 }
 
+func TestConnEncryptionStateReportsTransportBoundary(t *testing.T) {
+	conn := newLoginTestConn()
+	if conn.EncryptionEnabled() {
+		t.Fatal("new connection reports enabled encryption")
+	}
+	if conn.EncryptionDisabled() {
+		t.Fatal("new connection reports disabled encryption")
+	}
+	conn.disableEncryption = true
+	if !conn.EncryptionDisabled() {
+		t.Fatal("disabled transport boundary was not reported")
+	}
+	if conn.EncryptionEnabled() {
+		t.Fatal("disabled transport boundary reports enabled encryption")
+	}
+}
+
 func TestHandleDrainsResourcePacksInfoDeferredBeforePlayStatus(t *testing.T) {
 	conn := &Conn{
 		ctx:   context.Background(),

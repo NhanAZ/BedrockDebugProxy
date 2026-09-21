@@ -61,6 +61,8 @@ type hopState struct {
 	transferRouteProbed bool
 	upstreamNetwork     bedrock.Network
 	upstreamLogger      *slog.Logger
+	downstreamConn      atomic.Pointer[minecraft.Conn]
+	upstreamConn        atomic.Pointer[minecraft.Conn]
 	slot                upstreamSlot
 }
 
@@ -245,6 +247,9 @@ func (r *Runner) Run(ctx context.Context) error {
 		HopFunc:          func() int { return getAcceptState().hop },
 		ReadDirection:    capture.DirectionClientToServer,
 		WriteDirection:   capture.DirectionServerToClient,
+		PayloadMetadataFunc: func() map[string]any {
+			return transportMetadata(getAcceptState().downstreamConn.Load())
+		},
 		ConnectionContextFunc: func(ctx context.Context) {
 			generation := downstreamContext.Set(ctx)
 			context.AfterFunc(ctx, func() {
@@ -297,8 +302,14 @@ func (r *Runner) Run(ctx context.Context) error {
 					Logger: state.upstreamLogger, SessionID: sessionID, ConnectionID: state.upstreamID,
 					Channel: "upstream", Hop: state.hop, ReadDirection: capture.DirectionServerToClient,
 					WriteDirection: capture.DirectionClientToServer,
+					PayloadMetadataFunc: func() map[string]any {
+						return transportMetadata(state.upstreamConn.Load())
+					},
 				}
 				state.slot.conn, state.slot.resourcePacks, state.slot.err = r.connectUpstream(connectCtx, state.target, state.upstreamNetwork, observer, state.upstreamID, state.hop, state.upstreamLogger, live, identityData, clientData, state.transferLocalAddr != nil, state.transferRouteProbed)
+				if state.slot.conn != nil {
+					state.upstreamConn.Store(state.slot.conn)
+				}
 			})
 			if state.slot.err != nil || state.slot.conn == nil {
 				return nil
@@ -430,6 +441,7 @@ func (r *Runner) Run(ctx context.Context) error {
 			_ = accepted.Close()
 			return fmt.Errorf("accepted unexpected connection type %T", accepted)
 		}
+		state.downstreamConn.Store(clientConn)
 		downstreamContext.Clear()
 		authentication := "Xbox-authenticated"
 		if !clientConn.Authenticated() {
@@ -831,6 +843,30 @@ func networkSettingsMetadata(settings packet.NetworkSettings, available bool) ma
 		"client_throttle_threshold": settings.ClientThrottleThreshold,
 		"client_throttle_scalar":    settings.ClientThrottleScalar,
 	}
+}
+
+func transportMetadata(conn *minecraft.Conn) map[string]any {
+	if conn == nil {
+		return nil
+	}
+	metadata := map[string]any{}
+	switch {
+	case conn.EncryptionDisabled():
+		metadata["bedrock_encryption_state"] = "disabled"
+	case conn.EncryptionEnabled():
+		metadata["bedrock_encryption_state"] = "enabled"
+	default:
+		metadata["bedrock_encryption_state"] = "not_enabled"
+	}
+	settings, ok := conn.NetworkSettings()
+	if !ok {
+		metadata["bedrock_compression_state"] = "not_negotiated"
+		return metadata
+	}
+	metadata["bedrock_compression_state"] = "negotiated"
+	metadata["bedrock_compression_threshold"] = settings.CompressionThreshold
+	metadata["bedrock_compression_algorithm"] = settings.CompressionAlgorithm
+	return metadata
 }
 
 func (r *Runner) forward(source, destination *minecraft.Conn, failures *bedrock.FailureSink, live *liveReporter, shuttingDown *atomic.Bool, localAddress string, direction capture.Direction, sourceChannel, connectionID string, hop int, onTransfer func(string)) error {

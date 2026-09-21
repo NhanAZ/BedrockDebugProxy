@@ -2,6 +2,7 @@ package bedrock
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
 	"io"
 	"net"
@@ -74,6 +75,57 @@ func TestObservedConnPreservesPacketReadsContextAndLatency(t *testing.T) {
 	}
 	if events[2].Kind != "transport.connection_close" {
 		t.Fatalf("close event = %#v", events[2])
+	}
+}
+
+func TestObservedConnAddsPayloadMetadataWithoutReplacingRawPayload(t *testing.T) {
+	root := filepath.Join(t.TempDir(), "capture")
+	recorder, err := capture.New(root, capture.Options{})
+	if err != nil {
+		t.Fatal(err)
+	}
+	conn := &observedConn{Conn: &fakePacketConn{readPayload: []byte{1, 2, 3}}, network: Network{
+		Recorder:       recorder,
+		Failures:       &FailureSink{},
+		SessionID:      "session-test",
+		Channel:        "upstream",
+		ReadDirection:  capture.DirectionServerToClient,
+		WriteDirection: capture.DirectionClientToServer,
+		PayloadMetadataFunc: func() map[string]any {
+			return map[string]any{
+				"bedrock_encryption_state":      "enabled",
+				"bedrock_compression_state":     "negotiated",
+				"bedrock_compression_threshold": uint16(17),
+			}
+		},
+	}}
+	if _, err := conn.ReadPacket(); err != nil {
+		t.Fatal(err)
+	}
+	if err := conn.Close(); err != nil {
+		t.Fatal(err)
+	}
+	if err := recorder.Close("closed", nil); err != nil {
+		t.Fatal(err)
+	}
+
+	if err := capture.ScanEvents(root, func(event capture.Event) error {
+		if event.Kind != "transport.payload" {
+			return nil
+		}
+		var data map[string]any
+		if err := json.Unmarshal(event.Data, &data); err != nil {
+			return err
+		}
+		if data["bedrock_encryption_state"] != "enabled" || data["bedrock_compression_state"] != "negotiated" || data["bedrock_compression_threshold"] != float64(17) {
+			t.Fatalf("payload metadata = %#v", data)
+		}
+		if event.Blob == nil || event.Blob.Size != 3 || event.Blob.Representation != "bedrock_transport_payload" {
+			t.Fatalf("transport payload blob = %#v", event.Blob)
+		}
+		return nil
+	}); err != nil {
+		t.Fatal(err)
 	}
 }
 

@@ -29,6 +29,8 @@ These timings distinguish proxy-side read, capture submission, and forwarding de
 
 The clear local capture gaps were decoded connection metadata and upstream GameData. The implementation now records them as bounded derived views while preserving the exact Login and StartGame packet payloads as authoritative raw blobs. Large collections may be truncated according to the existing decoded-view limit. Spawn-time latency, cache state, and chunk radius are also retained because the current connections already expose them.
 
+Transport payload events now supplement the application-batch blob with per-connection Bedrock boundary state when the connection has completed enough of login to expose it. `bedrock_compression_state` is `negotiated` or `not_negotiated`, and negotiated events include the numeric compression threshold and algorithm. `bedrock_encryption_state` is `enabled`, `disabled`, or `not_enabled`. These fields describe the connection state observed by the proxy. They do not decode RakNet datagrams, identify a cipher outside the connection API, or replace the raw transport payload.
+
 ## Representative packet-family coverage
 
 The loopback regression test `TestRunnerForwardsBidirectionalPacketsAndCapturesSession` sends representative packets through both sides of the proxy and checks both forwarding and capture. It covers `PlayerSkin` with skin and cape bytes, `AddActor`, `LevelChunk`, `SubChunkRequest`, `UpdateBlock`, `InventoryContent`, `InventoryTransaction`, `MovePlayer`, and `Emote`.
@@ -47,7 +49,7 @@ This coverage does not add specialized commands or a second capture subsystem. I
 
 - Transfer packets are retained. Automatic hop following is opt-in through `--follow-transfers`; the original transfer remains authoritative and each followed hop is captured with its own hop and connection identifiers.
 - Raw UDP and RakNet recovery evidence requires a lower observation boundary.
-- The transport payload event does not yet classify encryption or compression state per event.
+- Transport payload state is only available after the corresponding connection exposes its login boundary. Earlier payloads can lack the derived state, and the event still does not expose raw UDP or RakNet framing.
 - Decoded snapshots reflect gophertunnel's active protocol model. Future analysis must prefer raw packet blobs when checking a changed or disputed definition.
 - Full login metadata is sensitive. Structured snapshots make selected identifiers easier to search even though the raw Login packet was already present.
 
