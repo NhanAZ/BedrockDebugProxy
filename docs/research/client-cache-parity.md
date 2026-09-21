@@ -37,6 +37,14 @@ from packet counts or from a decoder summary.
 The pinned dependency source used for this review is gophertunnel commit
 `283a5a97dfe65da94bcc0b401807f6aefa9e72ee`. No external source code was copied.
 
+The versioned Mojang protocol reference for game version 1.26.50 and protocol
+2193 describes packet 129 as a packet sent once by the client at login to
+communicate whether it supports the cache:
+<https://mojang.github.io/bedrock-protocol-docs/1.26.50/>
+(accessed 2026-09-21). The reference documents a client capability, not a
+platform-derived default. No supported source reviewed here establishes that
+`DeviceOS` is a safe substitute for the packet value.
+
 ## Handshake boundary
 
 The difference is caused by the current two-connection startup order. The
@@ -47,6 +55,13 @@ learns the real cache status only after it has already sent downstream
 pack result before it can complete that downstream offer. Therefore the exact
 downstream boolean is not available when the upstream Dialer must choose its
 status.
+
+The owner-controlled PocketMine source shows the same dependency in the local
+fixture. `NetworkSession::onServerLoginSuccess()` sends
+`PlayStatus(LoginSuccess)` and installs `ResourcePacksPacketHandler`, whose
+`setUp()` then sends `ResourcePacksInfo`; the handler can only observe the
+client response afterward. This local source review matches the captured
+downstream order and does not establish a universal server order.
 
 Changing the value unconditionally would make clients that report false use a
 server path they do not support. Waiting for the downstream value before
@@ -60,6 +75,10 @@ also turn an observed capability into an inference.
   `ClientCacheStatus=true` while the current upstream Dialer sends false.
 - Confirmed: the current proxy preserves both raw packets and records both
   connection values in the closed capture.
+- Confirmed: the Mojang 1.26.50 protocol reference defines packet 129 as a
+  client-reported capability and does not provide a platform default.
+- Confirmed: the owner-controlled PocketMine login path sends its resource-pack
+  offer before it can observe the client's cache status.
 - Inferred: when an upstream server honours the capability, the mismatch can
   change `LevelChunk.CacheEnabled`, blob-cache packets, and later transport
   payload boundaries.

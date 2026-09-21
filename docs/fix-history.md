@@ -662,6 +662,14 @@ Every new entry should state the symptom, root cause, implementation commits, ev
 - Evidence and validation: `captures/session-20260921T122228Z` contains downstream ID 129 payload `01` and upstream ID 129 payload `00`; the closed session also records both booleans in `session.spawned`. This is a documentation-only research update.
 - Status: confirmed parity difference, intentionally left as an explicit architecture boundary until an owner-controlled cache-enabled loopback can validate a safe redesign.
 
+### FIX-0082 - Add protocol and local-source evidence for client cache ordering
+
+- Symptom: the client-cache research note identified a startup dependency but did not cite the versioned Mojang packet reference or the owner-controlled server source that determines the local offer order.
+- Root cause: the initial note relied on the vendored gophertunnel source and capture evidence only, leaving the protocol capability definition and local server sequencing implicit.
+- Implementation: record the Mojang 1.26.50 protocol reference and the PocketMine `NetworkSession` and `ResourcePacksPacketHandler` source path in the client-cache research note. The note now distinguishes the confirmed capability definition and local ordering from platform-based inference.
+- Evidence and validation: the official protocol reference describes packet 129 as a client-reported login capability, and the local PocketMine source sends `ResourcePacksInfo` before observing the client response. No runtime code, capture schema, or packet behavior changes.
+- Status: implemented as a documentation-only provenance correction. A controlled cache-enabled local server test remains required before changing startup architecture.
+
 ## Ordering safety contract
 
 The deferred-packet change is deliberately narrow. `expectedIDs` remains the only authority for what the current login state accepts. The queue scan selects the earliest packet that is currently expected, leaves packets for later states queued, and never mutates or reorders bytes on the wire. The regression tests cover canonical resource-pack order, featured early `ResourcePacksInfo`, a later-phase packet queued ahead of the current phase, and all six permutations of the three login packets.
