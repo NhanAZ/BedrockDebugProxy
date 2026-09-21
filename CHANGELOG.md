@@ -40,6 +40,7 @@ Detailed rationale remains in [`docs/audits/`](docs/audits/).
 - Same-protocol raw-forward decode failures now appear as packet decode errors instead of generic bridge read errors.
 - Same-protocol packets whose derived decode fails now remain raw-forwarded with an explicit unknown view instead of closing the bridge.
 - Terminating bridges now retain and reuse raw `ResourcePackStack` startup packets when the downstream protocol matches, with a typed fallback when it does not.
+- Raw `ResourcePackStack` forwarding now uses the retained source protocol provenance on the listener path, ensuring the same-protocol raw branch is actually selected.
 - Terminating bridges now also retain and reuse raw `JigsawStructureData`, `StartGame`, and `VoxelShapes` startup packets when the downstream protocol matches, preserving the observed world-start bytes while keeping typed fallback behavior.
 - Terminating bridges no longer add an empty compatibility `CreativeContent` packet when the upstream server's own packet will be forwarded after spawn, avoiding the observed duplicate startup packet while retaining the upstream raw bytes.
 - The capture viewer retains the OFL-licensed fan-made font assets without contacting a font CDN. Visible text uses regular Monocraft and can resolve a separately installed Minecraft Ten before the embedded fallback.

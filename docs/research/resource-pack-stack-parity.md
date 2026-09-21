@@ -16,7 +16,7 @@ Dialled connections now retain a copy of the complete `ResourcePackStack` in `Ga
 
 The retained value is cloned at both connection boundaries. The fix preserves texture-pack order, base game version, experiments, and editor and toggle flags without changing resource-pack archive bytes or adding a second transfer path.
 
-The bridge also retains the complete encoded packet and the protocol ID that produced it. When the upstream and downstream protocol IDs match, the listener validates the packet ID and writes those original bytes. A protocol mismatch selects the cloned typed stack, while an invalid retained packet logs a warning and then uses that same fallback. `ResourcePacksInfo` remains a separate typed rebuild boundary because its downstream URLs must point to archives that the bridge can serve.
+The bridge also retains the complete encoded packet and the protocol ID that produced it. The listener stores that source protocol separately from its downstream `GameData` and, when the upstream and downstream protocol IDs match, validates the packet ID and writes those original bytes. A protocol mismatch selects the cloned typed stack, while an invalid retained packet logs a warning and then uses that same fallback. `ResourcePacksInfo` remains a separate typed rebuild boundary because its downstream URLs must point to archives that the bridge can serve.
 
 ## Evidence and provenance
 

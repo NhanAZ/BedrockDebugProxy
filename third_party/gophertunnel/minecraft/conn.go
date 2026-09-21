@@ -1317,7 +1317,7 @@ func (conn *Conn) handleResourcePackClientResponse(pk *packet.ResourcePackClient
 				})
 			}
 		}
-		if len(conn.rawResourcePackStack) > 0 && conn.gameData.RawProtocolID == conn.proto.ID() {
+		if len(conn.rawResourcePackStack) > 0 && conn.rawResourcePackStackProtocolID == conn.proto.ID() {
 			if err := conn.writeRawStartupPacket(conn.rawResourcePackStack, packet.IDResourcePackStack); err != nil {
 				conn.log.Warn("write retained ResourcePackStack bytes", "err", err)
 				if err := conn.WritePacket(cloneResourcePackStack(stack)); err != nil {

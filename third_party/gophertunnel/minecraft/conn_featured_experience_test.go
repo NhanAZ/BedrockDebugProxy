@@ -506,6 +506,7 @@ func TestResourcePackResponseWritesRetainedStackBytes(t *testing.T) {
 		Experiments:         []protocol.ExperimentData{{Name: "integration-experiment", Enabled: true}},
 	}
 	raw := wirePacketData(t, stack)
+	rawBytes := append(append([]byte(nil), raw.full...), 0x7f)
 	var output bytes.Buffer
 	conn := &Conn{
 		ctx:   context.Background(),
@@ -517,7 +518,7 @@ func TestResourcePackResponseWritesRetainedStackBytes(t *testing.T) {
 			RawProtocolID: DefaultProtocol.ID(),
 		},
 		resourcePackStack:              cloneResourcePackStack(stack),
-		rawResourcePackStack:           append([]byte(nil), raw.full...),
+		rawResourcePackStack:           rawBytes,
 		rawResourcePackStackProtocolID: DefaultProtocol.ID(),
 	}
 
@@ -531,8 +532,8 @@ func TestResourcePackResponseWritesRetainedStackBytes(t *testing.T) {
 	if err != nil {
 		t.Fatalf("decode resource-pack stack: %v", err)
 	}
-	if len(decoded) != 1 || !bytes.Equal(decoded[0], raw.full) {
-		t.Fatalf("resource-pack stack bytes = %x, want %x", decoded, raw.full)
+	if len(decoded) != 1 || !bytes.Equal(decoded[0], rawBytes) {
+		t.Fatalf("resource-pack stack bytes = %x, want %x", decoded, rawBytes)
 	}
 }
 
