@@ -174,6 +174,31 @@ func TestNetworkWrapReportsTransportContext(t *testing.T) {
 	}
 }
 
+func TestNetworkWrapPreservesCloseErrorWhenOpenCaptureFails(t *testing.T) {
+	recorder, err := capture.New(filepath.Join(t.TempDir(), "capture"), capture.Options{})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := recorder.Close("closed", nil); err != nil {
+		t.Fatal(err)
+	}
+	failures := &FailureSink{}
+	observer := NewObserver(recorder, failures, "session-test", 1, nil)
+	closeErr := errors.New("transport close failed")
+	network := Network{
+		Recorder:     recorder,
+		Observer:     observer,
+		Failures:     failures,
+		SessionID:    "session-test",
+		ConnectionID: "connection-test",
+		Channel:      "upstream",
+	}
+	_, err = network.wrap(&fakePacketConn{closeErr: closeErr})
+	if err == nil || !errors.Is(err, capture.ErrClosed) || !errors.Is(err, closeErr) {
+		t.Fatalf("wrap() error = %v, want capture and close errors", err)
+	}
+}
+
 func TestObservedConnPreservesTransportCapabilities(t *testing.T) {
 	key, err := ecdsa.GenerateKey(elliptic.P256(), rand.Reader)
 	if err != nil {
@@ -394,6 +419,7 @@ type fakePacketConn struct {
 	readPayload []byte
 	readErr     error
 	writeErr    error
+	closeErr    error
 	latency     time.Duration
 	closed      bool
 }
@@ -458,7 +484,7 @@ func (c *fakePacketConn) Close() error {
 		return errors.New("already closed")
 	}
 	c.closed = true
-	return nil
+	return c.closeErr
 }
 
 func (c *fakePacketConn) LocalAddr() net.Addr {

@@ -862,6 +862,14 @@ Every new entry should state the symptom, root cause, implementation commits, ev
 - Evidence and validation: the transport wrapper is the shared boundary for all observed connections, and the recorder already stores the operation error in the event. A deterministic regression test uses a closed recorder plus independent read and write errors and verifies both errors and transferred counts remain visible.
 - Status: implemented with deterministic local coverage. Live transport failure behavior remains unverified.
 
+### FIX-0108 - Preserve connection-close errors during failed observation setup
+
+- Symptom: when recording `transport.connection_open` failed, the wrapper closed the newly opened transport but returned only the capture error if the close also failed.
+- Root cause: `Network.wrap` discarded the close result after the open-event recorder failure.
+- Implementation: join the recorder and close errors while keeping the existing cleanup behavior.
+- Evidence and validation: the wrapper owns the open-event failure path and the regression test uses a closed recorder plus an independent transport close error to verify both remain discoverable.
+- Status: implemented with deterministic local coverage. Live transport-failure behavior remains unverified.
+
 ## Ordering safety contract
 
 The deferred-packet change is deliberately narrow. `expectedIDs` remains the only authority for what the current login state accepts. The queue scan selects the earliest packet that is currently expected, leaves packets for later states queued, and never mutates or reorders bytes on the wire. The regression tests cover canonical resource-pack order, featured early `ResourcePacksInfo`, a later-phase packet queued ahead of the current phase, and all six permutations of the three login packets.

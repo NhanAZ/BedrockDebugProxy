@@ -62,6 +62,8 @@ Transport lifecycle events also retain the optional RakNet GUID and public-key c
 
 The observing transport wrapper preserves error provenance at the read and write boundary. If the underlying transport returns a partial transfer or operation error while the recorder also fails, the wrapper retains the transferred byte count and joins the transport and capture errors. The event still records the original operation error and raw bytes that were available. This keeps a recorder failure from masking a transport failure or changing a partial-read result.
 
+The same rule applies when a connection-open event cannot be recorded. The wrapper still closes the newly opened transport and joins any close error with the recorder failure, so a capture failure does not hide a lower-layer shutdown problem.
+
 ## Representative packet-family coverage
 
 The loopback regression test `TestRunnerForwardsBidirectionalPacketsAndCapturesSession` sends representative packets through both sides of the proxy and checks both forwarding and capture. It covers `PlayerSkin` with skin and cape bytes, `AddActor`, `LevelChunk`, `SubChunkRequest`, `UpdateBlock`, `InventoryContent`, `InventoryTransaction`, `MovePlayer`, and `Emote`.
