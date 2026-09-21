@@ -161,6 +161,9 @@ type Conn struct {
 	// resourcePacks is a slice of resource packs that the listener may hold. Each client will be asked to
 	// download these resource packs upon joining.
 	resourcePacks []*resource.Pack
+	// resourcePackStack is an optional exact stack selected for this listener
+	// connection after the offered packs have been downloaded.
+	resourcePackStack *packet.ResourcePackStack
 	// texturePacksRequired specifies if clients that join must accept the texture pack in order for them to
 	// be able to join the server. If they don't accept, they can only leave the server.
 	texturePacksRequired bool
@@ -173,6 +176,8 @@ type Conn struct {
 	// fetchResourcePacks is an optional function passed from a Listener. If set, the returned resource packs from the function
 	// will determine which resource packs to send to the client based on its identity and client data.
 	fetchResourcePacks func(identityData login.IdentityData, clientData login.ClientData, current []*resource.Pack) []*resource.Pack
+	// fetchResourcePackStack selects an exact stack for the listener connection.
+	fetchResourcePackStack func(identityData login.IdentityData, clientData login.ClientData) *packet.ResourcePackStack
 	// ignoredResourcePacks is a slice of resource packs that are not being downloaded due to the downloadResourcePack
 	// func returning false for the specific pack.
 	ignoredResourcePacks []exemptedResourcePack
@@ -958,6 +963,11 @@ func (conn *Conn) handleClientToServerHandshake() error {
 	if conn.fetchResourcePacks != nil {
 		conn.resourcePacks = conn.fetchResourcePacks(conn.identityData, conn.clientData, slices.Clone(conn.resourcePacks))
 	}
+	if conn.fetchResourcePackStack != nil {
+		if stack := conn.fetchResourcePackStack(conn.identityData, conn.clientData); stack != nil {
+			conn.resourcePackStack = cloneResourcePackStack(stack)
+		}
+	}
 	pk := &packet.ResourcePacksInfo{TexturePackRequired: conn.texturePacksRequired, ForceDisableVibrantVisuals: conn.forceDisableVibrantVisuals}
 	for _, pack := range conn.resourcePacks {
 		texturePack := protocol.TexturePackInfo{
@@ -1121,6 +1131,7 @@ func (conn *Conn) storeResourcePack(key ResourcePackCacheKey, pack *resource.Pac
 // handleResourcePackStack handles a ResourcePackStack packet sent by the server. The stack defines the order
 // that resource packs are applied in.
 func (conn *Conn) handleResourcePackStack(pk *packet.ResourcePackStack) error {
+	conn.gameData.ResourcePackStack = cloneResourcePackStack(pk)
 	// We currently don't apply resource packs in any way, so instead we just check if all resource packs in
 	// the stacks are also downloaded.
 	for _, pack := range pk.TexturePacks {
@@ -1131,6 +1142,16 @@ func (conn *Conn) handleResourcePackStack(pk *packet.ResourcePackStack) error {
 	conn.expect(packet.IDDimensionData, packet.IDStartGame, packet.IDJigsawStructureData, packet.IDVoxelShapes)
 	_ = conn.WritePacket(&packet.ResourcePackClientResponse{Response: packet.PackResponseCompleted})
 	return nil
+}
+
+func cloneResourcePackStack(pk *packet.ResourcePackStack) *packet.ResourcePackStack {
+	if pk == nil {
+		return nil
+	}
+	clone := *pk
+	clone.TexturePacks = slices.Clone(pk.TexturePacks)
+	clone.Experiments = slices.Clone(pk.Experiments)
+	return &clone
 }
 
 // hasPack checks if the connection has a resource pack downloaded with the UUID and version passed, provided
@@ -1182,18 +1203,21 @@ func (conn *Conn) handleResourcePackClientResponse(pk *packet.ResourcePackClient
 			return err
 		}
 	case packet.PackResponseAllPacksDownloaded:
-		pk := &packet.ResourcePackStack{BaseGameVersion: protocol.CurrentVersion, Experiments: []protocol.ExperimentData{{Name: "cameras", Enabled: true}}}
-		for _, pack := range conn.resourcePacks {
-			resourcePack := protocol.StackResourcePack{UUID: pack.UUID().String(), Version: pack.Version()}
-			pk.TexturePacks = append(pk.TexturePacks, resourcePack)
+		stack := conn.resourcePackStack
+		if stack == nil {
+			stack = &packet.ResourcePackStack{BaseGameVersion: protocol.CurrentVersion, Experiments: []protocol.ExperimentData{{Name: "cameras", Enabled: true}}}
+			for _, pack := range conn.resourcePacks {
+				resourcePack := protocol.StackResourcePack{UUID: pack.UUID().String(), Version: pack.Version()}
+				stack.TexturePacks = append(stack.TexturePacks, resourcePack)
+			}
+			for _, exempted := range exemptedPacks {
+				stack.TexturePacks = append(stack.TexturePacks, protocol.StackResourcePack{
+					UUID:    exempted.uuid,
+					Version: exempted.version,
+				})
+			}
 		}
-		for _, exempted := range exemptedPacks {
-			pk.TexturePacks = append(pk.TexturePacks, protocol.StackResourcePack{
-				UUID:    exempted.uuid,
-				Version: exempted.version,
-			})
-		}
-		if err := conn.WritePacket(pk); err != nil {
+		if err := conn.WritePacket(cloneResourcePackStack(stack)); err != nil {
 			return fmt.Errorf("send ResourcePackStack: %w", err)
 		}
 	case packet.PackResponseCompleted:
@@ -1485,6 +1509,7 @@ func (conn *Conn) handleVoxelShapes(pk *packet.VoxelShapes) error {
 func (conn *Conn) handleStartGame(pk *packet.StartGame) error {
 	startGamePacket := *pk
 	conn.gameData = GameData{
+		ResourcePackStack:            conn.gameData.ResourcePackStack,
 		StartGamePacket:              &startGamePacket,
 		JigsawStructureData:          conn.gameData.JigsawStructureData,
 		VoxelShapes:                  conn.gameData.VoxelShapes,

@@ -494,6 +494,14 @@ Every new entry should state the symptom, root cause, implementation commits, ev
 - Evidence and validation: The Hive and local loopback captures contain packet IDs 313 and 337 in the upstream login and two downstream occurrences before this fix. New unit and proxy loopback tests verify decoded contents and one startup delivery path. [`docs/research/start-game-parity.md`](research/start-game-parity.md) records the capture evidence and boundary.
 - Status: implemented for the observed startup packet ordering. Packets arriving only after the connection is fully spawned remain normal forwarded traffic and require separate ordering evidence before changing the state machine.
 
+### FIX-0061 - Preserve the upstream resource-pack stack
+
+- Symptom: the upstream Hive capture carried a 1,449-byte `ResourcePackStack` with 24 texture-pack entries, while the downstream listener emitted a 1,446-byte reconstructed stack with 32 entries after adding gophertunnel's built-in exempted packs.
+- Root cause: the dialled connection validated `ResourcePackStack` but discarded the complete packet. The listener then rebuilt a stack using the local resource-pack list, the current protocol version, a default experiment, and exempted packs.
+- Implementation: retain a cloned `ResourcePackStack` in `GameData`, add a listener callback for an exact per-connection stack, and have the proxy supply the upstream stack before downstream resource-pack negotiation completes. The previous generated stack remains the fallback when no exact stack is available.
+- Evidence and validation: [`docs/research/resource-pack-stack-parity.md`](research/resource-pack-stack-parity.md), the nested retention test, and the proxy loopback integration test with non-default stack metadata.
+- Status: implemented for the exact stack boundary. `ResourcePacksInfo` offer-policy mirroring remains a separate documented limitation.
+
 ## Ordering safety contract
 
 The deferred-packet change is deliberately narrow. `expectedIDs` remains the only authority for what the current login state accepts. The queue scan selects the earliest packet that is currently expected, leaves packets for later states queued, and never mutates or reorders bytes on the wire. The regression tests cover canonical resource-pack order, featured early `ResourcePacksInfo`, a later-phase packet queued ahead of the current phase, and all six permutations of the three login packets.

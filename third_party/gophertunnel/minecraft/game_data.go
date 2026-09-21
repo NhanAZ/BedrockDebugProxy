@@ -9,6 +9,10 @@ import (
 // GameData is a loose wrapper around a part of the data found in the StartGame packet. It holds data sent
 // specifically at the start of the game, such as the position of the player, the game mode, etc.
 type GameData struct {
+	// ResourcePackStack contains the complete stack packet observed during a
+	// dialled server's login exchange. It is retained so a terminating bridge
+	// can offer the same stack to its downstream client.
+	ResourcePackStack *packet.ResourcePackStack
 	// StartGamePacket contains the complete decoded StartGame packet when this
 	// data was obtained from a dialled server. It preserves fields that are not
 	// represented by the compatibility-oriented fields below when a bridge
