@@ -630,6 +630,14 @@ Every new entry should state the symptom, root cause, implementation commits, ev
 - Evidence and validation: the report generated from `captures/session-20260921T122228Z` previously contained `09/21/2026 12:22:28`; after the fix it must retain `2026-09-21T12:22:28.3304852Z` and the corresponding end timestamp. PowerShell syntax, the low-memory quality gate, and `git diff --check` are required before commit.
 - Status: implemented as a deterministic validation-artifact correction. Existing reports are not rewritten in place.
 
+### FIX-0078 - Bound advertised URL resource-pack bodies
+
+- Symptom: the URL resource-pack adapter checked the advertised compressed size but the vendored URL reader could continue copying a response body that was larger than that size before metadata validation rejected it.
+- Root cause: `resource.ReadURL` streamed the HTTP body directly into its temporary archive without a caller-provided byte limit. `Content-Length` is optional and cannot be treated as the response boundary.
+- Implementation: add `resource.ReadURLLimited` and use the advertised pack size as the actual response-body limit. The reader rejects a declared or observed body larger than the limit before the archive is accepted, while the existing UUID, version, and size validation remains in place.
+- Evidence and validation: the loopback URL-cache regression serves a chunked response containing a valid archive followed by extra bytes and confirms that no pack is returned. The vendored patch note and resource-pack documentation record the project-specific bounded reader. Full quality and diff checks remain required before commit.
+- Status: implemented in the source tree with focused automated coverage. Real-client HTTP resource-pack validation remains pending.
+
 ## Ordering safety contract
 
 The deferred-packet change is deliberately narrow. `expectedIDs` remains the only authority for what the current login state accepts. The queue scan selects the earliest packet that is currently expected, leaves packets for later states queued, and never mutates or reorders bytes on the wire. The regression tests cover canonical resource-pack order, featured early `ResourcePacksInfo`, a later-phase packet queued ahead of the current phase, and all six permutations of the three login packets.

@@ -104,6 +104,41 @@ func TestURLResourcePackCacheReportsAdvertisedPackMismatch(t *testing.T) {
 	}
 }
 
+func TestURLResourcePackCacheBoundsResponseBodyToAdvertisedSize(t *testing.T) {
+	archive := testURLResourcePackArchive(t)
+	extra := bytes.Repeat([]byte{'x'}, 1024*1024)
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		flusher, ok := w.(http.Flusher)
+		if !ok {
+			http.Error(w, "test server does not support flushing", http.StatusInternalServerError)
+			return
+		}
+		if _, err := w.Write(archive); err != nil {
+			return
+		}
+		flusher.Flush()
+		_, _ = w.Write(extra)
+	}))
+	defer server.Close()
+
+	info := &packet.ResourcePacksInfo{TexturePacks: []protocol.TexturePackInfo{{
+		UUID:        uuid.MustParse("11111111-1111-1111-1111-111111111111"),
+		Version:     "1.0.0",
+		Size:        uint64(len(archive)),
+		DownloadURL: server.URL,
+	}}}
+	cache := newURLResourcePackCache(context.Background())
+	cache.Observe(packet.Header{PacketID: packet.IDResourcePacksInfo}, encodeResourcePacksInfo(t, info))
+	key := minecraft.ResourcePackCacheKey{UUID: info.TexturePacks[0].UUID, Version: "1.0.0", Size: uint64(len(archive))}
+	pack, err := cache.Load(context.Background(), key)
+	if err == nil || !strings.Contains(err.Error(), "exceeds") {
+		t.Fatalf("oversized response error = %v, want an exceeds-limit error", err)
+	}
+	if pack != nil {
+		t.Fatal("oversized response returned a resource pack")
+	}
+}
+
 func TestURLResourcePackCacheDownloadsPacksConcurrentlyInOfferOrder(t *testing.T) {
 	firstUUID := uuid.MustParse("11111111-1111-1111-1111-111111111111")
 	secondUUID := uuid.MustParse("22222222-2222-2222-2222-222222222222")
