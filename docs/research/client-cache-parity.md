@@ -85,6 +85,10 @@ mode retain their existing ordering.
 - Confirmed: the owner-controlled loopback integration now sends a cache-enabled
   client through the deferred offer path and observes `true` on both the
   downstream and upstream connection metadata.
+- Confirmed: the same loopback integration sends a cache-enabled `LevelChunk`,
+  forwards `ClientCacheBlobStatus`, and returns `ClientCacheMissResponse` with
+  the expected hash and payload on the downstream connection. The raw packet
+  hashes remain present on both bridge channels.
 - Inferred: when an upstream server honours the capability, the mismatch can
   change `LevelChunk.CacheEnabled`, blob-cache packets, and later transport
   payload boundaries.
@@ -103,8 +107,9 @@ connection values remain visible in the capture.
 
 ## Follow-up
 
-Use an owner-controlled local server that deliberately sends cache-enabled
-`LevelChunk` and `ClientCacheBlobStatus` traffic to validate the current
-forwarding path. Compare direct and proxied captures for packet order, cache
-hashes, miss responses, and spawn completion. Do not infer a public-server
+The deterministic loopback integration now validates the forwarding path for a
+cache-enabled `LevelChunk`, `ClientCacheBlobStatus`, and
+`ClientCacheMissResponse`, including raw hash preservation. A real vanilla
+client capture is still needed to observe cache storage and hit or miss
+selection rather than only the protocol exchange. Do not infer a public-server
 policy from this local capability difference.

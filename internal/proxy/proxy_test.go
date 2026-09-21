@@ -368,6 +368,9 @@ func TestRunnerForwardsBidirectionalPacketsAndCapturesSession(t *testing.T) {
 		WorldTemplateUUID:          uuid.MustParse("33333333-3333-4333-8333-333333333333"),
 		WorldTemplateVersion:       "integration-template",
 	}
+	const integrationCacheHash uint64 = 0x1122334455667788
+	integrationCachePayload := []byte{0x91, 0x92, 0x93}
+	integrationCacheMissPayload := []byte{0xa1, 0xa2, 0xa3, 0xa4}
 	integrationItemRegistry := &packet.ItemRegistry{Items: []protocol.ItemEntry{{
 		Name:           "integration:item",
 		RuntimeID:      42,
@@ -592,6 +595,14 @@ func TestRunnerForwardsBidirectionalPacketsAndCapturesSession(t *testing.T) {
 				SubChunkCount: 0,
 				RawPayload:    []byte{0x01, 0x02, 0x03},
 			},
+			&packet.LevelChunk{
+				Position:      protocol.ChunkPos{3, 4},
+				Dimension:     0,
+				SubChunkCount: 0,
+				CacheEnabled:  true,
+				BlobHashes:    []uint64{integrationCacheHash},
+				RawPayload:    integrationCachePayload,
+			},
 			&packet.UpdateBlock{
 				Position:          protocol.BlockPos{1, 64, 2},
 				NewBlockRuntimeID: 42,
@@ -611,6 +622,33 @@ func TestRunnerForwardsBidirectionalPacketsAndCapturesSession(t *testing.T) {
 		if flushErr := serverConn.Flush(); flushErr != nil {
 			serverErrors <- fmt.Errorf("flush server packet: %w", flushErr)
 			return
+		}
+		for {
+			received, readErr := serverConn.ReadPacket()
+			if readErr != nil {
+				serverErrors <- fmt.Errorf("read cache status: %w", readErr)
+				return
+			}
+			status, ok := received.(*packet.ClientCacheBlobStatus)
+			if !ok {
+				continue
+			}
+			if !reflect.DeepEqual(status.MissHashes, []uint64{integrationCacheHash}) || len(status.HitHashes) != 0 {
+				serverErrors <- fmt.Errorf("upstream cache status = %#v, want miss hash %#x", status, integrationCacheHash)
+				return
+			}
+			if writeErr := serverConn.WritePacket(&packet.ClientCacheMissResponse{Blobs: []protocol.CacheBlob{{
+				Hash:    integrationCacheHash,
+				Payload: integrationCacheMissPayload,
+			}}}); writeErr != nil {
+				serverErrors <- fmt.Errorf("write cache miss response: %w", writeErr)
+				return
+			}
+			if flushErr := serverConn.Flush(); flushErr != nil {
+				serverErrors <- fmt.Errorf("flush cache miss response: %w", flushErr)
+				return
+			}
+			break
 		}
 		select {
 		case <-clientReceived:
@@ -791,13 +829,15 @@ func TestRunnerForwardsBidirectionalPacketsAndCapturesSession(t *testing.T) {
 		t.Fatalf("forwarded malformed packet = %x, want %x", forwardedMalformed, malformedServerText)
 	}
 	expectedServerPackets := map[string]bool{
-		"Text":             false,
-		"CreativeContent":  false,
-		"PlayerSkin":       false,
-		"AddActor":         false,
-		"LevelChunk":       false,
-		"UpdateBlock":      false,
-		"InventoryContent": false,
+		"Text":                    false,
+		"CreativeContent":         false,
+		"PlayerSkin":              false,
+		"AddActor":                false,
+		"LevelChunk":              false,
+		"LevelChunkCache":         false,
+		"ClientCacheMissResponse": false,
+		"UpdateBlock":             false,
+		"InventoryContent":        false,
 	}
 	for {
 		received, readErr := client.ReadPacket()
@@ -834,11 +874,33 @@ func TestRunnerForwardsBidirectionalPacketsAndCapturesSession(t *testing.T) {
 			}
 			expectedServerPackets["AddActor"] = true
 		case *packet.LevelChunk:
-			if typed.Position != (protocol.ChunkPos{1, 2}) || !bytes.Equal(typed.RawPayload, []byte{0x01, 0x02, 0x03}) {
-				_ = client.Close()
-				t.Fatalf("downstream chunk payload was changed: %#v", typed)
+			if typed.CacheEnabled {
+				if typed.Position != (protocol.ChunkPos{3, 4}) || !reflect.DeepEqual(typed.BlobHashes, []uint64{integrationCacheHash}) || !bytes.Equal(typed.RawPayload, integrationCachePayload) {
+					_ = client.Close()
+					t.Fatalf("downstream cache chunk was changed: %#v", typed)
+				}
+				if err := client.WritePacket(&packet.ClientCacheBlobStatus{MissHashes: []uint64{integrationCacheHash}}); err != nil {
+					_ = client.Close()
+					t.Fatalf("write cache status: %v", err)
+				}
+				if err := client.Flush(); err != nil {
+					_ = client.Close()
+					t.Fatalf("flush cache status: %v", err)
+				}
+				expectedServerPackets["LevelChunkCache"] = true
+			} else {
+				if typed.Position != (protocol.ChunkPos{1, 2}) || !bytes.Equal(typed.RawPayload, []byte{0x01, 0x02, 0x03}) {
+					_ = client.Close()
+					t.Fatalf("downstream chunk payload was changed: %#v", typed)
+				}
+				expectedServerPackets["LevelChunk"] = true
 			}
-			expectedServerPackets["LevelChunk"] = true
+		case *packet.ClientCacheMissResponse:
+			if len(typed.Blobs) != 1 || typed.Blobs[0].Hash != integrationCacheHash || !bytes.Equal(typed.Blobs[0].Payload, integrationCacheMissPayload) {
+				_ = client.Close()
+				t.Fatalf("downstream cache miss response was changed: %#v", typed)
+			}
+			expectedServerPackets["ClientCacheMissResponse"] = true
 		case *packet.UpdateBlock:
 			if typed.Position != (protocol.BlockPos{1, 64, 2}) || typed.NewBlockRuntimeID != 42 || typed.Flags != packet.BlockUpdateNetwork || typed.Layer != 1 {
 				_ = client.Close()
@@ -938,25 +1000,27 @@ func TestRunnerForwardsBidirectionalPacketsAndCapturesSession(t *testing.T) {
 		id        uint32
 	}
 	expectedRaw := map[rawPacketKey]struct{}{
-		{capture.DirectionClientToServer, packet.IDClientCacheStatus}:    {},
-		{capture.DirectionClientToServer, packet.IDEmote}:                {},
-		{capture.DirectionClientToServer, packet.IDPlayerSkin}:           {},
-		{capture.DirectionClientToServer, packet.IDMovePlayer}:           {},
-		{capture.DirectionClientToServer, packet.IDSubChunkRequest}:      {},
-		{capture.DirectionClientToServer, packet.IDInventoryTransaction}: {},
-		{capture.DirectionServerToClient, packet.IDResourcePacksInfo}:    {},
-		{capture.DirectionServerToClient, packet.IDResourcePackStack}:    {},
-		{capture.DirectionServerToClient, packet.IDStartGame}:            {},
-		{capture.DirectionServerToClient, packet.IDItemRegistry}:         {},
-		{capture.DirectionServerToClient, packet.IDJigsawStructureData}:  {},
-		{capture.DirectionServerToClient, packet.IDVoxelShapes}:          {},
-		{capture.DirectionServerToClient, packet.IDCreativeContent}:      {},
-		{capture.DirectionServerToClient, packet.IDText}:                 {},
-		{capture.DirectionServerToClient, packet.IDPlayerSkin}:           {},
-		{capture.DirectionServerToClient, packet.IDAddActor}:             {},
-		{capture.DirectionServerToClient, packet.IDLevelChunk}:           {},
-		{capture.DirectionServerToClient, packet.IDUpdateBlock}:          {},
-		{capture.DirectionServerToClient, packet.IDInventoryContent}:     {},
+		{capture.DirectionClientToServer, packet.IDClientCacheStatus}:       {},
+		{capture.DirectionClientToServer, packet.IDClientCacheBlobStatus}:   {},
+		{capture.DirectionClientToServer, packet.IDEmote}:                   {},
+		{capture.DirectionClientToServer, packet.IDPlayerSkin}:              {},
+		{capture.DirectionClientToServer, packet.IDMovePlayer}:              {},
+		{capture.DirectionClientToServer, packet.IDSubChunkRequest}:         {},
+		{capture.DirectionClientToServer, packet.IDInventoryTransaction}:    {},
+		{capture.DirectionServerToClient, packet.IDResourcePacksInfo}:       {},
+		{capture.DirectionServerToClient, packet.IDResourcePackStack}:       {},
+		{capture.DirectionServerToClient, packet.IDStartGame}:               {},
+		{capture.DirectionServerToClient, packet.IDItemRegistry}:            {},
+		{capture.DirectionServerToClient, packet.IDJigsawStructureData}:     {},
+		{capture.DirectionServerToClient, packet.IDVoxelShapes}:             {},
+		{capture.DirectionServerToClient, packet.IDCreativeContent}:         {},
+		{capture.DirectionServerToClient, packet.IDText}:                    {},
+		{capture.DirectionServerToClient, packet.IDPlayerSkin}:              {},
+		{capture.DirectionServerToClient, packet.IDAddActor}:                {},
+		{capture.DirectionServerToClient, packet.IDLevelChunk}:              {},
+		{capture.DirectionServerToClient, packet.IDClientCacheMissResponse}: {},
+		{capture.DirectionServerToClient, packet.IDUpdateBlock}:             {},
+		{capture.DirectionServerToClient, packet.IDInventoryContent}:        {},
 	}
 	rawHashes := make(map[rawPacketKey]map[string]map[string]struct{}, len(expectedRaw))
 	var downstreamPacksPolicyPreserved bool
