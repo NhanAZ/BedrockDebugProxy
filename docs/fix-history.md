@@ -702,6 +702,14 @@ Every new entry should state the symptom, root cause, implementation commits, ev
 - Evidence and validation: the capture schema defines `SenderSubClient` and `TargetSubClient` on `PacketInfo`, and the regression test now asserts non-zero values survive the event boundary.
 - Status: implemented as a capture-context correction. No wire behavior, protocol ordering, or authentication behavior changes.
 
+### FIX-0087 - Classify raw-forward decode failures
+
+- Symptom: when same-protocol forwarding decoded a retained raw packet clone unsuccessfully, the bridge recorded the result as `bridge.read_error`, conflating a protocol decode failure with an underlying transport read failure.
+- Root cause: the forwarding loop reused its generic read-error branch after `DecodePacketRead` returned an error, even though the original raw packet header and bytes were still available.
+- Implementation: classify that branch as `packet.decode_error`, retain the packet ID and sub-client header context, and preserve the raw packet event. Transport errors and clone/storage errors continue using their existing bridge error kinds.
+- Evidence and validation: the raw packet adapter exposes the original header separately from clone decoding, and deterministic recorder tests verify the decode-error event and manifest counter. No wire bytes or forwarding decisions change.
+- Status: implemented with automated coverage. Real-client validation remains pending for the current stamped binary.
+
 ## Ordering safety contract
 
 The deferred-packet change is deliberately narrow. `expectedIDs` remains the only authority for what the current login state accepts. The queue scan selects the earliest packet that is currently expected, leaves packets for later states queued, and never mutates or reorders bytes on the wire. The regression tests cover canonical resource-pack order, featured early `ResourcePacksInfo`, a later-phase packet queued ahead of the current phase, and all six permutations of the three login packets.
