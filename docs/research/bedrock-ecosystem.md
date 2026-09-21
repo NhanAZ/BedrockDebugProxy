@@ -37,7 +37,7 @@ The public `Protocol` interface separates packet pools, readers, writers, and co
 
 The current resource-pack path downloads upstream packs, retains the advertised content key, supports a cache interface, and sends listener packs sequentially. `FetchResourcePacks` can choose packs after the connecting client's identity and client data are known. This enables a fixed-target proxy to establish the upstream connection during downstream login, capture the upstream packs, and then offer those packs to the client through public APIs.
 
-The `Network` interface warns that wrappers must preserve optional packet transport capabilities. The first observing network supports RakNet only. NetherNet support must use a capability-preserving wrapper or a dedicated adapter rather than assuming ordinary `net.Conn` framing.
+The `Network` interface warns that wrappers must preserve optional packet transport capabilities. The current observing network keeps the transport-specific `BatchHeader`, `DisableEncryption`, and `ReadPacket` methods through `observedConn`, so the same path can observe RakNet and NetherNet connections without assuming ordinary `net.Conn` framing. Unit tests confirm the wrapper contract and the NetherNet connection declares those capabilities. A live NetherNet capture remains unverified.
 
 ### Sandertv go-raknet
 
@@ -191,7 +191,7 @@ Dragonfly is a server implementation built around gophertunnel rather than a pac
 
 ## Open research items
 
-- Preserve NetherNet transport capabilities while observing its message boundary.
+- Exercise a live controlled NetherNet capture. Capability preservation through the observing wrapper is implemented and unit-tested, but transport-specific live behavior remains unverified.
 - Add optional raw UDP and PCAPNG capture without requiring elevated privileges for normal operation.
 - Compare decoded fixtures against PrismarineJS and future runtime schemas.
 - `--follow-transfers` starts a new hop after a server `Transfer` by rewriting the client destination to the local listener. The original target is then dialled after client reconnect, while the capture keeps one logical session timeline. See ADR 0003 for the trust boundary and concrete-listener requirement.

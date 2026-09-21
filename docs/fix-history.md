@@ -558,6 +558,14 @@ Every new entry should state the symptom, root cause, implementation commits, ev
 - Evidence and validation: the root loopback integration test now requires negotiated compression metadata on both channels before `session.negotiated`, proving that login-time payloads receive the state. The change is limited to capture observability and does not alter wire behavior.
 - Status: implemented as a capture-observability correction. The first payload can still be `not_negotiated` before NetworkSettings is processed, and raw UDP or RakNet framing remains outside this observation boundary.
 
+### FIX-0069 - Correct NetherNet capability research status
+
+- Symptom: the ecosystem research note still described the observing network as RakNet-only and listed capability preservation as an unimplemented item, although the current wrapper is used with configurable transports and exposes the transport-specific packet methods.
+- Root cause: the research note was not updated after the capability-preserving wrapper and transport selection path were implemented.
+- Implementation: update the research note to distinguish confirmed wrapper behavior from the remaining unknown live NetherNet behavior. No runtime code or wire behavior changes.
+- Evidence and validation: `internal/bedrock/network.go`, `internal/bedrock/network_test.go`, `internal/experience/target.go`, and the vendored NetherNet capability assertion show the supported path. The focused network tests pass.
+- Status: documentation correction only. A live controlled NetherNet capture is still pending.
+
 ## Ordering safety contract
 
 The deferred-packet change is deliberately narrow. `expectedIDs` remains the only authority for what the current login state accepts. The queue scan selects the earliest packet that is currently expected, leaves packets for later states queued, and never mutates or reorders bytes on the wire. The regression tests cover canonical resource-pack order, featured early `ResourcePacksInfo`, a later-phase packet queued ahead of the current phase, and all six permutations of the three login packets.
