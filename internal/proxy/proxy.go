@@ -539,7 +539,7 @@ func (r *Runner) Run(ctx context.Context) error {
 			}
 			stateMu.Unlock()
 			if followed.localAddr != nil && r.config.UpstreamNetwork == nil {
-				if err := r.probeTransferRoute(runCtx, followed.target, followed.localAddr, followed.clientGUID, state.hop+1, state.upstreamLogger, live); err != nil {
+				if err := r.probeTransferRoute(runCtx, followed.target, followed.localAddr, followed.clientGUID, state.hop+1, state.upstreamLogger, failures, live); err != nil {
 					live.Info("Transfer route probe failed - %s", err)
 				}
 				stateMu.Lock()
@@ -707,13 +707,26 @@ func (r *Runner) runHop(runCtx context.Context, localAddress string, state *hopS
 	return nil
 }
 
-func (r *Runner) probeTransferRoute(ctx context.Context, target string, localAddr *net.UDPAddr, clientGUID int64, hop int, logger *slog.Logger, live *liveReporter) error {
+func (r *Runner) probeTransferRoute(ctx context.Context, target string, localAddr *net.UDPAddr, clientGUID int64, hop int, logger *slog.Logger, failures *bedrock.FailureSink, live *liveReporter) error {
 	probeCtx, cancel := context.WithTimeout(ctx, transferRouteProbeTimeout)
 	defer cancel()
 	transport := minecraft.NewRakNet(logger)
 	transport.LocalAddr = localAddr
 	transport.ClientGUID = clientGUID
-	_, err := transport.PingContext(probeCtx, target)
+	network := bedrock.Network{
+		Transport:    transport,
+		Recorder:     r.config.Recorder,
+		Failures:     failures,
+		SessionID:    sessionID,
+		ConnectionID: fmt.Sprintf("upstream-%d", hop),
+		Channel:      "upstream",
+		Hop:          hop,
+	}
+	return r.probeTransferRouteNetwork(probeCtx, target, localAddr, clientGUID, hop, network, live)
+}
+
+func (r *Runner) probeTransferRouteNetwork(ctx context.Context, target string, localAddr *net.UDPAddr, clientGUID int64, hop int, network bedrock.Network, live *liveReporter) error {
+	_, err := network.PingContext(ctx, target)
 	fields := map[string]any{
 		"address":               target,
 		"local_address":         localAddr.String(),

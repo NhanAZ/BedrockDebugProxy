@@ -782,6 +782,14 @@ Every new entry should state the symptom, root cause, implementation commits, ev
 - Evidence and validation: gophertunnel `Dialer.prepareDialAddress` consumes the returned pong to select a redirected port, while transfer routing uses the same network boundary. Network tests cover successful response blobs, partial response on error, and error metadata. No network or public server was contacted.
 - Status: implemented with deterministic local coverage. Raw ping request and datagram-level evidence remain outside the current boundary.
 
+### FIX-0097 - Capture transfer route-probe responses
+
+- Symptom: the pre-reconnect transfer route probe called a RakNet transport directly, so its status-ping response bytes were discarded even though the later upstream dial used the observing `Network` boundary.
+- Root cause: `probeTransferRoute` recorded only the route-probe outcome and constructed its transport outside `bedrock.Network.PingContext`.
+- Implementation: route probes now use a `bedrock.Network` configured with the same local UDP address, client GUID, recorder, hop, and pending upstream connection identity. The existing `transfer.route_probe` lifecycle event remains, while the response and operation error are captured as `transport.ping` evidence.
+- Evidence and validation: the transfer path retains the source address and client GUID before probing; the route-probe regression test uses a deterministic network stub and verifies both lifecycle and raw ping evidence. No network or public server was contacted.
+- Status: implemented with deterministic local coverage. Raw UDP request and RakNet datagram-level evidence remain outside the current boundary.
+
 ## Ordering safety contract
 
 The deferred-packet change is deliberately narrow. `expectedIDs` remains the only authority for what the current login state accepts. The queue scan selects the earliest packet that is currently expected, leaves packets for later states queued, and never mutates or reorders bytes on the wire. The regression tests cover canonical resource-pack order, featured early `ResourcePacksInfo`, a later-phase packet queued ahead of the current phase, and all six permutations of the three login packets.
