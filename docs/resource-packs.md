@@ -10,6 +10,8 @@ Only URLs advertised by the current upstream `ResourcePacksInfo` are fetched. Th
 
 The downstream listener marks offered resource packs as required. Minecraft therefore gives the player the normal choice to download and join or leave. This is a downstream proxy policy, not a claim that every upstream server requires its packs. Gophertunnel exposes `ListenConfig.TexturePacksRequired` for the listener but does not expose the negotiated upstream `ResourcePacksInfo.TexturePackRequired` value through the public connection API, so BedrockDebugProxy cannot mirror an optional upstream policy exactly. The limitation remains explicit in the capture manifest.
 
+The later `ResourcePackStack` is a separate parity boundary. Dialled connections retain the complete upstream stack, and the proxy listener reuses it when available, preserving pack order, base game version, experiments, and stack flags. The normal gophertunnel-generated stack remains the fallback for standalone listener callers. The evidence and implementation boundary are recorded in [`docs/research/resource-pack-stack-parity.md`](research/resource-pack-stack-parity.md).
+
 Each `resource_pack.archive` event records the following evidence.
 
 - Parsed UUID, version, name, description, and manifest plus any retained download URL and content key

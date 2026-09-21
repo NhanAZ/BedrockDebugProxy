@@ -208,10 +208,20 @@ func TestRunnerForwardsBidirectionalPacketsAndCapturesSession(t *testing.T) {
 	ctx, cancel := context.WithTimeout(context.Background(), 20*time.Second)
 	defer cancel()
 
+	integrationResourcePackStack := &packet.ResourcePackStack{
+		TexturePackRequired:          true,
+		BaseGameVersion:              "1.26.51-integration-base",
+		Experiments:                  []protocol.ExperimentData{{Name: "integration-experiment", Enabled: true}},
+		ExperimentsPreviouslyToggled: true,
+		IncludeEditorPacks:           true,
+	}
 	upstreamListener, err := (minecraft.ListenConfig{
 		AuthenticationDisabled: true,
 		AllowUnknownPackets:    true,
 		AllowInvalidPackets:    true,
+		FetchResourcePackStack: func(login.IdentityData, login.ClientData) *packet.ResourcePackStack {
+			return integrationResourcePackStack
+		},
 	}).Listen("raknet", "127.0.0.1:0")
 	if err != nil {
 		t.Fatal(err)
@@ -461,6 +471,18 @@ func TestRunnerForwardsBidirectionalPacketsAndCapturesSession(t *testing.T) {
 		clientData.VoxelShapes.CustomShapeCount != 7 {
 		_ = client.Close()
 		t.Fatalf("downstream startup world packets were not preserved: jigsaw=%#v voxel=%#v", clientData.JigsawStructureData, clientData.VoxelShapes)
+	}
+	stack := client.GameData().ResourcePackStack
+	stackPacksEqual := stack != nil && len(stack.TexturePacks) == len(integrationResourcePackStack.TexturePacks) &&
+		(reflect.DeepEqual(stack.TexturePacks, integrationResourcePackStack.TexturePacks) || len(stack.TexturePacks) == 0)
+	if stack == nil || !stackPacksEqual ||
+		stack.TexturePackRequired != integrationResourcePackStack.TexturePackRequired ||
+		stack.BaseGameVersion != integrationResourcePackStack.BaseGameVersion ||
+		!reflect.DeepEqual(stack.Experiments, integrationResourcePackStack.Experiments) ||
+		stack.ExperimentsPreviouslyToggled != integrationResourcePackStack.ExperimentsPreviouslyToggled ||
+		stack.IncludeEditorPacks != integrationResourcePackStack.IncludeEditorPacks {
+		_ = client.Close()
+		t.Fatalf("downstream resource-pack stack was not preserved: %#v", stack)
 	}
 	for _, outgoing := range []packet.Packet{
 		integrationPlayerSkin(),

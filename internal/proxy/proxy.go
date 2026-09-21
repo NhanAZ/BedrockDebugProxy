@@ -308,6 +308,13 @@ func (r *Runner) Run(ctx context.Context) error {
 			}
 			return state.slot.conn.ResourcePacks()
 		},
+		FetchResourcePackStack: func(login.IdentityData, login.ClientData) *packet.ResourcePackStack {
+			state := getAcceptState()
+			if state.slot.conn == nil {
+				return nil
+			}
+			return state.slot.conn.GameData().ResourcePackStack
+		},
 	}
 	if r.config.FollowTransfers {
 		// A reconnect can overlap the listener's asynchronous player-count

@@ -269,6 +269,34 @@ func TestHandlePreservesStartupWorldPacketsForBridge(t *testing.T) {
 	}
 }
 
+func TestHandlePreservesResourcePackStackForBridge(t *testing.T) {
+	conn := newLoginTestConn()
+	conn.expectedIDs.Store([]uint32{packet.IDResourcePackStack})
+	conn.ignoredResourcePacks = []exemptedResourcePack{{uuid: "integration-pack", version: "2"}}
+	original := &packet.ResourcePackStack{
+		TexturePackRequired:          true,
+		TexturePacks:                 []protocol.StackResourcePack{{UUID: "integration-pack", Version: "2"}},
+		BaseGameVersion:              "1.26.51-integration-base",
+		Experiments:                  []protocol.ExperimentData{{Name: "integration-experiment", Enabled: true}},
+		ExperimentsPreviouslyToggled: true,
+		IncludeEditorPacks:           true,
+	}
+
+	if err := conn.handle(wirePacketData(t, original)); err != nil {
+		t.Fatalf("handle ResourcePackStack: %v", err)
+	}
+	got := conn.GameData().ResourcePackStack
+	if got == nil || !reflect.DeepEqual(got, original) {
+		t.Fatalf("preserved ResourcePackStack = %#v, want %#v", got, original)
+	}
+
+	original.TexturePacks[0].Version = "mutated-after-handle"
+	original.Experiments[0].Enabled = false
+	if got.TexturePacks[0].Version != "2" || !got.Experiments[0].Enabled {
+		t.Fatalf("preserved ResourcePackStack aliases input slices: %#v", got)
+	}
+}
+
 func newLoginTestConn() *Conn {
 	return &Conn{
 		ctx:   context.Background(),

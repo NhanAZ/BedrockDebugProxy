@@ -103,6 +103,10 @@ type ListenConfig struct {
 	// If set, it will be called before sending the ResourcePacksInfo packet. The returned resource packs
 	// will be forwarded to the client in place of the Listener's current ones.
 	FetchResourcePacks func(identityData login.IdentityData, clientData login.ClientData, current []*resource.Pack) []*resource.Pack
+	// FetchResourcePackStack determines the ResourcePackStack sent after the
+	// client has downloaded the offered packs. If it returns nil, the listener
+	// builds its normal stack from the downloaded packs.
+	FetchResourcePackStack func(identityData login.IdentityData, clientData login.ClientData) *packet.ResourcePackStack
 	// ResourcePackDelivery controls how resource pack data is sent to clients. The zero value keeps the
 	// conservative default chunk size and pacing.
 	ResourcePackDelivery ResourcePackDeliveryConfig
@@ -432,6 +436,7 @@ func (listener *Listener) createConn(netConn net.Conn) {
 	conn.forceDisableVibrantVisuals = listener.cfg.ForceDisableVibrantVisuals
 	conn.resourcePacks = packs
 	conn.fetchResourcePacks = listener.cfg.FetchResourcePacks
+	conn.fetchResourcePackStack = listener.cfg.FetchResourcePackStack
 	conn.resourcePackDelivery = listener.cfg.ResourcePackDelivery.normalized()
 	conn.gameData.WorldName = listener.status().ServerName
 	conn.authEnabled = !listener.cfg.AuthenticationDisabled
