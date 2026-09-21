@@ -8,6 +8,8 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"net/http"
+	"net/http/httptest"
 	"os"
 	"path/filepath"
 	"reflect"
@@ -24,6 +26,7 @@ import (
 	"github.com/sandertv/gophertunnel/minecraft/protocol"
 	"github.com/sandertv/gophertunnel/minecraft/protocol/login"
 	"github.com/sandertv/gophertunnel/minecraft/protocol/packet"
+	"github.com/sandertv/gophertunnel/minecraft/resource"
 )
 
 func TestUpstreamDialTimeoutErrorPreservesCause(t *testing.T) {
@@ -960,6 +963,204 @@ func TestRunnerForwardsBidirectionalPacketsAndCapturesSession(t *testing.T) {
 			t.Errorf("raw representative packet %d in %s direction changed between proxy channels", key.id, key.direction)
 		}
 	}
+}
+
+func TestRunnerPreservesMixedResourcePackOfferOrder(t *testing.T) {
+	ctx, cancel := context.WithTimeout(context.Background(), 20*time.Second)
+	defer cancel()
+
+	firstUUID := uuid.MustParse("11111111-1111-1111-1111-111111111111")
+	middleUUID := uuid.MustParse("22222222-2222-2222-2222-222222222222")
+	lastUUID := uuid.MustParse("33333333-3333-4333-8333-333333333333")
+	archives := map[string][]byte{
+		"/first.zip":  testURLResourcePackArchiveWith(t, firstUUID, "1.0.0"),
+		"/middle.zip": testURLResourcePackArchiveWith(t, middleUUID, "2.0.0"),
+		"/last.zip":   testURLResourcePackArchiveWith(t, lastUUID, "3.0.0"),
+	}
+	httpServer := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		archive, ok := archives[r.URL.Path]
+		if !ok {
+			http.NotFound(w, r)
+			return
+		}
+		_, _ = w.Write(archive)
+	}))
+	defer httpServer.Close()
+
+	firstPack, err := resource.ReadURL(httpServer.URL + "/first.zip")
+	if err != nil {
+		t.Fatal(err)
+	}
+	middlePack, err := resource.Read(bytes.NewReader(archives["/middle.zip"]))
+	if err != nil {
+		t.Fatal(err)
+	}
+	lastPack, err := resource.ReadURL(httpServer.URL + "/last.zip")
+	if err != nil {
+		t.Fatal(err)
+	}
+	packs := []*resource.Pack{firstPack, middlePack, lastPack}
+	info := &packet.ResourcePacksInfo{TexturePacks: []protocol.TexturePackInfo{
+		{UUID: firstPack.UUID(), Version: firstPack.Version(), Size: uint64(len(archives["/first.zip"])), DownloadURL: firstPack.DownloadURL()},
+		{UUID: middlePack.UUID(), Version: middlePack.Version(), Size: uint64(len(archives["/middle.zip"]))},
+		{UUID: lastPack.UUID(), Version: lastPack.Version(), Size: uint64(len(archives["/last.zip"])), DownloadURL: lastPack.DownloadURL()},
+	}}
+	stack := &packet.ResourcePackStack{
+		BaseGameVersion: "1.26.51-mixed-pack-test",
+		TexturePacks: []protocol.StackResourcePack{
+			{UUID: firstUUID.String(), Version: firstPack.Version()},
+			{UUID: middleUUID.String(), Version: middlePack.Version()},
+			{UUID: lastUUID.String(), Version: lastPack.Version()},
+		},
+	}
+	upstreamListener, err := (minecraft.ListenConfig{
+		AuthenticationDisabled: true,
+		AllowUnknownPackets:    true,
+		AllowInvalidPackets:    true,
+		ResourcePacks:          packs,
+		FetchResourcePacks: func(login.IdentityData, login.ClientData, []*resource.Pack) []*resource.Pack {
+			return packs
+		},
+		FetchResourcePacksInfo: func(login.IdentityData, login.ClientData) *packet.ResourcePacksInfo {
+			return info
+		},
+		FetchResourcePackStack: func(login.IdentityData, login.ClientData) *packet.ResourcePackStack {
+			return stack
+		},
+	}).Listen("raknet", "127.0.0.1:0")
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer func() { _ = upstreamListener.Close() }()
+
+	serverErrors := make(chan error, 1)
+	go func() {
+		accepted, acceptErr := upstreamListener.Accept()
+		if acceptErr != nil {
+			serverErrors <- acceptErr
+			return
+		}
+		serverConn, ok := accepted.(*minecraft.Conn)
+		if !ok {
+			_ = accepted.Close()
+			serverErrors <- fmt.Errorf("accepted unexpected connection type %T", accepted)
+			return
+		}
+		defer func() { _ = serverConn.Close() }()
+		serverErrors <- serverConn.StartGame(mixedResourcePackGameData())
+	}()
+
+	root := filepath.Join(t.TempDir(), "capture")
+	recorder, err := capture.New(root, capture.Options{SyncEachEvent: true})
+	if err != nil {
+		t.Fatal(err)
+	}
+	output := newListeningAddressWriter()
+	runner, err := New(Config{
+		ListenAddress:              "127.0.0.1:0",
+		UpstreamAddress:            upstreamListener.Addr().String(),
+		AllowUnauthenticatedClient: true,
+		Recorder:                   recorder,
+		Output:                     output,
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	runnerErrors := make(chan error, 1)
+	runnerDone := make(chan struct{})
+	go func() {
+		runnerErrors <- runner.Run(ctx)
+		close(runnerDone)
+	}()
+	defer func() {
+		cancel()
+		select {
+		case <-runnerDone:
+		case <-time.After(5 * time.Second):
+			t.Errorf("proxy runner did not stop during cleanup")
+		}
+		_ = recorder.Close("closed", nil)
+	}()
+
+	var proxyAddress string
+	select {
+	case proxyAddress = <-output.address:
+	case <-ctx.Done():
+		t.Fatalf("wait for proxy listener: %v", ctx.Err())
+	}
+	client, err := (minecraft.Dialer{
+		IdentityData: login.IdentityData{Identity: "11111111-1111-1111-1111-111111111111", DisplayName: "MixedPackTest"},
+		ClientData:   integrationClientData(),
+		DownloadResourcePack: func(uuid.UUID, string, int, int) bool {
+			return false
+		},
+	}).DialContext(ctx, "raknet", proxyAddress)
+	if err != nil {
+		output.mu.Lock()
+		proxyOutput := output.buffer.String()
+		output.mu.Unlock()
+		select {
+		case serverErr := <-serverErrors:
+			t.Fatalf("%v; upstream error: %v; proxy output: %s; capture: %s", err, serverErr, proxyOutput, root)
+		case runnerErr := <-runnerErrors:
+			t.Fatalf("%v; proxy error: %v; proxy output: %s; capture: %s", err, runnerErr, proxyOutput, root)
+		case <-time.After(time.Second):
+			t.Fatalf("%v; proxy output: %s; capture: %s", err, proxyOutput, root)
+		}
+	}
+	defer func() { _ = client.Close() }()
+	if err := client.DoSpawnContext(ctx); err != nil {
+		t.Fatal(err)
+	}
+
+	gotInfo := client.GameData().ResourcePacksInfo
+	if gotInfo == nil || len(gotInfo.TexturePacks) != len(info.TexturePacks) {
+		t.Fatalf("downstream mixed offer = %#v, want %d entries", gotInfo, len(info.TexturePacks))
+	}
+	for index, want := range info.TexturePacks {
+		got := gotInfo.TexturePacks[index]
+		if got.UUID != want.UUID || got.Version != want.Version || got.Size != want.Size || got.DownloadURL != "" {
+			t.Fatalf("downstream offer entry %d = %#v, want UUID/version/size %s/%s/%d with empty URL", index, got, want.UUID, want.Version, want.Size)
+		}
+	}
+	gotStack := client.GameData().ResourcePackStack
+	if gotStack == nil || !reflect.DeepEqual(gotStack.TexturePacks, stack.TexturePacks) || gotStack.BaseGameVersion != stack.BaseGameVersion {
+		t.Fatalf("downstream mixed stack = %#v, want %#v", gotStack, stack)
+	}
+
+	cancel()
+	select {
+	case err := <-runnerErrors:
+		if err != nil {
+			t.Fatalf("proxy run error: %v", err)
+		}
+	case <-ctx.Done():
+		if ctx.Err() != context.Canceled {
+			t.Fatalf("wait for proxy shutdown: %v", ctx.Err())
+		}
+	}
+	select {
+	case err := <-serverErrors:
+		if err != nil {
+			t.Fatalf("upstream mixed-pack session: %v", err)
+		}
+	case <-time.After(5 * time.Second):
+		t.Fatal("upstream mixed-pack session did not finish")
+	}
+	if err := recorder.Close("closed", nil); err != nil {
+		t.Fatal(err)
+	}
+	verification, err := capture.Verify(root)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(verification.Issues) != 0 {
+		t.Fatalf("capture issues = %v", verification.Issues)
+	}
+}
+
+func mixedResourcePackGameData() minecraft.GameData {
+	return minecraft.GameData{WorldName: "Mixed resource-pack integration", EntityUniqueID: 1, EntityRuntimeID: 1}
 }
 
 func TestRecordStructuredViewIndexesBinaryFields(t *testing.T) {
