@@ -534,6 +534,14 @@ Every new entry should state the symptom, root cause, implementation commits, ev
 - Evidence and validation: owner-controlled capture `captures/session-20260921T003441Z` showed upstream threshold `1` and downstream threshold `256`, nested retention tests cover all fields, and the root loopback integration test verifies the structured comparison.
 - Status: implemented as a capture-observability correction. Choosing a different downstream compression policy remains an open design question and is not inferred from this observation.
 
+### FIX-0066 - Classify transport boundary state
+
+- Symptom: transport payload blobs preserved application-batch bytes, but a capture could not show whether compression negotiation or packet encryption had completed for the connection that produced each payload.
+- Root cause: the transport wrapper recorded operation and byte counts only. Gophertunnel applied NetworkSettings and encryption internally without exposing their current state to the capture callback.
+- Implementation: add a per-payload metadata callback to the observed network wrapper, expose connection encryption state from the vendored connection, and attach bounded compression and encryption state to downstream and upstream transport events after their connection references become available. Raw payload blobs and existing event fields remain unchanged.
+- Evidence and validation: the transport wrapper unit test verifies metadata and raw blob retention, the nested connection test covers the encryption boundary accessors, and the root loopback integration test observes metadata on both proxy channels. [`docs/research/capture-observability.md`](research/capture-observability.md) records the field meanings and remaining lower-layer boundary.
+- Status: implemented as a capture-observability correction with no wire behavior change. Early login payloads may not have derived state because the connection has not exposed the relevant boundary yet.
+
 ## Ordering safety contract
 
 The deferred-packet change is deliberately narrow. `expectedIDs` remains the only authority for what the current login state accepts. The queue scan selects the earliest packet that is currently expected, leaves packets for later states queued, and never mutates or reorders bytes on the wire. The regression tests cover canonical resource-pack order, featured early `ResourcePacksInfo`, a later-phase packet queued ahead of the current phase, and all six permutations of the three login packets.

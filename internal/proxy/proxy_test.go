@@ -704,6 +704,11 @@ func TestRunnerForwardsBidirectionalPacketsAndCapturesSession(t *testing.T) {
 	var negotiated, spawned, closed bool
 	var negotiatedClientData bool
 	var connectionViews, loginSkinMetadataViews, gameDataViews int
+	type transportMetadataState struct {
+		encryptionEnabled     bool
+		compressionNegotiated bool
+	}
+	transportMetadataObserved := map[string]transportMetadataState{}
 	type decodedPacketKey struct {
 		direction capture.Direction
 		name      string
@@ -751,6 +756,18 @@ func TestRunnerForwardsBidirectionalPacketsAndCapturesSession(t *testing.T) {
 	expectedClientData := integrationClientData()
 	if err := capture.ScanEvents(root, func(event capture.Event) error {
 		switch event.Kind {
+		case "transport.payload":
+			var data struct {
+				EncryptionState  string `json:"bedrock_encryption_state"`
+				CompressionState string `json:"bedrock_compression_state"`
+			}
+			if err := json.Unmarshal(event.Data, &data); err != nil {
+				return err
+			}
+			state := transportMetadataObserved[event.Channel]
+			state.encryptionEnabled = state.encryptionEnabled || data.EncryptionState == "enabled"
+			state.compressionNegotiated = state.compressionNegotiated || data.CompressionState == "negotiated"
+			transportMetadataObserved[event.Channel] = state
 		case "session.negotiated":
 			negotiated = true
 			type networkSettingsView struct {
@@ -858,6 +875,12 @@ func TestRunnerForwardsBidirectionalPacketsAndCapturesSession(t *testing.T) {
 	}
 	if !negotiated || !negotiatedClientData || !spawned || !closed || connectionViews != 2 || loginSkinMetadataViews != 2 || gameDataViews != 1 {
 		t.Fatalf("session evidence negotiated=%t negotiated_client_data=%t spawned=%t closed=%t connection_views=%d login_skin_metadata_views=%d game_data_views=%d", negotiated, negotiatedClientData, spawned, closed, connectionViews, loginSkinMetadataViews, gameDataViews)
+	}
+	if downstream := transportMetadataObserved["downstream"]; !downstream.encryptionEnabled || !downstream.compressionNegotiated {
+		t.Fatalf("downstream transport metadata = %#v", downstream)
+	}
+	if upstream := transportMetadataObserved["upstream"]; !upstream.encryptionEnabled || !upstream.compressionNegotiated {
+		t.Fatalf("upstream transport metadata = %#v", upstream)
 	}
 	if !downstreamPacksPolicyPreserved {
 		t.Error("downstream resource-pack offer policy was not captured")

@@ -116,6 +116,7 @@ type Conn struct {
 	// connection. It is otherwise left unused.
 	salt              []byte
 	disableEncryption bool
+	encryptionEnabled atomic.Bool
 	// verifier verifies the OpenID token encapsulated in the first chain of
 	// the Login packet sent from the connection. If nil, the legacy chain will
 	// be instead used for authentication.
@@ -302,6 +303,18 @@ func (conn *Conn) NetworkSettings() (packet.NetworkSettings, bool) {
 		return packet.NetworkSettings{}, false
 	}
 	return *conn.networkSettings, true
+}
+
+// EncryptionEnabled reports whether packet encryption has been enabled on the
+// connection after the Bedrock handshake.
+func (conn *Conn) EncryptionEnabled() bool {
+	return conn.encryptionEnabled.Load()
+}
+
+// EncryptionDisabled reports whether this connection was configured to leave
+// packet encryption disabled at the transport boundary.
+func (conn *Conn) EncryptionDisabled() bool {
+	return conn.disableEncryption
 }
 
 // StartGame starts the game for a client that connected to the server. StartGame should be called for a Conn
@@ -1062,6 +1075,7 @@ func (conn *Conn) handleServerToClientHandshake(pk *packet.ServerToClientHandsha
 	conn.enc.EnableEncryption(keyBytes)
 	conn.encMu.Unlock()
 	conn.dec.EnableEncryption(keyBytes)
+	conn.encryptionEnabled.Store(true)
 
 	// We write a ClientToServerHandshake packet (which has no payload) as a response.
 	_ = conn.WritePacket(&packet.ClientToServerHandshake{})
@@ -1829,6 +1843,7 @@ func (conn *Conn) enableEncryption(clientPublicKey *ecdsa.PublicKey) error {
 	conn.enc.EnableEncryption(keyBytes)
 	conn.encMu.Unlock()
 	conn.dec.EnableEncryption(keyBytes)
+	conn.encryptionEnabled.Store(true)
 
 	return nil
 }

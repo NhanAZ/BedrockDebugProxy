@@ -30,6 +30,10 @@ type Network struct {
 	HopFunc          func() int
 	ReadDirection    capture.Direction
 	WriteDirection   capture.Direction
+	// PayloadMetadataFunc returns bounded state associated with the connection
+	// that produced the next transport payload event. It is evaluated for each
+	// payload and supplements, but never replaces, the raw payload blob.
+	PayloadMetadataFunc func() map[string]any
 	// ConnectionContextFunc is called after a transport connection is opened.
 	// It exposes the transport lifecycle context so callers can cancel work
 	// that is waiting on the corresponding Minecraft connection.
@@ -282,11 +286,17 @@ func (c *observedConn) recordPayload(operation string, payload []byte, attempted
 		source = c.LocalAddr()
 		destination = c.RemoteAddr()
 	}
-	data, _ := json.Marshal(map[string]any{
+	dataMap := map[string]any{
 		"operation":         operation,
 		"attempted_bytes":   attempted,
 		"transferred_bytes": transferred,
-	})
+	}
+	if c.network.PayloadMetadataFunc != nil {
+		for key, value := range c.network.PayloadMetadataFunc() {
+			dataMap[key] = value
+		}
+	}
+	data, _ := json.Marshal(dataMap)
 	event := capture.Event{
 		SessionID:    c.network.SessionID,
 		ConnectionID: c.network.connectionID(),

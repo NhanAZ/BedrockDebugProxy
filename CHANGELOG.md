@@ -12,6 +12,7 @@ Detailed rationale remains in [`docs/audits/`](docs/audits/).
 
 ### Changed
 
+- Transport payload events now include bounded per-connection compression and encryption state when that state is observable, while retaining the original raw application-batch blob.
 - `session.negotiated` capture events now distinguish the protocol implementation version from the game version and device OS reported in each connection's `ClientData`, including explicit mismatch booleans for local parity investigations.
 - `session.negotiated` capture events now include bounded compression and client-throttle settings for both connections, with an explicit match flag for per-session parity analysis.
 - Updated the compiled Bedrock game-version metadata to 1.26.51 while retaining protocol 2193 and the reviewed 1.26.50 packet definitions. Mojang's 1.26.51 release reports no packet changes, so authenticated upstream login metadata now advertises 1.26.51 without changing forwarded packet bytes.
