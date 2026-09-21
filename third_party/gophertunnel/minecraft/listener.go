@@ -113,6 +113,9 @@ type ListenConfig struct {
 	// FetchResourcePacks. This allows a terminating bridge to retain upstream
 	// offer policy without forwarding unusable URLs or stale pack entries.
 	FetchResourcePacksInfo func(identityData login.IdentityData, clientData login.ClientData) *packet.ResourcePacksInfo
+	// FetchRawResourcePacksInfo selects an exact wire offer when the prepared
+	// downstream offer is equivalent and the protocol matches.
+	FetchRawResourcePacksInfo func(identityData login.IdentityData, clientData login.ClientData) ([]byte, int32)
 	// FetchResourcePackStack determines the ResourcePackStack sent after the
 	// client has downloaded the offered packs. If it returns nil, the listener
 	// builds its normal stack from the downloaded packs.
@@ -457,6 +460,7 @@ func (listener *Listener) createConn(netConn net.Conn) {
 	conn.fetchResourcePacks = listener.cfg.FetchResourcePacks
 	conn.deferResourcePackOfferUntilClientCacheStatus = listener.cfg.DeferResourcePackOfferUntilClientCacheStatus
 	conn.fetchResourcePacksInfo = listener.cfg.FetchResourcePacksInfo
+	conn.fetchRawResourcePacksInfo = listener.cfg.FetchRawResourcePacksInfo
 	conn.fetchResourcePackStack = listener.cfg.FetchResourcePackStack
 	conn.fetchRawResourcePackStack = listener.cfg.FetchRawResourcePackStack
 	conn.resourcePackDelivery = listener.cfg.ResourcePackDelivery.normalized()

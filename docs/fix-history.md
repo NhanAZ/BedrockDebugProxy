@@ -838,6 +838,14 @@ Every new entry should state the symptom, root cause, implementation commits, ev
 - Evidence and validation: FIX-0083 through FIX-0086 and the current `internal/proxy/proxy_test.go` loopback assertions establish the forwarding and failure-recording behavior. This documentation-only correction does not change runtime behavior, packet bytes, or capture schema.
 - Status: documentation-only provenance clarification. The approved radius after a later request remains server-controlled and public-server validation is pending.
 
+### FIX-0104 - Preserve equivalent raw resource-pack offers
+
+- Symptom: the terminating listener retained decoded `ResourcePacksInfo` metadata but always serialized a new offer, leaving a byte-preserving gap for offers that required no URL or list transformation.
+- Root cause: the upstream raw offer was not retained in `GameData`, and the listener had no safe way to select it after archive-backed pack preparation.
+- Implementation: retain the complete raw `ResourcePacksInfo`, expose its source protocol through a narrow listener callback, and use the raw packet only after the prepared typed payload matches exactly. URL replacement, offer changes, protocol mismatches, and write failures keep the typed fallback.
+- Evidence and validation: the existing resource-pack stack boundary and same-protocol raw-forwarding decision establish the safety constraints. Nested gophertunnel tests cover retention and exact reuse, and the root loopback integration test verifies downstream raw bytes. No capture schema or packet policy changed.
+- Status: implemented with deterministic local coverage. Mixed URL and encrypted real-client resource-pack validation remains pending.
+
 ## Ordering safety contract
 
 The deferred-packet change is deliberately narrow. `expectedIDs` remains the only authority for what the current login state accepts. The queue scan selects the earliest packet that is currently expected, leaves packets for later states queued, and never mutates or reorders bytes on the wire. The regression tests cover canonical resource-pack order, featured early `ResourcePacksInfo`, a later-phase packet queued ahead of the current phase, and all six permutations of the three login packets.

@@ -190,6 +190,9 @@ type Conn struct {
 	// fetchResourcePacksInfo selects upstream offer metadata for a listener
 	// connection.
 	fetchResourcePacksInfo func(identityData login.IdentityData, clientData login.ClientData) *packet.ResourcePacksInfo
+	// fetchRawResourcePacksInfo selects an exact wire offer for the listener
+	// connection when the prepared downstream offer remains equivalent.
+	fetchRawResourcePacksInfo func(identityData login.IdentityData, clientData login.ClientData) ([]byte, int32)
 	// fetchResourcePackStack selects an exact stack for the listener connection.
 	fetchResourcePackStack func(identityData login.IdentityData, clientData login.ClientData) *packet.ResourcePackStack
 	// fetchRawResourcePackStack selects an exact wire stack and protocol for the
@@ -865,7 +868,7 @@ func (conn *Conn) handlePacket(pk packet.Packet, raw *packetData) error {
 	case *packet.PlayStatus:
 		return conn.handlePlayStatus(pk)
 	case *packet.ResourcePacksInfo:
-		return conn.handleResourcePacksInfo(pk)
+		return conn.handleResourcePacksInfo(pk, raw)
 	case *packet.ResourcePackDataInfo:
 		return conn.handleResourcePackDataInfo(pk)
 	case *packet.ResourcePackChunkData:
@@ -1031,6 +1034,12 @@ func (conn *Conn) sendResourcePackOffer() error {
 		conn.rawResourcePackStack = append([]byte(nil), raw...)
 		conn.rawResourcePackStackProtocolID = protocolID
 	}
+	var rawResourcePacksInfo []byte
+	var rawResourcePacksInfoProtocolID int32
+	if conn.fetchRawResourcePacksInfo != nil {
+		rawResourcePacksInfo, rawResourcePacksInfoProtocolID = conn.fetchRawResourcePacksInfo(conn.identityData, conn.clientData)
+		rawResourcePacksInfo = append([]byte(nil), rawResourcePacksInfo...)
+	}
 	pk := &packet.ResourcePacksInfo{TexturePackRequired: conn.texturePacksRequired, ForceDisableVibrantVisuals: conn.forceDisableVibrantVisuals}
 	var advertisedPacks []protocol.TexturePackInfo
 	if conn.fetchResourcePacksInfo != nil {
@@ -1070,10 +1079,30 @@ func (conn *Conn) sendResourcePackOffer() error {
 		pk.TexturePacks = append(pk.TexturePacks, texturePack)
 	}
 	// Finally we send the packet after the play status.
+	if len(rawResourcePacksInfo) > 0 && rawResourcePacksInfoProtocolID == conn.proto.ID() && conn.rawPacketMatchesTyped(rawResourcePacksInfo, pk, packet.IDResourcePacksInfo) {
+		if err := conn.writeRawStartupPacket(rawResourcePacksInfo, packet.IDResourcePacksInfo); err == nil {
+			return nil
+		} else {
+			conn.log.Warn("write retained ResourcePacksInfo bytes", "err", err)
+		}
+	}
 	if err := conn.WritePacket(pk); err != nil {
 		return fmt.Errorf("send ResourcePacksInfo: %w", err)
 	}
 	return nil
+}
+
+// rawPacketMatchesTyped verifies the payload of a retained packet against the
+// prepared typed packet before allowing the retained header and bytes through.
+// This keeps URL replacement and offer-list changes on the typed path.
+func (conn *Conn) rawPacketMatchesTyped(raw []byte, pk packet.Packet, expectedID uint32) bool {
+	data, err := parseData(append([]byte(nil), raw...), nil)
+	if err != nil || data.h.PacketID != expectedID || pk == nil {
+		return false
+	}
+	var payload bytes.Buffer
+	pk.Marshal(conn.proto.NewWriter(&payload, conn.shieldID.Load()))
+	return bytes.Equal(data.payload.Bytes(), payload.Bytes())
 }
 
 func matchAdvertisedTexturePack(advertised []protocol.TexturePackInfo, used []bool, pack *resource.Pack) (protocol.TexturePackInfo, bool) {
@@ -1154,8 +1183,12 @@ func (conn *Conn) handleClientCacheStatus(pk *packet.ClientCacheStatus) error {
 
 // handleResourcePacksInfo handles a ResourcePacksInfo packet sent by the server. The client responds by
 // sending the packs it needs downloaded.
-func (conn *Conn) handleResourcePacksInfo(pk *packet.ResourcePacksInfo) error {
+func (conn *Conn) handleResourcePacksInfo(pk *packet.ResourcePacksInfo, raw *packetData) error {
 	conn.gameData.ResourcePacksInfo = cloneResourcePacksInfo(pk)
+	conn.gameData.RawProtocolID = conn.proto.ID()
+	if raw != nil {
+		conn.gameData.RawResourcePacksInfo = append([]byte(nil), raw.full...)
+	}
 	// First create a new resource pack queue with the information in the packet so we can download them
 	// properly later.
 	totalPacks := len(pk.TexturePacks)
@@ -1712,6 +1745,7 @@ func (conn *Conn) handleStartGame(pk *packet.StartGame, raw *packetData) error {
 		RawStartGame:                     slices.Clone(conn.gameData.RawStartGame),
 		RawVoxelShapes:                   slices.Clone(conn.gameData.RawVoxelShapes),
 		RawItemRegistry:                  slices.Clone(conn.gameData.RawItemRegistry),
+		RawResourcePacksInfo:             slices.Clone(conn.gameData.RawResourcePacksInfo),
 		RawResourcePackStack:             slices.Clone(conn.gameData.RawResourcePackStack),
 		ResourcePacksInfo:                conn.gameData.ResourcePacksInfo,
 		ResourcePackStack:                conn.gameData.ResourcePackStack,

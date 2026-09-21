@@ -460,6 +460,7 @@ func TestRunnerForwardsBidirectionalPacketsAndCapturesSession(t *testing.T) {
 		WorldTemplateUUID:          uuid.MustParse("33333333-3333-4333-8333-333333333333"),
 		WorldTemplateVersion:       "integration-template",
 	}
+	integrationResourcePacksInfoRaw := integrationRawPacket(t, integrationResourcePacksInfo)
 	const integrationCacheHash uint64 = 0x1122334455667788
 	integrationCachePayload := []byte{0x91, 0x92, 0x93}
 	integrationCacheMissPayload := []byte{0xa1, 0xa2, 0xa3, 0xa4}
@@ -853,6 +854,10 @@ func TestRunnerForwardsBidirectionalPacketsAndCapturesSession(t *testing.T) {
 		info.WorldTemplateVersion != integrationResourcePacksInfo.WorldTemplateVersion {
 		_ = client.Close()
 		t.Fatalf("downstream resource-pack offer metadata was not preserved: %#v", info)
+	}
+	if !bytes.Equal(client.GameData().RawResourcePacksInfo, integrationResourcePacksInfoRaw) {
+		_ = client.Close()
+		t.Fatal("downstream ResourcePacksInfo wire bytes were not preserved")
 	}
 	if !bytes.Equal(client.GameData().RawItemRegistry, integrationItemRegistryRaw) {
 		_ = client.Close()

@@ -16,7 +16,7 @@ Dialled connections now retain a copy of the complete `ResourcePackStack` in `Ga
 
 The retained value is cloned at both connection boundaries. The fix preserves texture-pack order, base game version, experiments, and editor and toggle flags without changing resource-pack archive bytes or adding a second transfer path.
 
-The bridge also retains the complete encoded packet and the protocol ID that produced it. The listener stores that source protocol separately from its downstream `GameData` and, when the upstream and downstream protocol IDs match, validates the packet ID and writes those original bytes. A protocol mismatch selects the cloned typed stack, while an invalid retained packet logs a warning and then uses that same fallback. `ResourcePacksInfo` remains a separate typed rebuild boundary because its downstream URLs must point to archives that the bridge can serve.
+The bridge also retains the complete encoded packet and the protocol ID that produced it. The listener stores that source protocol separately from its downstream `GameData` and, when the upstream and downstream protocol IDs match, validates the packet ID and writes those original bytes. A protocol mismatch selects the cloned typed stack, while an invalid retained packet logs a warning and then uses that same fallback. `ResourcePacksInfo` has the same raw-preservation capability when its prepared downstream payload is equivalent, while URL or offer changes still require its typed rebuild boundary.
 
 ## Evidence and provenance
 
@@ -33,4 +33,4 @@ The bridge also retains the complete encoded packet and the protocol ID that pro
 
 ## Limitations
 
-`ResourcePacksInfo` metadata is now retained on dialled `GameData` and can be supplied to the listener through a narrow callback. The listener still rebuilds the pack entries from archive-backed resources so it does not forward stale URLs or entries it cannot serve. Standalone listener callers without an upstream offer continue to use their configured policy. These are separate resource-pack boundaries from `ResourcePackStack` preservation.
+`ResourcePacksInfo` metadata is retained on dialled `GameData` and can be supplied to the listener through narrow callbacks. When the prepared downstream offer has the same packet payload and protocol, the listener now reuses the retained raw bytes. It still rebuilds the typed packet when URL entries are replaced, an offer changes, or the protocol differs, so it does not forward stale URLs or entries it cannot serve. Standalone listener callers without an upstream offer continue to use their configured policy. These remain separate resource-pack boundaries from `ResourcePackStack` preservation.
