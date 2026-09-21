@@ -152,6 +152,23 @@ func (c *connectionContext) Clear() {
 	c.mu.Unlock()
 }
 
+// connectionLifecycleContext returns the current downstream transport context.
+// The observed Network wrapper reports its context after Listener.Accept returns,
+// but resource-pack callbacks run inside the listener login sequence before that
+// point. The connection created by the listener already owns the same cancellable
+// context, so use it as the early-login fallback.
+func connectionLifecycleContext(tracked *connectionContext, connection interface{ Context() context.Context }) context.Context {
+	if tracked != nil {
+		if ctx, _ := tracked.Get(); ctx != nil {
+			return ctx
+		}
+	}
+	if connection != nil {
+		return connection.Context()
+	}
+	return nil
+}
+
 // linkedConnectionContext cancels work when either the proxy run or the
 // physical downstream connection ends.
 func linkedConnectionContext(parent, connection context.Context) (context.Context, func()) {
@@ -318,7 +335,7 @@ func (r *Runner) Run(ctx context.Context) error {
 		FetchResourcePacks: func(identityData login.IdentityData, clientData login.ClientData, _ []*resource.Pack) []*resource.Pack {
 			state := getAcceptState()
 			state.slot.once.Do(func() {
-				clientContext, _ := downstreamContext.Get()
+				clientContext := connectionLifecycleContext(downstreamContext, state.downstreamConn.Load())
 				connectCtx, releaseContext := linkedConnectionContext(runCtx, clientContext)
 				defer releaseContext()
 				state.upstreamLogger = slog.New(bedrock.NewCaptureLogHandler(r.config.Recorder, failures, sessionID, state.upstreamID, "upstream", live.LibraryLog))

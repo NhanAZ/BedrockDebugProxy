@@ -32,6 +32,7 @@ Detailed rationale remains in [`docs/audits/`](docs/audits/).
 - URL-prefetched resource packs are now merged with non-URL packs in the upstream offer order instead of replacing the complete list and dropping RakNet-delivered entries.
 - URL-prefetched resource packs now bound the HTTP response body to the advertised compressed size before parsing, including responses without a trustworthy Content-Length.
 - URL-prefetched resource-pack requests now stop when their connection context is canceled, so closed sessions do not keep CDN fetches alive through the outer timeout.
+- Early-login resource-pack and upstream work now uses the listener connection context before the observing wrapper is accepted, so a client disconnect during login cancels in-flight work promptly.
 - Downstream resource-pack offers now retain per-pack content identity, sub-pack, script, addon, and RTX metadata while still rebuilding entries from proxy-served archives.
 - Terminating bridges now retain and reuse raw `DimensionData` and `ItemRegistry` startup packets when the downstream protocol matches, avoiding wire differences caused by typed re-serialization of NBT maps.
 - Terminating bridges now forward each observed downstream `RequestChunkRadius` to the paired upstream connection while retaining the existing 16/16 initial fallback.
