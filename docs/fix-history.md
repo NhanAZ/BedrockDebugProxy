@@ -798,6 +798,14 @@ Every new entry should state the symptom, root cause, implementation commits, ev
 - Evidence and validation: gophertunnel and the observing wrapper expose `ClientGUID` and `PublicKey` at the `net.Conn` boundary. The bedrock network regression test verifies both fields on `transport.connection_open`; no network or public server was contacted.
 - Status: implemented as a capture-observability correction. The fields describe capabilities, not a transport fingerprint or raw datagram behavior.
 
+### FIX-0100 - Document typed additional-packet boundary
+
+- Symptom: the raw forwarding adapter's `PacketRead` API can return a typed packet without raw bytes after gophertunnel has consumed it during login or produced it as an additional packet during protocol conversion.
+- Root cause: the dependency's login queue and conversion interface intentionally expose typed values after the original read boundary. The current protocol 2193 implementation uses identity conversion, so no additional converted packet is currently observed in the supported tree.
+- Implementation: document the confirmed raw-observation boundary and the future multi-packet conversion limitation in [`docs/research/capture-observability.md`](research/capture-observability.md). No runtime behavior changes and no synthetic raw bytes are introduced.
+- Evidence and validation: the in-tree `minecraft/raw_packet.go`, `minecraft/packet.go`, `minecraft/conn.go`, and `minecraft/protocol.go` source paths were reviewed. The current identity conversion and the packet-hook ordering are confirmed; future adapter usage remains unknown.
+- Status: documentation-only research clarification. No live or public-server validation was performed.
+
 ## Ordering safety contract
 
 The deferred-packet change is deliberately narrow. `expectedIDs` remains the only authority for what the current login state accepts. The queue scan selects the earliest packet that is currently expected, leaves packets for later states queued, and never mutates or reorders bytes on the wire. The regression tests cover canonical resource-pack order, featured early `ResourcePacksInfo`, a later-phase packet queued ahead of the current phase, and all six permutations of the three login packets.
