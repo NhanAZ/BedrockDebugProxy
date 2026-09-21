@@ -30,6 +30,12 @@ The local PocketMine console also emitted `Unexpected JSON property` warnings fo
 
 The 1.26.51 vanilla-client loopback run on 2026-09-21 exposed a second local parity issue. The proxied offline login contained a self-signed token `mid` derived from the forwarded `IdentityData.PlayFabID`, while the forwarded `ClientData.PlayFabId` remained the client value. ProxyFingerprint therefore reported `auth_client_playfab_mismatch`. The direct vanilla shape has no authenticated `mid` claim in this offline path. The unauthenticated dial helper cleared XUID and legacy title ID but not the two PlayFab identity fields. The focused fix clears all four authentication-bound fields before `EncodeOffline` and leaves the operator's display name and UUID intact.
 
+## Post-fix vanilla-client loopback
+
+After the fix was rebuilt into `bin/bedrock-debug-proxy.exe`, the real Windows Bedrock client signed in as `SampleAccount` through the proxy to the operator-controlled PocketMine server. The session ran for approximately 220.9 seconds, completed login, resource-pack negotiation, spawn, normal movement, and quit, and captured 4,350 packets. The proxy and upstream both negotiated protocol 2193 and game version 1.26.51 with Windows device metadata.
+
+The closed ProxyFingerprint report for this run contained no `auth_client_playfab_mismatch` signal. Its only heuristic signals were `non_public_peer` and `non_full_authentication`, both expected for the loopback server configured with `xbox-auth=off` and `verify-xuid=false`. The upstream self-signed identity fields were empty while the forwarded ClientData remained structurally valid. This is evidence that the local offline identity-parity defect is fixed for a real vanilla client. It is not evidence about a public server's anti-cheat or acceptance policy.
+
 ## Validation
 
 - `go test ./internal/proxy -run '^TestRunnerForwardsBidirectionalPacketsAndCapturesSession$' -count=1 -v` passed after the regression assertion was added.
