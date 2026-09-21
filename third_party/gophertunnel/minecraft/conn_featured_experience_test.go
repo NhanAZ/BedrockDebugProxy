@@ -3,6 +3,7 @@ package minecraft
 import (
 	"bytes"
 	"context"
+	"fmt"
 	"io"
 	"log/slog"
 	"reflect"
@@ -55,6 +56,56 @@ func TestHandleNetworkSettingsRetainsNegotiatedValues(t *testing.T) {
 	got, ok := conn.NetworkSettings()
 	if !ok || !reflect.DeepEqual(&got, want) {
 		t.Fatalf("retained NetworkSettings = %#v, available=%t, want %#v", got, ok, want)
+	}
+}
+
+func TestDeferredResourcePackOfferWaitsForClientCacheStatus(t *testing.T) {
+	for _, enabled := range []bool{false, true} {
+		enabled := enabled
+		t.Run(fmt.Sprintf("enabled_%t", enabled), func(t *testing.T) {
+			conn := newLoginTestConn()
+			conn.deferResourcePackOfferUntilClientCacheStatus = true
+
+			if err := conn.handleClientToServerHandshake(); err != nil {
+				t.Fatalf("handle ClientToServerHandshake: %v", err)
+			}
+			if !conn.resourcePackOfferPending {
+				t.Fatal("resource-pack offer was not deferred")
+			}
+			if len(conn.bufferedSend) != 1 {
+				t.Fatalf("buffered packets before ClientCacheStatus = %d, want PlayStatus only", len(conn.bufferedSend))
+			}
+			first, err := parseData(conn.bufferedSend[0], nil)
+			if err != nil {
+				t.Fatalf("parse deferred handshake output: %v", err)
+			}
+			if first.h.PacketID != packet.IDPlayStatus {
+				t.Fatalf("first packet ID = %d, want PlayStatus %d", first.h.PacketID, packet.IDPlayStatus)
+			}
+
+			if err := conn.handleClientCacheStatus(&packet.ClientCacheStatus{Enabled: enabled}); err != nil {
+				t.Fatalf("handle ClientCacheStatus: %v", err)
+			}
+			if conn.resourcePackOfferPending {
+				t.Fatal("resource-pack offer remained deferred after ClientCacheStatus")
+			}
+			if conn.cacheEnabled != enabled {
+				t.Fatalf("cache enabled = %t, want %t", conn.cacheEnabled, enabled)
+			}
+			if len(conn.bufferedSend) != 2 {
+				t.Fatalf("buffered packets after ClientCacheStatus = %d, want PlayStatus and ResourcePacksInfo", len(conn.bufferedSend))
+			}
+			second, err := parseData(conn.bufferedSend[1], nil)
+			if err != nil {
+				t.Fatalf("parse resource-pack offer output: %v", err)
+			}
+			if second.h.PacketID != packet.IDResourcePacksInfo {
+				t.Fatalf("second packet ID = %d, want ResourcePacksInfo %d", second.h.PacketID, packet.IDResourcePacksInfo)
+			}
+			if !conn.isExpectedPacket(packet.IDResourcePackClientResponse) || conn.isExpectedPacket(packet.IDClientCacheStatus) {
+				t.Fatalf("unexpected login state after deferred offer: %#v", conn.expectedIDs.Load())
+			}
+		})
 	}
 }
 
