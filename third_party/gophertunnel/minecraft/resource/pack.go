@@ -51,6 +51,22 @@ func ReadPath(path string) (*Pack, error) {
 // zip archive where the manifest.json file is inside a subdirectory rather than the root itself. If the resource
 // pack is not a valid zip or there is no manifest.json file, an error is returned.
 func ReadURL(url string) (*Pack, error) {
+	return readURL(url, 0, false)
+}
+
+// ReadURLLimited downloads a resource pack from url while allowing at most
+// maxBytes of response data. The limit applies to the bytes actually read,
+// not only to the HTTP Content-Length header. This is useful when a caller
+// has a server-advertised archive size that must bound local disk and memory
+// use before the archive is parsed.
+func ReadURLLimited(url string, maxBytes int64) (*Pack, error) {
+	if maxBytes < 0 {
+		return nil, fmt.Errorf("resource pack download limit must not be negative: %d", maxBytes)
+	}
+	return readURL(url, maxBytes, true)
+}
+
+func readURL(url string, maxBytes int64, limited bool) (*Pack, error) {
 	resp, err := http.Get(url)
 	if err != nil {
 		return nil, fmt.Errorf("download resource pack: %w", err)
@@ -59,12 +75,39 @@ func ReadURL(url string) (*Pack, error) {
 	if resp.StatusCode != http.StatusOK {
 		return nil, fmt.Errorf("download resource pack: %v (%d)", resp.Status, resp.StatusCode)
 	}
-	pack, err := Read(resp.Body)
+	var body io.Reader = resp.Body
+	var counted *limitedReader
+	if limited {
+		if resp.ContentLength > maxBytes {
+			return nil, fmt.Errorf("resource pack response size %d exceeds limit %d", resp.ContentLength, maxBytes)
+		}
+		readLimit := maxBytes
+		if readLimit < int64(^uint64(0)>>1) {
+			readLimit++
+		}
+		counted = &limitedReader{Reader: io.LimitReader(resp.Body, readLimit)}
+		body = counted
+	}
+	pack, err := Read(body)
+	if limited && counted.n > maxBytes {
+		return nil, fmt.Errorf("resource pack response exceeds limit %d", maxBytes)
+	}
 	if err != nil {
 		return nil, err
 	}
 	pack.downloadURL = url
 	return pack, nil
+}
+
+type limitedReader struct {
+	io.Reader
+	n int64
+}
+
+func (reader *limitedReader) Read(p []byte) (int, error) {
+	n, err := reader.Reader.Read(p)
+	reader.n += int64(n)
+	return n, err
 }
 
 // MustReadPath compiles a resource pack found at the path passed. The resource pack must either be a zip
