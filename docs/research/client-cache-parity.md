@@ -7,8 +7,8 @@ the downstream Bedrock client advertises?
 
 ## Confirmed observation
 
-The owner-controlled capture `captures/session-20260921T122228Z` records a
-different `ClientCacheStatus` value on the two connections. The downstream raw
+The pre-FIX-0091 owner-controlled capture `captures/session-20260921T122228Z`
+records a different `ClientCacheStatus` value on the two connections. The downstream raw
 packet with ID 129 at sequence 197 has a one-byte payload of `01`, which means
 the vanilla Windows client enabled the blob cache. The upstream raw packet with
 ID 129 at sequence 30 has a one-byte payload of `00`, which means the proxy's
@@ -17,8 +17,9 @@ pattern appears throughout the completed Windows client captures. The capture
 also records `downstream_client_cache_enabled: true` and
 `upstream_client_cache_enabled: false` in `session.spawned`.
 
-This is a confirmed wire and session-metadata difference. It is not inferred
-from packet counts or from a decoder summary.
+This is a confirmed historical wire and session-metadata difference. It is not
+inferred from packet counts or from a decoder summary. It must not be read as
+evidence that the current deferred-offer path still sends `false` upstream.
 
 ## Source path
 
@@ -31,8 +32,10 @@ from packet counts or from a decoder summary.
   upstream `PlayStatusLoginSuccess`.
 - `third_party/gophertunnel/minecraft/dial.go` initializes a dialled
   connection from `Dialer.EnableClientCache`, whose zero value is false.
-- `internal/proxy/proxy.go` does not set `EnableClientCache` in
-  `connectUpstream`, so the upstream value is currently the Dialer default.
+- `internal/proxy/proxy.go` passes the listener's observed capability through
+  `connectUpstream` after the deferred-offer boundary. The old capture was
+  produced before that path existed, when the upstream value was the Dialer
+  default.
 
 The pinned dependency source used for this review is gophertunnel commit
 `283a5a97dfe65da94bcc0b401807f6aefa9e72ee`. No external source code was copied.
@@ -74,10 +77,14 @@ mode retain their existing ordering.
 
 ## Evidence classification
 
-- Confirmed: Windows client captures in this repository send downstream
-  `ClientCacheStatus=true` while the current upstream Dialer sends false.
+- Confirmed historical evidence: the pre-FIX-0091 Windows capture sends
+  downstream `ClientCacheStatus=true` while the old upstream Dialer sends
+  `false`.
 - Confirmed: the current proxy preserves both raw packets and records both
   connection values in the closed capture.
+- Confirmed: the current owner-controlled loopback integration passes the
+  observed capability to the upstream Dialer and records matching cache
+  metadata on both sides.
 - Confirmed: the Mojang 1.26.50 protocol reference defines packet 129 as a
   client-reported capability and does not provide a platform default.
 - Confirmed: the owner-controlled PocketMine login path sends its resource-pack
