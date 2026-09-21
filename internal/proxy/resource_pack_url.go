@@ -257,7 +257,7 @@ func (cache *urlResourcePackCache) download(advertised protocol.TexturePackInfo)
 	default:
 	}
 
-	pack, err := resource.ReadURLLimited(advertised.DownloadURL, int64(advertised.Size))
+	pack, err := resource.ReadURLLimitedContext(cache.ctx, advertised.DownloadURL, int64(advertised.Size))
 	if err != nil {
 		return nil, fmt.Errorf("download resource pack from %q: %w", advertised.DownloadURL, err)
 	}

@@ -630,6 +630,14 @@ Every new entry should state the symptom, root cause, implementation commits, ev
 - Evidence and validation: the loopback URL-cache regression serves a chunked response containing a valid archive followed by extra bytes and confirms that no pack is returned. The vendored patch note and resource-pack documentation record the project-specific bounded reader. Full quality and diff checks remain required before commit.
 - Status: implemented in the source tree with focused automated coverage. Real-client HTTP resource-pack validation remains pending.
 
+### FIX-0079 - Cancel URL resource-pack fetches with the connection
+
+- Symptom: an in-flight URL resource-pack fetch could continue after the downstream connection or upstream login context had been canceled, delaying shutdown and retaining HTTP and archive resources until the outer timeout.
+- Root cause: the URL adapter checked its context before starting a download, but the vendored `resource.ReadURL` path used `http.Get` without a request context.
+- Implementation: add `resource.ReadURLLimitedContext` and pass the per-connection cache context through the bounded URL reader. Request cancellation now stops the HTTP request and body read while preserving the existing raw offer and cache error evidence.
+- Evidence and validation: the loopback cache regression holds an HTTP response open, cancels the cache context, and confirms the worker exits with a context-canceled error. The size-bound test and existing URL offer tests remain unchanged.
+- Status: implemented in the source tree with focused automated coverage. Real-client HTTP resource-pack validation remains pending.
+
 ## Ordering safety contract
 
 The deferred-packet change is deliberately narrow. `expectedIDs` remains the only authority for what the current login state accepts. The queue scan selects the earliest packet that is currently expected, leaves packets for later states queued, and never mutates or reorders bytes on the wire. The regression tests cover canonical resource-pack order, featured early `ResourcePacksInfo`, a later-phase packet queued ahead of the current phase, and all six permutations of the three login packets.

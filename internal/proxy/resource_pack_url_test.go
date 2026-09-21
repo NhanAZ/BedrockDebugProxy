@@ -139,6 +139,49 @@ func TestURLResourcePackCacheBoundsResponseBodyToAdvertisedSize(t *testing.T) {
 	}
 }
 
+func TestURLResourcePackCacheCancelsInFlightDownload(t *testing.T) {
+	started := make(chan struct{})
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		close(started)
+		<-r.Context().Done()
+	}))
+	defer server.Close()
+
+	info := &packet.ResourcePacksInfo{TexturePacks: []protocol.TexturePackInfo{{
+		UUID:        uuid.MustParse("11111111-1111-1111-1111-111111111111"),
+		Version:     "1.0.0",
+		Size:        1,
+		DownloadURL: server.URL,
+	}}}
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+	cache := newURLResourcePackCache(ctx)
+	done := make(chan struct{})
+	go func() {
+		cache.Observe(packet.Header{PacketID: packet.IDResourcePacksInfo}, encodeResourcePacksInfo(t, info))
+		close(done)
+	}()
+	select {
+	case <-started:
+	case <-time.After(time.Second):
+		t.Fatal("resource-pack request did not start")
+	}
+	cancel()
+	select {
+	case <-done:
+	case <-time.After(time.Second):
+		t.Fatal("resource-pack download did not stop after cancellation")
+	}
+	key := minecraft.ResourcePackCacheKey{UUID: info.TexturePacks[0].UUID, Version: "1.0.0", Size: 1}
+	pack, err := cache.Load(context.Background(), key)
+	if err == nil || !strings.Contains(err.Error(), "context canceled") {
+		t.Fatalf("canceled response error = %v, want context canceled", err)
+	}
+	if pack != nil {
+		t.Fatal("canceled response returned a resource pack")
+	}
+}
+
 func TestURLResourcePackCacheDownloadsPacksConcurrentlyInOfferOrder(t *testing.T) {
 	firstUUID := uuid.MustParse("11111111-1111-1111-1111-111111111111")
 	secondUUID := uuid.MustParse("22222222-2222-2222-2222-222222222222")
