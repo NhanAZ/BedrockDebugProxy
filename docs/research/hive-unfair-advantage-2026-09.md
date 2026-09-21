@@ -25,7 +25,9 @@ A repository-wide search found 23 Hive captures containing the upstream display 
 
 The successful capture `captures/session-20260917T034859Z` is the closest comparison. It also contains the `NhanAZ` downstream and `SrDuck84` upstream identity pattern, the same Hive selector, protocol 2193, and the same upstream game baseline. Its options are not identical: it used a different listen/authentication setup, did not follow transfers, and enabled pack decryption. Those differences prevent a claim that the two sessions were identical.
 
-The clearest client-side difference is in the login metadata. All successful Hive captures inspected for this comparison advertise client game version `1.26.50`; the affected capture advertises `1.26.51`. The Hive proxy baseline remains protocol 2193 and game version `1.26.50` in both manifests.
+The clearest client-side difference is in the login metadata. All successful Hive captures inspected for this comparison advertise client game version `1.26.50`; the affected capture advertises `1.26.51`. A direct read of the affected capture's login events further shows downstream `ClientData.GameVersion = 1.26.51` and authenticated upstream `ClientData.GameVersion = 1.26.50`; both sides use protocol 2193 and Android device OS metadata. The old proxy constant therefore introduced a concrete metadata mismatch, but the capture does not prove that this mismatch caused the ban.
+
+The local compatibility update documented in [`protocol-1.26.51.md`](protocol-1.26.51.md) changes the selected game-version metadata to 1.26.51 because Mojang reports no packet changes for that release. It is a parity correction, not evidence of a Hive detector or a way to evade enforcement.
 
 The successful viewer capture was generated at commit `76dd00fd0ae105a8bc44d3c8182787c4f54f6e51`. A source comparison from that commit to the affected commit found no changes under `internal/proxy`, `internal/bedrock`, `cmd`, or `third_party`. Recent viewer-only commits therefore do not explain the network outcome.
 
@@ -61,12 +63,14 @@ No indexed public result was found that names BedrockDebugProxy, `SrDuck84`, or 
 4. The affected session is the only inspected session with client metadata advertising `1.26.51`.
 5. The recent viewer commits did not change the runtime proxy, protocol, or bridge packages.
 6. Public Hive discussions contain other reports of `Unfair Advantage` false positives and VPN/proxy misclassification, but none identifies this proxy or identity pattern.
+7. The affected capture contains a downstream/upstream ClientData game-version mismatch of 1.26.51 versus 1.26.50 that was not visible in the original compact negotiation event.
 
 ### Plausible but unproven
 
 1. Hive may have changed a server-side proxy blocklist or anti-cheat detector after the earlier successful sessions.
 2. The `SrDuck84` upstream identity and the two-session authenticated proxy boundary may be an interaction factor that became detectable after such a change.
 3. Client 1.26.51 may have changed timing or behavior that interacts with the proxy boundary, even though the protocol ID and packet schemas did not change.
+4. The observed upstream ClientData version mismatch may have been one interaction signal, but no server-side evidence ties it to the punishment.
 
 ### Not established
 
@@ -81,7 +85,7 @@ No indexed public result was found that names BedrockDebugProxy, `SrDuck84`, or 
 
 The previous statement that `SrDuck84` could be excluded was too strong. The correct conclusion is that `SrDuck84` remains a leading interaction hypothesis, but the existing captures disprove the simpler claim that this identity alone always causes a ban.
 
-No runtime change is justified by this evidence. Preserve the affected capture, do not retest a punished account or substitute another account, and treat any future Hive validation as incomplete unless current policy review and explicit authorization permit the proxy connection. If authorized testing becomes available, compare a stamped binary, client version, downstream and upstream login metadata, timing, and the server response without attempting to evade enforcement.
+The version-metadata correction is justified as local client parity work, not as a punishment solution. Preserve the affected capture, do not retest a punished account or substitute another account, and treat any future Hive validation as incomplete unless current policy review and explicit authorization permit the proxy connection. If authorized testing becomes available, compare a stamped binary, client version, downstream and upstream login metadata, timing, and the server response without attempting to evade enforcement.
 
 ## Official appeal and support routes
 

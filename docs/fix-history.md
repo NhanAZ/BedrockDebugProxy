@@ -462,6 +462,14 @@ Every new entry should state the symptom, root cause, implementation commits, ev
 - Evidence and validation: focused analysis and proxy integration assertions cover both matching and mismatching metadata shapes. This is a capture-observability change and does not alter forwarded packet bytes.
 - Status: implemented with no wire-behavior change.
 
+### FIX-0057 - Align authenticated ClientData metadata with Bedrock 1.26.51
+
+- Symptom: the affected local Hive capture showed downstream ClientData game version `1.26.51` but authenticated upstream ClientData game version `1.26.50`, even though both sides used protocol 2193 and Android device metadata.
+- Root cause: gophertunnel's authenticated Android login path assigns `protocol.CurrentVersion` to upstream ClientData, and the selected local protocol constant still advertised `1.26.50`.
+- Implementation: update the selected game-version metadata to `1.26.51` while retaining protocol 2193 and the reviewed 1.26.50 packet definitions. Mojang's 1.26.51 release reports no packet changes.
+- Evidence and validation: [`docs/research/protocol-1.26.51.md`](research/protocol-1.26.51.md), the affected closed capture, Mojang release commit `8667debe0adad27de6c692c88942c489a1193206`, focused metadata and proxy tests, and the project quality gate. This correction does not establish the cause of the Hive punishment and does not bypass any server enforcement.
+- Status: implemented as a narrow metadata compatibility update. Authenticated vanilla-client and public-server validation remain pending and unauthorized by the current research record.
+
 ## Ordering safety contract
 
 The deferred-packet change is deliberately narrow. `expectedIDs` remains the only authority for what the current login state accepts. The queue scan selects the earliest packet that is currently expected, leaves packets for later states queued, and never mutates or reorders bytes on the wire. The regression tests cover canonical resource-pack order, featured early `ResourcePacksInfo`, a later-phase packet queued ahead of the current phase, and all six permutations of the three login packets.
