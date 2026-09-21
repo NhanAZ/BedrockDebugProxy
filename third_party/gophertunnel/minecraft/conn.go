@@ -176,6 +176,9 @@ type Conn struct {
 	// fetchResourcePacks is an optional function passed from a Listener. If set, the returned resource packs from the function
 	// will determine which resource packs to send to the client based on its identity and client data.
 	fetchResourcePacks func(identityData login.IdentityData, clientData login.ClientData, current []*resource.Pack) []*resource.Pack
+	// fetchResourcePacksInfo selects upstream offer metadata for a listener
+	// connection.
+	fetchResourcePacksInfo func(identityData login.IdentityData, clientData login.ClientData) *packet.ResourcePacksInfo
 	// fetchResourcePackStack selects an exact stack for the listener connection.
 	fetchResourcePackStack func(identityData login.IdentityData, clientData login.ClientData) *packet.ResourcePackStack
 	// ignoredResourcePacks is a slice of resource packs that are not being downloaded due to the downloadResourcePack
@@ -969,6 +972,15 @@ func (conn *Conn) handleClientToServerHandshake() error {
 		}
 	}
 	pk := &packet.ResourcePacksInfo{TexturePackRequired: conn.texturePacksRequired, ForceDisableVibrantVisuals: conn.forceDisableVibrantVisuals}
+	if conn.fetchResourcePacksInfo != nil {
+		if info := conn.fetchResourcePacksInfo(conn.identityData, conn.clientData); info != nil {
+			pk = cloneResourcePacksInfo(info)
+			// The downstream entries must describe the archive-backed packs that
+			// this listener can actually serve. Preserve the upstream metadata
+			// fields above, but never forward stale URLs or an unavailable list.
+			pk.TexturePacks = nil
+		}
+	}
 	for _, pack := range conn.resourcePacks {
 		texturePack := protocol.TexturePackInfo{
 			UUID:        pack.UUID(),
@@ -1047,6 +1059,7 @@ func (conn *Conn) handleClientCacheStatus(pk *packet.ClientCacheStatus) error {
 // handleResourcePacksInfo handles a ResourcePacksInfo packet sent by the server. The client responds by
 // sending the packs it needs downloaded.
 func (conn *Conn) handleResourcePacksInfo(pk *packet.ResourcePacksInfo) error {
+	conn.gameData.ResourcePacksInfo = cloneResourcePacksInfo(pk)
 	// First create a new resource pack queue with the information in the packet so we can download them
 	// properly later.
 	totalPacks := len(pk.TexturePacks)
@@ -1126,6 +1139,15 @@ func (conn *Conn) storeResourcePack(key ResourcePackCacheKey, pack *resource.Pac
 	if err := conn.resourcePackCache.Store(conn.ctx, key, pack); err != nil {
 		conn.log.Warn("failed to store resource pack in cache", "UUID", pack.UUID(), "version", pack.Version(), "err", err)
 	}
+}
+
+func cloneResourcePacksInfo(pk *packet.ResourcePacksInfo) *packet.ResourcePacksInfo {
+	if pk == nil {
+		return nil
+	}
+	clone := *pk
+	clone.TexturePacks = slices.Clone(pk.TexturePacks)
+	return &clone
 }
 
 // handleResourcePackStack handles a ResourcePackStack packet sent by the server. The stack defines the order
@@ -1509,6 +1531,7 @@ func (conn *Conn) handleVoxelShapes(pk *packet.VoxelShapes) error {
 func (conn *Conn) handleStartGame(pk *packet.StartGame) error {
 	startGamePacket := *pk
 	conn.gameData = GameData{
+		ResourcePacksInfo:            conn.gameData.ResourcePacksInfo,
 		ResourcePackStack:            conn.gameData.ResourcePackStack,
 		StartGamePacket:              &startGamePacket,
 		JigsawStructureData:          conn.gameData.JigsawStructureData,

@@ -215,12 +215,23 @@ func TestRunnerForwardsBidirectionalPacketsAndCapturesSession(t *testing.T) {
 		ExperimentsPreviouslyToggled: true,
 		IncludeEditorPacks:           true,
 	}
+	integrationResourcePacksInfo := &packet.ResourcePacksInfo{
+		TexturePackRequired:        false,
+		HasAddons:                  true,
+		HasScripts:                 true,
+		ForceDisableVibrantVisuals: true,
+		WorldTemplateUUID:          uuid.MustParse("33333333-3333-4333-8333-333333333333"),
+		WorldTemplateVersion:       "integration-template",
+	}
 	upstreamListener, err := (minecraft.ListenConfig{
 		AuthenticationDisabled: true,
 		AllowUnknownPackets:    true,
 		AllowInvalidPackets:    true,
 		FetchResourcePackStack: func(login.IdentityData, login.ClientData) *packet.ResourcePackStack {
 			return integrationResourcePackStack
+		},
+		FetchResourcePacksInfo: func(login.IdentityData, login.ClientData) *packet.ResourcePacksInfo {
+			return integrationResourcePacksInfo
 		},
 	}).Listen("raknet", "127.0.0.1:0")
 	if err != nil {
@@ -484,6 +495,15 @@ func TestRunnerForwardsBidirectionalPacketsAndCapturesSession(t *testing.T) {
 		_ = client.Close()
 		t.Fatalf("downstream resource-pack stack was not preserved: %#v", stack)
 	}
+	info := client.GameData().ResourcePacksInfo
+	if info == nil || info.TexturePackRequired != integrationResourcePacksInfo.TexturePackRequired ||
+		info.HasAddons != integrationResourcePacksInfo.HasAddons || info.HasScripts != integrationResourcePacksInfo.HasScripts ||
+		info.ForceDisableVibrantVisuals != integrationResourcePacksInfo.ForceDisableVibrantVisuals ||
+		info.WorldTemplateUUID != integrationResourcePacksInfo.WorldTemplateUUID ||
+		info.WorldTemplateVersion != integrationResourcePacksInfo.WorldTemplateVersion {
+		_ = client.Close()
+		t.Fatalf("downstream resource-pack offer metadata was not preserved: %#v", info)
+	}
 	for _, outgoing := range []packet.Packet{
 		integrationPlayerSkin(),
 		&packet.MovePlayer{
@@ -676,7 +696,7 @@ func TestRunnerForwardsBidirectionalPacketsAndCapturesSession(t *testing.T) {
 		{capture.DirectionServerToClient, packet.IDInventoryContent}:     {},
 	}
 	rawHashes := make(map[rawPacketKey]map[string]map[string]struct{}, len(expectedRaw))
-	var downstreamPacksRequired bool
+	var downstreamPacksPolicyPreserved bool
 	expectedClientData := integrationClientData()
 	if err := capture.ScanEvents(root, func(event capture.Event) error {
 		switch event.Kind {
@@ -720,10 +740,19 @@ func TestRunnerForwardsBidirectionalPacketsAndCapturesSession(t *testing.T) {
 					if err != nil {
 						return err
 					}
-					if len(payload) == 0 || payload[0] != 1 {
-						return fmt.Errorf("downstream ResourcePacksInfo does not require offered packs: %x", payload)
+					info, err := decodeResourcePacksInfo(payload)
+					if err != nil {
+						return err
 					}
-					downstreamPacksRequired = true
+					if info.TexturePackRequired != integrationResourcePacksInfo.TexturePackRequired ||
+						info.HasAddons != integrationResourcePacksInfo.HasAddons ||
+						info.HasScripts != integrationResourcePacksInfo.HasScripts ||
+						info.ForceDisableVibrantVisuals != integrationResourcePacksInfo.ForceDisableVibrantVisuals ||
+						info.WorldTemplateUUID != integrationResourcePacksInfo.WorldTemplateUUID ||
+						info.WorldTemplateVersion != integrationResourcePacksInfo.WorldTemplateVersion {
+						return fmt.Errorf("downstream ResourcePacksInfo metadata = %#v, want %#v", info, integrationResourcePacksInfo)
+					}
+					downstreamPacksPolicyPreserved = true
 				}
 				key := rawPacketKey{event.Direction, event.Packet.ID}
 				if _, ok := expectedRaw[key]; ok {
@@ -768,8 +797,8 @@ func TestRunnerForwardsBidirectionalPacketsAndCapturesSession(t *testing.T) {
 	if !negotiated || !negotiatedClientData || !spawned || !closed || connectionViews != 2 || loginSkinMetadataViews != 2 || gameDataViews != 1 {
 		t.Fatalf("session evidence negotiated=%t negotiated_client_data=%t spawned=%t closed=%t connection_views=%d login_skin_metadata_views=%d game_data_views=%d", negotiated, negotiatedClientData, spawned, closed, connectionViews, loginSkinMetadataViews, gameDataViews)
 	}
-	if !downstreamPacksRequired {
-		t.Error("downstream resource-pack acceptance policy was not captured")
+	if !downstreamPacksPolicyPreserved {
+		t.Error("downstream resource-pack offer policy was not captured")
 	}
 	for key := range expectedDecoded {
 		if !decodedObserved[key] {
