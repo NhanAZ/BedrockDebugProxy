@@ -180,21 +180,7 @@ func runProxy(args []string, stdout, stderr io.Writer) int {
 			return 1
 		}
 	}
-	limitations := []string{
-		"Raw UDP datagrams and RakNet acknowledgement or retransmission frames are not captured",
-		"Downstream clients must accept offered resource packs; the current adapter cannot mirror an upstream optional-pack policy",
-		"Transport payload encryption and compression state is not yet classified per event",
-	}
-	if *followTransfers {
-		limitations = append(limitations, "Transfer following is opt-in; server Transfer packets are rewritten to the local listener and each subsequent hop is captured in the same session")
-	} else {
-		limitations = append(limitations, "Transfer packets are recorded but automatic hop following is disabled")
-	}
-	if *decryptResourcePacks {
-		limitations = append(limitations, "Resource pack decryption supports only the documented AES-256-CFB8 contents format; unsupported variants are retained with a decrypt error")
-	} else {
-		limitations = append(limitations, "Encrypted resource pack archives and content keys are stored; decryption was not requested")
-	}
+	limitations := captureLimitations(*followTransfers, *decryptResourcePacks)
 	recorder, err := capture.New(exactCapturePath, capture.Options{
 		GeneratorName: "bedrock-debug-proxy",
 		Version:       buildinfo.Version,
@@ -324,6 +310,25 @@ func runProxy(args []string, stdout, stderr io.Writer) int {
 	}
 	_, _ = fmt.Fprintf(stdout, "Capture verified with %d events and %d blobs.\n", verification.Events, verification.Blobs)
 	return 0
+}
+
+func captureLimitations(followTransfers, decryptResourcePacks bool) []string {
+	limitations := []string{
+		"Raw UDP datagrams and RakNet acknowledgement or retransmission frames are not captured",
+		"Downstream clients must accept offered resource packs; the current adapter cannot mirror an upstream optional-pack policy",
+		"Early transport payloads may not expose compression or encryption state before the connection object is available",
+	}
+	if followTransfers {
+		limitations = append(limitations, "Transfer following is opt-in; server Transfer packets are rewritten to the local listener and each subsequent hop is captured in the same session")
+	} else {
+		limitations = append(limitations, "Transfer packets are recorded but automatic hop following is disabled")
+	}
+	if decryptResourcePacks {
+		limitations = append(limitations, "Resource pack decryption supports only the documented AES-256-CFB8 contents format; unsupported variants are retained with a decrypt error")
+	} else {
+		limitations = append(limitations, "Encrypted resource pack archives and content keys are stored; decryption was not requested")
+	}
+	return limitations
 }
 
 func runVerify(args []string, stdout, stderr io.Writer) int {

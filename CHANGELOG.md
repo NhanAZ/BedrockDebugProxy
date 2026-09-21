@@ -12,6 +12,7 @@ Detailed rationale remains in [`docs/audits/`](docs/audits/).
 
 ### Changed
 
+- Capture manifests now describe early transport-state availability accurately instead of claiming compression and encryption state is never classified per event.
 - Transport payload events now include bounded per-connection compression and encryption state when that state is observable, while retaining the original raw application-batch blob.
 - Transport payload metadata is now available during the login sequence as soon as the corresponding connection object exists, while the first pre-negotiation payload remains explicitly marked as not negotiated.
 - `session.negotiated` capture events now distinguish the protocol implementation version from the game version and device OS reported in each connection's `ClientData`, including explicit mismatch booleans for local parity investigations.
