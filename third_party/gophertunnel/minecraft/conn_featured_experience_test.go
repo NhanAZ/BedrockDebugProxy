@@ -393,12 +393,16 @@ func TestHandlePreservesResourcePackStackForBridge(t *testing.T) {
 		IncludeEditorPacks:           true,
 	}
 
-	if err := conn.handle(wirePacketData(t, original)); err != nil {
+	raw := wirePacketData(t, original)
+	if err := conn.handle(raw); err != nil {
 		t.Fatalf("handle ResourcePackStack: %v", err)
 	}
 	got := conn.GameData().ResourcePackStack
 	if got == nil || !reflect.DeepEqual(got, original) {
 		t.Fatalf("preserved ResourcePackStack = %#v, want %#v", got, original)
+	}
+	if !bytes.Equal(conn.GameData().RawResourcePackStack, raw.full) {
+		t.Fatal("retained ResourcePackStack bytes differ from input")
 	}
 
 	original.TexturePacks[0].Version = "mutated-after-handle"
@@ -491,6 +495,44 @@ func TestStartGameWritesRetainedItemRegistryBytes(t *testing.T) {
 	}
 	if !bytes.Equal(decoded[len(decoded)-1], raw.full) {
 		t.Fatal("StartGame did not write retained ItemRegistry bytes")
+	}
+}
+
+func TestResourcePackResponseWritesRetainedStackBytes(t *testing.T) {
+	stack := &packet.ResourcePackStack{
+		TexturePackRequired: true,
+		TexturePacks:        []protocol.StackResourcePack{{UUID: "integration-stack", Version: "1"}},
+		BaseGameVersion:     "1.26.51-integration-base",
+		Experiments:         []protocol.ExperimentData{{Name: "integration-experiment", Enabled: true}},
+	}
+	raw := wirePacketData(t, stack)
+	var output bytes.Buffer
+	conn := &Conn{
+		ctx:   context.Background(),
+		log:   slog.Default(),
+		proto: DefaultProtocol,
+		enc:   packet.NewEncoder(&output),
+		hdr:   &packet.Header{},
+		gameData: GameData{
+			RawProtocolID: DefaultProtocol.ID(),
+		},
+		resourcePackStack:              cloneResourcePackStack(stack),
+		rawResourcePackStack:           append([]byte(nil), raw.full...),
+		rawResourcePackStackProtocolID: DefaultProtocol.ID(),
+	}
+
+	if err := conn.handleResourcePackClientResponse(&packet.ResourcePackClientResponse{Response: packet.PackResponseAllPacksDownloaded}); err != nil {
+		t.Fatalf("handle all-packs-downloaded response: %v", err)
+	}
+	if err := conn.Flush(); err != nil {
+		t.Fatal(err)
+	}
+	decoded, err := packet.NewDecoder(bytes.NewReader(output.Bytes())).Decode()
+	if err != nil {
+		t.Fatalf("decode resource-pack stack: %v", err)
+	}
+	if len(decoded) != 1 || !bytes.Equal(decoded[0], raw.full) {
+		t.Fatalf("resource-pack stack bytes = %x, want %x", decoded, raw.full)
 	}
 }
 

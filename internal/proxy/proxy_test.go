@@ -359,6 +359,7 @@ func TestRunnerForwardsBidirectionalPacketsAndCapturesSession(t *testing.T) {
 		ExperimentsPreviouslyToggled: true,
 		IncludeEditorPacks:           true,
 	}
+	integrationResourcePackStackRaw := integrationRawPacket(t, integrationResourcePackStack)
 	integrationResourcePacksInfo := &packet.ResourcePacksInfo{
 		TexturePackRequired:        false,
 		HasAddons:                  true,
@@ -704,6 +705,10 @@ func TestRunnerForwardsBidirectionalPacketsAndCapturesSession(t *testing.T) {
 		stack.IncludeEditorPacks != integrationResourcePackStack.IncludeEditorPacks {
 		_ = client.Close()
 		t.Fatalf("downstream resource-pack stack was not preserved: %#v", stack)
+	}
+	if !bytes.Equal(client.GameData().RawResourcePackStack, integrationResourcePackStackRaw) {
+		_ = client.Close()
+		t.Fatal("downstream ResourcePackStack wire bytes were not preserved")
 	}
 	info := client.GameData().ResourcePacksInfo
 	if info == nil || info.TexturePackRequired != integrationResourcePacksInfo.TexturePackRequired ||

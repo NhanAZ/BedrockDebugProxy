@@ -52,6 +52,11 @@ type GameData struct {
 	// dialled server's login exchange. It is retained so a terminating bridge
 	// can offer the same stack to its downstream client.
 	ResourcePackStack *packet.ResourcePackStack
+	// RawResourcePackStack contains the complete wire representation of the
+	// ResourcePackStack packet observed during a dialled server's login
+	// exchange. It is retained so a terminating bridge can preserve the
+	// original bytes when the downstream protocol matches.
+	RawResourcePackStack []byte
 	// StartGamePacket contains the complete decoded StartGame packet when this
 	// data was obtained from a dialled server. It preserves fields that are not
 	// represented by the compatibility-oriented fields below when a bridge
