@@ -606,6 +606,14 @@ Every new entry should state the symptom, root cause, implementation commits, ev
 - Evidence and validation: source-path review of `internal/proxy/proxy.go` and `resource_pack_url.go`, plus `TestURLResourcePackCacheMergePreservesMixedOfferOrder`, which exercises URL, RakNet, URL ordering. Focused proxy tests and the full low-memory quality gate must pass before commit.
 - Status: implemented for mixed URL and RakNet offers. Real-client validation with an owner-controlled mixed offer remains pending.
 
+### FIX-0076 - Correct resource-pack limitation metadata
+
+- Symptom: newly opened manifests still claimed that the adapter could not mirror an upstream optional resource-pack policy after offer metadata preservation had been implemented.
+- Root cause: the static limitation string was not updated with the `ResourcePacksInfo` retention and URL-archive boundary.
+- Implementation: describe the preserved offer metadata and the intentional URL replacement with proxy-served archives. Failed URL retrieval remains observable through existing capture evidence and warnings.
+- Evidence and validation: `internal/proxy/proxy.go` supplies retained offer metadata through the listener callback, `docs/resource-packs.md` documents the boundary, and `cmd/bedrock-debug-proxy/main_test.go` rejects the stale text and checks the corrected wording. No forwarding or packet bytes change.
+- Status: implemented as a capture metadata correction. Mixed-offer real-client validation remains pending.
+
 ## Ordering safety contract
 
 The deferred-packet change is deliberately narrow. `expectedIDs` remains the only authority for what the current login state accepts. The queue scan selects the earliest packet that is currently expected, leaves packets for later states queued, and never mutates or reorders bytes on the wire. The regression tests cover canonical resource-pack order, featured early `ResourcePacksInfo`, a later-phase packet queued ahead of the current phase, and all six permutations of the three login packets.
