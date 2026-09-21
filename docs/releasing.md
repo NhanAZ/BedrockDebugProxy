@@ -62,12 +62,12 @@ Include `--follow-transfers` in the release command when the server's flow can s
 | `Mineville Zeqa` | `experience:Mineville Zeqa` | Enter the Zeqa flow and observe it directly |
 | `Enchanted` | `experience:Enchanted` | Receive the server-sent form, select any minigame, observe `Transfer`, follow the next hop, complete its resource-pack exchange when offered, and reach minigame spawn |
 
-Use this command for an Experience target. Replace `192.168.1.10` with the concrete LAN address used by the Minecraft client, and replace only the value after `--upstream` for each run. Do not add CubeCraft to this matrix because its published policy prohibits Bedrock proxy use. See [`server-targets.md`](server-targets.md) for the policy disclaimer and endpoint references.
+Use this command for an Experience target. Replace `<LAN_IP>` with the concrete LAN address used by the Minecraft client, and replace only the value after `--upstream` for each run. Do not add CubeCraft to this matrix because its published policy prohibits Bedrock proxy use. See [`server-targets.md`](server-targets.md) for the policy disclaimer and endpoint references.
 
 ```powershell
 .\bin\bedrock-debug-proxy.exe `
     run `
-    --listen 192.168.1.10:19132 `
+    --listen "<LAN_IP>:19132" `
     --upstream "experience:The Hive" `
     --auth device `
     --follow-transfers

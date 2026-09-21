@@ -65,7 +65,7 @@ For a trusted-LAN run that accepts a LAN World connection and follows server tra
 ```powershell
 .\bin\bedrock-debug-proxy.exe `
     run `
-    --listen 192.168.1.10:19132 `
+    --listen "<LAN_IP>:19132" `
     --upstream "<UPSTREAM>" `
     --auth device `
     --allow-unauthenticated-client `
@@ -77,7 +77,7 @@ Add `--web-viewer` when you want to inspect the ordered capture in a local brows
 ```powershell
 .\bin\bedrock-debug-proxy.exe `
     run `
-    --listen 192.168.1.10:19132 `
+    --listen "<LAN_IP>:19132" `
     --upstream "<UPSTREAM>" `
     --auth device `
     --allow-unauthenticated-client `

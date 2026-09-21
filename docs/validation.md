@@ -36,12 +36,12 @@ Commit the revision, ensure the working tree is clean, run the quality gate, and
 
 ## Capture and report
 
-Run the stamped binary and complete the required live session. Replace `192.168.1.10` below with the concrete LAN address that the Minecraft client will use. Stop it cleanly, then generate the sanitized report with project tooling rather than adding another command to the product CLI.
+Run the stamped binary and complete the required live session. Replace `<LAN_IP>` below with the concrete LAN address that the Minecraft client will use. Stop it cleanly, then generate the sanitized report with project tooling rather than adding another command to the product CLI.
 
 ```powershell
 .\bin\bedrock-debug-proxy.exe `
     run `
-    --listen 192.168.1.10:19132 `
+    --listen "<LAN_IP>:19132" `
     --upstream "experience:The Hive" `
     --auth device `
     --follow-transfers
