@@ -157,6 +157,12 @@ Do not use Em dash or En dash characters. Use a Hyphen where punctuation is need
 
 Documentation must explain observable behavior, trust boundaries, storage formats, protocol assumptions, and validation status. A new contributor or AI agent should be able to understand the data path without reading the entire codebase.
 
+### CLI and documentation consistency
+
+Treat command names, positional arguments, flags, defaults, prompts, exit behavior, and examples as one public interface. Any addition, removal, rename, or behavior change must update the root help output, `help COMMAND` output, the relevant README or focused guide, and focused help or usage tests in the same coherent change. Search for stale command syntax and examples before committing. A CLI change is incomplete when the command, help text, and documentation disagree.
+
+Source comments that describe user-visible commands, storage formats, protocol boundaries, or operational behavior must stay consistent with the linked documentation. Internal implementation comments do not need duplicated prose unless they define an observable contract or a maintenance decision. Keep comments and documentation in English, and update the changelog when the interface change is user-visible.
+
 Update documentation in the same commit as the behavior it describes whenever possible.
 
 Maintain the root [`CHANGELOG.md`](CHANGELOG.md) as a concise, user-facing release history. When a coherent change affects user-visible behavior, protocol support, CLI usage, compatibility, capture semantics, security posture, or release workflow, add or revise its entry under `Unreleased` in the same commit. Internal-only tests, formatting, audit records, and other changes with no user-facing effect do not need a changelog entry. Do not put credentials, captures, resource-pack keys, decrypted assets, or other sensitive data in the changelog. Changelog entries summarize; audit records remain the evidence-backed per-commit record.
