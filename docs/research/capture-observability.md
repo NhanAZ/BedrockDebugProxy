@@ -66,6 +66,8 @@ The same rule applies when a connection-open event cannot be recorded. The wrapp
 
 Transfer rewrite failures follow the same error-preservation rule. The bridge releases a retained raw packet only when one exists, records `bridge.transfer_rewrite_error`, and returns the wrapped rewrite failure. Typed forwarding and raw reads that already exposed a decoded packet have no retained `PacketRead`; they now terminate through the same captured error path without a nil dereference.
 
+Listener callbacks that cannot return errors also forward recorder failures to the run's `FailureSink`. The `RequestChunkRadius` decode and typed-forwarding hooks therefore stop the session when their error event cannot be persisted, rather than continuing with an incomplete canonical capture.
+
 ## Representative packet-family coverage
 
 The loopback regression test `TestRunnerForwardsBidirectionalPacketsAndCapturesSession` sends representative packets through both sides of the proxy and checks both forwarding and capture. It covers `PlayerSkin` with skin and cape bytes, `AddActor`, `LevelChunk`, `SubChunkRequest`, `UpdateBlock`, `InventoryContent`, `InventoryTransaction`, `MovePlayer`, and `Emote`.

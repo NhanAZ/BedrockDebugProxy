@@ -43,6 +43,7 @@ Detailed rationale remains in [`docs/audits/`](docs/audits/).
 - Observed transport reads and writes now preserve both the underlying transport error and any capture-recorder error, including partial byte counts.
 - Connection wrapping now preserves a transport close error when the initial connection-open capture also fails.
 - Transfer rewrite failures now preserve the captured error path when no raw packet read is retained, avoiding a nil dereference on typed or already-decoded forwarding paths.
+- RequestChunkRadius listener callbacks now propagate error-event write failures to the session failure sink instead of continuing with an incomplete capture.
 - Downstream resource-pack offers now retain per-pack content identity, sub-pack, script, addon, and RTX metadata while still rebuilding entries from proxy-served archives.
 - Terminating bridges now retain and reuse raw `DimensionData` and `ItemRegistry` startup packets when the downstream protocol matches, avoiding wire differences caused by typed re-serialization of NBT maps.
 - Terminating bridges now forward each observed downstream `RequestChunkRadius` to the paired upstream connection while retaining the existing 16/16 initial fallback.

@@ -26,13 +26,17 @@ operation `forward RequestChunkRadius`. This includes the race where the
 paired upstream connection is unavailable or closes between the downstream
 packet observation and the typed write. The original downstream raw packet is
 still retained, so a failed forward is visible rather than silently discarded.
+If writing that error event fails, the listener callback now propagates the
+recorder failure through the session `FailureSink` instead of allowing an
+incomplete capture to continue.
 
 If the observed body cannot be decoded as a complete `RequestChunkRadius`, the
 proxy now records a `packet.decode_error` event with the packet ID and typed
 context, including the packet header's sub-client routing bytes, before leaving
 the raw packet untouched. This keeps strict forwarding validation visible
 without treating an untrusted malformed body as a reason to rewrite or suppress
-the packet.
+the packet. A failure to record this decode error now also stops the run through
+the same capture-failure path.
 
 ## Classification
 
