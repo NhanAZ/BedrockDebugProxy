@@ -193,6 +193,24 @@ func TestSetCaptureFailurePropagatesCallbackRecorderError(t *testing.T) {
 	setCaptureFailure(failures, nil)
 }
 
+type errorCloser struct {
+	err error
+}
+
+func (c errorCloser) Close() error { return c.err }
+
+func TestCloseAfterUpstreamErrorPreservesCloseError(t *testing.T) {
+	operationErr := errors.New("resource-pack capture failed")
+	closeErr := errors.New("upstream close failed")
+	gotErr := closeAfterUpstreamError(errorCloser{err: closeErr}, operationErr)
+	if !errors.Is(gotErr, operationErr) || !errors.Is(gotErr, closeErr) {
+		t.Fatalf("combined upstream error = %v, want operation and close errors", gotErr)
+	}
+	if gotErr := closeAfterUpstreamError(nil, operationErr); !errors.Is(gotErr, operationErr) {
+		t.Fatalf("nil-connection error = %v, want %v", gotErr, operationErr)
+	}
+}
+
 func TestRecordPacketDecodeErrorRetainsPacketContext(t *testing.T) {
 	root := filepath.Join(t.TempDir(), "capture")
 	recorder, err := capture.New(root, capture.Options{})

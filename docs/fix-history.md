@@ -902,6 +902,14 @@ Every new entry should state the symptom, root cause, implementation commits, ev
 - Evidence and validation: each path owns an explicit lifecycle event and receives either the run failure sink or a `Network` carrying it. Deterministic local tests cover route-probe capture failure and the shared callback propagation helper.
 - Status: implemented with deterministic local coverage. Live recorder-failure behavior remains unverified.
 
+### FIX-0112 - Preserve upstream close errors during setup failure
+
+- Symptom: after resource-pack recording, downstream-pack preparation, or `upstream.connected` recording failed, `connectUpstream` closed the connection but returned only the original operation error.
+- Root cause: the three cleanup branches discarded the observed connection's `Close` result, hiding transport or capture errors from the failed setup.
+- Implementation: join the setup error with the connection close error through `closeAfterUpstreamError` while keeping cleanup ordering unchanged.
+- Evidence and validation: `connectUpstream` owns the connection after a successful dial and all three branches close that connection before returning. A deterministic test verifies both operation and close errors remain discoverable.
+- Status: implemented with deterministic local coverage. Live upstream cleanup failures remain unverified.
+
 ## Ordering safety contract
 
 The deferred-packet change is deliberately narrow. `expectedIDs` remains the only authority for what the current login state accepts. The queue scan selects the earliest packet that is currently expected, leaves packets for later states queued, and never mutates or reorders bytes on the wire. The regression tests cover canonical resource-pack order, featured early `ResourcePacksInfo`, a later-phase packet queued ahead of the current phase, and all six permutations of the three login packets.
