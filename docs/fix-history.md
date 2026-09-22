@@ -926,6 +926,14 @@ Every new entry should state the symptom, root cause, implementation commits, ev
 - Evidence and validation: the raw-forward code explicitly sets `rawRead` to nil for typed packets and already-decoded reads. A deterministic regression test closes the recorder, invokes the derived-view path with no raw packet, and verifies that the recorder error is returned instead of panicking.
 - Status: implemented with focused local coverage. Live Transfer capture-writer failure behavior remains unverified.
 
+### FIX-0115 - Document deferred-login raw and decoded ordering
+
+- Symptom: a local capture appeared to place a decoded `ServerBoundLoadingScreen` event after later raw packets, which could be mistaken for packet reordering or a missing raw-to-decoded pair.
+- Root cause: gophertunnel invokes the raw packet hook when a packet arrives, then may defer the packet in its login state machine until the current expected state accepts it. The bridge consumes and records the decoded view later, while concurrent observer and bridge callbacks share one ordered recorder stream.
+- Implementation: document the confirmed deferred-login ordering evidence and the confirmed, inferred, and unknown parts of the raw-to-decoded relationship in [`docs/research/capture-observability.md`](research/capture-observability.md). No packet bytes, forwarding policy, or capture schema changed.
+- Evidence and validation: owner-controlled capture `captures/session-20260921T122228Z` at revision `d272805fd571525cca6f7473b166fb1129bafd48`, plus the in-tree `minecraft/packet.go`, `minecraft/conn.go`, and `minecraft/raw_packet.go` queue paths. The event stream and closed manifest were inspected locally.
+- Status: documentation-only clarification. Raw and decoded events must not be paired by adjacent sequence numbers, and no public-server validation was performed.
+
 ## Ordering safety contract
 
 The deferred-packet change is deliberately narrow. `expectedIDs` remains the only authority for what the current login state accepts. The queue scan selects the earliest packet that is currently expected, leaves packets for later states queued, and never mutates or reorders bytes on the wire. The regression tests cover canonical resource-pack order, featured early `ResourcePacksInfo`, a later-phase packet queued ahead of the current phase, and all six permutations of the three login packets.
