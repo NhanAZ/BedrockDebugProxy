@@ -1062,6 +1062,14 @@ Every new entry should state the symptom, root cause, implementation commits, ev
 - Evidence and validation: Galaxite capture `fe9d3e3b-aa80-4976-a6ec-31db99dd1db1`, [`docs/research/galaxite-client-cache-blob-status-limit.md`](research/galaxite-client-cache-blob-status-limit.md), and `TestClientCacheBlobStatusAllowsObservedHashCount`.
 - Status: implemented with focused protocol regression coverage. A fresh stamped Galaxite capture and the full release matrix are required before release approval.
 
+### FIX-0132 - Recover repeated RakNet connection acceptance
+
+- Symptom: a Galaxite upstream dial aborted with `unexpected additional CONNECTION_REQUEST_ACCEPTED packet` after the dialer had already sent `NEW_INCOMING_CONNECTION`.
+- Root cause: the dialer treated a repeated acceptance as fatal. RakNet acceptance is not itself reliable, so a server can retransmit it when the first client response was lost or delayed.
+- Implementation: re-send `NEW_INCOMING_CONNECTION` with the repeated acceptance timestamp and keep the established connection open. The change is isolated to the vendored go-raknet dialer and does not alter Bedrock packet payloads.
+- Evidence and validation: capture `1de1bf87-bc59-47fe-949d-6f0eee6ea9fc` at revision `730e6b972dd16c21a94c3b9c2e2119d68e2ea7ea`, the immutable upstream handler at [`ea813dc668b5a2a2767cc5577bf77869c965f27a`](https://github.com/Sandertv/go-raknet/blob/ea813dc668b5a2a2767cc5577bf77869c965f27a/handler.go), and `TestDialerResendsNewIncomingConnectionAfterRepeatedAcceptance`.
+- Status: implemented with deterministic transport coverage. A fresh stamped Galaxite session is required. The later retry `9aeeab8b-46ac-499f-b42f-68b328b7a883` failed independently during the Minecraft authentication-chain request and does not validate or invalidate this transport fix.
+
 ## Ordering safety contract
 
 The deferred-packet change is deliberately narrow. `expectedIDs` remains the only authority for what the current login state accepts. The queue scan selects the earliest packet that is currently expected, leaves packets for later states queued, and never mutates or reorders bytes on the wire. The regression tests cover canonical resource-pack order, featured early `ResourcePacksInfo`, a later-phase packet queued ahead of the current phase, and all six permutations of the three login packets.
