@@ -894,6 +894,14 @@ Every new entry should state the symptom, root cause, implementation commits, ev
 - Evidence and validation: the listener callback is the only boundary for these observed requests, and the recorder methods return failures when the capture stream is unavailable. A deterministic unit test verifies that callback recorder errors reach the failure sink without changing packet forwarding.
 - Status: implemented with deterministic local coverage. Live capture-writer failure behavior remains unverified.
 
+### FIX-0111 - Preserve lifecycle error-event write failures
+
+- Symptom: `session.spawn_error`, `transfer.route_probe`, or `upstream.dial_error` could fail to enter the canonical capture while the underlying operation error remained the only visible result.
+- Root cause: these error paths treated their lifecycle event as best effort and discarded the recorder error, even though the run already had a `FailureSink` for capture failures.
+- Implementation: join lifecycle operation errors with recorder errors and send the capture error through the existing failure sink. Route-probe diagnostics remain non-fatal to the normal dial decision, but an incomplete route event now cancels the run.
+- Evidence and validation: each path owns an explicit lifecycle event and receives either the run failure sink or a `Network` carrying it. Deterministic local tests cover route-probe capture failure and the shared callback propagation helper.
+- Status: implemented with deterministic local coverage. Live recorder-failure behavior remains unverified.
+
 ## Ordering safety contract
 
 The deferred-packet change is deliberately narrow. `expectedIDs` remains the only authority for what the current login state accepts. The queue scan selects the earliest packet that is currently expected, leaves packets for later states queued, and never mutates or reorders bytes on the wire. The regression tests cover canonical resource-pack order, featured early `ResourcePacksInfo`, a later-phase packet queued ahead of the current phase, and all six permutations of the three login packets.

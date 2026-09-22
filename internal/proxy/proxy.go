@@ -658,8 +658,9 @@ func (r *Runner) runHop(runCtx context.Context, localAddress string, state *hopS
 		return err
 	}
 	if err := startGame(clientConn, serverConn, gameData); err != nil {
-		_ = r.recordAtHop("session.spawn_error", capture.SeverityError, map[string]any{"error": err.Error(), "type": fmt.Sprintf("%T", err)}, state.hop)
-		return err
+		captureErr := r.recordAtHop("session.spawn_error", capture.SeverityError, map[string]any{"error": err.Error(), "type": fmt.Sprintf("%T", err)}, state.hop)
+		setCaptureFailure(failures, captureErr)
+		return errors.Join(err, captureErr)
 	}
 	live.SetSpawned()
 	if err := r.recordAtHop("session.spawned", capture.SeverityInfo, map[string]any{
@@ -744,10 +745,15 @@ func (r *Runner) probeTransferRouteNetwork(ctx context.Context, target string, l
 	if err != nil {
 		fields["error"] = err.Error()
 		fields["type"] = fmt.Sprintf("%T", err)
-		_ = r.recordAtHop("transfer.route_probe", capture.SeverityWarn, fields, hop)
-		return err
+		captureErr := r.recordAtHop("transfer.route_probe", capture.SeverityWarn, fields, hop)
+		setCaptureFailure(network.Failures, captureErr)
+		return errors.Join(err, captureErr)
 	}
-	_ = r.recordAtHop("transfer.route_probe", capture.SeverityInfo, fields, hop)
+	captureErr := r.recordAtHop("transfer.route_probe", capture.SeverityInfo, fields, hop)
+	setCaptureFailure(network.Failures, captureErr)
+	if captureErr != nil {
+		return captureErr
+	}
 	live.Info("Transfer route probe completed - %s (local %s)", target, localAddr)
 	return nil
 }
@@ -813,8 +819,9 @@ func (r *Runner) connectUpstream(ctx context.Context, target string, network bed
 		if timedOut {
 			fields["timeout_duration"] = upstreamDialTimeout.String()
 		}
-		_ = r.recordAtHop("upstream.dial_error", capture.SeverityError, fields, hop)
-		return nil, nil, fmt.Errorf("connect to upstream server: %w", err)
+		captureErr := r.recordAtHop("upstream.dial_error", capture.SeverityError, fields, hop)
+		setCaptureFailure(network.Failures, captureErr)
+		return nil, nil, errors.Join(fmt.Errorf("connect to upstream server: %w", err), captureErr)
 	}
 	live.Info("Upstream login and resource-pack exchange completed in %s - downstream pack delivery can begin (sequential buffered mode)", waitDuration)
 	// Dialer returns only after the upstream login and resource-pack exchange has
@@ -1132,7 +1139,7 @@ func (r *Runner) forward(source, destination *minecraft.Conn, failures *bedrock.
 // return an error to the caller. The failure sink cancels the run and preserves
 // the first capture error as the authoritative session failure.
 func setCaptureFailure(failures *bedrock.FailureSink, err error) {
-	if err != nil {
+	if failures != nil && err != nil {
 		failures.Set(err)
 	}
 }

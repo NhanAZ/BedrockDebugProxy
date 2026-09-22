@@ -68,6 +68,8 @@ Transfer rewrite failures follow the same error-preservation rule. The bridge re
 
 Listener callbacks that cannot return errors also forward recorder failures to the run's `FailureSink`. The `RequestChunkRadius` decode and typed-forwarding hooks therefore stop the session when their error event cannot be persisted, rather than continuing with an incomplete canonical capture.
 
+The same boundary applies to lifecycle failures. Spawn failures, upstream dial failures, and transfer route-probe outcomes now join any error returned while recording their diagnostic event and propagate that capture failure through the run sink. A route-probe network failure itself remains a non-fatal routing hint, but a missing route-probe event is no longer silently accepted.
+
 ## Representative packet-family coverage
 
 The loopback regression test `TestRunnerForwardsBidirectionalPacketsAndCapturesSession` sends representative packets through both sides of the proxy and checks both forwarding and capture. It covers `PlayerSkin` with skin and cape bytes, `AddActor`, `LevelChunk`, `SubChunkRequest`, `UpdateBlock`, `InventoryContent`, `InventoryTransaction`, `MovePlayer`, and `Emote`.
