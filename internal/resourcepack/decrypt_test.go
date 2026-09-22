@@ -9,6 +9,7 @@ import (
 	"encoding/hex"
 	"encoding/json"
 	"io"
+	"strings"
 	"testing"
 )
 
@@ -116,6 +117,67 @@ func TestDecryptArchiveRootAndSubpack(t *testing.T) {
 		if string(files[name]) != expected {
 			t.Errorf("decrypted %s = %q, want %q", name, files[name], expected)
 		}
+	}
+}
+
+func TestDecryptArchiveAllowsImplicitDirectoryDeclarations(t *testing.T) {
+	t.Parallel()
+
+	fileKey := "ZYXWVUTSRQPONMLKJIHGFEDCBA654321"
+	input := buildEncryptedArchive(t, []testArchiveEntry{
+		{name: "manifest.json", data: []byte(`{"format_version":2}`)},
+		{name: "animation_controllers/example.json", data: encryptCFB8(t, []byte(fileKey), []byte("encrypted controller"))},
+		{name: "texts/en.lang", data: []byte("plain translation")},
+		{name: "contents.json", data: encryptedContents(t, testContentKey, testContentID, []contentsEntry{
+			{Path: "animation_controllers"},
+			{Path: "animation_controllers/example.json", Key: fileKey},
+			{Path: "texts"},
+			{Path: "texts/en.lang"},
+		})},
+	})
+
+	var output bytes.Buffer
+	result, err := DecryptArchive(context.Background(), bytes.NewReader(input), int64(len(input)), testContentKey, &output)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if result.Report.DecryptedFiles != 1 || result.Report.CopiedFiles != 2 {
+		t.Fatalf("directory declarations were counted as files: %#v", result.Report)
+	}
+	files := readArchiveFiles(t, output.Bytes())
+	if string(files["animation_controllers/example.json"]) != "encrypted controller" {
+		t.Fatalf("decrypted directory child = %q", files["animation_controllers/example.json"])
+	}
+	if string(files["texts/en.lang"]) != "plain translation" {
+		t.Fatalf("copied directory child = %q", files["texts/en.lang"])
+	}
+}
+
+func TestDecryptArchiveRejectsMissingDirectoryDeclaration(t *testing.T) {
+	t.Parallel()
+
+	input := buildEncryptedArchive(t, []testArchiveEntry{
+		{name: "manifest.json", data: []byte(`{"format_version":2}`)},
+		{name: "contents.json", data: encryptedContents(t, testContentKey, testContentID, []contentsEntry{{Path: "missing"}})},
+	})
+	var output bytes.Buffer
+	if _, err := DecryptArchive(context.Background(), bytes.NewReader(input), int64(len(input)), testContentKey, &output); err == nil || !strings.Contains(err.Error(), "missing entry missing") {
+		t.Fatalf("DecryptArchive error = %v, want missing directory entry", err)
+	}
+}
+
+func TestDecryptArchiveRejectsKeyedDirectoryDeclaration(t *testing.T) {
+	t.Parallel()
+
+	fileKey := "ZYXWVUTSRQPONMLKJIHGFEDCBA654321"
+	input := buildEncryptedArchive(t, []testArchiveEntry{
+		{name: "manifest.json", data: []byte(`{"format_version":2}`)},
+		{name: "animation_controllers/example.json", data: encryptCFB8(t, []byte(fileKey), []byte("encrypted controller"))},
+		{name: "contents.json", data: encryptedContents(t, testContentKey, testContentID, []contentsEntry{{Path: "animation_controllers", Key: fileKey}})},
+	})
+	var output bytes.Buffer
+	if _, err := DecryptArchive(context.Background(), bytes.NewReader(input), int64(len(input)), testContentKey, &output); err == nil || !strings.Contains(err.Error(), "directory animation_controllers has an encryption key") {
+		t.Fatalf("DecryptArchive error = %v, want keyed directory error", err)
 	}
 }
 

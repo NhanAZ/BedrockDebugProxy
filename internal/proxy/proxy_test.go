@@ -51,13 +51,14 @@ func TestTransferRouteProbeCapturesPingResponse(t *testing.T) {
 	failures := bedrock.NewFailureSink(nil)
 	response := []byte("pong response")
 	network := bedrock.Network{
-		Transport:    &transferProbeNetwork{response: response},
-		Recorder:     recorder,
-		Failures:     failures,
-		SessionID:    sessionID,
-		ConnectionID: "upstream-2",
-		Channel:      "upstream",
-		Hop:          2,
+		Transport:      &transferProbeNetwork{response: response},
+		Recorder:       recorder,
+		Failures:       failures,
+		SessionID:      sessionID,
+		ConnectionID:   "upstream-2",
+		Channel:        "upstream",
+		Hop:            2,
+		BestEffortPing: true,
 	}
 	localAddr := &net.UDPAddr{IP: net.IPv4(127, 0, 0, 1), Port: 40000}
 	if err := runner.probeTransferRouteNetwork(context.Background(), "example.test:19132", localAddr, 42, 2, network, newLiveReporter(io.Discard)); err != nil {
@@ -83,6 +84,13 @@ func TestTransferRouteProbeCapturesPingResponse(t *testing.T) {
 	}
 	if pingEvent.Blob == nil || pingEvent.Blob.Size != int64(len(response)) || pingEvent.Blob.Representation != "bedrock_transport_ping" {
 		t.Fatalf("ping blob = %#v", pingEvent.Blob)
+	}
+	var pingData map[string]any
+	if err := json.Unmarshal(pingEvent.Data, &pingData); err != nil {
+		t.Fatal(err)
+	}
+	if pingData["best_effort"] != true {
+		t.Fatalf("ping data = %#v, want best_effort=true", pingData)
 	}
 	if routeEvent.Kind != "transfer.route_probe" || routeEvent.Hop != 2 {
 		t.Fatalf("route event = %#v", routeEvent)

@@ -137,12 +137,13 @@ try {
     foreach ($item in $errors) {
         $kind = [string](Get-ObjectProperty $item "kind" "unknown")
         $operation = [string](Get-ObjectProperty $item "operation" "")
+        $bestEffort = [bool](Get-ObjectProperty $item "best_effort" $false)
         $count = [uint64](Get-ObjectProperty $item "count" 0)
         if (-not $safeErrorsByKind.ContainsKey($kind)) {
             $safeErrorsByKind[$kind] = [uint64]0
         }
         $safeErrorsByKind[$kind] = [uint64]$safeErrorsByKind[$kind] + $count
-        if ($kind -eq "bridge.read_error" -or ($kind -eq "transport.payload" -and $operation -eq "read")) {
+        if ($bestEffort -or $kind -eq "bridge.read_error" -or ($kind -eq "transport.payload" -and $operation -eq "read")) {
             $terminationErrorEvents += $count
         } else {
             $blockingErrorEvents += $count
@@ -154,7 +155,9 @@ try {
         }
     )
 
-    $verificationIssues = @(Get-ObjectProperty $analysis "verification_issues" @())
+    $verificationIssues = @(
+        @(Get-ObjectProperty $analysis "verification_issues" @()) | Where-Object { $null -ne $_ }
+    )
     $resourcePacks = @(Get-ObjectProperty $analysis "resource_packs" @())
     $packDecryptions = @(Get-ObjectProperty $analysis "resource_pack_decryptions" @())
     $decryptedPackCount = @($packDecryptions | Where-Object { [string](Get-ObjectProperty $_ "status" "") -eq "decrypted" }).Count

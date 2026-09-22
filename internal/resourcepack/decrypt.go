@@ -206,10 +206,21 @@ func DecryptArchive(ctx context.Context, source io.ReaderAt, archiveSize int64, 
 			if entry.Key != "" && len([]byte(entry.Key)) != 32 {
 				return Result{}, fmt.Errorf("resource pack entry %s has a %d-byte key, expected 32", fullPath, len([]byte(entry.Key)))
 			}
+			isDirectory := archiveDirectoryReference(fullPath, files)
 			if _, isContents := contentsSet[fullPath]; !isContents {
-				if _, exists := files[fullPath]; !exists {
+				if _, exists := files[fullPath]; !exists && !isDirectory {
 					return Result{}, fmt.Errorf("resource pack contents reference missing entry %s", fullPath)
 				}
+			}
+			if isDirectory {
+				if entry.Key != "" {
+					return Result{}, fmt.Errorf("resource pack contents directory %s has an encryption key", fullPath)
+				}
+				// ZIP archives may omit directory entries. The contents manifest
+				// still lists those directories so the child files can be keyed
+				// individually. Do not count a directory as a plain file.
+				declarations[fullPath] = ""
+				continue
 			}
 			declarations[fullPath] = entry.Key
 			if entry.Key == "" {
@@ -477,6 +488,26 @@ func joinArchivePath(prefix, name string) string {
 		return name
 	}
 	return prefix + "/" + name
+}
+
+func archiveDirectoryReference(name string, files map[string]*zip.File) bool {
+	name = strings.TrimSuffix(name, "/")
+	if name == "" {
+		return false
+	}
+	if file, ok := files[name]; ok {
+		return file.FileInfo().IsDir()
+	}
+	if file, ok := files[name+"/"]; ok && file.FileInfo().IsDir() {
+		return true
+	}
+	prefix := name + "/"
+	for candidate := range files {
+		if strings.HasPrefix(candidate, prefix) {
+			return true
+		}
+	}
+	return false
 }
 
 func allZero(data []byte) bool {

@@ -107,3 +107,28 @@ func TestExplainSanitizesCapturedMarkdownFields(t *testing.T) {
 		t.Fatalf("explanation contains captured Markdown structure:\n%s", explanation)
 	}
 }
+
+func TestAnalyzeMarksBestEffortPingErrors(t *testing.T) {
+	root := filepath.Join(t.TempDir(), "capture")
+	recorder, err := capture.New(root, capture.Options{CaptureID: "best-effort-ping", Commit: "0123456789abcdef0123456789abcdef01234567"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := recorder.Record(context.Background(), capture.Record{Event: capture.Event{
+		Kind: "transport.ping", Severity: capture.SeverityWarn,
+		Data:  []byte(`{"address":"example.test:19132","best_effort":true}`),
+		Error: &capture.ErrorInfo{Operation: "ping", Message: "ping timeout", Type: "*errors.errorString"},
+	}}); err != nil {
+		t.Fatal(err)
+	}
+	if err := recorder.Close("closed", nil); err != nil {
+		t.Fatal(err)
+	}
+	summary, err := Analyze(root)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(summary.Errors) != 1 || !summary.Errors[0].BestEffort {
+		t.Fatalf("best-effort errors = %#v", summary.Errors)
+	}
+}

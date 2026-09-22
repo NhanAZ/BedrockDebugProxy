@@ -111,6 +111,9 @@ Detailed rationale remains in [`docs/audits/`](docs/audits/).
 - The compact capture overview now vertically centers each metric label and value within the header row.
 - The contributor validation workflow now requires viewer asset, HTTP, JavaScript, and browser smoke checks in the same change whenever a web-facing change could affect the page.
 - Validation reports now preserve capture start and end timestamps as invariant UTC ISO 8601 values instead of locale-formatted strings.
+- Resource-pack decryption now accepts manifest entries for implicit directories while continuing to validate missing descendants and keyed-directory declarations.
+- Best-effort transfer route pings now retain their errors as warning evidence and do not block a report when the normal next-hop connection succeeds. Other status-ping errors remain blocking.
+- Validation report generation now treats a null integrity-issue list as empty, matching the analyzer's JSON representation for captures without verifier issues.
 
 ### Fixed
 

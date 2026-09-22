@@ -28,8 +28,11 @@ type Network struct {
 	Channel          string
 	Hop              int
 	HopFunc          func() int
-	ReadDirection    capture.Direction
-	WriteDirection   capture.Direction
+	// BestEffortPing marks a status ping used as a route hint. Its failure is
+	// retained as evidence but does not make the route probe itself fatal.
+	BestEffortPing bool
+	ReadDirection  capture.Direction
+	WriteDirection capture.Direction
 	// PayloadMetadataFunc returns bounded state associated with the connection
 	// that produced the next transport payload event. It is evaluated for each
 	// payload and supplements, but never replaces, the raw payload blob.
@@ -94,6 +97,7 @@ func (n Network) PingContext(ctx context.Context, address string) ([]byte, error
 		"address":        address,
 		"response_bytes": len(response),
 		"duration_nano":  time.Since(started).Nanoseconds(),
+		"best_effort":    n.BestEffortPing,
 	})
 	event := capture.Event{
 		SessionID:    n.SessionID,
@@ -108,6 +112,9 @@ func (n Network) PingContext(ctx context.Context, address string) ([]byte, error
 	}
 	if operationErr != nil {
 		event.Severity = capture.SeverityError
+		if n.BestEffortPing {
+			event.Severity = capture.SeverityWarn
+		}
 		event.Error = captureError("ping", operationErr)
 	}
 	_, captureErr := n.Recorder.Record(context.Background(), capture.Record{

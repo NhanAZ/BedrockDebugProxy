@@ -126,6 +126,7 @@ type ErrorCount struct {
 	Operation     string `json:"operation,omitempty"`
 	Type          string `json:"type,omitempty"`
 	Message       string `json:"message,omitempty"`
+	BestEffort    bool   `json:"best_effort,omitempty"`
 	Count         uint64 `json:"count"`
 	FirstSequence uint64 `json:"first_sequence"`
 	LastSequence  uint64 `json:"last_sequence"`
@@ -139,10 +140,11 @@ type packetKey struct {
 }
 
 type errorKey struct {
-	kind      string
-	operation string
-	typeName  string
-	message   string
+	kind       string
+	operation  string
+	typeName   string
+	message    string
+	bestEffort bool
 }
 
 type artifactAggregate struct {
@@ -259,7 +261,16 @@ func Analyze(root string) (Summary, error) {
 		}
 		if event.Error != nil || event.Severity == capture.SeverityError {
 			summary.Session.ErrorEvents++
-			key := errorKey{kind: event.Kind}
+			bestEffort := false
+			if event.Kind == "transport.ping" && len(event.Data) != 0 {
+				var ping struct {
+					BestEffort bool `json:"best_effort"`
+				}
+				if err := json.Unmarshal(event.Data, &ping); err == nil {
+					bestEffort = ping.BestEffort
+				}
+			}
+			key := errorKey{kind: event.Kind, bestEffort: bestEffort}
 			if event.Error != nil {
 				key.operation = event.Error.Operation
 				key.typeName = event.Error.Type
@@ -269,6 +280,7 @@ func Analyze(root string) (Summary, error) {
 			if aggregate == nil {
 				aggregate = &ErrorCount{
 					Kind: key.kind, Operation: key.operation, Type: key.typeName, Message: key.message,
+					BestEffort:    key.bestEffort,
 					FirstSequence: event.Sequence,
 				}
 				errorsByKey[key] = aggregate
