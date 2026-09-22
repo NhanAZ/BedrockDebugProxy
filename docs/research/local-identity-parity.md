@@ -48,6 +48,14 @@ The source path is confirmed in the in-tree gophertunnel fork. `defaultClientDat
 
 The mismatch removal is confirmed by source and deterministic unit coverage. A fresh real-client authenticated loopback report is still required to verify the emitted login shape after the fix. No public-server behavior is inferred from this local evidence.
 
+### Post-fix authenticated vanilla loopback
+
+On 2026-09-22, a real Windows Bedrock client signed in as `SrDuck84` through the stamped `970531e7d7132a4e0f889e1ab9ad735a8d4002c1` binary to the operator-controlled local PocketMine server. The session reached spawn, remained active for roughly one minute, and ended with `player_quit`.
+
+The closed proxy capture `captures/session-20260922T041204Z` contains 12,750 events and 6,118 blobs with zero write errors, dropped events, truncation, or decode errors. Its manifest records the exact tested revision. The matching ProxyFingerprint report completed with 1,391 packets, `ClientData.PlayFabId` absent, and only the expected `non_public_peer` signal. The earlier `auth_client_playfab_mismatch` signal is absent after the change.
+
+This confirms the synthetic authenticated PlayFab field is removed on the real-client local path. The upstream report still advertises Android metadata because the authenticated gophertunnel session remains a separate signed connection. This local result does not establish public-server compatibility or enforcement behavior.
+
 ### Local XUID rejection with an unauthenticated upstream
 
 The closed local capture `captures/session-20260921T121717Z` provides a second confirmation of this boundary. The downstream connection was an authenticated Bedrock client, while the proxy was started with `auth_mode=none` and the local upstream required its normal identity checks. The upstream dial reached the login exchange but failed with `XUID does not match (possible impersonation attempt)` after 1 minute 29.872 seconds. The capture has no `session.negotiated` event because the upstream never completed login.
