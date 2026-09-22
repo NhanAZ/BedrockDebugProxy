@@ -174,7 +174,7 @@ An exported `.bdpcap` is a portable copy, not a redacted copy. It can contain al
 
 The project currently supports Bedrock 1.26.51, protocol 2193, through the reviewed 1.26.50 gophertunnel packet definitions, the official 1.26.51 no-packet-change release metadata, and local featured-experience compatibility patches. It supports one downstream client. With `--follow-transfers`, subsequent upstream hops remain in the same process and capture session. Automated tests include a full local RakNet session and focused tests for capture integrity, representative packet preservation, Experience response parsing, transport capability preservation, protocol metadata, and new packet bodies.
 
-Automated success does not prove live Minecraft compatibility. Runtime changes require a stamped real-client session on The Hive, and releases require the five-server validation matrix documented in [`docs/validation.md`](docs/validation.md). Until the current candidate completes that process, treat it as development software rather than a production-ready proxy.
+Automated success does not prove live Minecraft compatibility. Runtime changes require a stamped real-client session on The Hive, and releases require the six-server validation matrix documented in [`docs/validation.md`](docs/validation.md). CubeCraft is included only when the maintainer accepts the connection risk for the exact diagnostic session. Until the current candidate completes that process, treat it as development software rather than a production-ready proxy.
 
 The Enchanted featured-experience transfer investigation, including the pre-fix failure signature and revision-matched live result, is recorded in the [research note](docs/research/enchanted-transfer-handshake.md).
 

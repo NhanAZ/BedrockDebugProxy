@@ -998,6 +998,14 @@ Every new entry should state the symptom, root cause, implementation commits, ev
 - Evidence and validation: documentation review and `git diff --check`. This is a workflow-only change with no runtime or capture impact.
 - Status: implemented as a documentation-only maintenance rule.
 
+### FIX-0125 - Restore CubeCraft as a maintainer-risk-gated release target
+
+- Symptom: the release workflow and readiness checker omitted CubeCraft even when the maintainer wanted the private, owner-controlled test process to include it.
+- Root cause: the workflow treated CubeCraft's public Bedrock proxy prohibition as an unconditional project exclusion instead of separating the public policy warning from the maintainer's internal risk decision.
+- Implementation: add CubeCraft as the sixth release-matrix label and direct endpoint, require an explicit `risk_acknowledged=pass` check, retain the public policy warning, prohibit recording private server discussions, and keep the normal read-only capture path. No runtime forwarding or packet behavior changed.
+- Evidence and validation: CubeCraft's [Rules](https://help.cubecraft.net/en/article/cubecraft-rules-1403lij/) and [Allowed Mods and Clients](https://www.cubecraft.net/threads/allowed-mods-and-clients.228596/) were reviewed on 2026-09-22. This change updates the release docs, agent guide, validation catalog, changelog, and readiness checker only.
+- Status: implemented as a documentation and release-workflow change. No CubeCraft connection was performed and no permission or policy exception is claimed.
+
 ## Ordering safety contract
 
 The deferred-packet change is deliberately narrow. `expectedIDs` remains the only authority for what the current login state accepts. The queue scan selects the earliest packet that is currently expected, leaves packets for later states queued, and never mutates or reorders bytes on the wire. The regression tests cover canonical resource-pack order, featured early `ResourcePacksInfo`, a later-phase packet queued ahead of the current phase, and all six permutations of the three login packets.
@@ -1008,5 +1016,5 @@ This is a compatibility guard, not permission to assume a universal Bedrock sequ
 
 - Generate a stamped binary from the current commit and run The Hive minimum baseline.
 - Re-run the direct Enchanted transfer and resource-pack flow with the same binary.
-- Complete the exact-revision matrix for Galaxite, Lifeboat, Mineville Zeqa, and Enchanted after the The Hive baseline before release.
+- Complete the exact-revision matrix for Galaxite, Lifeboat, Mineville Zeqa, Enchanted, and CubeCraft after the The Hive baseline before release. CubeCraft requires maintainer risk acknowledgement first.
 - If a server fails, record the capture and classify the failure before changing the generic state machine.

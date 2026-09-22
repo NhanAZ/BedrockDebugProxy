@@ -4,7 +4,7 @@ Automated tests establish that the implementation matches local expectations. Th
 
 Changes that can affect the local web viewer have an additional same-change requirement. The commit must include the viewer asset and HTTP integration tests and the embedded JavaScript syntax check. Presentation or interaction changes must also be smoke-tested in a browser from a clean committed build. Use [`web-validation.md`](web-validation.md) for the exact scope and checklist.
 
-For the end-to-end pull request checklist, use [`../CONTRIBUTING.md`](../CONTRIBUTING.md). For the ordered five-server release checklist, use [`releasing.md`](releasing.md). See [`server-targets.md`](server-targets.md) for endpoint references and the server-policy disclaimer. This document defines how to create and judge the validation evidence used by both workflows.
+For the end-to-end pull request checklist, use [`../CONTRIBUTING.md`](../CONTRIBUTING.md). For the ordered six-server release checklist, use [`releasing.md`](releasing.md). See [`server-targets.md`](server-targets.md) for endpoint references and the server-policy disclaimer. This document defines how to create and judge the validation evidence used by both workflows.
 
 The automated suite includes a loopback integration session over RakNet. It exercises offline login, resource-pack negotiation with no packs, StartGame and spawn, typed packet forwarding in both directions, clean shutdown, raw packet capture, decoded events, connection metadata, and GameData snapshots. This catches local forwarding and capture regressions without accounts or public infrastructure. It does not exercise Microsoft authentication, the retail Minecraft client, public-server routing, transfers, live resource packs, or server-specific behavior and therefore does not replace the gates below.
 
@@ -19,6 +19,8 @@ A change to a specific flow also requires direct validation of that flow. For ex
 For transfer-following changes, the direct check must observe the `Transfer` rewrite, a successful next-hop transport and upstream connection, the next hop's resource-pack exchange when offered, and a later spawn. When the route probe exposes it, inspect `client_guid_preserved: true` as evidence that the RakNet identity was carried into the next-hop handshake. A first-hop connection alone is not sufficient evidence for a transfer fix.
 
 The Enchanted release report has an additional mandatory flow. The server sends its form when the player joins. Select any available minigame in that server-sent form and wait for the server to send `Transfer`. The report passes only when the proxy follows that transfer, captures the next-hop login and resource-pack exchange when offered, and reaches the minigame spawn. Connecting to the Enchanted hub without selecting a minigame is not sufficient. Record `transfer_following=pass` and `resource_pack_transfer=pass` for this flow.
+
+CubeCraft has an additional maintainer risk gate. Before connecting, the maintainer must explicitly accept the possibility of rejection, kick, or ban for the exact diagnostic session. CubeCraft's public rules prohibit Bedrock proxies, so a risk acknowledgement must not be described as permission or a policy exception. If the acknowledgement is unavailable, do not connect and record `incomplete` with the relevant `risk_acknowledged=not_observed` check. The session must use the normal read-only proxy path and must not add bypass, mutation, replay, or anti-cheat evasion behavior.
 
 Do not approve or merge a runtime-affecting pull request without reports for the exact revision. Documentation, comments, formatting, and changes proven not to affect runtime may be exempt. When impact is uncertain, require validation.
 
@@ -91,12 +93,15 @@ baseline server.
 - Lifeboat
 - Mineville Zeqa (`experience:Mineville Zeqa`)
 - Enchanted (`experience:Enchanted`)
+- CubeCraft (`play.cubecraft.net:19132`)
 
-For each server, check connection, authentication, resource packs when offered, spawn, both traffic directions, packet decoding, stability, and unexplained protocol or decode errors. Do not assume the five servers use the same packet order, timing, optional packets, software, or infrastructure.
+For each server, check connection, authentication, resource packs when offered, spawn, both traffic directions, packet decoding, stability, and unexplained protocol or decode errors. Do not assume the six servers use the same packet order, timing, optional packets, software, or infrastructure.
+
+For CubeCraft, also require `risk_acknowledged=pass` before accepting `result=pass`. The public policy warning remains in force, and the acknowledgement does not imply that CubeCraft has granted an exception.
 
 A baseline failure starts an investigation. Determine whether the cause is a proxy bug, protocol misunderstanding, valid server behavior, or an external outage before changing code. Do not add a server-specific workaround merely to make the release matrix green. If an external condition prevents testing, retain an `incomplete` report and keep the release not ready until the maintainer explicitly resolves the gate.
 
-After generating all five reports for one runtime revision, run
+After generating all six reports for one runtime revision, run
 `tools/check-release-readiness.ps1 -Revision <40-character-commit>`. It checks that every required label has a
 passing report with automatic and manual gates for that exact revision. It does not replace human review of the
 local captures.
