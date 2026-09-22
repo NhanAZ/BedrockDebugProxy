@@ -955,8 +955,8 @@ Every new entry should state the symptom, root cause, implementation commits, ev
 - Symptom: an authenticated local upstream report contained a synthetic `ClientData.PlayFabId` whose HMAC differed from the same session's authenticated token `mid`, while a direct vanilla report omitted the field. ProxyFingerprint classified the proxied session as `auth_client_playfab_mismatch`.
 - Root cause: the forked gophertunnel dialer generated a random `PlayFabId` in `defaultClientData` before encoding every login, including authenticated dials where the downstream ClientData field was empty.
 - Implementation: make PlayFab fallback generation explicit and enable it only for offline dials. Authenticated dials now preserve the downstream value, including an intentional empty field. No token claim, signature, device metadata, or forwarded packet bytes are rewritten.
-- Evidence and validation: the closed local comparison reports from 2026-09-22, the `defaultClientData` and authenticated `login.Encode` source path, and `TestAuthenticatedClientDataPreservesEmptyPlayFabID`. A fresh real-client authenticated loopback report remains required to verify the post-fix wire shape.
-- Status: implemented with deterministic local coverage. The authenticated Android metadata boundary and public-server policy remain outside this fix.
+- Evidence and validation: the closed local comparison reports from 2026-09-22, the `defaultClientData` and authenticated `login.Encode` source path, `TestAuthenticatedClientDataPreservesEmptyPlayFabID`, and the post-fix real-client report from `captures/session-20260922T041204Z`. The post-fix report has no `auth_client_playfab_mismatch` signal and records the field as absent.
+- Status: implemented and validated on the owner-controlled local authenticated loopback. The authenticated Android metadata boundary and public-server policy remain outside this fix.
 
 ## Ordering safety contract
 
