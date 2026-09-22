@@ -41,6 +41,7 @@ Detailed rationale remains in [`docs/audits/`](docs/audits/).
 - Transport payload events now retain non-zero RakNet client GUID metadata when the connection exposes it.
 - Transport connection lifecycle events now retain bounded RakNet GUID and public-key capability metadata without storing public-key material.
 - Observed transport reads and writes now preserve both the underlying transport error and any capture-recorder error, including partial byte counts.
+- Partial transport writes now retain only the bytes reported as transferred in the raw payload blob while preserving attempted and transferred byte counts in event metadata.
 - Connection wrapping now preserves a transport close error when the initial connection-open capture also fails.
 - Transfer rewrite failures now preserve the captured error path when no raw packet read is retained, avoiding a nil dereference on typed or already-decoded forwarding paths.
 - RequestChunkRadius listener callbacks now propagate error-event write failures to the session failure sink instead of continuing with an incomplete capture.
