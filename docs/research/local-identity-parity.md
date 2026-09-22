@@ -46,7 +46,7 @@ The 2026-09-22 local authenticated run at revision `936acb064ac7c5a216a60ba919aa
 
 The source path is confirmed in the in-tree gophertunnel fork. `defaultClientData` generated a random `PlayFabId` before the authenticated branch called `setAndroidData`, even when the downstream client had supplied an empty field. The dialer now enables that fallback only for offline logins and preserves an empty authenticated field. This removes a proxy-created identifier without copying, forging, or re-signing the authenticated identity. The Android device metadata and the separate signed upstream session remain known authenticated-parity boundaries.
 
-The mismatch removal is confirmed by source and deterministic unit coverage. A fresh real-client authenticated loopback report is still required to verify the emitted login shape after the fix. No public-server behavior is inferred from this local evidence.
+The mismatch removal is confirmed by source, deterministic unit coverage, and the real-client loopback evidence below. No public-server behavior is inferred from this local evidence.
 
 ### Post-fix authenticated vanilla loopback
 
@@ -55,6 +55,14 @@ On 2026-09-22, a real Windows Bedrock client signed in as `SampleAccount` throug
 The closed proxy capture `captures/session-20260922T041204Z` contains 12,750 events and 6,118 blobs with zero write errors, dropped events, truncation, or decode errors. Its manifest records the exact tested revision. The matching ProxyFingerprint report completed with 1,391 packets, `ClientData.PlayFabId` absent, and only the expected `non_public_peer` signal. The earlier `auth_client_playfab_mismatch` signal is absent after the change. The PocketMine log still reported an `Unexpected JSON property for ClientData: PlayFabId` warning during this run because the empty field was omitted from the selected report but was still serialized on the wire. The follow-up JSON-tag change omits the key itself when empty.
 
 After that follow-up was built into revision `9994e4e11f595f7980fc6795f5cc8b05271d4de7`, the real Windows client repeated the local loopback on 2026-09-22. The client reached spawn, sent chat and gameplay traffic, and quit normally. Capture `captures/session-20260922T043146Z` closed with 8,250 events and 3,837 blobs, with zero write errors, dropped events, truncation, or decode errors. The matching ProxyFingerprint report `20260922T043303.076778Z_47906eadaa099058_unlabeled.json` completed after `player_quit`, recorded `ClientData.PlayFabId` as absent, and emitted only `non_public_peer`. The PocketMine log contains no `Unexpected JSON property for ClientData: PlayFabId` warning for this session and records `XUID match`. This confirms the empty-key wire-shape correction on the owner-controlled local authenticated loopback.
+
+### Android downstream loopback with a separate authenticated upstream
+
+On 2026-09-22, an Android Bedrock client signed in as `ClientAccount` connected over the LAN to `<LAN_IP>:19134`. The proxy used the cached `SampleAccount` device-auth token for its separate authenticated upstream dial to the local PocketMine server. The upstream therefore correctly reported `SampleAccount`, while the downstream transport peer was the Android client. This was an intentional two-identity local test, not an attempt to merge or forge account identities.
+
+The stamped revision was `9994e4e11f595f7980fc6795f5cc8b05271d4de7`. Capture `captures/session-20260922T044324Z` closed with 11,325 events and 6,235 blobs, with zero write errors, dropped events, truncation, or decode errors. The session negotiated protocol 2193 and game version 1.26.51 on both sides, reached spawn, carried bidirectional gameplay traffic, and ended with `player_quit`. The matching ProxyFingerprint report `20260922T045726.014738Z_f5c3fe0b06ede822_unlabeled.json` recorded Android device metadata, `ClientData.PlayFabId` absent, and only `non_public_peer`; PocketMine recorded `XUID match` and no `PlayFabId` parser warning.
+
+The same capture confirms the documented NetworkSettings boundary on a real Android client. The downstream listener advertised compression threshold `256`, while PocketMine's upstream response advertised threshold `1`, so `network_settings_match` was `false`. This is an observed local wire difference and remains a separate compatibility question. The proxy did not normalize or rewrite either setting.
 
 This confirms the synthetic authenticated PlayFab field is removed on the real-client local path. The upstream report still advertises Android metadata because the authenticated gophertunnel session remains a separate signed connection. This local result does not establish public-server compatibility or enforcement behavior.
 
@@ -77,4 +85,4 @@ An independent upstream report, [gophertunnel issue #407](https://github.com/San
 
 ## Limitations
 
-The test used a synthetic offline gophertunnel client and an operator-controlled local server. It does not establish how a public server classifies a proxy, and it does not replace a real vanilla-client validation of the Xbox-authenticated path.
+The local evidence uses owner-controlled PocketMine sessions and does not establish how a public server classifies a proxy. The authenticated upstream is a separate signed session, so account identity and device metadata must not be inferred as a single vanilla connection.

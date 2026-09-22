@@ -35,6 +35,7 @@ Each gophertunnel connection now retains the decoded `NetworkSettings` exchanged
 
 - Nested gophertunnel tests cover retention of all `NetworkSettings` fields.
 - The root loopback integration test checks that both sides expose equal settings in its deterministic fixture.
+- The real Android loopback in `captures/session-20260922T044324Z` at revision `9994e4e11f595f7980fc6795f5cc8b05271d4de7` observed downstream threshold `256` and upstream threshold `1`, with protocol 2193 and game version 1.26.51 on both sides. The session reached spawn and closed cleanly. This confirms the mismatch on the owner-controlled local path without implying a public-server policy signal.
 - No public server or external account was contacted for this change.
 
 ## Follow-up
