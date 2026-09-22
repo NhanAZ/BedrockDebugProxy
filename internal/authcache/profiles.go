@@ -183,6 +183,66 @@ func (s *AccountStore) Use(name string) (Account, error) {
 	return s.accountStatus(key, record, true), nil
 }
 
+// Rename moves one cached account to a new local label without changing its
+// token, cache age policy, or selected-default state. The destination must not
+// already exist so an explicit rename cannot overwrite another account.
+func (s *AccountStore) Rename(oldName, newName string) error {
+	oldKey, _, err := canonicalAccountName(oldName)
+	if err != nil {
+		return err
+	}
+	newKey, newLabel, err := canonicalAccountName(newName)
+	if err != nil {
+		return err
+	}
+	if oldKey == newKey {
+		return errors.New("old and new account names are the same")
+	}
+	registry, err := s.load()
+	if err != nil {
+		return err
+	}
+	record, ok := registry.Accounts[oldKey]
+	if !ok {
+		return fmt.Errorf("account %q was not found", oldName)
+	}
+	if _, exists := registry.Accounts[newKey]; exists {
+		return fmt.Errorf("account %q already exists", newName)
+	}
+	oldPath := s.tokenPath(oldKey)
+	newPath := s.tokenPath(newKey)
+	info, err := os.Stat(oldPath)
+	if errors.Is(err, os.ErrNotExist) {
+		return fmt.Errorf("account %q has no cached Microsoft authentication", oldName)
+	}
+	if err != nil {
+		return fmt.Errorf("inspect account cache: %w", err)
+	}
+	if !info.Mode().IsRegular() {
+		return fmt.Errorf("account cache %q is not a regular file", oldName)
+	}
+	if err := os.MkdirAll(filepath.Dir(newPath), 0o700); err != nil {
+		return fmt.Errorf("create account directory: %w", err)
+	}
+	if err := os.Rename(oldPath, newPath); err != nil {
+		return fmt.Errorf("rename account cache: %w", err)
+	}
+	rollback := func() {
+		_ = os.Rename(newPath, oldPath)
+	}
+	record.Name = newLabel
+	registry.Accounts[newKey] = record
+	delete(registry.Accounts, oldKey)
+	if registry.Default == oldKey {
+		registry.Default = newKey
+	}
+	if err := s.save(registry); err != nil {
+		rollback()
+		return fmt.Errorf("save renamed account: %w", err)
+	}
+	return nil
+}
+
 // Remove deletes one account's local token and registry entry. It returns the
 // selected replacement default, if one was chosen automatically.
 func (s *AccountStore) Remove(name string) (removed bool, replacement string, err error) {

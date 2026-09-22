@@ -34,12 +34,17 @@ Use a local label only when adding or switching accounts:
 # Select the account used by future run commands.
 .\bin\bedrock-debug-proxy.exe use NhanAZ
 
+# Rename a legacy default cache without reauthenticating it.
+.\bin\bedrock-debug-proxy.exe rename default SampleAccount
+
 # Sign out the default account, or name another account explicitly.
 .\bin\bedrock-debug-proxy.exe logout
 .\bin\bedrock-debug-proxy.exe logout OtherAccount
 ```
 
 `login` without a label prompts for a label in an interactive terminal. A non-empty label adds or reauthenticates that profile. Pressing Enter is allowed only after at least one account exists, and reauthenticates the current default. The first successful account becomes the default. `use` changes only the local selection. `logout` removes only the selected account's local token cache. If the default is removed while another account remains, the remaining account with the stable first label becomes the default.
+
+`rename OLD_ACCOUNT NEW_ACCOUNT` moves an existing local cache and preserves its token, local cache-age policy, and selected-default state. It never overwrites an existing destination. This is useful for converting the legacy `default` cache to a meaningful label without signing in again. The label is local metadata and is not verified against the Microsoft or Minecraft identity in the token.
 
 Account labels are local names, not claims about the Minecraft username inside the token. The account registry never stores access or refresh token values.
 

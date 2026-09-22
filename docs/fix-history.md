@@ -974,6 +974,14 @@ Every new entry should state the symptom, root cause, implementation commits, ev
 - Evidence and validation: focused command tests cover the required prompt, shared input buffering, and the existing optional default prompt. Full quality-gate validation remains required before treating this runtime change as live-validated.
 - Status: implemented with deterministic local coverage. Existing legacy caches remain compatible and are not renamed automatically.
 
+### FIX-0122 - Rename legacy authentication caches explicitly
+
+- Symptom: a legacy authentication file continued to appear as the ambiguous `default` account after named profiles were introduced.
+- Root cause: compatibility kept `%AppData%\\BedrockDebugProxy\\auth-token.json` at the synthetic `default` label, but there was no way to migrate that cache without signing in again.
+- Implementation: add `rename OLD_ACCOUNT NEW_ACCOUNT`. The command validates both labels, refuses an existing destination, moves the cache without changing token bytes, preserves the local age policy, and updates the selected default atomically with rollback on registry-save failure.
+- Evidence and validation: account-store tests cover legacy migration, default preservation, token retention, and destination collision rejection. Full quality-gate validation remains required before treating this runtime change as live-validated.
+- Status: implemented with deterministic local coverage. The label remains operator-supplied local metadata and is not verified against the token identity.
+
 ## Ordering safety contract
 
 The deferred-packet change is deliberately narrow. `expectedIDs` remains the only authority for what the current login state accepts. The queue scan selects the earliest packet that is currently expected, leaves packets for later states queued, and never mutates or reorders bytes on the wire. The regression tests cover canonical resource-pack order, featured early `ResourcePacksInfo`, a later-phase packet queued ahead of the current phase, and all six permutations of the three login packets.
