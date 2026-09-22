@@ -934,6 +934,14 @@ Every new entry should state the symptom, root cause, implementation commits, ev
 - Evidence and validation: the `net.Conn` write contract permits returning fewer bytes with an error. A deterministic regression test uses a synthetic partial transport, verifies the blob contains only the transferred prefix, and verifies both byte-count metadata fields.
 - Status: implemented with deterministic local coverage. Live partial-write behavior remains unverified.
 
+### FIX-0117 - Account for accepted events lost after writer failure
+
+- Symptom: when the asynchronous capture writer failed, it stopped after the failing job and left already accepted jobs in the queue without recording their loss in the manifest.
+- Root cause: the writer returned immediately after setting `failed`, so queued jobs were neither persisted nor counted as dropped. A rollback racing a completed job could also reuse its committed sequence number.
+- Implementation: drain accepted jobs after a writer failure, count the failed and drained jobs as dropped, add one explicit completeness limitation, and keep pending queue accounting consistent. Enqueue rollback now avoids rewinding a sequence that the writer already committed.
+- Evidence and validation: deterministic recorder coverage closes the event stream, queues three accepted jobs, closes the recorder, and verifies zero persisted events, three dropped events, an incomplete manifest, and the explicit limitation. The focused capture tests pass under the Go race detector.
+- Status: implemented with deterministic local coverage. Live disk-failure behavior remains unverified.
+
 ## Ordering safety contract
 
 The deferred-packet change is deliberately narrow. `expectedIDs` remains the only authority for what the current login state accepts. The queue scan selects the earliest packet that is currently expected, leaves packets for later states queued, and never mutates or reorders bytes on the wire. The regression tests cover canonical resource-pack order, featured early `ResourcePacksInfo`, a later-phase packet queued ahead of the current phase, and all six permutations of the three login packets.

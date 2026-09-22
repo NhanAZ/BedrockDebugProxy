@@ -138,7 +138,7 @@ The original CloudburstMC project remains evidence for the basic terminating-pro
 
 Spyglass hooks the Bedrock client at packet send and packet read boundaries. It retains raw packet bodies, unread byte counts, decode success, detailed error trees, packet names, sub-client information, and timing. Its UI is backed by a disk stream plus an index rather than an unbounded in-memory packet list.
 
-The bounded writer queue and visible rejected or dropped counters are strong design references. BedrockDebugProxy now uses a bounded ordered queue with blocking backpressure and a `never_drop` policy. Queue capacity and peak occupancy are visible in manifest values, while writer failures mark the capture incomplete.
+The bounded writer queue and visible rejected or dropped counters are strong design references. BedrockDebugProxy now uses a bounded ordered queue with blocking backpressure and a `never_drop` policy during normal operation. Queue capacity and peak occupancy are visible in manifest values. If a writer failure prevents accepted jobs from being persisted, those jobs are counted as dropped and the capture is marked incomplete.
 
 Spyglass also demonstrates that an ordered packet list, direction and failure filters, a decoded detail tree, a hex pane, keyboard navigation, and visible counts make packet research substantially easier than terminal summaries alone. BedrockDebugProxy adopts those interaction goals in a separate read-only viewer for closed canonical captures. It does not copy Spyglass source or use its injected overlay architecture. The local viewer remains independent from packet forwarding, keeps exact evidence in the existing capture format, and applies only bounded display previews.
 
