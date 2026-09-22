@@ -1,9 +1,11 @@
 package minecraft
 
 import (
+	"bytes"
 	"crypto/ecdsa"
 	"crypto/elliptic"
 	cryptorand "crypto/rand"
+	"encoding/json"
 	"testing"
 
 	"github.com/sandertv/gophertunnel/minecraft/protocol"
@@ -87,5 +89,25 @@ func TestAuthenticatedClientDataPreservesEmptyPlayFabID(t *testing.T) {
 
 	if clientData.PlayFabID != "" {
 		t.Fatalf("authenticated ClientData.PlayFabID = %q, want empty when the client omitted it", clientData.PlayFabID)
+	}
+}
+
+func TestAuthenticatedClientDataOmitsEmptyPlayFabIDFromJSON(t *testing.T) {
+	clientData := login.ClientData{PlayFabID: ""}
+	encoded, err := json.Marshal(clientData)
+	if err != nil {
+		t.Fatalf("marshal empty authenticated ClientData: %v", err)
+	}
+	if bytes.Contains(encoded, []byte(`"PlayFabId"`)) {
+		t.Fatalf("empty authenticated ClientData still contains PlayFabId: %s", encoded)
+	}
+
+	clientData.PlayFabID = "0123456789abcdef"
+	encoded, err = json.Marshal(clientData)
+	if err != nil {
+		t.Fatalf("marshal populated authenticated ClientData: %v", err)
+	}
+	if !bytes.Contains(encoded, []byte(`"PlayFabId":"0123456789abcdef"`)) {
+		t.Fatalf("populated ClientData omitted PlayFabId: %s", encoded)
 	}
 }
