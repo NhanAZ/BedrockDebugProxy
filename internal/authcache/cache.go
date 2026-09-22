@@ -26,8 +26,17 @@ type Source struct {
 	output    io.Writer
 	factory   sourceFactory
 	source    oauth2.TokenSource
+	persisted *oauth2.Token
 	fromCache bool
 	announced bool
+}
+
+// Options controls how a token source uses its local cache.
+type Options struct {
+	// ForceDevice ignores an existing cached token and starts device
+	// authentication. The new token replaces the cache after authentication
+	// succeeds.
+	ForceDevice bool
 }
 
 // DefaultPath returns the per-user path used for the Microsoft OAuth token cache.
@@ -65,17 +74,29 @@ func Remove(path string) (bool, error) {
 // token. Device authentication is requested only when no usable cached token is
 // available. The cache contains a refresh token and must be treated as a secret.
 func New(path string, output io.Writer) (*Source, error) {
-	return newSource(path, output, sourceFactory{
+	return NewWithOptions(path, output, Options{})
+}
+
+// NewWithOptions returns a token source that reuses and refreshes a cached
+// Microsoft OAuth token unless the caller explicitly requests device
+// authentication. The cache contains a refresh token and must be treated as a
+// secret.
+func NewWithOptions(path string, output io.Writer, options Options) (*Source, error) {
+	return newSourceWithOptions(path, output, sourceFactory{
 		device: func(w io.Writer) oauth2.TokenSource {
 			return auth.WriterTokenSource(newClickableAuthWriter(w))
 		},
 		refresh: func(token *oauth2.Token, w io.Writer) oauth2.TokenSource {
 			return auth.RefreshTokenSourceWriter(token, newClickableAuthWriter(w))
 		},
-	})
+	}, options)
 }
 
 func newSource(path string, output io.Writer, factory sourceFactory) (*Source, error) {
+	return newSourceWithOptions(path, output, factory, Options{})
+}
+
+func newSourceWithOptions(path string, output io.Writer, factory sourceFactory, options Options) (*Source, error) {
 	if path == "" {
 		return nil, errors.New("authentication cache path is empty")
 	}
@@ -87,6 +108,10 @@ func newSource(path string, output io.Writer, factory sourceFactory) (*Source, e
 	}
 
 	s := &Source{path: path, output: output, factory: factory}
+	if options.ForceDevice {
+		s.source = factory.device(output)
+		return s, nil
+	}
 	token, err := readToken(path)
 	if errors.Is(err, os.ErrNotExist) {
 		s.source = factory.device(output)
@@ -96,6 +121,7 @@ func newSource(path string, output io.Writer, factory sourceFactory) (*Source, e
 		return nil, err
 	}
 	s.source = factory.refresh(token, output)
+	s.persisted = cloneToken(token)
 	s.fromCache = true
 	return s, nil
 }
@@ -118,8 +144,11 @@ func (s *Source) Token() (*oauth2.Token, error) {
 	if token == nil {
 		return nil, errors.New("authentication token source returned a nil token")
 	}
-	if err := writeToken(s.path, token); err != nil {
-		return nil, err
+	if !sameToken(s.persisted, token) {
+		if err := writeToken(s.path, token); err != nil {
+			return nil, err
+		}
+		s.persisted = cloneToken(token)
 	}
 	if !s.announced {
 		if s.fromCache {
@@ -130,6 +159,24 @@ func (s *Source) Token() (*oauth2.Token, error) {
 		s.announced = true
 	}
 	return token, nil
+}
+
+func cloneToken(token *oauth2.Token) *oauth2.Token {
+	if token == nil {
+		return nil
+	}
+	clone := *token
+	return &clone
+}
+
+func sameToken(left, right *oauth2.Token) bool {
+	if left == nil || right == nil {
+		return left == right
+	}
+	return left.AccessToken == right.AccessToken &&
+		left.TokenType == right.TokenType &&
+		left.RefreshToken == right.RefreshToken &&
+		left.Expiry.Equal(right.Expiry)
 }
 
 func readToken(path string) (*oauth2.Token, error) {

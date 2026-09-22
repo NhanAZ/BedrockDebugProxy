@@ -108,6 +108,39 @@ func TestSourceFallsBackToDeviceAuthenticationWhenRefreshFails(t *testing.T) {
 	}
 }
 
+func TestSourceDoesNotRefreshCacheAgeForAnUnchangedToken(t *testing.T) {
+	path := filepath.Join(t.TempDir(), "auth-token.json")
+	token := &oauth2.Token{AccessToken: "access", RefreshToken: "refresh", Expiry: time.Now().Add(time.Hour).UTC().Round(0)}
+	if err := writeToken(path, token); err != nil {
+		t.Fatal(err)
+	}
+	old := time.Now().Add(-24 * time.Hour).UTC().Round(0)
+	if err := os.Chtimes(path, old, old); err != nil {
+		t.Fatal(err)
+	}
+	source, err := newSource(path, io.Discard, sourceFactory{
+		device: func(io.Writer) oauth2.TokenSource {
+			return oauth2.StaticTokenSource(token)
+		},
+		refresh: func(*oauth2.Token, io.Writer) oauth2.TokenSource {
+			return oauth2.StaticTokenSource(token)
+		},
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := source.Token(); err != nil {
+		t.Fatal(err)
+	}
+	info, err := os.Stat(path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !info.ModTime().Equal(old) {
+		t.Fatalf("cache modified at %v, want unchanged %v", info.ModTime(), old)
+	}
+}
+
 func TestReadTokenRejectsOversizedCache(t *testing.T) {
 	path := filepath.Join(t.TempDir(), "auth-token.json")
 	if err := os.WriteFile(path, bytes.Repeat([]byte{'x'}, maxCacheBytes+1), 0o600); err != nil {
@@ -182,5 +215,164 @@ func TestClickableAuthWriterRewritesPrompt(t *testing.T) {
 	}
 	if !strings.Contains(output.String(), "https://login.live.com/oauth20_remoteconnect.srf?otc=MQR5BATV") {
 		t.Fatalf("writer output = %q", output.String())
+	}
+}
+
+func TestAccountStoreTreatsLegacyCacheAsDefault(t *testing.T) {
+	root := t.TempDir()
+	store := newAccountStore(root)
+	if err := writeToken(filepath.Join(root, "auth-token.json"), &oauth2.Token{RefreshToken: "legacy"}); err != nil {
+		t.Fatal(err)
+	}
+	account, err := store.Default()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if account.Name != "default" || !account.Default || account.TokenPath != filepath.Join(root, "auth-token.json") {
+		t.Fatalf("default account = %#v", account)
+	}
+	accounts, err := store.List()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(accounts) != 1 || accounts[0].Name != "default" || !accounts[0].Cached {
+		t.Fatalf("accounts = %#v", accounts)
+	}
+}
+
+func TestAccountStoreAddsSwitchesAndRemovesAccounts(t *testing.T) {
+	root := t.TempDir()
+	store := newAccountStore(root)
+	if err := writeToken(filepath.Join(root, "accounts", "srduck84.json"), &oauth2.Token{RefreshToken: "sr"}); err != nil {
+		t.Fatal(err)
+	}
+	if err := store.Upsert("SrDuck84", 0, false); err != nil {
+		t.Fatal(err)
+	}
+	if err := writeToken(filepath.Join(root, "accounts", "nhanaz.json"), &oauth2.Token{RefreshToken: "nhan"}); err != nil {
+		t.Fatal(err)
+	}
+	if err := store.Upsert("NhanAZ", 7*24*time.Hour, true); err != nil {
+		t.Fatal(err)
+	}
+	defaultAccount, err := store.Default()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if defaultAccount.Name != "SrDuck84" {
+		t.Fatalf("default account after add = %#v", defaultAccount)
+	}
+	if _, err := store.Use("NhanAZ"); err != nil {
+		t.Fatal(err)
+	}
+	defaultAccount, err = store.Default()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if defaultAccount.Name != "NhanAZ" || defaultAccount.MaxCacheAge != 7*24*time.Hour {
+		t.Fatalf("selected account = %#v", defaultAccount)
+	}
+	removed, replacement, err := store.Remove("NhanAZ")
+	if err != nil || !removed || replacement != "SrDuck84" {
+		t.Fatalf("Remove() = %v, %q, %v", removed, replacement, err)
+	}
+	defaultAccount, err = store.Default()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if defaultAccount.Name != "SrDuck84" {
+		t.Fatalf("replacement default = %#v", defaultAccount)
+	}
+}
+
+func TestAccountStorePreservesLegacyAccountWhenAddingNamedAccount(t *testing.T) {
+	root := t.TempDir()
+	store := newAccountStore(root)
+	if err := writeToken(filepath.Join(root, "auth-token.json"), &oauth2.Token{RefreshToken: "legacy"}); err != nil {
+		t.Fatal(err)
+	}
+	if err := writeToken(filepath.Join(root, "accounts", "nhanaz.json"), &oauth2.Token{RefreshToken: "named"}); err != nil {
+		t.Fatal(err)
+	}
+	if err := store.Upsert("NhanAZ", 0, false); err != nil {
+		t.Fatal(err)
+	}
+	accounts, err := store.List()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(accounts) != 2 || accounts[0].Name != "default" || !accounts[0].Default || accounts[1].Name != "NhanAZ" {
+		t.Fatalf("accounts = %#v", accounts)
+	}
+}
+
+func TestAccountStoreRejectsUnsafeNames(t *testing.T) {
+	store := newAccountStore(t.TempDir())
+	for _, name := range []string{"", "..", "bad/name", "bad name", strings.Repeat("a", 33)} {
+		if _, _, err := store.TokenPath(name); err == nil {
+			t.Fatalf("TokenPath(%q) unexpectedly succeeded", name)
+		}
+	}
+}
+
+func TestAccountStoreRejectsUnsafeRegistryKeys(t *testing.T) {
+	root := t.TempDir()
+	registry := `{"version":1,"default":"../escape","accounts":{"../escape":{"name":"../escape"}}}`
+	if err := os.WriteFile(filepath.Join(root, registryFileName), []byte(registry), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := newAccountStore(root).List(); err == nil {
+		t.Fatal("List accepted an unsafe registry key")
+	}
+}
+
+func TestParseMaxCacheAge(t *testing.T) {
+	for _, test := range []struct {
+		value string
+		want  time.Duration
+	}{
+		{"", 0}, {"none", 0}, {"7d", 7 * 24 * time.Hour}, {"168h", 7 * 24 * time.Hour},
+	} {
+		got, err := ParseMaxCacheAge(test.value)
+		if err != nil || got != test.want {
+			t.Fatalf("ParseMaxCacheAge(%q) = %v, %v; want %v", test.value, got, err, test.want)
+		}
+	}
+	for _, value := range []string{"not-a-duration", "7days", "999999999999999999999d"} {
+		if _, err := ParseMaxCacheAge(value); err == nil {
+			t.Fatalf("ParseMaxCacheAge accepted invalid duration %q", value)
+		}
+	}
+}
+
+func TestNewSourceForceDeviceIgnoresExistingCache(t *testing.T) {
+	path := filepath.Join(t.TempDir(), "auth-token.json")
+	if err := writeToken(path, &oauth2.Token{RefreshToken: "cached"}); err != nil {
+		t.Fatal(err)
+	}
+	deviceCalls := 0
+	refreshCalls := 0
+	source, err := newSourceWithOptions(path, io.Discard, sourceFactory{
+		device: func(io.Writer) oauth2.TokenSource {
+			deviceCalls++
+			return oauth2.StaticTokenSource(&oauth2.Token{RefreshToken: "fresh"})
+		},
+		refresh: func(*oauth2.Token, io.Writer) oauth2.TokenSource {
+			refreshCalls++
+			return oauth2.StaticTokenSource(&oauth2.Token{RefreshToken: "refreshed"})
+		},
+	}, Options{ForceDevice: true})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := source.Token(); err != nil {
+		t.Fatal(err)
+	}
+	if deviceCalls != 1 || refreshCalls != 0 {
+		t.Fatalf("device calls = %d, refresh calls = %d", deviceCalls, refreshCalls)
+	}
+	cached, err := readToken(path)
+	if err != nil || cached.RefreshToken != "fresh" {
+		t.Fatalf("cached token = %#v, error = %v", cached, err)
 	}
 }
