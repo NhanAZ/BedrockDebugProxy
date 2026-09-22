@@ -30,6 +30,8 @@ const (
 
 var ErrClosed = errors.New("capture recorder is closed")
 
+const writerFailureLossReason = "capture writer failure left accepted events unpersisted"
+
 type Options struct {
 	CaptureID     string
 	GeneratorName string
@@ -435,23 +437,56 @@ func (r *Recorder) runWriter() {
 		} else if r.failed == nil {
 			r.markFailedLocked(ErrClosed)
 		}
-		if r.pending > 0 {
-			r.pending--
-		}
-		r.pendingBytes -= job.bytes
-		if r.pending == 0 {
-			close(r.idle)
-		}
-		changed := r.spaceChanged
-		r.spaceChanged = make(chan struct{})
 		failed := r.failed != nil
+		if failed {
+			r.markDroppedLocked()
+		}
+		changed := r.completePendingLocked(job.bytes)
 		r.mu.Unlock()
 		close(changed)
 		if failed {
 			r.writerStoppedOnce.Do(func() { close(r.writerStopped) })
+			r.drainFailedQueue()
 			return
 		}
 	}
+}
+
+func (r *Recorder) drainFailedQueue() {
+	for job := range r.queue {
+		r.mu.Lock()
+		r.markDroppedLocked()
+		changed := r.completePendingLocked(job.bytes)
+		r.mu.Unlock()
+		close(changed)
+	}
+}
+
+func (r *Recorder) markDroppedLocked() {
+	r.manifest.Counts.Dropped++
+	r.manifest.Completeness.Complete = false
+	for _, limitation := range r.manifest.Completeness.Limitations {
+		if limitation == writerFailureLossReason {
+			return
+		}
+	}
+	r.manifest.Completeness.Limitations = append(r.manifest.Completeness.Limitations, writerFailureLossReason)
+}
+
+func (r *Recorder) completePendingLocked(bytes int64) chan struct{} {
+	if r.pending > 0 {
+		r.pending--
+		r.pendingBytes -= bytes
+		if r.pendingBytes < 0 {
+			r.pendingBytes = 0
+		}
+		if r.pending == 0 {
+			close(r.idle)
+		}
+	}
+	changed := r.spaceChanged
+	r.spaceChanged = make(chan struct{})
+	return changed
 }
 
 func (r *Recorder) writeJobLocked(job recordJob) (Event, error) {
@@ -531,18 +566,10 @@ func (r *Recorder) waitForQueueSpace(ctx context.Context, bytes int64) error {
 
 func (r *Recorder) rollbackEnqueue(sequence uint64, bytes int64) {
 	r.mu.Lock()
-	if r.assignedSequence == sequence {
+	if r.assignedSequence == sequence && r.sequence < sequence {
 		r.assignedSequence--
 	}
-	if r.pending > 0 {
-		r.pending--
-	}
-	r.pendingBytes -= bytes
-	if r.pending == 0 {
-		close(r.idle)
-	}
-	changed := r.spaceChanged
-	r.spaceChanged = make(chan struct{})
+	changed := r.completePendingLocked(bytes)
 	r.mu.Unlock()
 	close(changed)
 }

@@ -329,6 +329,62 @@ func TestRecorderAsyncWriterPreservesBurstOrder(t *testing.T) {
 	}
 }
 
+func TestRecorderAccountsAcceptedJobsWhenWriterFails(t *testing.T) {
+	root := filepath.Join(t.TempDir(), "capture")
+	recorder, err := New(root, Options{WriterQueueCapacity: 8})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := recorder.events.Close(); err != nil {
+		t.Fatal(err)
+	}
+
+	const count = 3
+	recorder.mu.Lock()
+	jobs := make([]recordJob, 0, count)
+	for index := 0; index < count; index++ {
+		event, err := recorder.prepareEventLocked(Event{Kind: "accepted-before-writer-failure"})
+		if err != nil {
+			recorder.mu.Unlock()
+			t.Fatal(err)
+		}
+		recorder.assignedSequence = event.Sequence
+		if recorder.pending == 0 {
+			recorder.idle = make(chan struct{})
+		}
+		recorder.pending++
+		jobs = append(jobs, recordJob{event: event})
+	}
+	recorder.mu.Unlock()
+	for _, job := range jobs {
+		recorder.queue <- job
+	}
+	if err := recorder.Close("failed", nil); err == nil {
+		t.Fatal("Close() unexpectedly succeeded after the event stream was closed")
+	}
+
+	manifest, err := ReadManifest(root)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if manifest.Status != "failed" || manifest.Completeness.Complete {
+		t.Fatalf("manifest status/completeness = %q/%t", manifest.Status, manifest.Completeness.Complete)
+	}
+	if manifest.Counts.Events != 0 || manifest.Counts.Dropped != count {
+		t.Fatalf("manifest counts = %#v, want zero events and %d dropped", manifest.Counts, count)
+	}
+	foundReason := false
+	for _, limitation := range manifest.Completeness.Limitations {
+		if limitation == writerFailureLossReason {
+			foundReason = true
+			break
+		}
+	}
+	if !foundReason {
+		t.Fatalf("limitations = %v, missing %q", manifest.Completeness.Limitations, writerFailureLossReason)
+	}
+}
+
 func TestRecordReaderRejectsSizeMismatch(t *testing.T) {
 	root := filepath.Join(t.TempDir(), "capture")
 	recorder, err := New(root, Options{})
