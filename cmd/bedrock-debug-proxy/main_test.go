@@ -1,6 +1,7 @@
 package main
 
 import (
+	"bufio"
 	"bytes"
 	"context"
 	"io"
@@ -88,6 +89,33 @@ func TestLoginCachePolicyDefaultsToNoLocalLimit(t *testing.T) {
 	}
 	if !strings.Contains(output.String(), "Enter for no limit") {
 		t.Fatalf("prompt = %q", output.String())
+	}
+}
+
+func TestPromptAccountNameAllowsDefaultAndSharesInputReader(t *testing.T) {
+	reader := bufio.NewReader(strings.NewReader("NhanAZ\n7d\n"))
+	var output bytes.Buffer
+	name, err := promptAccountName(reader, &output, false)
+	if err != nil || name != "NhanAZ" {
+		t.Fatalf("promptAccountName() = %q, %v", name, err)
+	}
+	maxAge, setMaxAge, err := loginCachePolicy("", reader, io.Discard, true)
+	if err != nil || !setMaxAge || maxAge != 7*24*time.Hour {
+		t.Fatalf("loginCachePolicy() after account prompt = %v, %v, %v", maxAge, setMaxAge, err)
+	}
+	if !strings.Contains(output.String(), "Enter for default") {
+		t.Fatalf("account prompt = %q", output.String())
+	}
+}
+
+func TestPromptAccountNameRequiresFirstAccountLabel(t *testing.T) {
+	reader := bufio.NewReader(strings.NewReader("\n"))
+	var output bytes.Buffer
+	if name, err := promptAccountName(reader, &output, true); err == nil || name != "" {
+		t.Fatalf("promptAccountName() = %q, %v; want required-name error", name, err)
+	}
+	if !strings.Contains(output.String(), "required") {
+		t.Fatalf("required prompt = %q", output.String())
 	}
 }
 

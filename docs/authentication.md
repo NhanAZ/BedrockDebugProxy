@@ -4,13 +4,15 @@ BedrockDebugProxy keeps Microsoft authentication in per-user local cache files. 
 
 ## First login
 
-Run this once when no cached account exists:
+The first interactive authentication must have a local account label. This prevents a new installation from silently assigning the token to the synthetic `default` profile. Start the proxy normally, or run the login command directly:
 
 ```powershell
 .\bin\bedrock-debug-proxy.exe login
 ```
 
-The first account is selected as the default automatically. After that, the usual command remains short:
+When no account exists, the terminal asks for the Microsoft account username or a local label. Entering a non-empty label is required and the first successful account becomes the default. If accounts already exist, pressing Enter at this prompt reauthenticates the selected default instead.
+
+The usual proxy command remains short after the first login:
 
 ```powershell
 .\bin\bedrock-debug-proxy.exe run --upstream "<UPSTREAM>" --auth device
@@ -37,7 +39,7 @@ Use a local label only when adding or switching accounts:
 .\bin\bedrock-debug-proxy.exe logout OtherAccount
 ```
 
-`login` without a label reauthenticates the current default. The first successful account becomes the default. `use` changes only the local selection. `logout` removes only the selected account's local token cache. If the default is removed while another account remains, the remaining account with the stable first label becomes the default.
+`login` without a label prompts for a label in an interactive terminal. A non-empty label adds or reauthenticates that profile. Pressing Enter is allowed only after at least one account exists, and reauthenticates the current default. The first successful account becomes the default. `use` changes only the local selection. `logout` removes only the selected account's local token cache. If the default is removed while another account remains, the remaining account with the stable first label becomes the default.
 
 Account labels are local names, not claims about the Minecraft username inside the token. The account registry never stores access or refresh token values.
 
@@ -55,7 +57,7 @@ The flag is useful for scripts or for skipping the prompt. The accepted forms ar
 
 ## Storage and privacy
 
-On Windows, the legacy single-account cache is `%AppData%\BedrockDebugProxy\auth-token.json`. Additional named accounts use `%AppData%\BedrockDebugProxy\accounts\<label>.json`, and the local selection is in `%AppData%\BedrockDebugProxy\accounts.json`. Existing legacy caches continue to work as the `default` account without a migration prompt.
+On Windows, the legacy single-account cache is `%AppData%\BedrockDebugProxy\auth-token.json`. Additional named accounts use `%AppData%\BedrockDebugProxy\accounts\<label>.json`, and the local selection is in `%AppData%\BedrockDebugProxy\accounts.json`. Existing legacy caches continue to work as the `default` account without a migration prompt. A new installation with no cache cannot create an unnamed `default` profile through an interactive first login.
 
 These files contain Microsoft authentication secrets. They are written with user-only permissions where the platform supports them, are ignored by Git, and must not be copied into captures, issues, logs, or commits. `logout` removes the local cache but does not revoke the Microsoft session or sign out other Microsoft applications.
 
