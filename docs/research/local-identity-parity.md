@@ -40,6 +40,14 @@ The closed ProxyFingerprint report for this run contained no `auth_client_playfa
 
 The authenticated path has a separate, source-backed boundary. Sandertv/gophertunnel at immutable commit [`7a556a07335b663744b50d38062636ad8283f314`](https://github.com/Sandertv/gophertunnel/blob/7a556a07335b663744b50d38062636ad8283f314/minecraft/dial.go) still calls `setAndroidData` before encoding an authenticated login because the XBL chain's title ID cannot be edited. That dialer creates a new signed upstream session from the token source. Preserving the downstream device metadata without also changing the signed chain would create an internal metadata contradiction, not a vanilla-equivalent login. This project therefore keeps the upstream behavior and treats authenticated two-session parity as an architectural limitation requiring an authorized server-side test, not a target for heuristic evasion.
 
+### Authenticated ClientData PlayFab field
+
+The 2026-09-22 local authenticated run at revision `936acb064ac7c5a216a60ba919aaddb6e1eaa80a` exposed a narrower metadata defect inside that boundary. The direct vanilla report omitted `ClientData.PlayFabId`, while the proxied upstream report contained a generated value whose HMAC differed from the authenticated token's `mid` claim. ProxyFingerprint recorded `auth_client_playfab_mismatch`; both sessions still completed login, spawn, and quit.
+
+The source path is confirmed in the in-tree gophertunnel fork. `defaultClientData` generated a random `PlayFabId` before the authenticated branch called `setAndroidData`, even when the downstream client had supplied an empty field. The dialer now enables that fallback only for offline logins and preserves an empty authenticated field. This removes a proxy-created identifier without copying, forging, or re-signing the authenticated identity. The Android device metadata and the separate signed upstream session remain known authenticated-parity boundaries.
+
+The mismatch removal is confirmed by source and deterministic unit coverage. A fresh real-client authenticated loopback report is still required to verify the emitted login shape after the fix. No public-server behavior is inferred from this local evidence.
+
 ### Local XUID rejection with an unauthenticated upstream
 
 The closed local capture `captures/session-20260921T121717Z` provides a second confirmation of this boundary. The downstream connection was an authenticated Bedrock client, while the proxy was started with `auth_mode=none` and the local upstream required its normal identity checks. The upstream dial reached the login exchange but failed with `XUID does not match (possible impersonation attempt)` after 1 minute 29.872 seconds. The capture has no `session.negotiated` event because the upstream never completed login.

@@ -64,7 +64,7 @@ func TestOfflineEncodingOmitsAuthenticationBoundClaims(t *testing.T) {
 	clearXBLIdentityData(&identity)
 
 	clientData := login.ClientData{}
-	defaultClientData("127.0.0.1:19132", identity.DisplayName, &clientData)
+	defaultClientData("127.0.0.1:19132", identity.DisplayName, &clientData, true)
 	request := login.EncodeOffline(identity, clientData, key, false)
 	parsed, _, authResult, err := login.Parse(request, nil)
 	if err != nil {
@@ -78,5 +78,14 @@ func TestOfflineEncodingOmitsAuthenticationBoundClaims(t *testing.T) {
 	}
 	if parsed.Identity != identity.Identity || parsed.DisplayName != identity.DisplayName {
 		t.Fatalf("offline identity changed: got %#v, want %#v", parsed, identity)
+	}
+}
+
+func TestAuthenticatedClientDataPreservesEmptyPlayFabID(t *testing.T) {
+	clientData := login.ClientData{}
+	defaultClientData("127.0.0.1:19132", "AuthenticatedProbe", &clientData, false)
+
+	if clientData.PlayFabID != "" {
+		t.Fatalf("authenticated ClientData.PlayFabID = %q, want empty when the client omitted it", clientData.PlayFabID)
 	}
 }

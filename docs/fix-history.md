@@ -950,6 +950,14 @@ Every new entry should state the symptom, root cause, implementation commits, ev
 - Evidence and validation: the loopback transfer regression sends `RequestChunkRadius` after the old hop's Transfer and verifies the downstream raw event remains `downstream-1`. A focused overlapping-flow observer test verifies both old and new identities. No packet bytes or transfer routing behavior changed.
 - Status: implemented with deterministic local coverage. Real-client overlap timing remains unverified.
 
+### FIX-0119 - Preserve omitted PlayFab ID in authenticated upstream ClientData
+
+- Symptom: an authenticated local upstream report contained a synthetic `ClientData.PlayFabId` whose HMAC differed from the same session's authenticated token `mid`, while a direct vanilla report omitted the field. ProxyFingerprint classified the proxied session as `auth_client_playfab_mismatch`.
+- Root cause: the forked gophertunnel dialer generated a random `PlayFabId` in `defaultClientData` before encoding every login, including authenticated dials where the downstream ClientData field was empty.
+- Implementation: make PlayFab fallback generation explicit and enable it only for offline dials. Authenticated dials now preserve the downstream value, including an intentional empty field. No token claim, signature, device metadata, or forwarded packet bytes are rewritten.
+- Evidence and validation: the closed local comparison reports from 2026-09-22, the `defaultClientData` and authenticated `login.Encode` source path, and `TestAuthenticatedClientDataPreservesEmptyPlayFabID`. A fresh real-client authenticated loopback report remains required to verify the post-fix wire shape.
+- Status: implemented with deterministic local coverage. The authenticated Android metadata boundary and public-server policy remain outside this fix.
+
 ## Ordering safety contract
 
 The deferred-packet change is deliberately narrow. `expectedIDs` remains the only authority for what the current login state accepts. The queue scan selects the earliest packet that is currently expected, leaves packets for later states queued, and never mutates or reorders bytes on the wire. The regression tests cover canonical resource-pack order, featured early `ResourcePacksInfo`, a later-phase packet queued ahead of the current phase, and all six permutations of the three login packets.
