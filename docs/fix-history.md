@@ -1022,6 +1022,14 @@ Every new entry should state the symptom, root cause, implementation commits, ev
 - Evidence and validation: focused viewer coverage verifies the manifest value and Account header marker. The CLI path uses the same default account already selected by `run`. Full quality gate and browser smoke validation remain required for the viewer-facing change.
 - Status: implemented with deterministic local coverage. Real-client account identity parity remains outside this presentation change.
 
+### FIX-0127 - Select the newest event during live follow
+
+- Symptom: Follow live moved the viewer to the newest page, but the table still showed that page from its first row and did not identify the newest packet in the live stream.
+- Root cause: live refresh used the API tail offset but preserved the current event selection instead of selecting the last row returned by the tail query.
+- Implementation: when Follow live is enabled, each successful refresh selects the last matching row returned, loads its details, and scrolls that row into the event table viewport. Repeated refreshes avoid reloading details when the newest sequence is unchanged.
+- Evidence and validation: viewer JavaScript coverage checks the newest-event hook, while browser smoke validation must append complete live events and confirm the newest row remains selected and visible without changing filters.
+- Status: implemented with viewer-only impact. The canonical capture and packet forwarding paths are unchanged.
+
 ## Ordering safety contract
 
 The deferred-packet change is deliberately narrow. `expectedIDs` remains the only authority for what the current login state accepts. The queue scan selects the earliest packet that is currently expected, leaves packets for later states queued, and never mutates or reorders bytes on the wire. The regression tests cover canonical resource-pack order, featured early `ResourcePacksInfo`, a later-phase packet queued ahead of the current phase, and all six permutations of the three login packets.

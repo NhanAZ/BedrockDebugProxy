@@ -33,6 +33,6 @@ For a presentation or interaction change, commit the change and build the exact 
 .\bin\bedrock-debug-proxy.exe view --no-open CAPTURE_DIRECTORY
 ```
 
-Open the printed loopback URL in a browser. Confirm that the page loads without a blank or partially rendered state and that the browser console has no errors. Exercise the affected controls. For the general viewer, also select a filter, reset it, open an event, inspect decoded details, inspect a blob preview, and verify that the page remains read-only. For `view --live` or `run --web-viewer`, confirm that new complete events appear and that the final verification state is reached after the capture closes.
+Open the printed loopback URL in a browser. Confirm that the page loads without a blank or partially rendered state and that the browser console has no errors. Exercise the affected controls. For the general viewer, also select a filter, reset it, open an event, inspect decoded details, inspect a blob preview, and verify that the page remains read-only. For `view --live` or `run --web-viewer`, confirm that new complete events appear, Follow live selects the newest matching event and scrolls it into view, and the final verification state is reached after the capture closes.
 
 Record the exact binary revision, capture identifier, browser smoke result, and any remaining platform-specific rendering limits in the commit audit. Keep captures and sensitive viewer URLs out of Git.

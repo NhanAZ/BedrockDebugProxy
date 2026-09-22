@@ -58,7 +58,7 @@ The command verifies referenced blobs before streaming and exits with status 1 i
 
 `bedrock-debug-proxy view CAPTURE_DIRECTORY` verifies and indexes a closed capture, starts a temporary HTTP server on an automatically selected IPv4 loopback port, and opens the default browser. Use `--no-open` to print the URL without starting a browser.
 
-Use `bedrock-debug-proxy view --live CAPTURE_DIRECTORY` to follow a capture that another proxy process is writing. More commonly, add `--web-viewer` to `run` so the proxy starts the live viewer and opens the browser automatically. The page refreshes once per second while the manifest is open. "Follow live" keeps the newest matching page visible and can be disabled to inspect earlier pages.
+Use `bedrock-debug-proxy view --live CAPTURE_DIRECTORY` to follow a capture that another proxy process is writing. More commonly, add `--web-viewer` to `run` so the proxy starts the live viewer and opens the browser automatically. The page refreshes once per second while the manifest is open. "Follow live" keeps the newest matching page visible, selects the newest matching event, and scrolls that row into view. It can be disabled to inspect earlier pages or events.
 
 The interface provides server-side pagination and filters for direction, packet name, event kind, channel, text, and problem events. Selecting a row loads its complete event JSON on demand and shows at most 64 KiB of its referenced blob as a hex preview. The decoded tree stops rendering after 4,000 nodes so one unusually large event cannot make the browser unresponsive. These are display limits only. They do not modify, truncate, or replace the canonical event stream or blobs.
 

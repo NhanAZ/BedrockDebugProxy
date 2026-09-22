@@ -255,7 +255,7 @@ function filterQuery() {
   return query.toString();
 }
 
-async function loadEvents({ preserveSelection = true } = {}) {
+async function loadEvents({ preserveSelection = true, followNewest = state.live && elements.follow.checked } = {}) {
   const version = ++state.requestVersion;
   elements["viewer-status"].textContent = "Loading events...";
   const result = await requestJSON(`api/events?${filterQuery()}`);
@@ -269,6 +269,9 @@ async function loadEvents({ preserveSelection = true } = {}) {
     clearSelection();
   } else {
     markSelectedRow();
+  }
+  if (followNewest) {
+    selectNewestEvent();
   }
   const start = state.total === 0 ? 0 : state.offset + 1;
   const end = Math.min(state.offset + state.rows.length, state.total);
@@ -360,6 +363,20 @@ function markSelectedRow() {
   for (const tr of elements["event-rows"].querySelectorAll("tr")) {
     tr.classList.toggle("selected", Number(tr.dataset.sequence) === state.selectedSequence);
   }
+}
+
+function selectNewestEvent() {
+  const newest = state.rows[state.rows.length - 1];
+  if (!newest) {
+    clearSelection();
+    return;
+  }
+  if (state.selectedSequence === newest.sequence) {
+    markSelectedRow();
+    return;
+  }
+  selectEvent(newest.sequence);
+  elements["event-rows"].querySelector(`[data-sequence="${newest.sequence}"]`)?.scrollIntoView({ block: "nearest" });
 }
 
 async function selectEvent(sequence) {
@@ -522,9 +539,10 @@ function schedulePoll() {
   clearTimeout(pollTimer);
   if (!state.live) return;
   pollTimer = setTimeout(async () => {
+    const followNewest = state.live && elements.follow.checked;
     try {
       await loadSession();
-      await loadEvents();
+      await loadEvents({ followNewest });
     } catch (error) {
       elements["viewer-status"].textContent = `Live refresh failed: ${error.message}`;
     } finally {
