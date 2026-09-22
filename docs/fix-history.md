@@ -990,6 +990,14 @@ Every new entry should state the symptom, root cause, implementation commits, ev
 - Evidence and validation: focused CLI tests cover grouped help text, command-specific help, and unknown-command handling. Full quality-gate validation remains required before treating this documentation-facing runtime change as live-validated.
 - Status: implemented with deterministic local coverage. Detailed flag descriptions remain on each command's existing flag set.
 
+### FIX-0124 - Require CLI and documentation consistency checks
+
+- Symptom: command help and documentation can drift when a command, flag, prompt, or user-visible comment changes independently of the implementation.
+- Root cause: the agent guide required documentation updates for behavior changes but did not make root help, command help, and focused usage tests an explicit interface contract.
+- Implementation: extend `AGENTS.md` with a CLI and documentation consistency rule. Public command syntax, prompts, defaults, exit behavior, examples, and user-visible comments must be updated together with help, focused documentation, and tests.
+- Evidence and validation: documentation review and `git diff --check`. This is a workflow-only change with no runtime or capture impact.
+- Status: implemented as a documentation-only maintenance rule.
+
 ## Ordering safety contract
 
 The deferred-packet change is deliberately narrow. `expectedIDs` remains the only authority for what the current login state accepts. The queue scan selects the earliest packet that is currently expected, leaves packets for later states queued, and never mutates or reorders bytes on the wire. The regression tests cover canonical resource-pack order, featured early `ResourcePacksInfo`, a later-phase packet queued ahead of the current phase, and all six permutations of the three login packets.
