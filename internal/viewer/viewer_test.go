@@ -22,7 +22,7 @@ import (
 
 func TestViewerServesFilteredEventsAndBlobPreview(t *testing.T) {
 	root := filepath.Join(t.TempDir(), "capture")
-	recorder, err := capture.New(root, capture.Options{CaptureID: "viewer-test"})
+	recorder, err := capture.New(root, capture.Options{CaptureID: "viewer-test", Values: map[string]string{"account_name": "NhanAZ"}})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -68,7 +68,7 @@ func TestViewerServesFilteredEventsAndBlobPreview(t *testing.T) {
 	if response.StatusCode != http.StatusOK || !strings.Contains(string(index), "BedrockDebugProxy") {
 		t.Fatalf("index status = %d, body = %s", response.StatusCode, index)
 	}
-	for _, marker := range []string{`href="assets/app.css"`, `src="assets/app.js"`, `href="assets/favicon-32x32.png"`, `href="assets/favicon.ico"`, `href="assets/apple-touch-icon.png"`, `href="assets/site.webmanifest"`, `<meta name="theme-color" content="#000000">`, `aria-label="Capture overview"`, `class="brand-name"`, `id="viewer-status"`, `id="event-count"`, `id="blob-count"`, `id="duration"`, `id="generator"`, `id="direction"`, `id="packet"`, `id="kind"`, `id="channel"`, `id="page-input"`, `id="page-label"`, `id="bytes-panel"`, `id="bytes-toggle"`, `aria-expanded="false"`, `id="hex-view" class="hex-view" hidden`, `class="panel-title"`, `class="panel-title-separator"`, "BedrockDebugProxy", "Ordered stream", "Decoded view", "Raw evidence"} {
+	for _, marker := range []string{`href="assets/app.css"`, `src="assets/app.js"`, `href="assets/favicon-32x32.png"`, `href="assets/favicon.ico"`, `href="assets/apple-touch-icon.png"`, `href="assets/site.webmanifest"`, `<meta name="theme-color" content="#000000">`, `aria-label="Capture overview"`, `class="brand-name"`, `id="viewer-status"`, `id="account-name"`, `id="event-count"`, `id="blob-count"`, `id="duration"`, `id="generator"`, `id="direction"`, `id="packet"`, `id="kind"`, `id="channel"`, `id="page-input"`, `id="page-label"`, `id="bytes-panel"`, `id="bytes-toggle"`, `aria-expanded="false"`, `id="hex-view" class="hex-view" hidden`, `class="panel-title"`, `class="panel-title-separator"`, "BedrockDebugProxy", "Ordered stream", "Decoded view", "Raw evidence"} {
 		if !strings.Contains(string(index), marker) {
 			t.Fatalf("index is missing viewer marker %q", marker)
 		}
@@ -88,6 +88,9 @@ func TestViewerServesFilteredEventsAndBlobPreview(t *testing.T) {
 	decodeURL(t, server.URL+"/test-token/api/session", &session)
 	if session.Manifest.CaptureID != "viewer-test" || session.Events != 2 || session.Blobs != 1 {
 		t.Fatalf("session = %+v", session)
+	}
+	if session.Manifest.Options.Values["account_name"] != "NhanAZ" {
+		t.Fatalf("account name = %q", session.Manifest.Options.Values["account_name"])
 	}
 
 	var events eventsResponse

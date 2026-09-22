@@ -432,6 +432,7 @@ func runProxy(args []string, stdout, stderr io.Writer) int {
 		return 2
 	}
 	var tokenSource oauth2.TokenSource
+	accountName := ""
 	switch *authMode {
 	case "device":
 		store, err := authcache.NewAccountStore()
@@ -468,6 +469,7 @@ func runProxy(args []string, stdout, stderr io.Writer) int {
 			}
 			account = authcache.Account{Name: firstLoginName, TokenPath: tokenPath}
 		}
+		accountName = account.Name
 		forceDevice := account.CacheExpired(time.Now())
 		if forceDevice {
 			_, _ = fmt.Fprintf(stderr, "Default account cache reached its local max-age. Starting device authentication.\n")
@@ -499,6 +501,9 @@ func runProxy(args []string, stdout, stderr io.Writer) int {
 		_, _ = fmt.Fprintln(stderr, "Experience targets require --auth device.")
 		return 2
 	}
+	if accountName != "" {
+		_, _ = fmt.Fprintf(stdout, "Using Microsoft account %q.\n", accountName)
+	}
 
 	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
 	defer stop()
@@ -529,6 +534,7 @@ func runProxy(args []string, stdout, stderr io.Writer) int {
 		SyncEachEvent: *syncEachEvent,
 		RawLayers:     []string{"bedrock_transport_payload", "bedrock_packet_payload"},
 		Values: map[string]string{
+			"account_name":                 accountName,
 			"listen_address":               *listen,
 			"upstream_selector":            target.Selector,
 			"upstream_address":             target.Address,

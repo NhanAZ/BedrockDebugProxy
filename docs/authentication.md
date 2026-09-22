@@ -50,6 +50,8 @@ Use a local label only when adding or switching accounts:
 
 Account labels are local names, not claims about the Minecraft username inside the token. The account registry never stores access or refresh token values.
 
+Authenticated `run` output and the capture viewer show the selected local account label for the session. This is a convenience label from the local account registry, not a verification of the Microsoft or Minecraft identity.
+
 ## Local cache age
 
 When `login` runs in a terminal without `--max-age`, it asks for a local cache age. Press Enter for no local limit, or enter a value such as `7d`. This is the low-friction default. Non-interactive login uses no local limit automatically so scripts do not wait for input.

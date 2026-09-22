@@ -1006,6 +1006,14 @@ Every new entry should state the symptom, root cause, implementation commits, ev
 - Evidence and validation: CubeCraft's [Rules](https://help.cubecraft.net/en/article/cubecraft-rules-1403lij/) and [Allowed Mods and Clients](https://www.cubecraft.net/threads/allowed-mods-and-clients.228596/) were reviewed on 2026-09-22. This change updates the release docs, agent guide, validation catalog, changelog, and readiness checker only.
 - Status: implemented as a documentation and release-workflow change. No CubeCraft connection was performed and no permission or policy exception is claimed.
 
+### FIX-0126 - Surface the selected account in run output and viewer headers
+
+- Symptom: after multiple Microsoft accounts were added, the terminal and capture viewer did not identify which selected account started a session.
+- Root cause: account selection existed only in the local account store and was not copied into capture metadata or the viewer overview.
+- Implementation: record the selected account label as `options.values.account_name`, print it when an authenticated run starts, and add an Account metric to the viewer header. The value is local operator metadata and is never a token or identity verification claim.
+- Evidence and validation: focused viewer coverage verifies the manifest value and Account header marker. The CLI path uses the same default account already selected by `run`. Full quality gate and browser smoke validation remain required for the viewer-facing change.
+- Status: implemented with deterministic local coverage. Real-client account identity parity remains outside this presentation change.
+
 ## Ordering safety contract
 
 The deferred-packet change is deliberately narrow. `expectedIDs` remains the only authority for what the current login state accepts. The queue scan selects the earliest packet that is currently expected, leaves packets for later states queued, and never mutates or reorders bytes on the wire. The regression tests cover canonical resource-pack order, featured early `ResourcePacksInfo`, a later-phase packet queued ahead of the current phase, and all six permutations of the three login packets.

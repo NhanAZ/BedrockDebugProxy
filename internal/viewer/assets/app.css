@@ -109,7 +109,7 @@ h2 { font-size: var(--font-size); letter-spacing: 0.03em; }
 .overview {
   min-width: 0;
   display: grid;
-  grid-template-columns: repeat(4, minmax(0, 1fr));
+  grid-template-columns: repeat(5, minmax(0, 1fr));
   margin: 0 18px;
   border-left: 1px solid var(--line);
   background: var(--bg);
