@@ -14,7 +14,7 @@ The project must not use a punished account or another account to probe The Hive
 
 ## Active pre-release validation matrix
 
-These five targets are the required release matrix. Use the exact selector with the stamped binary and record the observed endpoint in the local report rather than assuming that the reference remains current.
+These six targets are the required release matrix. Use the exact selector with the stamped binary and record the observed endpoint in the local report rather than assuming that the reference remains current. CubeCraft is additionally subject to the maintainer risk gate below.
 
 | Report label | Upstream selector | Endpoint reference | Category |
 | --- | --- | --- | --- |
@@ -23,6 +23,7 @@ These five targets are the required release matrix. Use the exact selector with 
 | Lifeboat | `experience:Lifeboat` | `mco.lbsg.net:19132` | Creator Experience |
 | Mineville Zeqa | `experience:Mineville Zeqa` | `play.inpvp.net:19132` | Creator Experience |
 | Enchanted | `experience:Enchanted` | `play.enchanted.gg:19132` | Creator Experience |
+| CubeCraft | `play.cubecraft.net:19132` | `play.cubecraft.net:19132` | Featured server |
 
 For release validation, follow [`validation.md`](validation.md) and [`releasing.md`](releasing.md). Use a concrete reachable LAN address for `--listen` when testing `--follow-transfers`. Do not place raw addresses, credentials, or captures in sanitized reports.
 
@@ -49,15 +50,15 @@ These entries are useful for exploratory research but are not release gates.
 | --- | --- | --- |
 | MegaSMP | `experience:MegaSMP` | By InPvP, `play.megasmp.gg:19132` |
 
-The five active targets above also use Creator Experience selectors. The provider and endpoint references in this document came from the maintainer's current test catalog and must be rechecked if a service changes its routing.
+The five Experience targets above use Creator Experience selectors. The provider and endpoint references in this document came from the maintainer's current test catalog and must be rechecked if a service changes its routing.
 
-## CubeCraft exclusion
+## CubeCraft maintainer risk gate
 
-CubeCraft is intentionally excluded from the active validation matrix, pull request recommendations, release gates, and proposed test targets. Existing CubeCraft notes in `docs/research/` are historical evidence only and do not authorize a new connection.
+CubeCraft is included as a release target only for an owner-controlled test where the maintainer explicitly accepts the risk of connecting through a proxy. Do not record, infer, or publish any private server discussion or claim that CubeCraft permits the connection. A risk acknowledgement is not a policy exception and does not change the server's published rules.
 
 CubeCraft's published policies explicitly prohibit proxies in Minecraft Bedrock:
 
-- [CubeCraft Rules](https://help.cubecraft.net/en/article/cubecraft-rules-1403lij/) - reviewed 2026-09-14.
-- [Allowed Mods and Clients](https://www.cubecraft.net/threads/allowed-mods-and-clients.228596/) - reviewed 2026-09-14.
+- [CubeCraft Rules](https://help.cubecraft.net/en/article/cubecraft-rules-1403lij/) - reviewed 2026-09-22.
+- [Allowed Mods and Clients](https://www.cubecraft.net/threads/allowed-mods-and-clients.228596/) - reviewed 2026-09-22.
 
-If the maintainer explicitly asks to test CubeCraft, the agent must surface this policy and the possible connection, kick, or ban risk before proceeding. This is an agent workflow warning, not a runtime warning and not a bypass recommendation.
+Before a CubeCraft session, the maintainer must explicitly accept the possibility of rejection, kick, or ban. Without that acknowledgement, do not connect and record the CubeCraft report as `incomplete`; the release gate must remain blocked. The validation uses the normal read-only proxy path and adds no bypass, mutation, replay, or anti-cheat evasion behavior. This is an agent workflow requirement, not a product runtime warning.

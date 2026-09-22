@@ -15,6 +15,7 @@ $requiredServers = @(
     "Lifeboat"
     "Mineville Zeqa"
     "Enchanted"
+    "CubeCraft"
 )
 
 Push-Location $projectRoot
@@ -93,6 +94,7 @@ try {
             Result = [string]$report.result
             Automatic = [bool]$report.evidence.automatic_checks_passed
             Manual = [bool]$report.manual_checks_passed
+            ManualChecks = @($report.manual_checks)
         }
     }
 
@@ -104,7 +106,13 @@ try {
             $candidates = @($reportsByServer[$server])
         }
         $passing = @($candidates | Where-Object {
-                $_.Result -eq "pass" -and $_.Automatic -and $_.Manual
+                $riskGate = $true
+                if ($server -eq "CubeCraft") {
+                    $riskGate = @($_.ManualChecks | Where-Object {
+                            [string]$_.name -eq "risk_acknowledged" -and [string]$_.result -eq "pass"
+                        }).Count -gt 0
+                }
+                $_.Result -eq "pass" -and $_.Automatic -and $_.Manual -and $riskGate
             })
         if ($passing.Count -eq 0) {
             $state = if ($candidates.Count -eq 0) { "missing" } else { "not passing" }

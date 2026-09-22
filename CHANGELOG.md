@@ -12,6 +12,7 @@ Detailed rationale remains in [`docs/audits/`](docs/audits/).
 
 ### Changed
 
+- The release workflow now includes CubeCraft as a sixth, maintainer-risk-gated validation target. The normal read-only capture path is required, and a missing risk acknowledgement keeps the release incomplete. No private server discussion is recorded.
 - Microsoft authentication now supports multiple named local accounts with one default account used automatically by `run`. The first interactive login requires a non-empty account username or local label, while later unlabeled logins may press Enter to reuse the selected default. `login`, `accounts`, `use`, `rename`, and `logout` cover account management without adding account flags to normal proxy commands. `rename` converts the legacy `default` cache to a named profile without reauthenticating. Interactive `login` asks once for an optional local cache age and Enter means no local limit. The `--max-age` form remains available for scripts and does not alter Microsoft token expiry.
 - The CLI help is now grouped by proxy, authentication accounts, capture inspection, and information commands. `help COMMAND` provides a short purpose and usage for each command so the workflow is discoverable without memorizing a flat command list.
 - LAN listener examples now use an explicit `<LAN_IP>` placeholder instead of an operator-specific address.
