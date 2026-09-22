@@ -309,11 +309,11 @@ func (r *Runner) Run(ctx context.Context) error {
 			state := getAcceptState()
 			request, err := decodeRequestChunkRadius(payload)
 			if err != nil {
-				_ = r.recordPacketDecodeErrorAtHop(capture.PacketInfo{
+				setCaptureFailure(failures, r.recordPacketDecodeErrorAtHop(capture.PacketInfo{
 					ID: header.PacketID, Name: "RequestChunkRadius", GoType: "*packet.RequestChunkRadius",
 					SenderSubClient: header.SenderSubClient, TargetSubClient: header.TargetSubClient,
 					DecodeStatus: "decode_error",
-				}, capture.DirectionClientToServer, "downstream", state.downstreamID, state.hop, "decode RequestChunkRadius for forwarding", err)
+				}, capture.DirectionClientToServer, "downstream", state.downstreamID, state.hop, "decode RequestChunkRadius for forwarding", err))
 				return
 			}
 			// The upstream dial completes before the downstream StartGame sequence
@@ -326,7 +326,7 @@ func (r *Runner) Run(ctx context.Context) error {
 				forwardErr = forwardRequestChunkRadius(upstream, request)
 			}
 			if forwardErr != nil {
-				_ = r.recordNetworkErrorAtHop("bridge.write_error", capture.DirectionClientToServer, "upstream", state.upstreamID, state.hop, "forward RequestChunkRadius", forwardErr)
+				setCaptureFailure(failures, r.recordNetworkErrorAtHop("bridge.write_error", capture.DirectionClientToServer, "upstream", state.upstreamID, state.hop, "forward RequestChunkRadius", forwardErr))
 			}
 		},
 		ConnectionFunc: func(conn *minecraft.Conn) {
@@ -1125,6 +1125,15 @@ func (r *Runner) forward(source, destination *minecraft.Conn, failures *bedrock.
 				return &transferError{target: target, localAddr: udpAddress(source.LocalAddr()), clientGUID: clientGUID}
 			}
 		}
+	}
+}
+
+// setCaptureFailure forwards recorder failures from callback APIs that cannot
+// return an error to the caller. The failure sink cancels the run and preserves
+// the first capture error as the authoritative session failure.
+func setCaptureFailure(failures *bedrock.FailureSink, err error) {
+	if err != nil {
+		failures.Set(err)
 	}
 }
 

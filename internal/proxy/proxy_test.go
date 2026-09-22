@@ -154,6 +154,16 @@ func TestForwardRequestChunkRadiusReturnsWriteError(t *testing.T) {
 	}
 }
 
+func TestSetCaptureFailurePropagatesCallbackRecorderError(t *testing.T) {
+	failures := bedrock.NewFailureSink(nil)
+	wantErr := errors.New("capture callback failed")
+	setCaptureFailure(failures, wantErr)
+	if !errors.Is(failures.Err(), wantErr) {
+		t.Fatalf("failure sink error = %v, want %v", failures.Err(), wantErr)
+	}
+	setCaptureFailure(failures, nil)
+}
+
 func TestRecordPacketDecodeErrorRetainsPacketContext(t *testing.T) {
 	root := filepath.Join(t.TempDir(), "capture")
 	recorder, err := capture.New(root, capture.Options{})

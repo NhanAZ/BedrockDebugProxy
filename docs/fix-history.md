@@ -886,6 +886,14 @@ Every new entry should state the symptom, root cause, implementation commits, ev
 - Evidence and validation: the forwarding path sets `rawRead` to nil after a decoded raw read and never initializes it on typed forwarding. A deterministic regression test invokes the same error finalization with no raw packet and verifies the wrapped error and capture event.
 - Status: implemented with deterministic local coverage. Live Transfer rewrite failures remain unverified.
 
+### FIX-0110 - Propagate listener callback capture failures
+
+- Symptom: a `RequestChunkRadius` decode or upstream-forwarding failure could be recorded unsuccessfully by the listener callback while the callback ignored the recorder error and allowed the session to continue.
+- Root cause: gophertunnel's packet callback cannot return an error, but the proxy discarded the errors from `recordPacketDecodeErrorAtHop` and `recordNetworkErrorAtHop` instead of sending them to the run's `FailureSink`.
+- Implementation: route both callback recorder errors through `setCaptureFailure`, which preserves the first capture error and cancels the run through the existing failure sink.
+- Evidence and validation: the listener callback is the only boundary for these observed requests, and the recorder methods return failures when the capture stream is unavailable. A deterministic unit test verifies that callback recorder errors reach the failure sink without changing packet forwarding.
+- Status: implemented with deterministic local coverage. Live capture-writer failure behavior remains unverified.
+
 ## Ordering safety contract
 
 The deferred-packet change is deliberately narrow. `expectedIDs` remains the only authority for what the current login state accepts. The queue scan selects the earliest packet that is currently expected, leaves packets for later states queued, and never mutates or reorders bytes on the wire. The regression tests cover canonical resource-pack order, featured early `ResourcePacksInfo`, a later-phase packet queued ahead of the current phase, and all six permutations of the three login packets.
