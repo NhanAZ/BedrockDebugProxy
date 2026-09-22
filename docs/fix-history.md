@@ -1030,6 +1030,14 @@ Every new entry should state the symptom, root cause, implementation commits, ev
 - Evidence and validation: viewer JavaScript coverage requires the table-only scroll hook. Browser smoke validation must keep the details panel in view while a live event is appended and confirm that the page scroll position remains stable.
 - Status: implemented with viewer-only impact. The selected newest row remains visible inside the event table without moving the outer page.
 
+### FIX-0129 - Preserve details layout during packet-heavy live follow
+
+- Symptom: on a high-rate capture, Follow live repeatedly collapsed Decoded view - Event details to a loading line before expanding it again, so the page scrollbar moved and manual inspection was interrupted.
+- Root cause: each newest-event request cleared the details DOM before its response arrived. The resulting layout changes triggered browser scroll anchoring while the table was also being refreshed.
+- Implementation: keep the current details and blob preview visible while Follow live loads the next event, then restore the page scroll position after rendering the replacement. Manual event selection keeps the existing loading feedback.
+- Evidence and validation: viewer JavaScript coverage requires the preserve-details and page-scroll hooks. Browser smoke validation must append events at a packet-heavy cadence while the details panel is in view and confirm its content does not collapse or move the outer page.
+- Status: implemented with viewer-only impact. The selected event can change while its previous details remain visible until the new response is ready.
+
 ## Ordering safety contract
 
 The deferred-packet change is deliberately narrow. `expectedIDs` remains the only authority for what the current login state accepts. The queue scan selects the earliest packet that is currently expected, leaves packets for later states queued, and never mutates or reorders bytes on the wire. The regression tests cover canonical resource-pack order, featured early `ResourcePacksInfo`, a later-phase packet queued ahead of the current phase, and all six permutations of the three login packets.
