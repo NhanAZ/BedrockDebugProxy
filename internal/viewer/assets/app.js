@@ -9,6 +9,8 @@ const state = {
   selectedEvent: null,
   requestVersion: 0,
   live: false,
+  verificationProgress: null,
+  eventStatus: "",
 };
 
 const elements = Object.fromEntries([
@@ -188,6 +190,18 @@ function formatCount(value) {
   return new Intl.NumberFormat().format(value);
 }
 
+function updateViewerStatus() {
+  if (state.verificationProgress) {
+    const progress = state.verificationProgress;
+    const suffix = progress.phase === "manifest"
+      ? "checking manifest"
+      : `scanned ${formatCount(progress.events)} events and verified ${formatCount(progress.blobs)} blobs`;
+    elements["viewer-status"].textContent = `Verifying capture - ${suffix}`;
+    return;
+  }
+  elements["viewer-status"].textContent = state.eventStatus;
+}
+
 function formatDuration(nanoseconds) {
   const milliseconds = Number(BigInt(nanoseconds || "0") / 1000000n);
   if (milliseconds < 1000) return `${milliseconds} ms`;
@@ -227,6 +241,7 @@ async function loadSession() {
   const session = await requestJSON("api/session");
   const manifest = session.manifest;
   state.live = session.mode === "live" && manifest.status === "open";
+  state.verificationProgress = session.verification_progress || null;
   elements["follow-container"].hidden = !state.live;
   elements["event-count"].textContent = formatCount(session.events);
   elements["blob-count"].textContent = formatCount(session.blobs);
@@ -276,7 +291,8 @@ async function loadEvents({ preserveSelection = true, followNewest = state.live 
   const start = state.total === 0 ? 0 : state.offset + 1;
   const end = Math.min(state.offset + state.rows.length, state.total);
   const prefix = state.live ? "Live" : "Showing";
-  elements["viewer-status"].textContent = `${prefix} ${formatCount(start)}-${formatCount(end)} of ${formatCount(state.total)} matching events`;
+  state.eventStatus = `${prefix} ${formatCount(start)}-${formatCount(end)} of ${formatCount(state.total)} matching events`;
+  updateViewerStatus();
 }
 
 function renderRows() {
@@ -569,7 +585,7 @@ function showFatal(error) {
 
 function schedulePoll() {
   clearTimeout(pollTimer);
-  if (!state.live) return;
+  if (!state.live && !state.verificationProgress) return;
   pollTimer = setTimeout(async () => {
     const followNewest = state.live && elements.follow.checked;
     try {

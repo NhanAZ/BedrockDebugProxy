@@ -20,6 +20,17 @@ type Verification struct {
 	Issues   []string
 }
 
+// VerificationProgress reports coarse-grained progress while a capture is
+// being scanned. It is intentionally separate from Verification so callers
+// can expose progress without changing the verified result or capture schema.
+type VerificationProgress struct {
+	Phase        string `json:"phase"`
+	Events       uint64 `json:"events"`
+	Blobs        uint64 `json:"blobs"`
+	BlobBytes    uint64 `json:"blob_bytes"`
+	LastSequence uint64 `json:"last_sequence"`
+}
+
 func ReadManifest(root string) (Manifest, error) {
 	data, err := os.ReadFile(filepath.Join(root, manifestName))
 	if err != nil {
@@ -66,6 +77,13 @@ func ScanEvents(root string, visit func(Event) error) error {
 }
 
 func Verify(root string) (Verification, error) {
+	return VerifyWithProgress(root, nil)
+}
+
+// VerifyWithProgress verifies a capture and reports progress every 10,000
+// events, plus the start and final scan milestones. The callback runs in the
+// caller's goroutine and must not block on the capture being verified.
+func VerifyWithProgress(root string, progress func(VerificationProgress)) (Verification, error) {
 	manifest, err := ReadManifest(root)
 	if err != nil {
 		return Verification{}, err
@@ -78,6 +96,19 @@ func Verify(root string) (Verification, error) {
 	seenBlobs := map[string]BlobRef{}
 	var previousSequence uint64
 	var blobBytes uint64
+	report := func(phase string, sequence uint64) {
+		if progress == nil {
+			return
+		}
+		progress(VerificationProgress{
+			Phase:        phase,
+			Events:       result.Events,
+			Blobs:        result.Blobs,
+			BlobBytes:    blobBytes,
+			LastSequence: sequence,
+		})
+	}
+	report("events", 0)
 	err = ScanEvents(root, func(event Event) error {
 		result.Events++
 		if event.Schema != SchemaVersion {
@@ -90,6 +121,9 @@ func Verify(root string) (Verification, error) {
 			result.Issues = append(result.Issues, fmt.Sprintf("event sequence jumps from %d to %d", previousSequence, event.Sequence))
 		}
 		previousSequence = event.Sequence
+		if result.Events%10000 == 0 {
+			report("events", event.Sequence)
+		}
 		if event.Blob == nil {
 			return nil
 		}
@@ -122,6 +156,7 @@ func Verify(root string) (Verification, error) {
 	if err != nil {
 		return Verification{}, err
 	}
+	report("manifest", previousSequence)
 	if manifest.Schema != SchemaVersion {
 		result.Issues = append(result.Issues, fmt.Sprintf("manifest has schema %q", manifest.Schema))
 	}
@@ -134,6 +169,7 @@ func Verify(root string) (Verification, error) {
 	if manifest.Counts.BlobBytes != blobBytes {
 		result.Issues = append(result.Issues, fmt.Sprintf("manifest counts %d unique blob bytes but events reference %d", manifest.Counts.BlobBytes, blobBytes))
 	}
+	report("complete", previousSequence)
 	return result, nil
 }
 

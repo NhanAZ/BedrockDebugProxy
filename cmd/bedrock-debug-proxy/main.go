@@ -561,7 +561,7 @@ func runProxy(args []string, stdout, stderr io.Writer) int {
 	var liveCaptureViewer *viewer.Viewer
 	var liveViewerServer *viewer.LocalServer
 	if *webViewer {
-		liveCaptureViewer, err = viewer.OpenLive(recorder.Root(), viewer.Options{})
+		liveCaptureViewer, err = viewer.OpenLive(recorder.Root(), viewer.Options{ExternalVerification: true})
 		if err != nil {
 			_ = target.Close()
 			_ = recorder.Close("failed", err)
@@ -635,8 +635,19 @@ func runProxy(args []string, stdout, stderr io.Writer) int {
 	_, _ = fmt.Fprintln(stdout, "Capture recorder closed. Finishing automatic artifact folders...")
 	artifactStatus, artifactErr := views.Finish()
 	runErr = errors.Join(runErr, artifactErr)
+	if liveCaptureViewer != nil {
+		liveCaptureViewer.BeginVerification()
+	}
 	_, _ = fmt.Fprintf(stdout, "Automatic artifacts %s through event %d. Verifying capture...\n", artifactStatus.State, artifactStatus.LastSequence)
-	verification, verifyErr := capture.Verify(recorder.Root())
+	verification, verifyErr := capture.VerifyWithProgress(recorder.Root(), func(progress capture.VerificationProgress) {
+		writeVerificationProgress(stdout, progress)
+		if liveCaptureViewer != nil {
+			liveCaptureViewer.UpdateVerificationProgress(progress)
+		}
+	})
+	if liveCaptureViewer != nil {
+		liveCaptureViewer.CompleteVerification(verification, verifyErr)
+	}
 	if verifyErr != nil {
 		runErr = errors.Join(runErr, verifyErr)
 	} else if len(verification.Issues) != 0 {
@@ -691,7 +702,9 @@ func runVerify(args []string, stdout, stderr io.Writer) int {
 		flags.Usage()
 		return 2
 	}
-	result, err := capture.Verify(flags.Arg(0))
+	result, err := capture.VerifyWithProgress(flags.Arg(0), func(progress capture.VerificationProgress) {
+		writeVerificationProgress(stderr, progress)
+	})
 	if err != nil {
 		_, _ = fmt.Fprintf(stderr, "Verify capture - %v\n", err)
 		return 1
@@ -719,6 +732,14 @@ func runVerify(args []string, stdout, stderr io.Writer) int {
 		return 1
 	}
 	return 0
+}
+
+func writeVerificationProgress(writer io.Writer, progress capture.VerificationProgress) {
+	if progress.Phase == "events" {
+		_, _ = fmt.Fprintf(writer, "Verification progress - scanned %d events, verified %d blobs, last sequence %d.\n", progress.Events, progress.Blobs, progress.LastSequence)
+		return
+	}
+	_, _ = fmt.Fprintf(writer, "Verification progress - phase %s, scanned %d events, verified %d blobs.\n", progress.Phase, progress.Events, progress.Blobs)
 }
 
 func runInspect(args []string, stdout, stderr io.Writer) int {
