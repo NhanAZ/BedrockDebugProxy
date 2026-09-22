@@ -306,6 +306,53 @@ func TestAccountStorePreservesLegacyAccountWhenAddingNamedAccount(t *testing.T) 
 	}
 }
 
+func TestAccountStoreRenamesLegacyCacheAndPreservesDefault(t *testing.T) {
+	root := t.TempDir()
+	store := newAccountStore(root)
+	legacyPath := filepath.Join(root, "auth-token.json")
+	if err := writeToken(legacyPath, &oauth2.Token{RefreshToken: "legacy"}); err != nil {
+		t.Fatal(err)
+	}
+	if err := store.Rename("default", "SrDuck84"); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := os.Stat(legacyPath); !errors.Is(err, os.ErrNotExist) {
+		t.Fatalf("legacy cache still exists, stat error = %v", err)
+	}
+	namedPath := filepath.Join(root, "accounts", "srduck84.json")
+	if _, err := os.Stat(namedPath); err != nil {
+		t.Fatalf("named cache missing: %v", err)
+	}
+	account, err := store.Default()
+	if err != nil || account.Name != "SrDuck84" || account.TokenPath != namedPath {
+		t.Fatalf("renamed default = %#v, %v", account, err)
+	}
+	cached, err := readToken(namedPath)
+	if err != nil || cached.RefreshToken != "legacy" {
+		t.Fatalf("renamed token = %#v, %v", cached, err)
+	}
+}
+
+func TestAccountStoreRenameRejectsExistingDestination(t *testing.T) {
+	root := t.TempDir()
+	store := newAccountStore(root)
+	if err := writeToken(filepath.Join(root, "auth-token.json"), &oauth2.Token{RefreshToken: "legacy"}); err != nil {
+		t.Fatal(err)
+	}
+	if err := writeToken(filepath.Join(root, "accounts", "nhanaz.json"), &oauth2.Token{RefreshToken: "named"}); err != nil {
+		t.Fatal(err)
+	}
+	if err := store.Upsert("NhanAZ", 0, false); err != nil {
+		t.Fatal(err)
+	}
+	if err := store.Rename("default", "NhanAZ"); err == nil || !strings.Contains(err.Error(), "already exists") {
+		t.Fatalf("Rename() error = %v", err)
+	}
+	if _, err := os.Stat(filepath.Join(root, "auth-token.json")); err != nil {
+		t.Fatalf("legacy cache after rejected rename: %v", err)
+	}
+}
+
 func TestAccountStoreRejectsUnsafeNames(t *testing.T) {
 	store := newAccountStore(t.TempDir())
 	for _, name := range []string{"", "..", "bad/name", "bad name", strings.Repeat("a", 33)} {

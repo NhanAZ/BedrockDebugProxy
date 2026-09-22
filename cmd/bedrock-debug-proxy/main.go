@@ -47,6 +47,8 @@ func run(args []string, stdout, stderr io.Writer) int {
 		return runAccounts(args[1:], stdout, stderr)
 	case "use":
 		return runUseAccount(args[1:], stdout, stderr)
+	case "rename":
+		return runRenameAccount(args[1:], stdout, stderr)
 	case "logout":
 		return runLogout(args[1:], stdout, stderr)
 	case "verify":
@@ -351,6 +353,32 @@ func runUseAccount(args []string, stdout, stderr io.Writer) int {
 		return 1
 	}
 	_, _ = fmt.Fprintf(stdout, "Default account is now %q.\n", account.Name)
+	return 0
+}
+
+func runRenameAccount(args []string, stdout, stderr io.Writer) int {
+	flags := flag.NewFlagSet("rename", flag.ContinueOnError)
+	flags.SetOutput(stderr)
+	flags.Usage = func() {
+		_, _ = fmt.Fprintln(stderr, "Usage - bedrock-debug-proxy rename OLD_ACCOUNT NEW_ACCOUNT")
+	}
+	if err := flags.Parse(args); err != nil {
+		return 2
+	}
+	if flags.NArg() != 2 {
+		_, _ = fmt.Fprintln(stderr, "Both old and new account names are required.")
+		return 2
+	}
+	store, err := authcache.NewAccountStore()
+	if err != nil {
+		_, _ = fmt.Fprintf(stderr, "Locate authentication accounts - %v\n", err)
+		return 1
+	}
+	if err := store.Rename(flags.Arg(0), flags.Arg(1)); err != nil {
+		_, _ = fmt.Fprintf(stderr, "Rename account - %v\n", err)
+		return 1
+	}
+	_, _ = fmt.Fprintf(stdout, "Renamed local account %q to %q.\n", flags.Arg(0), flags.Arg(1))
 	return 0
 }
 
@@ -897,6 +925,7 @@ func printUsage(writer io.Writer) {
 	_, _ = fmt.Fprintln(writer, "  bedrock-debug-proxy login [--max-age 7d] [ACCOUNT_NAME]")
 	_, _ = fmt.Fprintln(writer, "  bedrock-debug-proxy accounts")
 	_, _ = fmt.Fprintln(writer, "  bedrock-debug-proxy use ACCOUNT_NAME")
+	_, _ = fmt.Fprintln(writer, "  bedrock-debug-proxy rename OLD_ACCOUNT NEW_ACCOUNT")
 	_, _ = fmt.Fprintln(writer, "  bedrock-debug-proxy logout [ACCOUNT_NAME]")
 	_, _ = fmt.Fprintln(writer, "  bedrock-debug-proxy verify CAPTURE_DIRECTORY")
 	_, _ = fmt.Fprintln(writer, "  bedrock-debug-proxy inspect [filters] CAPTURE_DIRECTORY")

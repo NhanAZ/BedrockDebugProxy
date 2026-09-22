@@ -119,6 +119,16 @@ func TestPromptAccountNameRequiresFirstAccountLabel(t *testing.T) {
 	}
 }
 
+func TestRenameCommandRequiresBothNames(t *testing.T) {
+	var stdout, stderr bytes.Buffer
+	if code := run([]string{"rename", "default"}, &stdout, &stderr); code != 2 {
+		t.Fatalf("rename code = %d, stderr = %s", code, stderr.String())
+	}
+	if !strings.Contains(stderr.String(), "Both old and new account names are required") {
+		t.Fatalf("rename stderr = %s", stderr.String())
+	}
+}
+
 func TestLoginCachePolicySupportsNonInteractiveAndFlagForms(t *testing.T) {
 	maxAge, setMaxAge, err := loginCachePolicy("", strings.NewReader("7d\n"), io.Discard, false)
 	if err != nil || !setMaxAge || maxAge != 0 {
