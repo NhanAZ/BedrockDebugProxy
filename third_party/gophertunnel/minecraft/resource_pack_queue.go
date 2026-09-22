@@ -4,13 +4,38 @@ import (
 	"bytes"
 	"fmt"
 	"strings"
+	"sync"
 
 	"github.com/sandertv/gophertunnel/minecraft/protocol/packet"
 	"github.com/sandertv/gophertunnel/minecraft/resource"
 )
 
+// DefaultResourcePackMaxInFlightChunks bounds the number of upstream resource-pack
+// chunk requests that may be outstanding for one pack. The vanilla client keeps
+// a bounded request window and replenishes it as responses arrive.
+const DefaultResourcePackMaxInFlightChunks uint32 = 100
+
+const maxResourcePackChunkCount uint64 = 1<<31 - 1
+
+// resourcePackChunkCount returns the number of chunks needed for a pack. The
+// count is bounded because ResourcePackChunkRequest carries a signed 32-bit
+// chunk index.
+func resourcePackChunkCount(size uint64, chunkSize uint32) (uint32, bool) {
+	if chunkSize == 0 {
+		return 0, false
+	}
+	count := size / uint64(chunkSize)
+	if size%uint64(chunkSize) != 0 {
+		count++
+	}
+	if count > maxResourcePackChunkCount {
+		return 0, false
+	}
+	return uint32(count), true
+}
+
 // resourcePackQueue is used to aid in the handling of resource pack queueing and downloading. Only one
-// resource pack is downloaded at a time.
+// resource pack is downloaded at a time, while its chunks may be requested in a bounded window.
 type resourcePackQueue struct {
 	packs           []*resource.Pack
 	packsToDownload map[string]*resource.Pack
@@ -18,20 +43,27 @@ type resourcePackQueue struct {
 	currentOffset   uint64
 
 	packAmount       int
-	downloadingPacks map[string]downloadingPack
+	downloadingPacks map[string]*downloadingPack
 	awaitingPacks    map[string]*downloadingPack
 	chunkSize        uint32
 }
 
+type resourcePackChunk struct {
+	index uint32
+	data  []byte
+}
+
 // downloadingPack is a resource pack that is being downloaded by a client connection.
 type downloadingPack struct {
-	buf           *bytes.Buffer
-	chunkSize     uint32
-	size          uint64
-	expectedIndex uint32
-	newFrag       chan []byte
-	contentKey    string
-	cacheKey      ResourcePackCacheKey
+	buf        *bytes.Buffer
+	chunkSize  uint32
+	size       uint64
+	chunkCount uint32
+	mu         sync.Mutex
+	requested  map[uint32]struct{}
+	newFrag    chan resourcePackChunk
+	contentKey string
+	cacheKey   ResourcePackCacheKey
 }
 
 // Request 'requests' all resource packs passed, provided they all exist in the resourcePackQueue. Clients

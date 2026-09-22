@@ -1070,6 +1070,14 @@ Every new entry should state the symptom, root cause, implementation commits, ev
 - Evidence and validation: Galaxite capture `captures/session-20260922T151050Z` at revision `a992d6c37f07ae04afb651ce2130712f9e4b209e`, [`docs/research/galaxite-resource-pack-flow.md`](research/galaxite-resource-pack-flow.md), and the existing timeout error coverage.
 - Status: implemented with documentation updates. A fresh stamped Galaxite session must reach upstream login, spawn, and shutdown before release approval.
 
+### FIX-0134 - Pipeline upstream resource-pack chunk requests
+
+- Symptom: an active featured-experience resource-pack exchange requested one chunk, waited for its response, and left the server's available response window idle. The fifteen-minute deadline fixed the premature timeout but not the serial transfer cost.
+- Root cause: the pinned gophertunnel upstream download loop was serial. The listener's sequential downstream delivery is a separate path and was not the cause of the upstream wait.
+- Implementation: allow up to 100 validated upstream chunk requests in flight for one pack, replenish the window as responses arrive, and retain out-of-order fragments in a bounded reorder buffer. Validate chunk indices, request membership, bounds, and exact lengths, and clone response bytes before buffering. Keep downstream sequencing and pacing unchanged.
+- Evidence and validation: Galaxite capture `captures/session-20260922T151050Z`, the source and implementation notes in [`docs/research/resource-pack-pipeline.md`](research/resource-pack-pipeline.md), [gophertunnel PR #509](https://github.com/Sandertv/gophertunnel/pull/509), and `resource_pack_pipeline_test.go`. A fresh stamped The Hive baseline and Galaxite session are required because upstream transfer scheduling changed.
+- Status: implemented with focused nested gophertunnel coverage. Real-server validation remains pending.
+
 ## Ordering safety contract
 
 The deferred-packet change is deliberately narrow. `expectedIDs` remains the only authority for what the current login state accepts. The queue scan selects the earliest packet that is currently expected, leaves packets for later states queued, and never mutates or reorders bytes on the wire. The regression tests cover canonical resource-pack order, featured early `ResourcePacksInfo`, a later-phase packet queued ahead of the current phase, and all six permutations of the three login packets.
