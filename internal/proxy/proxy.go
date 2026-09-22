@@ -1090,8 +1090,7 @@ func (r *Runner) forward(source, destination *minecraft.Conn, failures *bedrock.
 					return r.finishTransferRewriteErrorAtHop(rawRead, direction, sourceChannel, connectionID, hop, rewriteErr, shuttingDown)
 				}
 				outgoing = rewritten
-				if err := r.recordTransferRewrite(transfer, rewritten, target, connectionID, hop); err != nil {
-					rawRead.Release()
+				if err := r.recordTransferRewriteForForward(rawRead, transfer, rewritten, target, connectionID, hop); err != nil {
 					return err
 				}
 			}
@@ -1319,6 +1318,20 @@ func (r *Runner) recordTransferRewrite(original, rewritten *packet.Transfer, tar
 		Annotations: []string{"The original Transfer remains in packet.raw; this opt-in rewrite routes the client back to the local listener"},
 	}})
 	return err
+}
+
+// recordTransferRewriteForForward records the derived Transfer view before the
+// typed packet is written. A typed forwarding path and a raw read that already
+// exposed a decoded packet do not retain a PacketRead, so cleanup must remain
+// conditional when the recorder rejects the derived event.
+func (r *Runner) recordTransferRewriteForForward(rawRead *minecraft.PacketRead, original, rewritten *packet.Transfer, target, connectionID string, hop int) error {
+	if err := r.recordTransferRewrite(original, rewritten, target, connectionID, hop); err != nil {
+		if rawRead != nil {
+			rawRead.Release()
+		}
+		return err
+	}
+	return nil
 }
 
 func (r *Runner) recordStructuredView(kind string, value any, direction capture.Direction, connectionID, channel, stage string, annotations []string) error {

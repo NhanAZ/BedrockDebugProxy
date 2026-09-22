@@ -66,6 +66,8 @@ The same rule applies when a connection-open event cannot be recorded. The wrapp
 
 Transfer rewrite failures follow the same error-preservation rule. The bridge releases a retained raw packet only when one exists, records `bridge.transfer_rewrite_error`, and returns the wrapped rewrite failure. Typed forwarding and raw reads that already exposed a decoded packet have no retained `PacketRead`; they now terminate through the same captured error path without a nil dereference.
 
+The same conditional cleanup applies when recording the derived `packet.transfer_rewrite` view fails before the typed Transfer write. A closed or failing recorder must not turn that capture failure into a secondary nil dereference when the forwarding path has no retained raw packet.
+
 Listener callbacks that cannot return errors also forward recorder failures to the run's `FailureSink`. The `RequestChunkRadius` decode and typed-forwarding hooks therefore stop the session when their error event cannot be persisted, rather than continuing with an incomplete canonical capture.
 
 The same boundary applies to lifecycle failures. Spawn failures, upstream dial failures, and transfer route-probe outcomes now join any error returned while recording their diagnostic event and propagate that capture failure through the run sink. A route-probe network failure itself remains a non-fatal routing hint, but a missing route-probe event is no longer silently accepted.

@@ -46,6 +46,7 @@ Detailed rationale remains in [`docs/audits/`](docs/audits/).
 - RequestChunkRadius listener callbacks now propagate error-event write failures to the session failure sink instead of continuing with an incomplete capture.
 - Spawn, upstream-dial, and transfer-route lifecycle errors now preserve failures from writing their diagnostic events and stop incomplete captures through the existing failure sink.
 - Upstream setup failures now retain transport or capture errors returned while closing the connection during cleanup.
+- Transfer rewrite view failures now preserve the recorder error without dereferencing a missing retained raw packet.
 - Downstream resource-pack offers now retain per-pack content identity, sub-pack, script, addon, and RTX metadata while still rebuilding entries from proxy-served archives.
 - Terminating bridges now retain and reuse raw `DimensionData` and `ItemRegistry` startup packets when the downstream protocol matches, avoiding wire differences caused by typed re-serialization of NBT maps.
 - Terminating bridges now forward each observed downstream `RequestChunkRadius` to the paired upstream connection while retaining the existing 16/16 initial fallback.

@@ -52,6 +52,25 @@ func TestFinishTransferRewriteErrorAtHopAllowsDecodedPacketWithoutRawRead(t *tes
 	}
 }
 
+func TestRecordTransferRewriteFailureAllowsTypedTransferWithoutRawRead(t *testing.T) {
+	root := filepath.Join(t.TempDir(), "capture")
+	recorder, err := capture.New(root, capture.Options{})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := recorder.Close("closed", nil); err != nil {
+		t.Fatal(err)
+	}
+	runner := &Runner{config: Config{Recorder: recorder}}
+	err = runner.recordTransferRewriteForForward(nil,
+		&packet.Transfer{Address: "next.example", Port: 19132},
+		&packet.Transfer{Address: "127.0.0.1", Port: 19132},
+		"next.example:19132", "upstream-1", 1)
+	if err == nil {
+		t.Fatal("recordTransferRewriteForForward() returned nil after recorder close")
+	}
+}
+
 func TestTransferForProxyAddressPreservesSemantics(t *testing.T) {
 	original := &packet.Transfer{Address: "[2001:db8::20]", Port: 19133, ReloadWorld: true}
 	rewritten, target, err := transferForProxyAddress(original, "192.168.1.10:19132")
