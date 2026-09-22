@@ -129,6 +129,37 @@ func TestRenameCommandRequiresBothNames(t *testing.T) {
 	}
 }
 
+func TestHelpGroupsCommands(t *testing.T) {
+	var stdout, stderr bytes.Buffer
+	if code := run([]string{"help"}, &stdout, &stderr); code != 0 {
+		t.Fatalf("help code = %d, stderr = %s", code, stderr.String())
+	}
+	output := stdout.String()
+	for _, section := range []string{"Proxy", "Authentication accounts", "Capture inspection", "Information", "help [COMMAND]"} {
+		if !strings.Contains(output, section) {
+			t.Fatalf("help output missing %q: %s", section, output)
+		}
+	}
+}
+
+func TestCommandHelpAndUnknownHelp(t *testing.T) {
+	var stdout, stderr bytes.Buffer
+	if code := run([]string{"help", "login"}, &stdout, &stderr); code != 0 {
+		t.Fatalf("login help code = %d, stderr = %s", code, stderr.String())
+	}
+	if !strings.Contains(stdout.String(), "Usage - bedrock-debug-proxy login") {
+		t.Fatalf("login help = %s", stdout.String())
+	}
+	stdout.Reset()
+	stderr.Reset()
+	if code := run([]string{"help", "missing"}, &stdout, &stderr); code != 2 {
+		t.Fatalf("unknown help code = %d", code)
+	}
+	if !strings.Contains(stderr.String(), "Unknown command") || !strings.Contains(stderr.String(), "Authentication accounts") {
+		t.Fatalf("unknown help stderr = %s", stderr.String())
+	}
+}
+
 func TestLoginCachePolicySupportsNonInteractiveAndFlagForms(t *testing.T) {
 	maxAge, setMaxAge, err := loginCachePolicy("", strings.NewReader("7d\n"), io.Discard, false)
 	if err != nil || !setMaxAge || maxAge != 0 {

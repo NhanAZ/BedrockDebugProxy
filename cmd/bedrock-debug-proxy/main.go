@@ -70,14 +70,32 @@ func run(args []string, stdout, stderr io.Writer) int {
 		}
 		_, _ = fmt.Fprintf(stdout, " - Bedrock %s protocol %d\n", protocol.CurrentVersion, protocol.CurrentProtocol)
 		return 0
-	case "help", "-h", "--help":
-		printUsage(stdout)
-		return 0
+	case "help":
+		return runHelp(args[1:], stdout, stderr)
+	case "-h", "--help":
+		return runHelp(args[1:], stdout, stderr)
 	default:
 		_, _ = fmt.Fprintf(stderr, "Unknown command %q.\n\n", args[0])
 		printUsage(stderr)
 		return 2
 	}
+}
+
+func runHelp(args []string, stdout, stderr io.Writer) int {
+	if len(args) == 0 {
+		printUsage(stdout)
+		return 0
+	}
+	if len(args) != 1 {
+		_, _ = fmt.Fprintln(stderr, "Usage - bedrock-debug-proxy help [COMMAND]")
+		return 2
+	}
+	if !printCommandHelp(stdout, args[0]) {
+		_, _ = fmt.Fprintf(stderr, "Unknown command %q.\n\n", args[0])
+		printUsage(stderr)
+		return 2
+	}
+	return 0
 }
 
 func runLogout(args []string, stdout, stderr io.Writer) int {
@@ -920,18 +938,82 @@ func nextCapturePath(root string, now time.Time) (string, error) {
 func printUsage(writer io.Writer) {
 	_, _ = fmt.Fprintln(writer, "BedrockDebugProxy")
 	_, _ = fmt.Fprintln(writer)
-	_, _ = fmt.Fprintln(writer, "Usage")
-	_, _ = fmt.Fprintln(writer, "  bedrock-debug-proxy run --upstream HOST:PORT|experience:NAME [options]")
-	_, _ = fmt.Fprintln(writer, "  bedrock-debug-proxy login [--max-age 7d] [ACCOUNT_NAME]")
-	_, _ = fmt.Fprintln(writer, "  bedrock-debug-proxy accounts")
-	_, _ = fmt.Fprintln(writer, "  bedrock-debug-proxy use ACCOUNT_NAME")
-	_, _ = fmt.Fprintln(writer, "  bedrock-debug-proxy rename OLD_ACCOUNT NEW_ACCOUNT")
-	_, _ = fmt.Fprintln(writer, "  bedrock-debug-proxy logout [ACCOUNT_NAME]")
-	_, _ = fmt.Fprintln(writer, "  bedrock-debug-proxy verify CAPTURE_DIRECTORY")
-	_, _ = fmt.Fprintln(writer, "  bedrock-debug-proxy inspect [filters] CAPTURE_DIRECTORY")
-	_, _ = fmt.Fprintln(writer, "  bedrock-debug-proxy view [--live] [--no-open] CAPTURE_DIRECTORY")
-	_, _ = fmt.Fprintln(writer, "  bedrock-debug-proxy analyze CAPTURE_DIRECTORY")
-	_, _ = fmt.Fprintln(writer, "  bedrock-debug-proxy explain CAPTURE_DIRECTORY")
-	_, _ = fmt.Fprintln(writer, "  bedrock-debug-proxy export CAPTURE_DIRECTORY OUTPUT.bdpcap")
-	_, _ = fmt.Fprintln(writer, "  bedrock-debug-proxy version")
+	_, _ = fmt.Fprintln(writer, "Usage - bedrock-debug-proxy <command> [arguments]")
+	_, _ = fmt.Fprintln(writer)
+	_, _ = fmt.Fprintln(writer, "Proxy")
+	_, _ = fmt.Fprintln(writer, "  run --upstream HOST:PORT|experience:NAME [options]  Start the observation proxy")
+	_, _ = fmt.Fprintln(writer)
+	_, _ = fmt.Fprintln(writer, "Authentication accounts")
+	_, _ = fmt.Fprintln(writer, "  login [--max-age 7d] [ACCOUNT_NAME]                 Add or reauthenticate an account")
+	_, _ = fmt.Fprintln(writer, "  accounts                                             Show cached accounts and default")
+	_, _ = fmt.Fprintln(writer, "  use ACCOUNT_NAME                                     Select the default account")
+	_, _ = fmt.Fprintln(writer, "  rename OLD_ACCOUNT NEW_ACCOUNT                       Rename a local cache")
+	_, _ = fmt.Fprintln(writer, "  logout [ACCOUNT_NAME]                                Remove a local cache")
+	_, _ = fmt.Fprintln(writer)
+	_, _ = fmt.Fprintln(writer, "Capture inspection")
+	_, _ = fmt.Fprintln(writer, "  view [--live] [--no-open] CAPTURE_DIRECTORY         Open the web viewer")
+	_, _ = fmt.Fprintln(writer, "  verify CAPTURE_DIRECTORY                              Verify capture integrity")
+	_, _ = fmt.Fprintln(writer, "  inspect [filters] CAPTURE_DIRECTORY                   Filter ordered events")
+	_, _ = fmt.Fprintln(writer, "  analyze CAPTURE_DIRECTORY                             Summarize captured behavior")
+	_, _ = fmt.Fprintln(writer, "  explain CAPTURE_DIRECTORY                             Explain capture findings")
+	_, _ = fmt.Fprintln(writer, "  export CAPTURE_DIRECTORY OUTPUT.bdpcap               Export a portable capture")
+	_, _ = fmt.Fprintln(writer)
+	_, _ = fmt.Fprintln(writer, "Information")
+	_, _ = fmt.Fprintln(writer, "  help [COMMAND]                                       Show command help")
+	_, _ = fmt.Fprintln(writer, "  version                                              Show build and protocol version")
+	_, _ = fmt.Fprintln(writer)
+	_, _ = fmt.Fprintln(writer, "Run 'bedrock-debug-proxy help COMMAND' for details.")
+}
+
+func printCommandHelp(writer io.Writer, command string) bool {
+	switch command {
+	case "run":
+		_, _ = fmt.Fprintln(writer, "Usage - bedrock-debug-proxy run --upstream HOST:PORT|experience:NAME [options]")
+		_, _ = fmt.Fprintln(writer, "Start a local observation proxy and write a canonical capture.")
+		_, _ = fmt.Fprintln(writer, "Common options - --listen ADDRESS, --auth device|none, --web-viewer, --follow-transfers")
+		_, _ = fmt.Fprintln(writer, "Use --help on this command's flag set for the complete option list.")
+	case "login":
+		_, _ = fmt.Fprintln(writer, "Usage - bedrock-debug-proxy login [--max-age 7d] [ACCOUNT_NAME]")
+		_, _ = fmt.Fprintln(writer, "Add or reauthenticate a local Microsoft account cache.")
+		_, _ = fmt.Fprintln(writer, "The first interactive login requires a non-empty account name. Enter selects the default only after an account exists.")
+	case "accounts":
+		_, _ = fmt.Fprintln(writer, "Usage - bedrock-debug-proxy accounts")
+		_, _ = fmt.Fprintln(writer, "Show local account labels, cache state, token expiry, and the selected default.")
+	case "use":
+		_, _ = fmt.Fprintln(writer, "Usage - bedrock-debug-proxy use ACCOUNT_NAME")
+		_, _ = fmt.Fprintln(writer, "Select an existing local account for future proxy runs.")
+	case "rename":
+		_, _ = fmt.Fprintln(writer, "Usage - bedrock-debug-proxy rename OLD_ACCOUNT NEW_ACCOUNT")
+		_, _ = fmt.Fprintln(writer, "Move a local cache to a new label without reauthenticating or overwriting another cache.")
+	case "logout":
+		_, _ = fmt.Fprintln(writer, "Usage - bedrock-debug-proxy logout [ACCOUNT_NAME]")
+		_, _ = fmt.Fprintln(writer, "Remove one local authentication cache. This does not sign out Microsoft elsewhere.")
+	case "view":
+		_, _ = fmt.Fprintln(writer, "Usage - bedrock-debug-proxy view [--live] [--no-open] CAPTURE_DIRECTORY")
+		_, _ = fmt.Fprintln(writer, "Open a capture in the local web viewer.")
+	case "verify":
+		_, _ = fmt.Fprintln(writer, "Usage - bedrock-debug-proxy verify CAPTURE_DIRECTORY")
+		_, _ = fmt.Fprintln(writer, "Check capture files, hashes, event ordering, and completeness metadata.")
+	case "inspect":
+		_, _ = fmt.Fprintln(writer, "Usage - bedrock-debug-proxy inspect [filters] CAPTURE_DIRECTORY")
+		_, _ = fmt.Fprintln(writer, "Print matching ordered events as machine-readable JSON.")
+	case "analyze":
+		_, _ = fmt.Fprintln(writer, "Usage - bedrock-debug-proxy analyze CAPTURE_DIRECTORY")
+		_, _ = fmt.Fprintln(writer, "Summarize packets, flows, errors, timing, and observed limitations.")
+	case "explain":
+		_, _ = fmt.Fprintln(writer, "Usage - bedrock-debug-proxy explain CAPTURE_DIRECTORY")
+		_, _ = fmt.Fprintln(writer, "Explain capture findings with confirmed, inferred, and unknown evidence.")
+	case "export":
+		_, _ = fmt.Fprintln(writer, "Usage - bedrock-debug-proxy export CAPTURE_DIRECTORY OUTPUT.bdpcap")
+		_, _ = fmt.Fprintln(writer, "Create a portable archive from a verified capture.")
+	case "version":
+		_, _ = fmt.Fprintln(writer, "Usage - bedrock-debug-proxy version")
+		_, _ = fmt.Fprintln(writer, "Show the build revision and Bedrock protocol version.")
+	case "help":
+		_, _ = fmt.Fprintln(writer, "Usage - bedrock-debug-proxy help [COMMAND]")
+		_, _ = fmt.Fprintln(writer, "Show the grouped command list or details for one command.")
+	default:
+		return false
+	}
+	return true
 }
