@@ -20,6 +20,6 @@ The matching BedrockProtocol implementation reads the miss and hit counts as Var
 - Gophertunnel master at revision [`7a556a07335b663744b50d38062636ad8283f314`](https://github.com/Sandertv/gophertunnel/blob/7a556a07335b663744b50d38062636ad8283f314/minecraft/protocol/io.go#L120-L145), accessed 2026-09-22.
 - BedrockProtocol master at revision [`8eb5a390a8d913ee54b97ac71f42899ecbb5c419`](https://github.com/pmmp/BedrockProtocol/blob/8eb5a390a8d913ee54b97ac71f42899ecbb5c419/src/ClientCacheBlobStatusPacket.php#L53-L71), accessed 2026-09-22.
 
-## Status and next investigation
+## Status and validation
 
-No decoder change is made by this note. Before changing code, establish a focused fixture for a `ClientCacheBlobStatus` packet with 1,302 hashes, determine whether the generic limit can be made packet-specific without weakening unrelated parser bounds, and add a regression test that preserves raw evidence and typed decoding. The Galaxite release report remains `fail` until the exact stamped revision passes without a blocking decode error.
+The decoder now gives only `ClientCacheBlobStatus` a bounded 16,384-entry limit. Ordinary protocol slices keep the upstream 1,024-entry bound. `TestClientCacheBlobStatusAllowsObservedHashCount` encodes and decodes 1,302 miss hashes with the strict reader enabled and checks both list boundaries. The Galaxite release report remains `fail` until a new stamped runtime revision passes without a blocking decode error.
