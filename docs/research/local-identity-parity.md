@@ -64,6 +64,12 @@ The stamped revision was `9994e4e11f595f7980fc6795f5cc8b05271d4de7`. Capture `ca
 
 The same capture confirms the documented NetworkSettings boundary on a real Android client. The downstream listener advertised compression threshold `256`, while PocketMine's upstream response advertised threshold `1`, so `network_settings_match` was `false`. This is an observed local wire difference and remains a separate compatibility question. The proxy did not normalize or rewrite either setting.
 
+### Direct Android baseline
+
+After the proxy was stopped, the same Android client connected directly to the operator-controlled PocketMine listener on 2026-09-22. PocketMine identified the expected downstream username, authenticated the client to Xbox Live, reached spawn, carried gameplay traffic, and recorded a clean `player_quit`. The direct ProxyFingerprint report `20260922T051215.790689Z_a81b5174db46135f_unlabeled.json` completed with 1,672 packets, Android metadata, `ClientData.PlayFabId` absent, and only `non_public_peer`.
+
+The direct report and the proxied report share the same selected Android metadata, including game version 1.26.51, input modes, platform type, memory tier, view distance, and language. The proxied report contains `IsPartyLeader` and `PartyId` claim keys that the direct report omits. Because the two sessions used different authenticated account identities, those account-scoped claim differences cannot be attributed to the proxy. A same-account authenticated upstream is required for an identity-level parity comparison.
+
 This confirms the synthetic authenticated PlayFab field is removed on the real-client local path. The upstream report still advertises Android metadata because the authenticated gophertunnel session remains a separate signed connection. This local result does not establish public-server compatibility or enforcement behavior.
 
 ### Local XUID rejection with an unauthenticated upstream
