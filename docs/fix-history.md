@@ -1086,6 +1086,22 @@ Every new entry should state the symptom, root cause, implementation commits, ev
 - Evidence and validation: Galaxite capture `captures/session-20260922T151050Z`, the source and implementation notes in [`docs/research/resource-pack-pipeline.md`](research/resource-pack-pipeline.md), [gophertunnel PR #509](https://github.com/Sandertv/gophertunnel/pull/509), and `resource_pack_pipeline_test.go`. A fresh stamped The Hive baseline and Galaxite session are required because upstream transfer scheduling changed.
 - Status: implemented with focused nested gophertunnel coverage. Real-server validation remains pending.
 
+### FIX-0135 - Accept implicit resource-pack directory declarations
+
+- Symptom: CubeCraft encrypted resource packs recorded `resource_pack.decrypt_error` events because `contents.json` declared directories such as `animation_controllers` and `texts` that were not present as explicit ZIP directory entries.
+- Root cause: the decoder required every manifest path to match a file-map entry. ZIP archives commonly omit directory entries, while the manifest still lists directories before their keyed child files.
+- Implementation: treat a manifest path as an implicit directory only when the archive contains descendants below it and the directory entry has an empty key. Keep child-file keys unchanged, exclude directory declarations from file counts, and continue rejecting genuinely missing paths or keyed directories.
+- Evidence and validation: CubeCraft capture `captures/session-20260922T165238Z` at revision `3a77b024ef44f37479f925ed1cba0aacddffc448`, the encrypted archive directory listings, `TestDecryptArchiveAllowsImplicitDirectoryDeclarations`, `TestDecryptArchiveRejectsMissingDirectoryDeclaration`, `TestDecryptArchiveRejectsKeyedDirectoryDeclaration`, and a temporary direct decrypt check over all five captured CubeCraft packs.
+- Status: implemented with focused resource-pack regression coverage. A fresh stamped six-server matrix is required before release approval.
+
+### FIX-0136 - Preserve best-effort transfer probe failures without blocking validation
+
+- Symptom: an Enchanted transfer session reached hop 2 and spawn, but its best-effort route probe and the actual dial status ping recorded DNS timeout errors as blocking validation failures.
+- Root cause: route-hint pings were retained as ordinary transport errors even though the route probe is explicitly non-fatal and the normal dial continued to a successful upstream connection.
+- Implementation: mark route-hint pings as best effort in their structured metadata, retain their operation errors, render them as warnings, and classify only those marked errors as non-blocking in sanitized reports. Other status-ping failures remain blocking.
+- Evidence and validation: Enchanted capture `captures/session-20260922T164833Z` at revision `3a77b024ef44f37479f925ed1cba0aacddffc448`, where hop 2 connected and spawned after the 750 ms DNS timeout, plus focused network, proxy, analysis, and report-generation checks.
+- Status: implemented with explicit evidence classification. A fresh stamped Enchanted session is required before release approval.
+
 ## Ordering safety contract
 
 The deferred-packet change is deliberately narrow. `expectedIDs` remains the only authority for what the current login state accepts. The queue scan selects the earliest packet that is currently expected, leaves packets for later states queued, and never mutates or reorders bytes on the wire. The regression tests cover canonical resource-pack order, featured early `ResourcePacksInfo`, a later-phase packet queued ahead of the current phase, and all six permutations of the three login packets.

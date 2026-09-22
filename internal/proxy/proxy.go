@@ -723,13 +723,14 @@ func (r *Runner) probeTransferRoute(ctx context.Context, target string, localAdd
 	transport.LocalAddr = localAddr
 	transport.ClientGUID = clientGUID
 	network := bedrock.Network{
-		Transport:    transport,
-		Recorder:     r.config.Recorder,
-		Failures:     failures,
-		SessionID:    sessionID,
-		ConnectionID: fmt.Sprintf("upstream-%d", hop),
-		Channel:      "upstream",
-		Hop:          hop,
+		Transport:      transport,
+		Recorder:       r.config.Recorder,
+		Failures:       failures,
+		SessionID:      sessionID,
+		ConnectionID:   fmt.Sprintf("upstream-%d", hop),
+		Channel:        "upstream",
+		Hop:            hop,
+		BestEffortPing: true,
 	}
 	return r.probeTransferRouteNetwork(probeCtx, target, localAddr, clientGUID, hop, network, live)
 }

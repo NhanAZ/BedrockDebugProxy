@@ -347,6 +347,47 @@ func TestNetworkPingCapturesFailure(t *testing.T) {
 	}
 }
 
+func TestNetworkPingCapturesBestEffortFailureAsWarning(t *testing.T) {
+	root := filepath.Join(t.TempDir(), "capture")
+	recorder, err := capture.New(root, capture.Options{})
+	if err != nil {
+		t.Fatal(err)
+	}
+	pingErr := errors.New("ping timeout")
+	network := Network{
+		Transport:      &fakePingNetwork{err: pingErr},
+		Recorder:       recorder,
+		Failures:       &FailureSink{},
+		BestEffortPing: true,
+	}
+	if _, err := network.PingContext(context.Background(), "example.test:19132"); !errors.Is(err, pingErr) {
+		t.Fatalf("ping error = %v", err)
+	}
+	if err := recorder.Close("closed", nil); err != nil {
+		t.Fatal(err)
+	}
+
+	var event capture.Event
+	if err := capture.ScanEvents(root, func(candidate capture.Event) error {
+		if candidate.Kind == "transport.ping" {
+			event = candidate
+		}
+		return nil
+	}); err != nil {
+		t.Fatal(err)
+	}
+	if event.Severity != capture.SeverityWarn || event.Error == nil {
+		t.Fatalf("best-effort ping event = %#v", event)
+	}
+	var data map[string]any
+	if err := json.Unmarshal(event.Data, &data); err != nil {
+		t.Fatal(err)
+	}
+	if data["best_effort"] != true {
+		t.Fatalf("best-effort ping data = %#v", data)
+	}
+}
+
 func TestObservedConnReportsTransferredBytesWhenCaptureFails(t *testing.T) {
 	recorder, err := capture.New(filepath.Join(t.TempDir(), "capture"), capture.Options{})
 	if err != nil {
