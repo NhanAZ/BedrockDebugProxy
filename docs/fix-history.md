@@ -934,6 +934,14 @@ Every new entry should state the symptom, root cause, implementation commits, ev
 - Evidence and validation: owner-controlled capture `captures/session-20260921T122228Z` at revision `d272805fd571525cca6f7473b166fb1129bafd48`, plus the in-tree `minecraft/packet.go`, `minecraft/conn.go`, and `minecraft/raw_packet.go` queue paths. The event stream and closed manifest were inspected locally.
 - Status: documentation-only clarification. Raw and decoded events must not be paired by adjacent sequence numbers, and no public-server validation was performed.
 
+### FIX-0116 - Retain only transferred bytes on partial writes
+
+- Symptom: a partial transport write recorded a raw `transport.payload` blob containing the entire attempted buffer even though the transport reported that only a prefix was transferred.
+- Root cause: `observedConn.Write` passed the caller's full payload to the recorder while separately storing the shorter transferred byte count.
+- Implementation: slice the write payload to the reported transferred prefix before recording the raw blob. Keep `attempted_bytes`, `transferred_bytes`, and the underlying transport error unchanged.
+- Evidence and validation: the `net.Conn` write contract permits returning fewer bytes with an error. A deterministic regression test uses a synthetic partial transport, verifies the blob contains only the transferred prefix, and verifies both byte-count metadata fields.
+- Status: implemented with deterministic local coverage. Live partial-write behavior remains unverified.
+
 ## Ordering safety contract
 
 The deferred-packet change is deliberately narrow. `expectedIDs` remains the only authority for what the current login state accepts. The queue scan selects the earliest packet that is currently expected, leaves packets for later states queued, and never mutates or reorders bytes on the wire. The regression tests cover canonical resource-pack order, featured early `ResourcePacksInfo`, a later-phase packet queued ahead of the current phase, and all six permutations of the three login packets.

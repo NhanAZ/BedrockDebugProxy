@@ -302,10 +302,20 @@ func (c *observedConn) PublicKey() *ecdsa.PublicKey {
 
 func (c *observedConn) Write(payload []byte) (int, error) {
 	n, err := c.Conn.Write(payload)
-	if captureErr := c.recordPayload("write", payload, len(payload), n, err); captureErr != nil {
+	if captureErr := c.recordPayload("write", transferredPayload(payload, n), len(payload), n, err); captureErr != nil {
 		return n, errors.Join(err, captureErr)
 	}
 	return n, err
+}
+
+func transferredPayload(payload []byte, transferred int) []byte {
+	if transferred <= 0 {
+		return payload[:0]
+	}
+	if transferred >= len(payload) {
+		return payload
+	}
+	return payload[:transferred]
 }
 
 func (c *observedConn) Close() error {

@@ -89,7 +89,7 @@ Transport payload events now supplement the application-batch blob with per-conn
 
 Transport lifecycle events also retain the optional RakNet GUID and public-key capability at connection open or close when the underlying `net.Conn` exposes them. Only public-key capability and presence booleans are stored. This records the identity boundary needed for local parity analysis without persisting the key itself.
 
-The observing transport wrapper preserves error provenance at the read and write boundary. If the underlying transport returns a partial transfer or operation error while the recorder also fails, the wrapper retains the transferred byte count and joins the transport and capture errors. The event still records the original operation error and raw bytes that were available. This keeps a recorder failure from masking a transport failure or changing a partial-read result.
+The observing transport wrapper preserves error provenance at the read and write boundary. If the underlying transport returns a partial transfer or operation error while the recorder also fails, the wrapper retains the transferred byte count and joins the transport and capture errors. Read blobs contain the bytes reported by the read, and write blobs contain only the prefix reported as transferred, while event metadata retains both the attempted and transferred counts. This keeps a recorder failure from masking a transport failure or making an attempted but unsent write look like wire evidence.
 
 The same rule applies when a connection-open event cannot be recorded. The wrapper still closes the newly opened transport and joins any close error with the recorder failure, so a capture failure does not hide a lower-layer shutdown problem.
 

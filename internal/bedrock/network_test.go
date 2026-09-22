@@ -9,6 +9,7 @@ import (
 	"errors"
 	"io"
 	"net"
+	"os"
 	"path/filepath"
 	"testing"
 	"time"
@@ -400,6 +401,60 @@ func TestObservedConnPreservesTransportErrorWhenCaptureFails(t *testing.T) {
 	}
 }
 
+func TestObservedConnRetainsOnlyTransferredBytesOnPartialWrite(t *testing.T) {
+	root := filepath.Join(t.TempDir(), "capture")
+	recorder, err := capture.New(root, capture.Options{})
+	if err != nil {
+		t.Fatal(err)
+	}
+	writeErr := errors.New("partial transport write")
+	conn := &observedConn{Conn: &partialWriteConn{
+		fakePacketConn: fakePacketConn{writeErr: writeErr},
+		transferred:    2,
+	}, network: Network{
+		Recorder:       recorder,
+		Failures:       &FailureSink{},
+		WriteDirection: capture.DirectionClientToServer,
+	}}
+	written, err := conn.Write([]byte{1, 2, 3, 4})
+	if written != 2 || !errors.Is(err, writeErr) {
+		t.Fatalf("Write() = %d, %v, want partial count and transport error", written, err)
+	}
+	if err := conn.Close(); err != nil {
+		t.Fatal(err)
+	}
+	if err := recorder.Close("closed", nil); err != nil {
+		t.Fatal(err)
+	}
+
+	var payloadEvent capture.Event
+	if err := capture.ScanEvents(root, func(event capture.Event) error {
+		if event.Kind == "transport.payload" {
+			payloadEvent = event
+		}
+		return nil
+	}); err != nil {
+		t.Fatal(err)
+	}
+	if payloadEvent.Blob == nil {
+		t.Fatal("partial write did not retain a payload blob")
+	}
+	raw, err := os.ReadFile(filepath.Join(root, filepath.FromSlash(payloadEvent.Blob.Path)))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if string(raw) != string([]byte{1, 2}) {
+		t.Fatalf("partial write blob = %x, want transferred prefix 0102", raw)
+	}
+	var metadata map[string]any
+	if err := json.Unmarshal(payloadEvent.Data, &metadata); err != nil {
+		t.Fatal(err)
+	}
+	if metadata["attempted_bytes"] != float64(4) || metadata["transferred_bytes"] != float64(2) {
+		t.Fatalf("partial write metadata = %#v", metadata)
+	}
+}
+
 func TestFailureSinkNotifiesOnce(t *testing.T) {
 	notifications := 0
 	sink := NewFailureSink(func() { notifications++ })
@@ -428,6 +483,15 @@ type fakeCapabilityConn struct {
 	fakePacketConn
 	publicKey  *ecdsa.PublicKey
 	clientGUID int64
+}
+
+type partialWriteConn struct {
+	fakePacketConn
+	transferred int
+}
+
+func (c *partialWriteConn) Write(payload []byte) (int, error) {
+	return c.transferred, c.writeErr
 }
 
 func (*fakeCapabilityConn) BatchHeader() []byte           { return nil }
