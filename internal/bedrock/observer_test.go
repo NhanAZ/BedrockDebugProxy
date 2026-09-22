@@ -78,6 +78,41 @@ func TestObserverRecordsRawPacketsWithObservedDirection(t *testing.T) {
 	}
 }
 
+func TestObserverUsesPhysicalFlowIdentityWhenFlowsOverlap(t *testing.T) {
+	root := filepath.Join(t.TempDir(), "capture")
+	recorder, err := capture.New(root, capture.Options{SyncEachEvent: true})
+	if err != nil {
+		t.Fatal(err)
+	}
+	observer := NewObserver(recorder, &FailureSink{}, "session-test", 1, nil)
+	local := &net.UDPAddr{IP: net.ParseIP("127.0.0.1"), Port: 19132}
+	oldClient := &net.UDPAddr{IP: net.ParseIP("127.0.0.1"), Port: 50000}
+	newClient := &net.UDPAddr{IP: net.ParseIP("127.0.0.1"), Port: 50001}
+	observer.SetFlowWithIdentity("downstream", local, oldClient, "downstream-1", 1)
+	observer.SetFlowWithIdentity("downstream", local, newClient, "downstream-2", 2)
+	callback := observer.PacketFuncDynamic("downstream", func() string { return "fallback" })
+	header := packet.Header{PacketID: 42}
+	callback(header, []byte{0xaa}, oldClient, local)
+	callback(header, []byte{0xbb}, newClient, local)
+	if err := recorder.Close("closed", nil); err != nil {
+		t.Fatal(err)
+	}
+
+	var events []capture.Event
+	if err := capture.ScanEvents(root, func(event capture.Event) error {
+		events = append(events, event)
+		return nil
+	}); err != nil {
+		t.Fatal(err)
+	}
+	if len(events) != 2 {
+		t.Fatalf("event count = %d, want 2", len(events))
+	}
+	if events[0].ConnectionID != "downstream-1" || events[0].Hop != 1 || events[1].ConnectionID != "downstream-2" || events[1].Hop != 2 {
+		t.Fatalf("flow identities = %#v", events)
+	}
+}
+
 func TestCaptureLogHandlerPreservesAttributeGroupsAndIntegerPrecision(t *testing.T) {
 	root := filepath.Join(t.TempDir(), "capture")
 	recorder, err := capture.New(root, capture.Options{})

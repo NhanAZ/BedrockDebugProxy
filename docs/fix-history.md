@@ -950,6 +950,14 @@ Every new entry should state the symptom, root cause, implementation commits, ev
 - Evidence and validation: deterministic recorder coverage closes the event stream, queues three accepted jobs, closes the recorder, and verifies zero persisted events, three dropped events, an incomplete manifest, and the explicit limitation. The focused capture tests pass under the Go race detector.
 - Status: implemented with deterministic local coverage. Live disk-failure behavior remains unverified.
 
+### FIX-0118 - Preserve physical flow identity during transfer overlap
+
+- Symptom: a packet emitted by the old client connection after `Transfer` could receive the pending hop's downstream connection ID while the old physical flow was still active.
+- Root cause: the listener observer used mutable pending state for every downstream callback. Transfer following creates that state before the old client flow has fully closed, so source and destination addresses were not used to select provenance.
+- Implementation: retain connection ID and hop alongside every observed physical flow at transport-open time. Packet callbacks now match source and destination addresses to the flow that produced them, while retaining the existing dynamic fallback for callers without an identity-bearing flow.
+- Evidence and validation: the loopback transfer regression sends `RequestChunkRadius` after the old hop's Transfer and verifies the downstream raw event remains `downstream-1`. A focused overlapping-flow observer test verifies both old and new identities. No packet bytes or transfer routing behavior changed.
+- Status: implemented with deterministic local coverage. Real-client overlap timing remains unverified.
+
 ## Ordering safety contract
 
 The deferred-packet change is deliberately narrow. `expectedIDs` remains the only authority for what the current login state accepts. The queue scan selects the earliest packet that is currently expected, leaves packets for later states queued, and never mutates or reorders bytes on the wire. The regression tests cover canonical resource-pack order, featured early `ResourcePacksInfo`, a later-phase packet queued ahead of the current phase, and all six permutations of the three login packets.
