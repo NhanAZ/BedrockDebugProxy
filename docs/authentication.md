@@ -2,6 +2,8 @@
 
 BedrockDebugProxy keeps Microsoft authentication in per-user local cache files. The normal `run` command uses one selected default account, so everyday proxy commands do not need an account flag.
 
+For a quick command overview, run `bedrock-debug-proxy help`. Use `bedrock-debug-proxy help login` or `bedrock-debug-proxy help rename` for one account command's short workflow.
+
 ## First login
 
 The first interactive authentication must have a local account label. This prevents a new installation from silently assigning the token to the synthetic `default` profile. Start the proxy normally, or run the login command directly:

@@ -982,6 +982,14 @@ Every new entry should state the symptom, root cause, implementation commits, ev
 - Evidence and validation: account-store tests cover legacy migration, default preservation, token retention, and destination collision rejection. Full quality-gate validation remains required before treating this runtime change as live-validated.
 - Status: implemented with deterministic local coverage. The label remains operator-supplied local metadata and is not verified against the token identity.
 
+### FIX-0123 - Group and discover CLI help
+
+- Symptom: the root help output listed every command in one flat block, making it difficult to find account-management versus capture-inspection workflows.
+- Root cause: `printUsage` had no command categories, descriptions, or command-specific help route.
+- Implementation: group the root command list by purpose and add `help [COMMAND]` with concise usage and behavior details for every command. The command remains read-only and does not alter proxy or capture behavior.
+- Evidence and validation: focused CLI tests cover grouped help text, command-specific help, and unknown-command handling. Full quality-gate validation remains required before treating this documentation-facing runtime change as live-validated.
+- Status: implemented with deterministic local coverage. Detailed flag descriptions remain on each command's existing flag set.
+
 ## Ordering safety contract
 
 The deferred-packet change is deliberately narrow. `expectedIDs` remains the only authority for what the current login state accepts. The queue scan selects the earliest packet that is currently expected, leaves packets for later states queued, and never mutates or reorders bytes on the wire. The regression tests cover canonical resource-pack order, featured early `ResourcePacksInfo`, a later-phase packet queued ahead of the current phase, and all six permutations of the three login packets.
