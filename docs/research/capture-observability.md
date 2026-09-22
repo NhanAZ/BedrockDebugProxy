@@ -97,6 +97,21 @@ Transfer rewrite failures follow the same error-preservation rule. The bridge re
 
 The same conditional cleanup applies when recording the derived `packet.transfer_rewrite` view fails before the typed Transfer write. A closed or failing recorder must not turn that capture failure into a secondary nil dereference when the forwarding path has no retained raw packet.
 
+Transfer reconnects can briefly overlap the old physical client flow and the
+new pending hop. A deterministic loopback regression sends a client packet
+after the old hop's `Transfer` was observed but before that client closes. The
+pre-fix observer selected the mutable pending connection ID for that raw
+packet, even though its source and destination addresses still belonged to the
+old flow. The observer now records connection ID and hop at transport-open
+time and selects the matching physical flow for each packet callback. This
+preserves provenance without changing packet bytes or transfer behavior.
+
+Confirmed: the loopback packet is attributed to `downstream-1` while the new
+flow is already pending, and the overlapping-flow unit test preserves both
+identities. Inferred: a real featured-experience client may emit packets in the
+same overlap window. Unknown: whether any server relies on or reacts to the
+timing of those final old-flow packets.
+
 Listener callbacks that cannot return errors also forward recorder failures to the run's `FailureSink`. The `RequestChunkRadius` decode and typed-forwarding hooks therefore stop the session when their error event cannot be persisted, rather than continuing with an incomplete canonical capture.
 
 The same boundary applies to lifecycle failures. Spawn failures, upstream dial failures, and transfer route-probe outcomes now join any error returned while recording their diagnostic event and propagate that capture failure through the run sink. A route-probe network failure itself remains a non-fatal routing hint, but a missing route-probe event is no longer silently accepted.

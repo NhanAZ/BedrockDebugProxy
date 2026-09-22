@@ -169,6 +169,14 @@ func TestRunnerFollowsTransferAndAcceptsNextHop(t *testing.T) {
 		_ = client.Close()
 		t.Fatalf("client received transfer = %#v", transfer)
 	}
+	if err := client.WritePacket(&packet.RequestChunkRadius{ChunkRadius: 5}); err != nil {
+		_ = client.Close()
+		t.Fatalf("write post-transfer request: %v", err)
+	}
+	if err := client.Flush(); err != nil {
+		_ = client.Close()
+		t.Fatalf("flush post-transfer request: %v", err)
+	}
 	if err := client.Close(); err != nil {
 		t.Fatal(err)
 	}
@@ -195,10 +203,13 @@ func TestRunnerFollowsTransferAndAcceptsNextHop(t *testing.T) {
 	if err != nil || len(verification.Issues) != 0 {
 		t.Fatalf("capture verification = %+v, error = %v", verification, err)
 	}
-	var transferSeen, rewriteSeen, routeProbeSeen, hopTwo bool
+	var transferSeen, rewriteSeen, routeProbeSeen, hopTwo, postTransferRequestSeen bool
+	var transferSequence uint64
+	var postTransferRequestConnectionID string
 	if err := capture.ScanEvents(root, func(event capture.Event) error {
 		if event.Kind == "packet.decoded" && event.Packet != nil && event.Packet.Name == "Transfer" && event.Hop == 1 {
 			transferSeen = true
+			transferSequence = event.Sequence
 		}
 		if event.Kind == "packet.transfer_rewrite" {
 			rewriteSeen = true
@@ -209,12 +220,16 @@ func TestRunnerFollowsTransferAndAcceptsNextHop(t *testing.T) {
 		if event.Hop == 2 && event.Kind == "session.spawned" {
 			hopTwo = true
 		}
+		if event.Kind == "packet.raw" && event.Packet != nil && event.Packet.ID == packet.IDRequestChunkRadius && event.Direction == capture.DirectionClientToServer && event.Channel == "downstream" && event.Sequence > transferSequence {
+			postTransferRequestSeen = true
+			postTransferRequestConnectionID = event.ConnectionID
+		}
 		return nil
 	}); err != nil {
 		t.Fatal(err)
 	}
-	if !transferSeen || !rewriteSeen || !routeProbeSeen || !hopTwo {
-		t.Fatalf("transfer evidence = transfer %v, rewrite %v, route probe %v, hop2 %v", transferSeen, rewriteSeen, routeProbeSeen, hopTwo)
+	if !transferSeen || !rewriteSeen || !routeProbeSeen || !hopTwo || !postTransferRequestSeen || postTransferRequestConnectionID != "downstream-1" {
+		t.Fatalf("transfer evidence = transfer %v, rewrite %v, route probe %v, hop2 %v, post-transfer request hop1 %v connection %q", transferSeen, rewriteSeen, routeProbeSeen, hopTwo, postTransferRequestSeen, postTransferRequestConnectionID)
 	}
 	for i := 0; i < 2; i++ {
 		select {

@@ -43,6 +43,7 @@ Detailed rationale remains in [`docs/audits/`](docs/audits/).
 - Observed transport reads and writes now preserve both the underlying transport error and any capture-recorder error, including partial byte counts.
 - Partial transport writes now retain only the bytes reported as transferred in the raw payload blob while preserving attempted and transferred byte counts in event metadata.
 - Accepted capture events that cannot be persisted after a writer failure are now counted as dropped in the manifest instead of disappearing silently.
+- Transfer-overlap packet evidence now keeps the physical flow's connection ID and hop instead of using the pending reconnect state.
 - Connection wrapping now preserves a transport close error when the initial connection-open capture also fails.
 - Transfer rewrite failures now preserve the captured error path when no raw packet read is retained, avoiding a nil dereference on typed or already-decoded forwarding paths.
 - RequestChunkRadius listener callbacks now propagate error-event write failures to the session failure sink instead of continuing with an incomplete capture.
