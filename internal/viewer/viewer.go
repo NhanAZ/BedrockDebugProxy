@@ -30,27 +30,31 @@ const (
 var assets embed.FS
 
 type Options struct {
-	BlobPreviewBytes int64
+	BlobPreviewBytes     int64
+	ExternalVerification bool
 }
 
 type Viewer struct {
-	mu               sync.RWMutex
-	root             string
-	resolvedRoot     string
-	eventsPath       string
-	verification     capture.Verification
-	verificationDone bool
-	tailing          bool
-	indexedOffset    int64
-	rows             []eventIndex
-	bySequence       map[uint64]int
-	filters          filterValues
-	directions       map[string]struct{}
-	kinds            map[string]struct{}
-	packets          map[string]struct{}
-	channels         map[string]struct{}
-	seenBlobs        map[string]struct{}
-	blobPreviewBytes int64
+	mu                   sync.RWMutex
+	root                 string
+	resolvedRoot         string
+	eventsPath           string
+	verification         capture.Verification
+	verificationDone     bool
+	tailing              bool
+	externalVerification bool
+	verificationProgress *capture.VerificationProgress
+	verificationError    string
+	indexedOffset        int64
+	rows                 []eventIndex
+	bySequence           map[uint64]int
+	filters              filterValues
+	directions           map[string]struct{}
+	kinds                map[string]struct{}
+	packets              map[string]struct{}
+	channels             map[string]struct{}
+	seenBlobs            map[string]struct{}
+	blobPreviewBytes     int64
 }
 
 type eventIndex struct {
@@ -91,14 +95,15 @@ type filterValues struct {
 }
 
 type sessionResponse struct {
-	Manifest           capture.Manifest `json:"manifest"`
-	Events             uint64           `json:"events"`
-	Blobs              uint64           `json:"blobs"`
-	Filters            filterValues     `json:"filters"`
-	PreviewBytes       int64            `json:"blob_preview_bytes"`
-	Mode               string           `json:"mode"`
-	Verification       string           `json:"verification"`
-	VerificationIssues []string         `json:"verification_issues,omitempty"`
+	Manifest             capture.Manifest              `json:"manifest"`
+	Events               uint64                        `json:"events"`
+	Blobs                uint64                        `json:"blobs"`
+	Filters              filterValues                  `json:"filters"`
+	PreviewBytes         int64                         `json:"blob_preview_bytes"`
+	Mode                 string                        `json:"mode"`
+	Verification         string                        `json:"verification"`
+	VerificationIssues   []string                      `json:"verification_issues,omitempty"`
+	VerificationProgress *capture.VerificationProgress `json:"verification_progress,omitempty"`
 }
 
 type eventsResponse struct {
@@ -180,18 +185,58 @@ func newViewer(root string, manifest capture.Manifest, options Options) (*Viewer
 		previewBytes = defaultBlobPreviewBytes
 	}
 	return &Viewer{
-		root:             root,
-		resolvedRoot:     resolvedRoot,
-		eventsPath:       eventsPath,
-		verification:     capture.Verification{Manifest: manifest},
-		bySequence:       make(map[uint64]int),
-		directions:       make(map[string]struct{}),
-		kinds:            make(map[string]struct{}),
-		packets:          make(map[string]struct{}),
-		channels:         make(map[string]struct{}),
-		seenBlobs:        make(map[string]struct{}),
-		blobPreviewBytes: previewBytes,
+		root:                 root,
+		resolvedRoot:         resolvedRoot,
+		eventsPath:           eventsPath,
+		verification:         capture.Verification{Manifest: manifest},
+		externalVerification: options.ExternalVerification,
+		bySequence:           make(map[uint64]int),
+		directions:           make(map[string]struct{}),
+		kinds:                make(map[string]struct{}),
+		packets:              make(map[string]struct{}),
+		channels:             make(map[string]struct{}),
+		seenBlobs:            make(map[string]struct{}),
+		blobPreviewBytes:     previewBytes,
 	}, nil
+}
+
+// BeginVerification marks a closed live capture as externally verified. The
+// owner can then report progress without an HTTP request blocking on a second
+// verification pass.
+func (v *Viewer) BeginVerification() {
+	v.mu.Lock()
+	defer v.mu.Unlock()
+	v.externalVerification = true
+	v.verificationDone = false
+	v.verificationError = ""
+	v.verificationProgress = &capture.VerificationProgress{Phase: "starting"}
+}
+
+// UpdateVerificationProgress publishes the latest verification counters to
+// live viewer clients.
+func (v *Viewer) UpdateVerificationProgress(progress capture.VerificationProgress) {
+	v.mu.Lock()
+	defer v.mu.Unlock()
+	progressCopy := progress
+	v.verificationProgress = &progressCopy
+}
+
+// CompleteVerification publishes the final verification result and lets the
+// live viewer serve the completed capture without verifying it again.
+func (v *Viewer) CompleteVerification(result capture.Verification, verifyErr error) {
+	v.mu.Lock()
+	defer v.mu.Unlock()
+	if result.Manifest.CaptureID != "" {
+		v.verification = result
+	}
+	v.verificationProgress = nil
+	v.verificationDone = true
+	v.tailing = false
+	v.verificationError = ""
+	if verifyErr != nil {
+		v.verificationError = verifyErr.Error()
+		v.verification.Issues = append(v.verification.Issues, verifyErr.Error())
+	}
 }
 
 func NewAccessToken() (string, error) {
@@ -299,21 +344,25 @@ func (v *Viewer) serveSession(writer http.ResponseWriter) {
 		mode = "live"
 	}
 	verification := "pending"
+	if v.verificationProgress != nil {
+		verification = "verifying"
+	}
 	if v.verificationDone {
 		verification = "verified"
-		if len(v.verification.Issues) != 0 {
+		if len(v.verification.Issues) != 0 || v.verificationError != "" {
 			verification = "failed"
 		}
 	}
 	writeJSON(writer, http.StatusOK, sessionResponse{
-		Manifest:           v.verification.Manifest,
-		Events:             uint64(len(v.rows)),
-		Blobs:              uint64(len(v.seenBlobs)),
-		Filters:            v.filters,
-		PreviewBytes:       v.blobPreviewBytes,
-		Mode:               mode,
-		Verification:       verification,
-		VerificationIssues: v.verification.Issues,
+		Manifest:             v.verification.Manifest,
+		Events:               uint64(len(v.rows)),
+		Blobs:                uint64(len(v.seenBlobs)),
+		Filters:              v.filters,
+		PreviewBytes:         v.blobPreviewBytes,
+		Mode:                 mode,
+		Verification:         verification,
+		VerificationIssues:   v.verification.Issues,
+		VerificationProgress: v.verificationProgress,
 	})
 }
 
@@ -429,6 +478,9 @@ func (v *Viewer) Refresh() error {
 	}
 	v.verification.Manifest = manifest
 	if manifest.Status == "open" || manifest.EndedAt == "" {
+		return nil
+	}
+	if v.externalVerification && !v.verificationDone {
 		return nil
 	}
 	if _, err := v.indexAppendedEvents(false); err != nil {

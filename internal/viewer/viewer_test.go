@@ -233,7 +233,7 @@ func TestViewerServesEmbeddedFontAssets(t *testing.T) {
 	if !strings.Contains(string(js), "decode-pending") || !strings.Contains(string(js), "not_yet_decoded") || !strings.Contains(string(js), "setBytesExpanded") || !strings.Contains(string(js), "elements[\"hex-view\"].hidden") {
 		t.Fatal("JavaScript does not classify pending-decode rows")
 	}
-	for _, source := range []string{"function goToPage", "function selectNewestEvent", "function scrollRowWithinTable", "function pageScrollTop", "function restorePageScroll", "preserveDetails: true", "elements[\"page-input\"].max", "event.key === \"Enter\"", "followNewest = state.live && elements.follow.checked", "await loadEvents({ followNewest })"} {
+	for _, source := range []string{"function goToPage", "function selectNewestEvent", "function scrollRowWithinTable", "function pageScrollTop", "function restorePageScroll", "preserveDetails: true", "verificationProgress", "Verifying capture -", "elements[\"page-input\"].max", "event.key === \"Enter\"", "followNewest = state.live && elements.follow.checked", "await loadEvents({ followNewest })"} {
 		if !strings.Contains(string(js), source) {
 			t.Fatalf("JavaScript does not support direct page entry %q", source)
 		}
@@ -369,6 +369,45 @@ func TestLiveViewerIndexesAppendedEventsAndVerifiesOnClose(t *testing.T) {
 	var completed sessionResponse
 	decodeURL(t, server.URL+"/live-token/api/session", &completed)
 	if completed.Mode != "closed" || completed.Verification != "verified" || completed.Events != 3 || completed.Blobs != 3 {
+		t.Fatalf("completed session = %+v", completed)
+	}
+}
+
+func TestLiveViewerPublishesExternalVerificationProgress(t *testing.T) {
+	root := filepath.Join(t.TempDir(), "capture")
+	recorder, err := capture.New(root, capture.Options{CaptureID: "external-verification"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := recorder.Record(context.Background(), capture.Record{Event: capture.Event{Kind: "packet.decoded"}}); err != nil {
+		t.Fatal(err)
+	}
+	view, err := OpenLive(root, Options{ExternalVerification: true})
+	if err != nil {
+		t.Fatal(err)
+	}
+	server := httptest.NewServer(view.Handler("external-token"))
+	defer server.Close()
+	view.BeginVerification()
+	if err := recorder.Close("closed", nil); err != nil {
+		t.Fatal(err)
+	}
+	view.UpdateVerificationProgress(capture.VerificationProgress{Phase: "events", Events: 1, LastSequence: 1})
+
+	var pending sessionResponse
+	decodeURL(t, server.URL+"/external-token/api/session", &pending)
+	if pending.Verification != "verifying" || pending.VerificationProgress == nil || pending.VerificationProgress.Events != 1 {
+		t.Fatalf("pending session = %+v", pending)
+	}
+
+	verification, err := capture.Verify(root)
+	if err != nil {
+		t.Fatal(err)
+	}
+	view.CompleteVerification(verification, nil)
+	var completed sessionResponse
+	decodeURL(t, server.URL+"/external-token/api/session", &completed)
+	if completed.Verification != "verified" || completed.VerificationProgress != nil {
 		t.Fatalf("completed session = %+v", completed)
 	}
 }

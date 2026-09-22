@@ -35,6 +35,43 @@ func TestVerifyReportsTamperedBlob(t *testing.T) {
 	}
 }
 
+func TestVerifyWithProgressReportsScanMilestones(t *testing.T) {
+	root := filepath.Join(t.TempDir(), "capture")
+	recorder, err := New(root, Options{})
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, record := range []Record{
+		{Event: Event{Kind: "packet.decoded"}},
+		{Event: Event{Kind: "packet.decoded"}},
+		{Event: Event{Kind: "packet.raw"}, Raw: []byte("payload")},
+	} {
+		if _, err := recorder.Record(context.Background(), record); err != nil {
+			t.Fatal(err)
+		}
+	}
+	if err := recorder.Close("closed", nil); err != nil {
+		t.Fatal(err)
+	}
+
+	var progress []VerificationProgress
+	verification, err := VerifyWithProgress(root, func(update VerificationProgress) {
+		progress = append(progress, update)
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(progress) != 3 || progress[0].Phase != "events" || progress[1].Phase != "manifest" || progress[2].Phase != "complete" {
+		t.Fatalf("progress = %+v", progress)
+	}
+	if progress[2].Events != 3 || progress[2].Blobs != 1 || progress[2].LastSequence != 3 {
+		t.Fatalf("final progress = %+v", progress[2])
+	}
+	if verification.Events != 3 || verification.Blobs != 1 {
+		t.Fatalf("verification = %+v", verification)
+	}
+}
+
 func TestScanEventsRejectsTruncatedLine(t *testing.T) {
 	root := filepath.Join(t.TempDir(), "capture")
 	if err := os.MkdirAll(root, 0o700); err != nil {

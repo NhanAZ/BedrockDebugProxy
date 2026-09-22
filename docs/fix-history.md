@@ -1046,6 +1046,14 @@ Every new entry should state the symptom, root cause, implementation commits, ev
 - Evidence and validation: viewer JavaScript coverage requires the preserve-details and page-scroll hooks. Browser smoke validation must append events at a packet-heavy cadence while the details panel is in view and confirm its content does not collapse or move the outer page.
 - Status: implemented with viewer-only impact. The selected event can change while its previous details remain visible until the new response is ready.
 
+### FIX-0130 - Report progress during closed-capture verification
+
+- Symptom: after automatic artifacts finished, the terminal only printed a single verification message and appeared idle for several minutes while a large capture was scanned. The live viewer also had no indication that verification was still active.
+- Root cause: capture verification was synchronous and exposed no progress callbacks. The run command and live viewer therefore had no intermediate state to publish after the recorder and artifact writer closed.
+- Implementation: add coarse verification milestones for scanned events and verified blobs, print them to the console, and publish the same counters through the live viewer session API. The run viewer opts into external verification ownership so HTTP polling does not start a competing blocking verification pass. The viewer keeps polling until verification completes, then returns to its normal event status.
+- Evidence and validation: capture verification tests cover the start, manifest, and completion milestones. Viewer tests cover externally owned progress and the final verified state. Browser smoke validation must observe progress text in a live viewer while a large closed capture is verified and confirm that the terminal remains active.
+- Status: implemented with capture verification and viewer status impact. The capture schema and verified result remain unchanged.
+
 ## Ordering safety contract
 
 The deferred-packet change is deliberately narrow. `expectedIDs` remains the only authority for what the current login state accepts. The queue scan selects the earliest packet that is currently expected, leaves packets for later states queued, and never mutates or reorders bytes on the wire. The regression tests cover canonical resource-pack order, featured early `ResourcePacksInfo`, a later-phase packet queued ahead of the current phase, and all six permutations of the three login packets.
