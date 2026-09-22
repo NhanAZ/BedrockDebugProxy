@@ -213,9 +213,8 @@ func (h listenerConnectionHandler) handleNewIncomingConnection(conn *Conn) error
 type dialerConnectionHandler struct{ l *slog.Logger }
 
 var (
-	errUnexpectedCR            = errors.New("unexpected CONNECTION_REQUEST packet")
-	errUnexpectedAdditionalCRA = errors.New("unexpected additional CONNECTION_REQUEST_ACCEPTED packet")
-	errUnexpectedNIC           = errors.New("unexpected NEW_INCOMING_CONNECTION packet")
+	errUnexpectedCR  = errors.New("unexpected CONNECTION_REQUEST packet")
+	errUnexpectedNIC = errors.New("unexpected NEW_INCOMING_CONNECTION packet")
 )
 
 func (h dialerConnectionHandler) log() *slog.Logger {
@@ -262,7 +261,12 @@ func (h dialerConnectionHandler) handleConnectionRequestAccepted(conn *Conn, b [
 	}
 	select {
 	case <-conn.connected:
-		return errUnexpectedAdditionalCRA
+		// CONNECTION_REQUEST_ACCEPTED is not itself reliable. If the first
+		// NEW_INCOMING_CONNECTION was lost, a server may retransmit the
+		// acceptance after the dialer has marked the connection established.
+		// Re-send the response so the handshake can converge instead of
+		// treating a recoverable retransmission as a fatal protocol error.
+		return conn.send(&message.NewIncomingConnection{ServerAddress: resolve(conn.raddr), PingTime: pk.PongTime, PongTime: timestamp()})
 	default:
 		// Make sure to send NewIncomingConnection before closing conn.connected.
 		err := conn.send(&message.NewIncomingConnection{ServerAddress: resolve(conn.raddr), PingTime: pk.PongTime, PongTime: timestamp()})

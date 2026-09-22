@@ -13,6 +13,54 @@ import (
 	"github.com/sandertv/go-raknet/internal/message"
 )
 
+func TestDialerResendsNewIncomingConnectionAfterRepeatedAcceptance(t *testing.T) {
+	packetConn := &recordingPacketConn{local: testUDPAddr("192.0.2.20:50000")}
+	conn := newConn(packetConn, testUDPAddr("192.0.2.10:19132"), 1200, dialerConnectionHandler{})
+	defer conn.cancelFunc()
+	close(conn.connected)
+
+	accepted, err := (&message.ConnectionRequestAccepted{
+		ClientAddress: netip.MustParseAddrPort("192.0.2.20:50000"),
+		PongTime:      2,
+	}).MarshalBinary()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := (dialerConnectionHandler{}).handleConnectionRequestAccepted(conn, accepted[1:]); err != nil {
+		t.Fatalf("repeated acceptance returned error: %v", err)
+	}
+	if got := packetConn.writeCount(); got != 1 {
+		t.Fatalf("NewIncomingConnection datagrams = %d, want 1", got)
+	}
+}
+
+type recordingPacketConn struct {
+	mu     sync.Mutex
+	writes [][]byte
+	local  net.Addr
+}
+
+func (c *recordingPacketConn) ReadFrom([]byte) (int, net.Addr, error) { return 0, nil, net.ErrClosed }
+
+func (c *recordingPacketConn) WriteTo(b []byte, _ net.Addr) (int, error) {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	c.writes = append(c.writes, append([]byte(nil), b...))
+	return len(b), nil
+}
+
+func (c *recordingPacketConn) Close() error                     { return nil }
+func (c *recordingPacketConn) LocalAddr() net.Addr              { return c.local }
+func (c *recordingPacketConn) SetDeadline(time.Time) error      { return nil }
+func (c *recordingPacketConn) SetReadDeadline(time.Time) error  { return nil }
+func (c *recordingPacketConn) SetWriteDeadline(time.Time) error { return nil }
+
+func (c *recordingPacketConn) writeCount() int {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	return len(c.writes)
+}
+
 func TestMTUSizesFor(t *testing.T) {
 	tests := []struct {
 		name string
