@@ -233,7 +233,7 @@ func TestViewerServesEmbeddedFontAssets(t *testing.T) {
 	if !strings.Contains(string(js), "decode-pending") || !strings.Contains(string(js), "not_yet_decoded") || !strings.Contains(string(js), "setBytesExpanded") || !strings.Contains(string(js), "elements[\"hex-view\"].hidden") {
 		t.Fatal("JavaScript does not classify pending-decode rows")
 	}
-	for _, source := range []string{"function goToPage", "elements[\"page-input\"].max", "event.key === \"Enter\""} {
+	for _, source := range []string{"function goToPage", "function selectNewestEvent", "elements[\"page-input\"].max", "event.key === \"Enter\"", "followNewest = state.live && elements.follow.checked", "await loadEvents({ followNewest })"} {
 		if !strings.Contains(string(js), source) {
 			t.Fatalf("JavaScript does not support direct page entry %q", source)
 		}
