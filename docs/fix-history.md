@@ -910,6 +910,14 @@ Every new entry should state the symptom, root cause, implementation commits, ev
 - Action: document the boundary and the correct local test mode. Do not clear or forge identity checks to make an `auth none` upstream appear authenticated.
 - Status: documentation-only clarification. No runtime behavior changed and no public-server validation was performed.
 
+### FIX-0114 - Preserve typed Transfer capture failures without a raw packet
+
+- Symptom: a recorder failure while writing the derived `packet.transfer_rewrite` view could call `Release` on a nil `PacketRead` and panic when `--follow-transfers` used typed forwarding or a raw read that had already exposed a decoded packet.
+- Root cause: the forwarding path fixed nil cleanup for Transfer address rewrite failures but retained an unconditional raw-packet release in the preceding derived-view recording branch.
+- Implementation: centralize the derived Transfer event write and release a retained raw packet only when one exists. The existing rewrite event and transfer error semantics remain unchanged.
+- Evidence and validation: the raw-forward code explicitly sets `rawRead` to nil for typed packets and already-decoded reads. A deterministic regression test closes the recorder, invokes the derived-view path with no raw packet, and verifies that the recorder error is returned instead of panicking.
+- Status: implemented with focused local coverage. Live Transfer capture-writer failure behavior remains unverified.
+
 ## Ordering safety contract
 
 The deferred-packet change is deliberately narrow. `expectedIDs` remains the only authority for what the current login state accepts. The queue scan selects the earliest packet that is currently expected, leaves packets for later states queued, and never mutates or reorders bytes on the wire. The regression tests cover canonical resource-pack order, featured early `ResourcePacksInfo`, a later-phase packet queued ahead of the current phase, and all six permutations of the three login packets.
