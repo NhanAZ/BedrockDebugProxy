@@ -902,6 +902,14 @@ Every new entry should state the symptom, root cause, implementation commits, ev
 - Evidence and validation: `connectUpstream` owns the connection after a successful dial and all three branches close that connection before returning. A deterministic test verifies both operation and close errors remain discoverable.
 - Status: implemented with deterministic local coverage. Live upstream cleanup failures remain unverified.
 
+### FIX-0113 - Record the authenticated upstream identity boundary
+
+- Symptom: a local server reported `XUID does not match (possible impersonation attempt)` when an authenticated Bedrock client connected through a proxy started with `--auth none`.
+- Classification: confirmed local interoperability boundary, not a packet-forwarding defect. The offline upstream dial creates a new self-signed login and cannot carry the downstream Xbox identity into a server that verifies XUID.
+- Evidence: closed capture `captures/session-20260921T121717Z` from stamped revision `d272805fd571525cca6f7473b166fb1129bafd48`. The upstream dial failed before `session.negotiated`; the error was recorded as `upstream.dial_error` after 1 minute 29.872 seconds. The existing authenticated boundary research and offline identity tests establish why copying or re-signing the authenticated identity would be unsafe.
+- Action: document the boundary and the correct local test mode. Do not clear or forge identity checks to make an `auth none` upstream appear authenticated.
+- Status: documentation-only clarification. No runtime behavior changed and no public-server validation was performed.
+
 ## Ordering safety contract
 
 The deferred-packet change is deliberately narrow. `expectedIDs` remains the only authority for what the current login state accepts. The queue scan selects the earliest packet that is currently expected, leaves packets for later states queued, and never mutates or reorders bytes on the wire. The regression tests cover canonical resource-pack order, featured early `ResourcePacksInfo`, a later-phase packet queued ahead of the current phase, and all six permutations of the three login packets.
