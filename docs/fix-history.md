@@ -1070,6 +1070,14 @@ Every new entry should state the symptom, root cause, implementation commits, ev
 - Evidence and validation: capture `1de1bf87-bc59-47fe-949d-6f0eee6ea9fc` at revision `730e6b972dd16c21a94c3b9c2e2119d68e2ea7ea`, the immutable upstream handler at [`ea813dc668b5a2a2767cc5577bf77869c965f27a`](https://github.com/Sandertv/go-raknet/blob/ea813dc668b5a2a2767cc5577bf77869c965f27a/handler.go), and `TestDialerResendsNewIncomingConnectionAfterRepeatedAcceptance`.
 - Status: implemented with deterministic transport coverage. A fresh stamped Galaxite session is required. The later retry `9aeeab8b-46ac-499f-b42f-68b328b7a883` failed independently during the Minecraft authentication-chain request and does not validate or invalidate this transport fix.
 
+### FIX-0133 - Allow slow active resource-pack exchanges to finish
+
+- Symptom: the Galaxite session continued receiving and requesting resource-pack chunks for five minutes, then the proxy timed out before upstream login completed.
+- Root cause: the absolute five-minute per-hop deadline was shorter than the observed 460-chunk exchange. The capture showed 186 chunks arriving with ongoing requests when the deadline fired, so the connection was active rather than stalled.
+- Implementation: increase the bounded upstream login and resource-pack deadline to fifteen minutes. Packet ordering, chunk contents, and capture error reporting remain unchanged.
+- Evidence and validation: Galaxite capture `captures/session-20260922T151050Z` at revision `a992d6c37f07ae04afb651ce2130712f9e4b209e`, [`docs/research/galaxite-resource-pack-flow.md`](research/galaxite-resource-pack-flow.md), and the existing timeout error coverage.
+- Status: implemented with documentation updates. A fresh stamped Galaxite session must reach upstream login, spawn, and shutdown before release approval.
+
 ## Ordering safety contract
 
 The deferred-packet change is deliberately narrow. `expectedIDs` remains the only authority for what the current login state accepts. The queue scan selects the earliest packet that is currently expected, leaves packets for later states queued, and never mutates or reorders bytes on the wire. The regression tests cover canonical resource-pack order, featured early `ResourcePacksInfo`, a later-phase packet queued ahead of the current phase, and all six permutations of the three login packets.

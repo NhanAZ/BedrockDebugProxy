@@ -29,12 +29,12 @@ const (
 	sessionID                 = "session-1"
 	transferGracePeriod       = 5 * time.Second
 	transferRouteProbeTimeout = 750 * time.Millisecond
-	// A resource-pack exchange can legitimately take several minutes on a
-	// featured experience. Galaxite can advertise many packs and pace chunk
-	// responses across them, so a one-minute deadline aborts an active exchange.
-	// Keep the wait bounded while allowing the observed multi-pack flow to
+	// A resource-pack exchange can legitimately take many minutes on a
+	// featured experience. Galaxite advertises 460 chunks and the observed
+	// server pace delivered only 186 chunks in five minutes while still making
+	// progress. Keep the wait bounded while allowing that active exchange to
 	// complete.
-	upstreamDialTimeout = 5 * time.Minute
+	upstreamDialTimeout = 15 * time.Minute
 	// Enchanted's featured-experience edge can drop fragmented 1492-byte
 	// handshake probes on the transfer target. Keep transfer probes within a
 	// single common UDP datagram while leaving initial connections unchanged.
