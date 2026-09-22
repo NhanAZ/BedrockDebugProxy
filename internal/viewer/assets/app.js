@@ -12,7 +12,7 @@ const state = {
 };
 
 const elements = Object.fromEntries([
-  "event-count", "blob-count", "duration", "generator",
+  "account-name", "event-count", "blob-count", "duration", "generator",
   "search", "direction", "packet", "kind", "channel", "problems", "reset",
   "previous", "next", "page-input", "page-label", "event-rows", "empty-state", "event-details",
   "copy-json", "bytes-panel", "bytes-toggle", "byte-status", "hex-view", "viewer-status", "follow", "follow-container",
@@ -230,6 +230,8 @@ async function loadSession() {
   elements["follow-container"].hidden = !state.live;
   elements["event-count"].textContent = formatCount(session.events);
   elements["blob-count"].textContent = formatCount(session.blobs);
+  const values = manifest.options?.values || {};
+  elements["account-name"].textContent = values.account_name || "-";
   const start = Date.parse(manifest.started_at);
   const end = state.live ? Date.now() : Date.parse(manifest.ended_at);
   elements.duration.textContent = Number.isNaN(start) || Number.isNaN(end) ? "-" : formatDuration(String((end - start) * 1000000));

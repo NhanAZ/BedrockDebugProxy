@@ -16,7 +16,7 @@ capture-directory/
 
 ## Manifest
 
-`manifest.json` identifies the capture, generator, host platform, options, known limitations, completion status, and final counters. It is written when the capture opens and replaced from a synced temporary file when the recorder closes. Readers must tolerate an `open` manifest whose event stream contains newer data after an interrupted run.
+`manifest.json` identifies the capture, generator, host platform, options, known limitations, completion status, and final counters. The CLI records the selected local account label as `options.values.account_name` for authenticated runs. This is operator-supplied local metadata, not a verified claim about the Minecraft identity inside the token. It is omitted or empty for unauthenticated upstream runs. It is written when the capture opens and replaced from a synced temporary file when the recorder closes. Readers must tolerate an `open` manifest whose event stream contains newer data after an interrupted run.
 
 A capture with `completeness.complete` set to `false` is still useful. The adjacent limitations and counters explain known missing, dropped, truncated, or failed data. An `open` status after the process is gone means the session did not close cleanly.
 
