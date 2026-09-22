@@ -3,8 +3,10 @@ package main
 import (
 	"bytes"
 	"context"
+	"io"
 	"os"
 	"path/filepath"
+	"slices"
 	"strings"
 	"testing"
 	"time"
@@ -67,6 +69,36 @@ func TestRunRejectsMissingUpstream(t *testing.T) {
 	}
 	if !strings.Contains(stderr.String(), "--upstream is required") {
 		t.Fatalf("stderr = %s", stderr.String())
+	}
+}
+
+func TestReorderLoginFlagsKeepsAccountSyntaxShort(t *testing.T) {
+	got := reorderLoginFlags([]string{"NhanAZ", "--max-age", "7d"})
+	want := []string{"--max-age", "7d", "NhanAZ"}
+	if !slices.Equal(got, want) {
+		t.Fatalf("reorderLoginFlags() = %#v, want %#v", got, want)
+	}
+}
+
+func TestLoginCachePolicyDefaultsToNoLocalLimit(t *testing.T) {
+	var output bytes.Buffer
+	maxAge, setMaxAge, err := loginCachePolicy("", strings.NewReader("\n"), &output, true)
+	if err != nil || !setMaxAge || maxAge != 0 {
+		t.Fatalf("loginCachePolicy() = %v, %v, %v", maxAge, setMaxAge, err)
+	}
+	if !strings.Contains(output.String(), "Enter for no limit") {
+		t.Fatalf("prompt = %q", output.String())
+	}
+}
+
+func TestLoginCachePolicySupportsNonInteractiveAndFlagForms(t *testing.T) {
+	maxAge, setMaxAge, err := loginCachePolicy("", strings.NewReader("7d\n"), io.Discard, false)
+	if err != nil || !setMaxAge || maxAge != 0 {
+		t.Fatalf("non-interactive policy = %v, %v, %v", maxAge, setMaxAge, err)
+	}
+	maxAge, setMaxAge, err = loginCachePolicy("7d", strings.NewReader("invalid\n"), io.Discard, true)
+	if err != nil || !setMaxAge || maxAge != 7*24*time.Hour {
+		t.Fatalf("flag policy = %v, %v, %v", maxAge, setMaxAge, err)
 	}
 }
 

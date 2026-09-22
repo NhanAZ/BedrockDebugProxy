@@ -1,6 +1,7 @@
 package main
 
 import (
+	"bufio"
 	"context"
 	"encoding/json"
 	"errors"
@@ -40,6 +41,12 @@ func run(args []string, stdout, stderr io.Writer) int {
 	switch args[0] {
 	case "run":
 		return runProxy(args[1:], stdout, stderr)
+	case "login":
+		return runLogin(args[1:], stdout, stderr)
+	case "accounts":
+		return runAccounts(args[1:], stdout, stderr)
+	case "use":
+		return runUseAccount(args[1:], stdout, stderr)
 	case "logout":
 		return runLogout(args[1:], stdout, stderr)
 	case "verify":
@@ -80,25 +87,226 @@ func runLogout(args []string, stdout, stderr io.Writer) int {
 	if err := flags.Parse(args); err != nil {
 		return 2
 	}
-	if flags.NArg() != 0 {
+	if flags.NArg() > 1 {
 		_, _ = fmt.Fprintf(stderr, "Unexpected positional arguments - %s\n", strings.Join(flags.Args(), " "))
 		return 2
 	}
-	cachePath, err := authcache.DefaultPath()
+	store, err := authcache.NewAccountStore()
 	if err != nil {
-		_, _ = fmt.Fprintf(stderr, "Locate authentication cache - %v\n", err)
+		_, _ = fmt.Fprintf(stderr, "Locate authentication accounts - %v\n", err)
 		return 1
 	}
-	removed, err := authcache.Remove(cachePath)
+	accounts, err := store.List()
+	if err != nil {
+		_, _ = fmt.Fprintf(stderr, "List authentication accounts - %v\n", err)
+		return 1
+	}
+	if len(accounts) == 0 {
+		_, _ = fmt.Fprintln(stdout, "No cached Microsoft authentication found.")
+		return 0
+	}
+	name := flags.Arg(0)
+	if name == "" {
+		defaultAccount, defaultErr := store.Default()
+		if defaultErr != nil {
+			_, _ = fmt.Fprintf(stderr, "Select default account - %v\n", defaultErr)
+			return 1
+		}
+		name = defaultAccount.Name
+	}
+	removed, replacement, err := store.Remove(name)
 	if err != nil {
 		_, _ = fmt.Fprintf(stderr, "Logout - %v\n", err)
 		return 1
 	}
 	if removed {
-		_, _ = fmt.Fprintf(stdout, "Removed cached Microsoft authentication from %s.\n", cachePath)
+		_, _ = fmt.Fprintf(stdout, "Logged out of account %q.\n", name)
 	} else {
-		_, _ = fmt.Fprintf(stdout, "No cached Microsoft authentication found at %s.\n", cachePath)
+		_, _ = fmt.Fprintf(stdout, "Account %q had no cached Microsoft authentication.\n", name)
 	}
+	if replacement != "" {
+		_, _ = fmt.Fprintf(stdout, "Default account is now %q.\n", replacement)
+	}
+	return 0
+}
+
+func runLogin(args []string, stdout, stderr io.Writer) int {
+	return runLoginWithInput(args, os.Stdin, stdout, stderr)
+}
+
+func runLoginWithInput(args []string, input io.Reader, stdout, stderr io.Writer) int {
+	flags := flag.NewFlagSet("login", flag.ContinueOnError)
+	flags.SetOutput(stderr)
+	maxAgeText := flags.String("max-age", "", "optional local cache age such as 7d or 168h")
+	flags.Usage = func() {
+		_, _ = fmt.Fprintln(stderr, "Usage - bedrock-debug-proxy login [--max-age 7d] [ACCOUNT_NAME]")
+		flags.PrintDefaults()
+	}
+	if err := flags.Parse(reorderLoginFlags(args)); err != nil {
+		return 2
+	}
+	if flags.NArg() > 1 {
+		_, _ = fmt.Fprintf(stderr, "Unexpected positional arguments - %s\n", strings.Join(flags.Args(), " "))
+		return 2
+	}
+	store, err := authcache.NewAccountStore()
+	if err != nil {
+		_, _ = fmt.Fprintf(stderr, "Locate authentication accounts - %v\n", err)
+		return 1
+	}
+	name := flags.Arg(0)
+	if name == "" {
+		defaultAccount, defaultErr := store.Default()
+		if defaultErr != nil {
+			_, _ = fmt.Fprintf(stderr, "Select default account - %v\n", defaultErr)
+			return 1
+		}
+		name = defaultAccount.Name
+	}
+	_, tokenPath, err := store.TokenPath(name)
+	if err != nil {
+		_, _ = fmt.Fprintf(stderr, "Validate account name - %v\n", err)
+		return 2
+	}
+	maxAge, setMaxAge, err := loginCachePolicy(*maxAgeText, input, stdout, isInteractiveInput(input))
+	if err != nil {
+		_, _ = fmt.Fprintf(stderr, "Parse local cache age - %v\n", err)
+		return 2
+	}
+	tokenSource, err := authcache.NewWithOptions(tokenPath, stderr, authcache.Options{ForceDevice: true})
+	if err != nil {
+		_, _ = fmt.Fprintf(stderr, "Configure authentication - %v\n", err)
+		return 1
+	}
+	if _, err := tokenSource.Token(); err != nil {
+		_, _ = fmt.Fprintf(stderr, "Authenticate account %q - %v\n", name, err)
+		return 1
+	}
+	if err := store.Upsert(name, maxAge, setMaxAge); err != nil {
+		_, _ = fmt.Fprintf(stderr, "Save account %q - %v\n", name, err)
+		return 1
+	}
+	_, _ = fmt.Fprintf(stdout, "Account %q authenticated.\n", name)
+	return 0
+}
+
+func loginCachePolicy(flagText string, input io.Reader, output io.Writer, interactive bool) (time.Duration, bool, error) {
+	if strings.TrimSpace(flagText) != "" {
+		maxAge, err := authcache.ParseMaxCacheAge(flagText)
+		return maxAge, true, err
+	}
+	if !interactive {
+		return 0, true, nil
+	}
+	_, _ = fmt.Fprint(output, "Local cache age (Enter for no limit, for example 7d): ")
+	line, err := bufio.NewReader(input).ReadString('\n')
+	if err != nil && !errors.Is(err, io.EOF) {
+		return 0, false, err
+	}
+	maxAge, parseErr := authcache.ParseMaxCacheAge(strings.TrimSpace(line))
+	return maxAge, true, parseErr
+}
+
+func isInteractiveInput(input io.Reader) bool {
+	file, ok := input.(*os.File)
+	if !ok {
+		return false
+	}
+	info, err := file.Stat()
+	return err == nil && info.Mode()&os.ModeCharDevice != 0
+}
+
+// reorderLoginFlags keeps the short login form convenient when an operator
+// writes "login ACCOUNT --max-age 7d". The standard flag package stops at the
+// first positional argument, so move the one supported option ahead of it.
+func reorderLoginFlags(args []string) []string {
+	options := make([]string, 0, len(args))
+	positionals := make([]string, 0, 1)
+	for index := 0; index < len(args); index++ {
+		argument := args[index]
+		if argument == "--max-age" && index+1 < len(args) {
+			options = append(options, argument, args[index+1])
+			index++
+			continue
+		}
+		if strings.HasPrefix(argument, "--max-age=") {
+			options = append(options, argument)
+			continue
+		}
+		positionals = append(positionals, argument)
+	}
+	return append(options, positionals...)
+}
+
+func runAccounts(args []string, stdout, stderr io.Writer) int {
+	flags := flag.NewFlagSet("accounts", flag.ContinueOnError)
+	flags.SetOutput(stderr)
+	flags.Usage = func() {
+		_, _ = fmt.Fprintln(stderr, "Usage - bedrock-debug-proxy accounts")
+	}
+	if err := flags.Parse(args); err != nil {
+		return 2
+	}
+	if flags.NArg() != 0 {
+		_, _ = fmt.Fprintf(stderr, "Unexpected positional arguments - %s\n", strings.Join(flags.Args(), " "))
+		return 2
+	}
+	store, err := authcache.NewAccountStore()
+	if err != nil {
+		_, _ = fmt.Fprintf(stderr, "Locate authentication accounts - %v\n", err)
+		return 1
+	}
+	accounts, err := store.List()
+	if err != nil {
+		_, _ = fmt.Fprintf(stderr, "List authentication accounts - %v\n", err)
+		return 1
+	}
+	if len(accounts) == 0 {
+		_, _ = fmt.Fprintln(stdout, "No accounts configured. Run bedrock-debug-proxy login.")
+		return 0
+	}
+	_, _ = fmt.Fprintln(stdout, "Accounts:")
+	for _, account := range accounts {
+		marker := " "
+		if account.Default {
+			marker = "*"
+		}
+		line := fmt.Sprintf("%s %s - %s", marker, account.Name, account.CacheState)
+		if !account.CacheExpires.IsZero() {
+			line += ", local cache until " + account.CacheExpires.Local().Format(time.RFC3339)
+		}
+		if !account.AccessExpires.IsZero() {
+			line += ", access token until " + account.AccessExpires.Local().Format(time.RFC3339)
+		}
+		_, _ = fmt.Fprintln(stdout, line)
+	}
+	return 0
+}
+
+func runUseAccount(args []string, stdout, stderr io.Writer) int {
+	flags := flag.NewFlagSet("use", flag.ContinueOnError)
+	flags.SetOutput(stderr)
+	flags.Usage = func() {
+		_, _ = fmt.Fprintln(stderr, "Usage - bedrock-debug-proxy use ACCOUNT_NAME")
+	}
+	if err := flags.Parse(args); err != nil {
+		return 2
+	}
+	if flags.NArg() != 1 {
+		_, _ = fmt.Fprintln(stderr, "An account name is required.")
+		return 2
+	}
+	store, err := authcache.NewAccountStore()
+	if err != nil {
+		_, _ = fmt.Fprintf(stderr, "Locate authentication accounts - %v\n", err)
+		return 1
+	}
+	account, err := store.Use(flags.Arg(0))
+	if err != nil {
+		_, _ = fmt.Fprintf(stderr, "Select account - %v\n", err)
+		return 1
+	}
+	_, _ = fmt.Fprintf(stdout, "Default account is now %q.\n", account.Name)
 	return 0
 }
 
@@ -136,12 +344,21 @@ func runProxy(args []string, stdout, stderr io.Writer) int {
 	var tokenSource oauth2.TokenSource
 	switch *authMode {
 	case "device":
-		cachePath, err := authcache.DefaultPath()
+		store, err := authcache.NewAccountStore()
 		if err != nil {
-			_, _ = fmt.Fprintf(stderr, "Configure authentication - %v\n", err)
+			_, _ = fmt.Fprintf(stderr, "Locate authentication accounts - %v\n", err)
 			return 1
 		}
-		tokenSource, err = authcache.New(cachePath, stderr)
+		account, err := store.Default()
+		if err != nil {
+			_, _ = fmt.Fprintf(stderr, "Select default account - %v\n", err)
+			return 1
+		}
+		forceDevice := account.CacheExpired(time.Now())
+		if forceDevice {
+			_, _ = fmt.Fprintf(stderr, "Default account cache reached its local max-age. Starting device authentication.\n")
+		}
+		tokenSource, err = authcache.NewWithOptions(account.TokenPath, stderr, authcache.Options{ForceDevice: forceDevice})
 		if err != nil {
 			_, _ = fmt.Fprintf(stderr, "Configure authentication - %v\n", err)
 			return 1
@@ -599,7 +816,10 @@ func printUsage(writer io.Writer) {
 	_, _ = fmt.Fprintln(writer)
 	_, _ = fmt.Fprintln(writer, "Usage")
 	_, _ = fmt.Fprintln(writer, "  bedrock-debug-proxy run --upstream HOST:PORT|experience:NAME [options]")
-	_, _ = fmt.Fprintln(writer, "  bedrock-debug-proxy logout")
+	_, _ = fmt.Fprintln(writer, "  bedrock-debug-proxy login [--max-age 7d] [ACCOUNT_NAME]")
+	_, _ = fmt.Fprintln(writer, "  bedrock-debug-proxy accounts")
+	_, _ = fmt.Fprintln(writer, "  bedrock-debug-proxy use ACCOUNT_NAME")
+	_, _ = fmt.Fprintln(writer, "  bedrock-debug-proxy logout [ACCOUNT_NAME]")
 	_, _ = fmt.Fprintln(writer, "  bedrock-debug-proxy verify CAPTURE_DIRECTORY")
 	_, _ = fmt.Fprintln(writer, "  bedrock-debug-proxy inspect [filters] CAPTURE_DIRECTORY")
 	_, _ = fmt.Fprintln(writer, "  bedrock-debug-proxy view [--live] [--no-open] CAPTURE_DIRECTORY")

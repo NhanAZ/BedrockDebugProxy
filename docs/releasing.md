@@ -50,7 +50,7 @@ If the candidate can affect the local web viewer, complete the automated and bro
 
 Use a real Minecraft Bedrock client. For each server, start the same stamped binary, complete a normal session, exercise the named flow, stop with `Ctrl+C`, and wait for the capture verification message.
 
-The first successful device login creates a per-user token cache, so later server runs normally do not require another device code. Wait for `Listening on` before connecting Minecraft. Use the default Xbox-authenticated downstream path for the required release reports, normally through the Servers tab. Do not add `--allow-unauthenticated-client` to the release command unless the release is separately validating the trusted-LAN opt-in flow.
+The first successful device login creates the selected default account cache, so later server runs normally do not require another device code. If the machine has multiple profiles, select the intended account with `bedrock-debug-proxy use NAME` before starting the stamped binary. Wait for `Listening on` before connecting Minecraft. Use the default Xbox-authenticated downstream path for the required release reports, normally through the Servers tab. Do not add `--allow-unauthenticated-client` to the release command unless the release is separately validating the trusted-LAN opt-in flow.
 
 Include `--follow-transfers` in the release command when the server's flow can send a `Transfer` packet. This keeps subsequent hops in the same capture. Use a concrete reachable address in `--listen` for that mode; a wildcard listener address cannot be sent back to the client.
 
