@@ -833,8 +833,7 @@ func (r *Runner) connectUpstream(ctx context.Context, target string, network bed
 	if err := bedrock.RecordResourcePacks(ctx, r.config.Recorder, sessionID, connectionID, hop, conn.RemoteAddr(), conn.LocalAddr(), resourcePacks, bedrock.ResourcePackCaptureOptions{
 		Decrypt: r.config.DecryptResourcePacks,
 	}); err != nil {
-		_ = conn.Close()
-		return nil, nil, err
+		return nil, nil, closeAfterUpstreamError(conn, err)
 	}
 	if count := len(resourcePacks); count != 0 {
 		derivation := "disabled; encrypted originals remain available"
@@ -845,8 +844,7 @@ func (r *Runner) connectUpstream(ctx context.Context, target string, network bed
 	}
 	deliveryPacks, err := resourcePacksForDownstream(resourcePacks)
 	if err != nil {
-		_ = conn.Close()
-		return nil, nil, fmt.Errorf("prepare resource packs for downstream delivery: %w", err)
+		return nil, nil, closeAfterUpstreamError(conn, fmt.Errorf("prepare resource packs for downstream delivery: %w", err))
 	}
 	if err := r.recordAtHop("upstream.connected", capture.SeverityInfo, map[string]any{
 		"local_address":       conn.LocalAddr().String(),
@@ -855,11 +853,17 @@ func (r *Runner) connectUpstream(ctx context.Context, target string, network bed
 		"game_version":        conn.Proto().Ver(),
 		"resource_pack_count": len(resourcePacks),
 	}, hop); err != nil {
-		_ = conn.Close()
-		return nil, nil, err
+		return nil, nil, closeAfterUpstreamError(conn, err)
 	}
 	live.Info("Upstream connected - %s, Bedrock %s protocol %d", conn.RemoteAddr(), conn.Proto().Ver(), conn.Proto().ID())
 	return conn, deliveryPacks, nil
+}
+
+func closeAfterUpstreamError(conn io.Closer, operationErr error) error {
+	if conn == nil {
+		return operationErr
+	}
+	return errors.Join(operationErr, conn.Close())
 }
 
 // resourcePacksForDownstream prevents a server-advertised URL from being

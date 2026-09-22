@@ -70,6 +70,8 @@ Listener callbacks that cannot return errors also forward recorder failures to t
 
 The same boundary applies to lifecycle failures. Spawn failures, upstream dial failures, and transfer route-probe outcomes now join any error returned while recording their diagnostic event and propagate that capture failure through the run sink. A route-probe network failure itself remains a non-fatal routing hint, but a missing route-probe event is no longer silently accepted.
 
+Upstream setup cleanup also preserves provenance. If resource-pack recording, downstream pack preparation, or the `upstream.connected` event fails after a connection has opened, the returned error now includes any failure from closing that observed connection. Cleanup still occurs before the setup path returns.
+
 ## Representative packet-family coverage
 
 The loopback regression test `TestRunnerForwardsBidirectionalPacketsAndCapturesSession` sends representative packets through both sides of the proxy and checks both forwarding and capture. It covers `PlayerSkin` with skin and cape bytes, `AddActor`, `LevelChunk`, `SubChunkRequest`, `UpdateBlock`, `InventoryContent`, `InventoryTransaction`, `MovePlayer`, and `Emote`.
