@@ -89,6 +89,35 @@ func TestTransferRouteProbeCapturesPingResponse(t *testing.T) {
 	}
 }
 
+func TestTransferRouteProbePropagatesCaptureFailure(t *testing.T) {
+	root := filepath.Join(t.TempDir(), "capture")
+	recorder, err := capture.New(root, capture.Options{})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := recorder.Close("closed", nil); err != nil {
+		t.Fatal(err)
+	}
+	failures := bedrock.NewFailureSink(nil)
+	runner := &Runner{config: Config{Recorder: recorder}}
+	network := bedrock.Network{
+		Transport:    &transferProbeNetwork{response: []byte("pong response")},
+		Recorder:     recorder,
+		Failures:     failures,
+		SessionID:    sessionID,
+		ConnectionID: "upstream-2",
+		Channel:      "upstream",
+		Hop:          2,
+	}
+	localAddr := &net.UDPAddr{IP: net.IPv4(127, 0, 0, 1), Port: 40000}
+	if err := runner.probeTransferRouteNetwork(context.Background(), "example.test:19132", localAddr, 42, 2, network, newLiveReporter(io.Discard)); err == nil {
+		t.Fatal("route probe returned nil after recorder close")
+	}
+	if failures.Err() == nil {
+		t.Fatal("route probe capture failure did not reach failure sink")
+	}
+}
+
 type transferProbeNetwork struct {
 	response []byte
 }
