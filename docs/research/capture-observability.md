@@ -42,6 +42,35 @@ fabricate raw bytes for a typed additional packet; a future implementation that
 uses this path should add an explicit derived-view annotation and regression
 fixture before changing forwarding behavior.
 
+### Deferred-login ordering evidence
+
+The owner-controlled capture `captures/session-20260921T122228Z` at stamped
+revision `d272805fd571525cca6f7473b166fb1129bafd48` confirms the temporal
+separation between raw observation and bridge decoding. The downstream packet
+hook recorded `ServerBoundLoadingScreen` (ID 312), `ClientCacheStatus` (ID
+113), and several `PlayerAuthInput` packets (ID 144) before
+`session.spawned`. The bridge later emitted a decoded `ServerBoundLoadingScreen`
+event after `session.spawned`, followed by decoded gameplay packets.
+
+This is expected behavior, not evidence that the raw packet was reordered or
+lost. `parseData` invokes the packet hook before the login state machine
+decodes a packet. The login state machine can defer that packet until the
+current expected state accepts it, after which `ReadPacketDataWithTime` returns
+the retained raw packet to the bridge. The recorder's sequence is therefore the
+ordered submission stream of concurrent observer and bridge callbacks, not a
+promise that every raw event is immediately adjacent to its later decoded view.
+The raw blob and decoded event remain separately authoritative for their
+respective boundaries.
+
+Confirmed for this capture: raw hook arrival preceded bridge consumption for
+the deferred login packets. Inferred: the ID 312 raw event before
+`session.spawned` is the source of the later decoded ID 312 event, based on
+packet identity, connection, direction, and the gophertunnel deferred queue.
+Unknown: whether a future protocol conversion or server ordering will produce
+the same separation for other packet families. Analysis must not pair raw and
+decoded events solely by adjacent sequence numbers or fabricate a new raw
+event at the decode boundary.
+
 ## Public bedrocktool comparison
 
 The original public repository was used for use-case comparison, not protocol authority. Its [`handlers/capture.go`](https://github.com/bedrock-tool/bedrocktool/blob/d7788b57acbdd3eb93ac1efdd4f1107b78aea9b0/handlers/capture.go) retains raw packet records and downloaded resource-pack archives, while [`utils/proxy/session.go`](https://github.com/bedrock-tool/bedrocktool/blob/d7788b57acbdd3eb93ac1efdd4f1107b78aea9b0/utils/proxy/session.go) handles pre-play packets, StartGame state, cache blobs, transfers, and gameplay packets. It also contains specialized world, skin, and utility handlers.
