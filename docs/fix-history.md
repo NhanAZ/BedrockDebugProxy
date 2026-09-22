@@ -1046,6 +1046,14 @@ Every new entry should state the symptom, root cause, implementation commits, ev
 - Evidence and validation: capture verification tests cover the start, manifest, and completion milestones. Viewer tests cover externally owned progress and the final verified state. Browser smoke validation must observe progress text in a live viewer while a large closed capture is verified and confirm that the terminal remains active.
 - Status: implemented with capture verification and viewer status impact. The capture schema and verified result remain unchanged.
 
+### FIX-0131 - Accept large client cache blob status lists
+
+- Symptom: the Galaxite release capture recorded one `ClientCacheBlobStatus` decode error when the client sent 1,302 miss hashes. The session otherwise connected, spawned, forwarded traffic, and completed artifacts.
+- Root cause: the vendored gophertunnel protocol helper applied its generic 1,024-entry slice safety bound to both cache hash lists. The Bedrock packet schema has VarInt counts and the reviewed BedrockProtocol implementation does not define a 1,024-entry protocol limit.
+- Implementation: add a bounded `FuncSliceOfLenWithMaxLen` helper and use a packet-specific 16,384-entry bound for `ClientCacheBlobStatus`. All ordinary slices retain the 1,024-entry bound. Raw packet capture and decode-error reporting remain unchanged.
+- Evidence and validation: Galaxite capture `fe9d3e3b-aa80-4976-a6ec-31db99dd1db1`, [`docs/research/galaxite-client-cache-blob-status-limit.md`](research/galaxite-client-cache-blob-status-limit.md), and `TestClientCacheBlobStatusAllowsObservedHashCount`.
+- Status: implemented with focused protocol regression coverage. A fresh stamped Galaxite capture and the full release matrix are required before release approval.
+
 ## Ordering safety contract
 
 The deferred-packet change is deliberately narrow. `expectedIDs` remains the only authority for what the current login state accepts. The queue scan selects the earliest packet that is currently expected, leaves packets for later states queued, and never mutates or reorders bytes on the wire. The regression tests cover canonical resource-pack order, featured early `ResourcePacksInfo`, a later-phase packet queued ahead of the current phase, and all six permutations of the three login packets.

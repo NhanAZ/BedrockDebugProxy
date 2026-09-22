@@ -18,6 +18,31 @@ func TestProtocolVersion12651(t *testing.T) {
 	}
 }
 
+func TestClientCacheBlobStatusAllowsObservedHashCount(t *testing.T) {
+	want := &packet.ClientCacheBlobStatus{
+		MissHashes: make([]uint64, 1302),
+		HitHashes:  []uint64{0x0102030405060708},
+	}
+	for i := range want.MissHashes {
+		want.MissHashes[i] = uint64(i + 1)
+	}
+
+	var encoded bytes.Buffer
+	want.Marshal(protocol.NewWriter(&encoded, 0))
+
+	got := &packet.ClientCacheBlobStatus{}
+	got.Marshal(protocol.NewReader(bytes.NewReader(encoded.Bytes()), 0, true))
+	if len(got.MissHashes) != len(want.MissHashes) {
+		t.Fatalf("decoded miss hash count = %d, want %d", len(got.MissHashes), len(want.MissHashes))
+	}
+	if got.MissHashes[0] != want.MissHashes[0] || got.MissHashes[len(got.MissHashes)-1] != want.MissHashes[len(want.MissHashes)-1] {
+		t.Fatalf("decoded miss hash boundaries = %#x, %#x, want %#x, %#x", got.MissHashes[0], got.MissHashes[len(got.MissHashes)-1], want.MissHashes[0], want.MissHashes[len(want.MissHashes)-1])
+	}
+	if len(got.HitHashes) != 1 || got.HitHashes[0] != want.HitHashes[0] {
+		t.Fatalf("decoded hit hashes = %#v, want %#v", got.HitHashes, want.HitHashes)
+	}
+}
+
 func TestProtocol12651PacketRegistration(t *testing.T) {
 	if got, want := packet.IDSetPlayerFurnaceOptions, 351; got != want {
 		t.Fatalf("SetPlayerFurnaceOptions packet ID = %d, want %d", got, want)

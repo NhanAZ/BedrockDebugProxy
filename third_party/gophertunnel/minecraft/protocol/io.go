@@ -140,9 +140,16 @@ func SliceOfLen[T any, S ~*[]T, A PtrMarshaler[T]](r IO, l uint32, x S) {
 
 // FuncSliceOfLen reads/writes the elements of a slice of type T with length l using func f.
 func FuncSliceOfLen[T any, S ~*[]T](r IO, l uint32, x S, f func(*T)) {
+	FuncSliceOfLenWithMaxLen(r, l, x, f, maxSliceLength)
+}
+
+// FuncSliceOfLenWithMaxLen reads or writes a slice using an explicit safety limit.
+// Packet fields with a protocol-defined or observed larger cardinality can opt in
+// without weakening the default limit used by ordinary slices.
+func FuncSliceOfLenWithMaxLen[T any, S ~*[]T](r IO, l uint32, x S, f func(*T), max uint32) {
 	limit, ok := r.(sliceReader)
 	if ok {
-		limit.SliceLength(l, maxSliceLength)
+		limit.SliceLength(l, max)
 		*x = make([]T, l)
 	}
 

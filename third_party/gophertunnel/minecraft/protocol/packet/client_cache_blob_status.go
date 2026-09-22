@@ -15,12 +15,21 @@ type ClientCacheBlobStatus struct {
 	HitHashes []uint64
 }
 
+// A featured-experience client can report more than the generic protocol slice
+// bound when its cache spans many chunks. Keep the field-specific bound finite
+// while allowing the observed 1,302-hash status packet.
+const maxClientCacheBlobHashes = 16 * 1024
+
 // ID ...
 func (pk *ClientCacheBlobStatus) ID() uint32 {
 	return IDClientCacheBlobStatus
 }
 
 func (pk *ClientCacheBlobStatus) Marshal(io protocol.IO) {
-	protocol.FuncSlice(io, &pk.MissHashes, io.Uint64)
-	protocol.FuncSlice(io, &pk.HitHashes, io.Uint64)
+	count := uint32(len(pk.MissHashes))
+	io.Varuint32(&count)
+	protocol.FuncSliceOfLenWithMaxLen(io, count, &pk.MissHashes, io.Uint64, maxClientCacheBlobHashes)
+	count = uint32(len(pk.HitHashes))
+	io.Varuint32(&count)
+	protocol.FuncSliceOfLenWithMaxLen(io, count, &pk.HitHashes, io.Uint64, maxClientCacheBlobHashes)
 }
