@@ -966,6 +966,14 @@ Every new entry should state the symptom, root cause, implementation commits, ev
 - Evidence and validation: focused auth-cache tests cover legacy compatibility, account selection and replacement, safe names, local-age parsing, unchanged-cache timestamp preservation, interactive and non-interactive policy selection, and forced device authentication. Documentation records the storage paths, token privacy boundary, and official Microsoft token-lifetime references. Full quality-gate and manual device-login validation remain required before treating this runtime change as live-validated.
 - Status: implemented with deterministic local coverage. Existing cached tokens and the Microsoft provider remain untouched unless the operator explicitly runs `login` or `logout`.
 
+### FIX-0121 - Require a label for the first interactive account
+
+- Symptom: a first device login could silently store the token under the synthetic `default` account, making it unclear which local profile would be used by later proxy runs.
+- Root cause: the new account registry intentionally preserved the legacy `default` path, and the unlabeled login path reused that name even when no account had been configured.
+- Implementation: prompt for an account username or local label during the first interactive `login` and first interactive `run --auth device`. A non-empty label is required and becomes the first default account. Existing installations with one or more accounts retain the low-friction Enter-for-default behavior. Non-interactive first runs fail with an actionable instruction instead of creating an unnamed profile.
+- Evidence and validation: focused command tests cover the required prompt, shared input buffering, and the existing optional default prompt. Full quality-gate validation remains required before treating this runtime change as live-validated.
+- Status: implemented with deterministic local coverage. Existing legacy caches remain compatible and are not renamed automatically.
+
 ## Ordering safety contract
 
 The deferred-packet change is deliberately narrow. `expectedIDs` remains the only authority for what the current login state accepts. The queue scan selects the earliest packet that is currently expected, leaves packets for later states queued, and never mutates or reorders bytes on the wire. The regression tests cover canonical resource-pack order, featured early `ResourcePacksInfo`, a later-phase packet queued ahead of the current phase, and all six permutations of the three login packets.

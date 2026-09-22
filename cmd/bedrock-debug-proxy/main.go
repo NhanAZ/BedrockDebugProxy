@@ -154,8 +154,29 @@ func runLoginWithInput(args []string, input io.Reader, stdout, stderr io.Writer)
 		_, _ = fmt.Fprintf(stderr, "Locate authentication accounts - %v\n", err)
 		return 1
 	}
-	name := flags.Arg(0)
+	accounts, err := store.List()
+	if err != nil {
+		_, _ = fmt.Fprintf(stderr, "List authentication accounts - %v\n", err)
+		return 1
+	}
+	interactive := isInteractiveInput(input)
+	var promptReader *bufio.Reader
+	if interactive {
+		promptReader = bufio.NewReader(input)
+	}
+	name := strings.TrimSpace(flags.Arg(0))
+	if name == "" && promptReader != nil {
+		name, err = promptAccountName(promptReader, stdout, len(accounts) == 0)
+		if err != nil {
+			_, _ = fmt.Fprintf(stderr, "Read account name - %v\n", err)
+			return 1
+		}
+	}
 	if name == "" {
+		if len(accounts) == 0 {
+			_, _ = fmt.Fprintln(stderr, "An account name is required for the first login. Run login ACCOUNT_NAME.")
+			return 2
+		}
 		defaultAccount, defaultErr := store.Default()
 		if defaultErr != nil {
 			_, _ = fmt.Fprintf(stderr, "Select default account - %v\n", defaultErr)
@@ -168,7 +189,11 @@ func runLoginWithInput(args []string, input io.Reader, stdout, stderr io.Writer)
 		_, _ = fmt.Fprintf(stderr, "Validate account name - %v\n", err)
 		return 2
 	}
-	maxAge, setMaxAge, err := loginCachePolicy(*maxAgeText, input, stdout, isInteractiveInput(input))
+	var cacheInput io.Reader = input
+	if promptReader != nil {
+		cacheInput = promptReader
+	}
+	maxAge, setMaxAge, err := loginCachePolicy(*maxAgeText, cacheInput, stdout, interactive)
 	if err != nil {
 		_, _ = fmt.Fprintf(stderr, "Parse local cache age - %v\n", err)
 		return 2
@@ -188,6 +213,25 @@ func runLoginWithInput(args []string, input io.Reader, stdout, stderr io.Writer)
 	}
 	_, _ = fmt.Fprintf(stdout, "Account %q authenticated.\n", name)
 	return 0
+}
+
+func promptAccountName(input *bufio.Reader, output io.Writer, required bool) (string, error) {
+	prompt := "Microsoft account username or local label (Enter for default): "
+	if required {
+		prompt = "Microsoft account username or local label (required): "
+	}
+	if _, err := fmt.Fprint(output, prompt); err != nil {
+		return "", err
+	}
+	line, err := input.ReadString('\n')
+	if err != nil && !errors.Is(err, io.EOF) {
+		return "", err
+	}
+	name := strings.TrimSpace(line)
+	if required && name == "" {
+		return "", errors.New("an account name is required for the first login")
+	}
+	return name, nil
 }
 
 func loginCachePolicy(flagText string, input io.Reader, output io.Writer, interactive bool) (time.Duration, bool, error) {
@@ -349,10 +393,34 @@ func runProxy(args []string, stdout, stderr io.Writer) int {
 			_, _ = fmt.Fprintf(stderr, "Locate authentication accounts - %v\n", err)
 			return 1
 		}
+		accounts, err := store.List()
+		if err != nil {
+			_, _ = fmt.Fprintf(stderr, "List authentication accounts - %v\n", err)
+			return 1
+		}
 		account, err := store.Default()
 		if err != nil {
 			_, _ = fmt.Fprintf(stderr, "Select default account - %v\n", err)
 			return 1
+		}
+		firstLoginName := ""
+		if len(accounts) == 0 {
+			if !isInteractiveInput(os.Stdin) {
+				_, _ = fmt.Fprintln(stderr, "No authentication account is configured. Run login ACCOUNT_NAME in an interactive terminal first.")
+				return 1
+			}
+			promptReader := bufio.NewReader(os.Stdin)
+			firstLoginName, err = promptAccountName(promptReader, stderr, true)
+			if err != nil {
+				_, _ = fmt.Fprintf(stderr, "Read account name - %v\n", err)
+				return 2
+			}
+			_, tokenPath, pathErr := store.TokenPath(firstLoginName)
+			if pathErr != nil {
+				_, _ = fmt.Fprintf(stderr, "Validate account name - %v\n", pathErr)
+				return 2
+			}
+			account = authcache.Account{Name: firstLoginName, TokenPath: tokenPath}
 		}
 		forceDevice := account.CacheExpired(time.Now())
 		if forceDevice {
@@ -362,6 +430,16 @@ func runProxy(args []string, stdout, stderr io.Writer) int {
 		if err != nil {
 			_, _ = fmt.Fprintf(stderr, "Configure authentication - %v\n", err)
 			return 1
+		}
+		if firstLoginName != "" {
+			if _, err := tokenSource.Token(); err != nil {
+				_, _ = fmt.Fprintf(stderr, "Authenticate account %q - %v\n", firstLoginName, err)
+				return 1
+			}
+			if err := store.Upsert(firstLoginName, 0, true); err != nil {
+				_, _ = fmt.Fprintf(stderr, "Save account %q - %v\n", firstLoginName, err)
+				return 1
+			}
 		}
 	case "none":
 	case "":
