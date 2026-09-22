@@ -375,7 +375,7 @@ function selectNewestEvent() {
     markSelectedRow();
     return;
   }
-  selectEvent(newest.sequence);
+  selectEvent(newest.sequence, { preserveDetails: true });
   scrollRowWithinTable(elements["event-rows"].querySelector(`[data-sequence="${newest.sequence}"]`));
 }
 
@@ -394,20 +394,37 @@ function scrollRowWithinTable(row) {
   }
 }
 
-async function selectEvent(sequence) {
+function pageScrollTop() {
+  return document.scrollingElement?.scrollTop || 0;
+}
+
+function restorePageScroll(top) {
+  const scrollingElement = document.scrollingElement;
+  if (scrollingElement) scrollingElement.scrollTop = top;
+}
+
+async function selectEvent(sequence, { preserveDetails = false } = {}) {
   state.selectedSequence = sequence;
   markSelectedRow();
-  elements["event-details"].textContent = "Loading event details...";
-  elements["hex-view"].textContent = "Loading blob preview...";
+  if (!preserveDetails) {
+    elements["event-details"].textContent = "Loading event details...";
+    elements["hex-view"].textContent = "Loading blob preview...";
+  }
   try {
     const result = await requestJSON(`api/events/${sequence}`);
     if (state.selectedSequence !== sequence) return;
+    const scrollTop = pageScrollTop();
     state.selectedEvent = result.event;
     renderEvent(result);
+    restorePageScroll(scrollTop);
   } catch (error) {
     if (state.selectedSequence !== sequence) return;
-    elements["event-details"].textContent = error.message;
-    elements["hex-view"].textContent = "Blob preview unavailable.";
+    if (!preserveDetails) {
+      const scrollTop = pageScrollTop();
+      elements["event-details"].textContent = error.message;
+      elements["hex-view"].textContent = "Blob preview unavailable.";
+      restorePageScroll(scrollTop);
+    }
     elements["viewer-status"].textContent = error.message;
   }
 }
