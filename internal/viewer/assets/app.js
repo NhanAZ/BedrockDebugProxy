@@ -376,7 +376,22 @@ function selectNewestEvent() {
     return;
   }
   selectEvent(newest.sequence);
-  elements["event-rows"].querySelector(`[data-sequence="${newest.sequence}"]`)?.scrollIntoView({ block: "nearest" });
+  scrollRowWithinTable(elements["event-rows"].querySelector(`[data-sequence="${newest.sequence}"]`));
+}
+
+function scrollRowWithinTable(row) {
+  if (!row) return;
+  const tableWrap = elements["event-rows"].closest(".table-wrap");
+  if (!tableWrap) return;
+  const tableRect = tableWrap.getBoundingClientRect();
+  const rowRect = row.getBoundingClientRect();
+  const headerHeight = tableWrap.querySelector("thead")?.getBoundingClientRect().height || 0;
+  const visibleTop = tableRect.top + headerHeight;
+  if (rowRect.top < visibleTop) {
+    tableWrap.scrollTop -= visibleTop - rowRect.top;
+  } else if (rowRect.bottom > tableRect.bottom) {
+    tableWrap.scrollTop += rowRect.bottom - tableRect.bottom;
+  }
 }
 
 async function selectEvent(sequence) {
@@ -617,7 +632,7 @@ document.addEventListener("keydown", (event) => {
   if (state.rows[next]) {
     event.preventDefault();
     selectEvent(state.rows[next].sequence);
-    elements["event-rows"].querySelector(`[data-sequence="${state.rows[next].sequence}"]`)?.scrollIntoView({ block: "nearest" });
+    scrollRowWithinTable(elements["event-rows"].querySelector(`[data-sequence="${state.rows[next].sequence}"]`));
   }
 });
 

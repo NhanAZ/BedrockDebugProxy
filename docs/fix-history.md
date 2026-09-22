@@ -1030,6 +1030,14 @@ Every new entry should state the symptom, root cause, implementation commits, ev
 - Evidence and validation: viewer JavaScript coverage checks the newest-event hook, while browser smoke validation must append complete live events and confirm the newest row remains selected and visible without changing filters.
 - Status: implemented with viewer-only impact. The canonical capture and packet forwarding paths are unchanged.
 
+### FIX-0128 - Keep page scroll stable during live follow
+
+- Symptom: while inspecting Decoded view - Event details, each Follow live refresh moved the page back toward the event table and interrupted manual scrolling.
+- Root cause: newest-event selection used `scrollIntoView`, which was allowed to scroll the page-level document in addition to the bounded event table.
+- Implementation: scroll the newest or keyboard-selected row by adjusting only the event table wrapper's `scrollTop`, leaving the page and inspector scroll position unchanged.
+- Evidence and validation: viewer JavaScript coverage requires the table-only scroll hook. Browser smoke validation must keep the details panel in view while a live event is appended and confirm that the page scroll position remains stable.
+- Status: implemented with viewer-only impact. The selected newest row remains visible inside the event table without moving the outer page.
+
 ## Ordering safety contract
 
 The deferred-packet change is deliberately narrow. `expectedIDs` remains the only authority for what the current login state accepts. The queue scan selects the earliest packet that is currently expected, leaves packets for later states queued, and never mutates or reorders bytes on the wire. The regression tests cover canonical resource-pack order, featured early `ResourcePacksInfo`, a later-phase packet queued ahead of the current phase, and all six permutations of the three login packets.
