@@ -328,7 +328,12 @@ func (d Dialer) DialContextNetwork(ctx context.Context, network Network, address
 	}
 
 	defaultIdentityData(&conn.identityData)
-	defaultClientData(address, conn.identityData.DisplayName, &conn.clientData)
+	// Authenticated vanilla clients may omit ClientData.PlayFabId even though
+	// the multiplayer token carries the account's PlayFab identity. Preserve
+	// that observed omission instead of synthesizing a second identifier. The
+	// offline path still needs the historical generated value for callers that
+	// do not provide one.
+	defaultClientData(address, conn.identityData.DisplayName, &conn.clientData, chainData == "" && token == "")
 
 	var request []byte
 	if chainData == "" && token == "" {
@@ -523,7 +528,9 @@ func serverAddress(address string) string {
 }
 
 // defaultClientData edits the ClientData passed to have defaults set to all fields that were left unchanged.
-func defaultClientData(address, username string, d *login.ClientData) {
+// generatePlayFabID is true only for offline logins. Authenticated login data
+// must preserve an empty PlayFabId when the client omitted that field.
+func defaultClientData(address, username string, d *login.ClientData, generatePlayFabID bool) {
 	d.ServerAddress = serverAddress(address)
 	d.ThirdPartyName = username
 	if d.DeviceOS == 0 {
@@ -547,7 +554,7 @@ func defaultClientData(address, username string, d *login.ClientData) {
 	if d.LanguageCode == "" {
 		d.LanguageCode = "en_GB"
 	}
-	if d.PlayFabID == "" {
+	if generatePlayFabID && d.PlayFabID == "" {
 		id := make([]byte, 8)
 		_, _ = cryptorand.Read(id)
 		d.PlayFabID = hex.EncodeToString(id)
