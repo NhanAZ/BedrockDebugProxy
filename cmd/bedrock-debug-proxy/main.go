@@ -405,6 +405,7 @@ func runProxy(args []string, stdout, stderr io.Writer) int {
 	flags.SetOutput(stderr)
 	listen := flags.String("listen", "127.0.0.1:19132", "local Bedrock address")
 	upstream := flags.String("upstream", "", "destination HOST:PORT or experience:NAME")
+	packsOnly := flags.Bool("packs-only", false, "download and capture upstream resource packs without starting a local listener or spawning into the world")
 	capturePath := flags.String("capture", "", "exact capture directory")
 	captureRoot := flags.String("capture-root", "captures", "parent for generated capture directories")
 	authMode := flags.String("auth", "device", "upstream authentication mode - device (cached) or none")
@@ -430,6 +431,18 @@ func runProxy(args []string, stdout, stderr io.Writer) int {
 	if *upstream == "" {
 		_, _ = fmt.Fprintln(stderr, "--upstream is required.")
 		return 2
+	}
+	if *packsOnly {
+		listenSpecified := false
+		flags.Visit(func(parsed *flag.Flag) {
+			if parsed.Name == "listen" {
+				listenSpecified = true
+			}
+		})
+		if listenSpecified || *followTransfers || *allowUnauthenticated {
+			_, _ = fmt.Fprintln(stderr, "--packs-only cannot be combined with --listen, --follow-transfers, or --allow-unauthenticated-client.")
+			return 2
+		}
 	}
 	var tokenSource oauth2.TokenSource
 	accountName := ""
@@ -527,30 +540,41 @@ func runProxy(args []string, stdout, stderr io.Writer) int {
 		}
 	}
 	limitations := captureLimitations(*followTransfers, *decryptResourcePacks)
+	if *packsOnly {
+		limitations = append(limitations, "Packs-only mode closes after the upstream resource-pack exchange and does not request world spawn or capture gameplay and world state")
+		limitations = append(limitations, "Packs-only login uses gophertunnel default client metadata and may receive a different resource-pack offer than a specific Minecraft client")
+	}
+	captureValues := map[string]string{
+		"operation_mode":               "proxy",
+		"account_name":                 accountName,
+		"upstream_selector":            target.Selector,
+		"upstream_address":             target.Address,
+		"upstream_transport":           target.Transport,
+		"upstream_name":                target.Name,
+		"upstream_experience_id":       target.ExperienceID,
+		"auth_mode":                    *authMode,
+		"allow_unauthenticated_client": strconv.FormatBool(*allowUnauthenticated),
+		"follow_transfers":             strconv.FormatBool(*followTransfers),
+		"protocol_id":                  strconv.FormatInt(int64(protocol.CurrentProtocol), 10),
+		"game_version":                 protocol.CurrentVersion,
+		"decrypt_resource_packs":       strconv.FormatBool(*decryptResourcePacks),
+		"web_viewer":                   strconv.FormatBool(*webViewer),
+		"automatic_artifacts":          artifacts.Schema,
+	}
+	if *packsOnly {
+		captureValues["operation_mode"] = "packs_only"
+		captureValues["client_metadata_source"] = "gophertunnel_default"
+	} else {
+		captureValues["listen_address"] = *listen
+	}
 	recorder, err := capture.New(exactCapturePath, capture.Options{
 		GeneratorName: "bedrock-debug-proxy",
 		Version:       buildinfo.Version,
 		Commit:        buildinfo.Commit,
 		SyncEachEvent: *syncEachEvent,
 		RawLayers:     []string{"bedrock_transport_payload", "bedrock_packet_payload"},
-		Values: map[string]string{
-			"account_name":                 accountName,
-			"listen_address":               *listen,
-			"upstream_selector":            target.Selector,
-			"upstream_address":             target.Address,
-			"upstream_transport":           target.Transport,
-			"upstream_name":                target.Name,
-			"upstream_experience_id":       target.ExperienceID,
-			"auth_mode":                    *authMode,
-			"allow_unauthenticated_client": strconv.FormatBool(*allowUnauthenticated),
-			"follow_transfers":             strconv.FormatBool(*followTransfers),
-			"protocol_id":                  strconv.FormatInt(int64(protocol.CurrentProtocol), 10),
-			"game_version":                 protocol.CurrentVersion,
-			"decrypt_resource_packs":       strconv.FormatBool(*decryptResourcePacks),
-			"web_viewer":                   strconv.FormatBool(*webViewer),
-			"automatic_artifacts":          artifacts.Schema,
-		},
-		Limitations: limitations,
+		Values:        captureValues,
+		Limitations:   limitations,
 	})
 	if err != nil {
 		_ = target.Close()
@@ -591,6 +615,7 @@ func runProxy(args []string, stdout, stderr io.Writer) int {
 
 	runner, err := proxy.New(proxy.Config{
 		ListenAddress:              *listen,
+		PacksOnly:                  *packsOnly,
 		UpstreamAddress:            target.Address,
 		UpstreamNetwork:            target.Network,
 		AllowUnauthenticatedClient: *allowUnauthenticated,
@@ -620,8 +645,14 @@ func runProxy(args []string, stdout, stderr io.Writer) int {
 		return 1
 	}
 	_, _ = fmt.Fprintf(stdout, "Automatic artifact folders %s\n", filepath.Join(recorder.Root(), "artifacts"))
-	runErr := runner.Run(ctx)
-	_, _ = fmt.Fprintln(stdout, "Proxy forwarding stopped. Closing network connections...")
+	var runErr error
+	if *packsOnly {
+		runErr = runner.RunPacksOnly(ctx)
+		_, _ = fmt.Fprintln(stdout, "Pack-only session stopped. Closing network connections...")
+	} else {
+		runErr = runner.Run(ctx)
+		_, _ = fmt.Fprintln(stdout, "Proxy forwarding stopped. Closing network connections...")
+	}
 	runErr = errors.Join(runErr, target.Close())
 	status := "closed"
 	if runErr != nil {
@@ -663,7 +694,11 @@ func runProxy(args []string, stdout, stderr io.Writer) int {
 	}
 	_, _ = fmt.Fprintln(stdout, "Capture verification complete.")
 	if runErr != nil {
-		_, _ = fmt.Fprintf(stderr, "Proxy stopped with an error - %v\n", runErr)
+		if *packsOnly {
+			_, _ = fmt.Fprintf(stderr, "Pack-only session stopped with an error - %v\n", runErr)
+		} else {
+			_, _ = fmt.Fprintf(stderr, "Proxy stopped with an error - %v\n", runErr)
+		}
 		return 1
 	}
 	_, _ = fmt.Fprintf(stdout, "Capture verified with %d events and %d blobs.\n", verification.Events, verification.Blobs)
@@ -968,7 +1003,7 @@ func printUsage(writer io.Writer) {
 	_, _ = fmt.Fprintln(writer, "Usage - bedrock-debug-proxy <command> [arguments]")
 	_, _ = fmt.Fprintln(writer)
 	_, _ = fmt.Fprintln(writer, "Proxy")
-	_, _ = fmt.Fprintln(writer, "  run --upstream HOST:PORT|experience:NAME [options]  Start the observation proxy")
+	_, _ = fmt.Fprintln(writer, "  run --upstream HOST:PORT|experience:NAME [options]  Start the observation proxy or capture packs only")
 	_, _ = fmt.Fprintln(writer)
 	_, _ = fmt.Fprintln(writer, "Authentication accounts")
 	_, _ = fmt.Fprintln(writer, "  login [--max-age 7d] [ACCOUNT_NAME]                 Add or reauthenticate an account")
@@ -996,8 +1031,10 @@ func printCommandHelp(writer io.Writer, command string) bool {
 	switch command {
 	case "run":
 		_, _ = fmt.Fprintln(writer, "Usage - bedrock-debug-proxy run --upstream HOST:PORT|experience:NAME [options]")
-		_, _ = fmt.Fprintln(writer, "Start a local observation proxy and write a canonical capture.")
-		_, _ = fmt.Fprintln(writer, "Common options - --listen ADDRESS, --auth device|none, --web-viewer, --follow-transfers")
+		_, _ = fmt.Fprintln(writer, "Run the observation proxy or capture upstream resource packs into a canonical capture.")
+		_, _ = fmt.Fprintln(writer, "Common options - --listen ADDRESS, --auth device|none, --web-viewer, --follow-transfers, --packs-only")
+		_, _ = fmt.Fprintln(writer, "--packs-only completes the upstream resource-pack exchange, records the archives, and closes without a local listener or world spawn.")
+		_, _ = fmt.Fprintln(writer, "Do not combine --packs-only with --listen, --follow-transfers, or --allow-unauthenticated-client.")
 		_, _ = fmt.Fprintln(writer, "Use --help on this command's flag set for the complete option list.")
 	case "login":
 		_, _ = fmt.Fprintln(writer, "Usage - bedrock-debug-proxy login [--max-age 7d] [ACCOUNT_NAME]")

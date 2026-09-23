@@ -182,6 +182,10 @@ type Conn struct {
 	// downloadResourcePack is an optional function passed to a Dial() call. If set, each resource pack received
 	// from the server will call this function to see if it should be downloaded or not.
 	downloadResourcePack func(id uuid.UUID, version string, currentPack, totalPacks int) bool
+	// resourcePackExchangeDone is signalled by dial-only sessions after the server's
+	// ResourcePackStack has been accepted and the final client response is flushed.
+	resourcePackExchangeDone chan struct{}
+	resourcePackExchangeOnce sync.Once
 	// fetchResourcePacks is an optional function passed from a Listener. If set, the returned resource packs from the function
 	// will determine which resource packs to send to the client based on its identity and client data.
 	fetchResourcePacks func(identityData login.IdentityData, clientData login.ClientData, current []*resource.Pack) []*resource.Pack
@@ -1295,7 +1299,15 @@ func (conn *Conn) handleResourcePackStack(pk *packet.ResourcePackStack, raw *pac
 		}
 	}
 	conn.expect(packet.IDDimensionData, packet.IDStartGame, packet.IDJigsawStructureData, packet.IDVoxelShapes)
-	_ = conn.WritePacket(&packet.ResourcePackClientResponse{Response: packet.PackResponseCompleted})
+	if err := conn.WritePacket(&packet.ResourcePackClientResponse{Response: packet.PackResponseCompleted}); err != nil {
+		return fmt.Errorf("send resource pack completion: %w", err)
+	}
+	if conn.resourcePackExchangeDone != nil {
+		if err := conn.Flush(); err != nil {
+			return fmt.Errorf("flush resource pack completion: %w", err)
+		}
+		conn.resourcePackExchangeOnce.Do(func() { close(conn.resourcePackExchangeDone) })
+	}
 	return nil
 }
 

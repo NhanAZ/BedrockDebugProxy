@@ -95,6 +95,10 @@ type Dialer struct {
 	// and version of the resource pack, the number of the current pack being downloaded, and the total amount of packs.
 	// The boolean returned determines if the pack will be downloaded or not.
 	DownloadResourcePack func(id uuid.UUID, version string, current, total int) bool
+	// ResourcePackExchangeOnly returns once the server's ResourcePackStack has
+	// been accepted and the final client response has been flushed. The returned
+	// connection has not completed the world-spawn sequence.
+	ResourcePackExchangeOnly bool
 	// ResourcePackCache, if set, reuses resource packs downloaded on earlier logins. Misses and errors
 	// fall back to a normal download.
 	ResourcePackCache ResourcePackCache
@@ -323,6 +327,9 @@ func (d Dialer) DialContextNetwork(ctx context.Context, network Network, address
 	conn.disconnectOnInvalidPacket = d.DisconnectOnInvalidPackets
 	conn.disconnectOnUnknownPacket = d.DisconnectOnUnknownPackets
 	conn.maxDecompressedLen = math.MaxInt
+	if d.ResourcePackExchangeOnly {
+		conn.resourcePackExchangeDone = make(chan struct{})
+	}
 	if d.ConnectionFunc != nil {
 		d.ConnectionFunc(conn)
 	}
@@ -356,7 +363,11 @@ func (d Dialer) DialContextNetwork(ctx context.Context, network Network, address
 		conn.identityData = identityData
 	}
 
-	readyForLogin, connected := make(chan struct{}), make(chan struct{})
+	readyForLogin, connected := make(chan struct{}), make(chan struct{}, 1)
+	var dialComplete <-chan struct{} = connected
+	if d.ResourcePackExchangeOnly {
+		dialComplete = conn.resourcePackExchangeDone
+	}
 	ctx, cancel := context.WithCancelCause(ctx)
 	go listenConn(conn, readyForLogin, connected, cancel)
 
@@ -384,8 +395,10 @@ func (d Dialer) DialContextNetwork(ctx context.Context, network Network, address
 			return nil, conn.wrap(context.Cause(ctx), "dial")
 		case <-conn.ctx.Done():
 			return nil, conn.closeErr("dial")
-		case <-connected:
-			// We've connected successfully. We return the connection and no error.
+		case <-dialComplete:
+			// The selected dial completion boundary has been reached. Standard
+			// dials wait for the full login; pack-only dials stop after the pack
+			// exchange without waiting for world spawn.
 			return conn, nil
 		}
 	}
@@ -502,6 +515,17 @@ func listenConn(conn *Conn, readyForLogin, connected chan struct{}, cancel conte
 				// that it may be detected.
 				cancelContext = false
 				connected <- struct{}{}
+			}
+			if conn.resourcePackExchangeDone != nil {
+				select {
+				case <-conn.resourcePackExchangeDone:
+					// The dial caller owns shutdown after the resource-pack boundary.
+					// Stop processing server gameplay packets while leaving the
+					// connection open until that caller closes it.
+					<-conn.ctx.Done()
+					return
+				default:
+				}
 			}
 		}
 	}

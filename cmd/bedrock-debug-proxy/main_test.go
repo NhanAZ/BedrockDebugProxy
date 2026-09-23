@@ -135,7 +135,7 @@ func TestHelpGroupsCommands(t *testing.T) {
 		t.Fatalf("help code = %d, stderr = %s", code, stderr.String())
 	}
 	output := stdout.String()
-	for _, section := range []string{"Proxy", "Authentication accounts", "Capture inspection", "Information", "help [COMMAND]"} {
+	for _, section := range []string{"Proxy", "Authentication accounts", "Capture inspection", "Information", "help [COMMAND]", "capture packs only"} {
 		if !strings.Contains(output, section) {
 			t.Fatalf("help output missing %q: %s", section, output)
 		}
@@ -157,6 +157,35 @@ func TestCommandHelpAndUnknownHelp(t *testing.T) {
 	}
 	if !strings.Contains(stderr.String(), "Unknown command") || !strings.Contains(stderr.String(), "Authentication accounts") {
 		t.Fatalf("unknown help stderr = %s", stderr.String())
+	}
+}
+
+func TestRunHelpDocumentsPacksOnlyMode(t *testing.T) {
+	var stdout, stderr bytes.Buffer
+	if code := run([]string{"help", "run"}, &stdout, &stderr); code != 0 {
+		t.Fatalf("run help code = %d, stderr = %s", code, stderr.String())
+	}
+	for _, expected := range []string{"--packs-only", "without a local listener or world spawn", "--follow-transfers"} {
+		if !strings.Contains(stdout.String(), expected) {
+			t.Fatalf("run help missing %q: %s", expected, stdout.String())
+		}
+	}
+}
+
+func TestRunPacksOnlyRejectsListenerOnlyOptions(t *testing.T) {
+	for _, extra := range [][]string{
+		{"--listen", "127.0.0.1:19132"},
+		{"--follow-transfers"},
+		{"--allow-unauthenticated-client"},
+	} {
+		args := append([]string{"run", "--upstream", "127.0.0.1:19132", "--packs-only"}, extra...)
+		var stdout, stderr bytes.Buffer
+		if code := run(args, &stdout, &stderr); code != 2 {
+			t.Fatalf("run(%v) code = %d, want 2; stdout=%s stderr=%s", args, code, stdout.String(), stderr.String())
+		}
+		if !strings.Contains(stderr.String(), "--packs-only cannot be combined") {
+			t.Fatalf("run(%v) stderr = %s", args, stderr.String())
+		}
 	}
 }
 

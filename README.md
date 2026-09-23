@@ -137,6 +137,15 @@ Resource-pack archives, metadata, checksums, download information, and content k
 
 Unsupported encryption variants retain the original archive and produce structured error evidence instead of a guessed fallback.
 
+To capture resource packs without opening a local listener or connecting a Minecraft client, use packs-only mode.
+
+```powershell
+# Replace <UPSTREAM> with an Experience selector or direct HOST:PORT.
+.\bin\bedrock-debug-proxy.exe run --upstream "<UPSTREAM>" --packs-only --web-viewer
+```
+
+This still performs a real upstream Bedrock login with the selected authentication mode and completes the server's resource-pack exchange. It closes the upstream connection before requesting a world spawn. The server still receives a login and may count, log, or reject that connection. This is not an offline pack fetch. Since no Minecraft client is connected, the dialer uses its default client metadata; a server may therefore offer different packs than it would to a specific PC or mobile client. The capture retains the login and resource-pack packet evidence plus the exact archives. `--decrypt-resource-packs` remains opt-in. Packs and content keys can be sensitive, so keep the capture local.
+
 ## Inspecting a capture
 
 The following commands are optional analysis and packaging tools, not extra steps required to save a debug session.

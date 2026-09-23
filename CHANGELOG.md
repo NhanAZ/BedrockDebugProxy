@@ -9,6 +9,7 @@ Detailed rationale remains in [`docs/audits/`](docs/audits/).
 ### Added
 
 - Added a read-only local capture viewer with paginated event filters, decoded JSON details, bounded blob hex previews, loopback-only serving, and per-run access URLs. Open captures can be followed with `view --live`, and `run --web-viewer` starts the live browser view automatically without putting browser work on the forwarding path.
+- Added `run --packs-only` to capture resource-pack offers and archives from a real upstream login without opening a local listener or requesting world spawn. Its opt-in dial completion boundary waits for the final resource-pack response to flush, then closes before world startup. Packet evidence and archives remain in the canonical capture, and decryption stays opt-in.
 
 ### Changed
 

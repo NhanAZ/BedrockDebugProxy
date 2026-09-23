@@ -14,6 +14,7 @@ import (
 
 type Config struct {
 	ListenAddress              string
+	PacksOnly                  bool
 	UpstreamAddress            string
 	UpstreamNetwork            minecraft.Network
 	AllowUnauthenticatedClient bool
@@ -37,8 +38,10 @@ func (c *Config) normalize() error {
 	if c.UpstreamAddress == "" {
 		return errors.New("upstream address is required")
 	}
-	if err := validateAddress(c.ListenAddress); err != nil {
-		return fmt.Errorf("invalid listen address: %w", err)
+	if !c.PacksOnly {
+		if err := validateAddress(c.ListenAddress); err != nil {
+			return fmt.Errorf("invalid listen address: %w", err)
+		}
 	}
 	if c.UpstreamNetwork == nil {
 		if err := validateAddress(c.UpstreamAddress); err != nil {
