@@ -4,7 +4,7 @@
 
 This note records the investigation performed on 2026-09-20 after a BedrockDebugProxy session to The Hive received an `Unfair Advantage` ban response. It separates capture evidence, official server policy, public release information, and hypotheses. It is not a guide for bypassing a punishment or an anti-cheat system.
 
-The source captures remain local and sensitive. This note intentionally omits XUIDs, identity UUIDs, authentication data, packet payloads, and resource-pack keys. No additional live Hive test should be performed with the punished account or another account while proxy use is not authorized.
+The source captures remain local and sensitive. This note intentionally omits XUIDs, identity UUIDs, authentication data, packet payloads, and resource-pack keys. Do not use a live session to probe Hive enforcement. Any release baseline must follow the current project validation workflow and a direct maintainer request. An individual appeal outcome does not change Hive's public proxy policy.
 
 ## Incident evidence
 
@@ -18,6 +18,10 @@ The affected capture is `captures/session-20260920T135412Z`.
 - The client error panel also shows `InitialConnection-55`. No public Hive or Mojang mapping for `InitialConnection-55` was found. In this screenshot it is a client-side diagnostic label shown alongside the ban response, not an independent explanation of the punishment.
 - The same panel reports `RakNet:2193`, which is the transport and Bedrock protocol metadata. It is not itself a ban code. `NetworkType`, `Connection`, `WorldSession`, and `Client` are diagnostic fields whose exact meanings are not publicly documented; their values are intentionally omitted from this note.
 - Same-protocol traffic was forwarded through the raw path. The capture does not show an intentional gameplay mutation, injection, replay, or transfer-address rewrite before the ban.
+
+### Appeal outcome
+
+The maintainer later reported that Hive treated the punishment as a false positive and lifted it after appeal review. The provided support-thread export confirms that the Appeals & Security Team reviewed the case and lifted the punishment, but it does not identify the detector or explain which signal caused the original action. The correspondence itself, contact details, and punishment ID are not retained in this repository. This account-level outcome does not resolve the technical cause or change the public proxy policy.
 
 ## Comparative capture evidence
 
@@ -64,6 +68,7 @@ No indexed public result was found that names BedrockDebugProxy, `SrDuck84`, or 
 5. The recent viewer commits did not change the runtime proxy, protocol, or bridge packages.
 6. Public Hive discussions contain other reports of `Unfair Advantage` false positives and VPN/proxy misclassification, but none identifies this proxy or identity pattern.
 7. The affected capture contains a downstream/upstream ClientData game-version mismatch of 1.26.51 versus 1.26.50 that was not visible in the original compact negotiation event.
+8. The maintainer reports that Hive characterized this punishment as a false positive. The provided support-thread export confirms that the appeal was reviewed and the punishment lifted, but gives no technical explanation.
 
 ### Plausible but unproven
 
@@ -74,7 +79,7 @@ No indexed public result was found that names BedrockDebugProxy, `SrDuck84`, or 
 
 ### Not established
 
-1. The exact Hive detector, rule, or packet that produced the ban.
+1. The exact Hive detector, rule, or packet that produced the ban, and which signal was considered false positive during the appeal.
 2. Whether `SrDuck84` was the direct trigger, a contributing signal, or unrelated to the ban.
 3. Whether the cause was a server-side rollout, client behavior, proxy identity presentation, or a combination.
 4. Whether any code-only change could make this proxy path acceptable under Hive policy.
@@ -83,9 +88,9 @@ No indexed public result was found that names BedrockDebugProxy, `SrDuck84`, or 
 
 ## Maintainer decision and follow-up
 
-The previous statement that `SrDuck84` could be excluded was too strong. The correct conclusion is that `SrDuck84` remains a leading interaction hypothesis, but the existing captures disprove the simpler claim that this identity alone always causes a ban.
+The appeal outcome means the punishment was lifted, per the maintainer's report, but it does not establish a technical trigger. The capture comparison still shows that the `SrDuck84` identity alone is not sufficient to explain every outcome; any causal role remains unproven.
 
-The version-metadata correction is justified as local client parity work, not as a punishment solution. Preserve the affected capture, do not retest a punished account or substitute another account, and treat any future Hive validation as incomplete unless current policy review and explicit authorization permit the proxy connection. If authorized testing becomes available, compare a stamped binary, client version, downstream and upstream login metadata, timing, and the server response without attempting to evade enforcement.
+The version-metadata correction is justified as local client parity work, not as a punishment solution. Preserve the affected capture. Any later Hive session must be an ordinary read-only baseline under [`docs/server-targets.md`](../server-targets.md) and [`docs/validation.md`](../validation.md), not an attempt to identify or evade an enforcement mechanism. A new session is separate validation evidence and is not implied by the appeal outcome.
 
 ## Official appeal and support routes
 

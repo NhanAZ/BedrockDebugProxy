@@ -420,7 +420,7 @@ Every new entry should state the symptom, root cause, implementation commits, ev
 - Root cause: unresolved. The capture proves the server response, but it does not expose whether the trigger was a server-side blocklist or anti-cheat change, the `SrDuck84` upstream identity at the separate authenticated session boundary, client 1.26.51 behavior, or a combination.
 - Implementation: none. This is an evidence and policy record, not a runtime fix.
 - Evidence and validation: [`docs/research/hive-unfair-advantage-2026-09.md`](research/hive-unfair-advantage-2026-09.md), affected capture `session-20260920T135412Z`, comparison capture `session-20260917T034859Z`, Hive's current proxy policy, public Hive and Mojang release pages, and the community reports cited in the research note.
-- Status: unresolved research. The same `NhanAZ` to `SrDuck84` pattern appears in 22 earlier successful Hive captures, so `SrDuck84` is not proven sufficient by itself and must not be excluded as an interaction hypothesis. No further live test is authorized by this record.
+- Status: the technical cause remains unresolved. The maintainer later reported that Hive treated the punishment as a false positive and lifted it; the provided support-thread export confirms the review and lift but does not identify the trigger. The same `NhanAZ` to `SrDuck84` pattern appears in 22 earlier successful Hive captures, so the identity alone is not proven sufficient. Any future Hive session must follow the current read-only validation workflow and must not probe enforcement or imply a public policy change.
 
 ### FIX-0052 - Size the event sequence column from visible values
 
