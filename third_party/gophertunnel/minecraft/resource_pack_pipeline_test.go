@@ -65,6 +65,62 @@ func TestResourcePackDownloadWindowReplenishesAfterResponse(t *testing.T) {
 	cancel()
 }
 
+func TestResourcePackDownloadWindowIsSharedAcrossPacks(t *testing.T) {
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+	conn := newResourcePackPipelineTestConn(ctx)
+	conn.packQueue = &resourcePackQueue{
+		downloadingPacks: map[string]*downloadingPack{
+			"pack-a": {size: 101, buf: bytes.NewBuffer(nil)},
+			"pack-b": {size: 101, buf: bytes.NewBuffer(nil)},
+		},
+		awaitingPacks: make(map[string]*downloadingPack),
+	}
+	for _, id := range []string{"pack-a", "pack-b"} {
+		if err := conn.handleResourcePackDataInfo(&packet.ResourcePackDataInfo{UUID: id + "_1", Size: 101, DataChunkSize: 1}); err != nil {
+			t.Fatalf("handle ResourcePackDataInfo for %s: %v", id, err)
+		}
+	}
+
+	waitForResourcePackPackets(t, conn, int(DefaultResourcePackMaxInFlightChunks))
+	if got := len(conn.resourcePackChunkSlots); got != int(DefaultResourcePackMaxInFlightChunks) {
+		t.Fatalf("outstanding connection-wide chunk requests = %d, want %d", got, DefaultResourcePackMaxInFlightChunks)
+	}
+	time.Sleep(25 * time.Millisecond)
+	conn.sendMu.Lock()
+	requestCount := len(conn.bufferedSend)
+	conn.sendMu.Unlock()
+	if requestCount != int(DefaultResourcePackMaxInFlightChunks) {
+		t.Fatalf("buffered resource-pack requests = %d, want connection-wide limit %d", requestCount, DefaultResourcePackMaxInFlightChunks)
+	}
+
+	var response *packet.ResourcePackChunkData
+	conn.packMu.Lock()
+	for id, pack := range conn.packQueue.awaitingPacks {
+		pack.mu.Lock()
+		for index := range pack.requested {
+			response = &packet.ResourcePackChunkData{UUID: id + "_1", ChunkIndex: index, Data: []byte{0}}
+			break
+		}
+		pack.mu.Unlock()
+		if response != nil {
+			break
+		}
+	}
+	conn.packMu.Unlock()
+	if response == nil {
+		t.Fatal("no requested chunk available for response")
+	}
+	if err := conn.handleResourcePackChunkData(response); err != nil {
+		t.Fatalf("handle requested chunk response: %v", err)
+	}
+	waitForResourcePackPackets(t, conn, int(DefaultResourcePackMaxInFlightChunks)+1)
+	if got := len(conn.resourcePackChunkSlots); got != int(DefaultResourcePackMaxInFlightChunks) {
+		t.Fatalf("outstanding connection-wide chunk requests after replenishment = %d, want %d", got, DefaultResourcePackMaxInFlightChunks)
+	}
+	cancel()
+}
+
 func TestResourcePackDataInfoTransitionsConcurrentPacksSafely(t *testing.T) {
 	const packCount = 128
 	ctx, cancel := context.WithCancel(context.Background())
@@ -102,7 +158,7 @@ func TestResourcePackDataInfoTransitionsConcurrentPacksSafely(t *testing.T) {
 	}
 	close(start)
 	handlers.Wait()
-	waitForResourcePackPackets(t, conn, packCount)
+	waitForResourcePackPackets(t, conn, int(DefaultResourcePackMaxInFlightChunks))
 
 	conn.packMu.Lock()
 	awaiting := len(conn.packQueue.awaitingPacks)
@@ -111,6 +167,9 @@ func TestResourcePackDataInfoTransitionsConcurrentPacksSafely(t *testing.T) {
 	if awaiting != packCount || downloading != 0 {
 		t.Fatalf("resource-pack queue has %d awaiting and %d downloading packs, want %d and 0", awaiting, downloading, packCount)
 	}
+	if got := len(conn.resourcePackChunkSlots); got != int(DefaultResourcePackMaxInFlightChunks) {
+		t.Fatalf("outstanding connection-wide chunk requests = %d, want %d", got, DefaultResourcePackMaxInFlightChunks)
+	}
 }
 
 func TestHandleResourcePackChunkDataRequiresRequestedChunkAndCopiesBytes(t *testing.T) {
@@ -118,6 +177,7 @@ func TestHandleResourcePackChunkDataRequiresRequestedChunkAndCopiesBytes(t *test
 	defer cancel()
 	fragment := make([]byte, 2)
 	conn := newResourcePackPipelineTestConn(ctx)
+	conn.resourcePackChunkSlots <- struct{}{}
 	conn.packQueue = &resourcePackQueue{
 		awaitingPacks: map[string]*downloadingPack{
 			"pack": {
@@ -132,6 +192,9 @@ func TestHandleResourcePackChunkDataRequiresRequestedChunkAndCopiesBytes(t *test
 	if err := conn.handleResourcePackChunkData(&packet.ResourcePackChunkData{UUID: "pack_1", ChunkIndex: 1, Data: fragment}); err != nil {
 		t.Fatalf("handle requested chunk: %v", err)
 	}
+	if got := len(conn.resourcePackChunkSlots); got != 0 {
+		t.Fatalf("connection-wide request slots after response = %d, want 0", got)
+	}
 	fragment[0] = 9
 	got := <-conn.packQueue.awaitingPacks["pack"].newFrag
 	if got.index != 1 || !bytes.Equal(got.data, []byte{0, 0}) {
@@ -144,11 +207,12 @@ func TestHandleResourcePackChunkDataRequiresRequestedChunkAndCopiesBytes(t *test
 
 func newResourcePackPipelineTestConn(ctx context.Context) *Conn {
 	return &Conn{
-		ctx:   ctx,
-		log:   slog.Default(),
-		proto: DefaultProtocol,
-		enc:   packet.NewEncoder(io.Discard),
-		hdr:   &packet.Header{},
+		ctx:                    ctx,
+		log:                    slog.Default(),
+		proto:                  DefaultProtocol,
+		enc:                    packet.NewEncoder(io.Discard),
+		hdr:                    &packet.Header{},
+		resourcePackChunkSlots: make(chan struct{}, DefaultResourcePackMaxInFlightChunks),
 	}
 }
 

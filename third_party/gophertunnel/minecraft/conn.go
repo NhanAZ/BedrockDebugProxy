@@ -162,6 +162,8 @@ type Conn struct {
 
 	// packMu protects resource pack state shared with download goroutines.
 	packMu sync.Mutex
+	// resourcePackChunkSlots bounds outstanding chunk requests across the connection.
+	resourcePackChunkSlots chan struct{}
 	// resourcePacks is a slice of resource packs that the listener may hold. Each client will be asked to
 	// download these resource packs upon joining.
 	resourcePacks []*resource.Pack
@@ -252,7 +254,8 @@ func newConn(netConn net.Conn, key *ecdsa.PrivateKey, log *slog.Logger, proto Pr
 		proto:        proto,
 		readerLimits: limits,
 
-		resourcePackDelivery: defaultResourcePackDeliveryConfig(),
+		resourcePackDelivery:   defaultResourcePackDeliveryConfig(),
+		resourcePackChunkSlots: make(chan struct{}, DefaultResourcePackMaxInFlightChunks),
 	}
 	if d, ok := netConn.(packet.EncryptionDisabler); ok {
 		conn.disableEncryption = d.DisableEncryption()
@@ -1634,6 +1637,11 @@ func (conn *Conn) downloadResourcePackChunks(id, packetID string, pack *download
 	nextRequest, nextWrite, received := uint32(0), uint32(0), uint32(0)
 
 	requestChunk := func(index uint32) error {
+		select {
+		case conn.resourcePackChunkSlots <- struct{}{}:
+		case <-conn.ctx.Done():
+			return context.Canceled
+		}
 		pack.mu.Lock()
 		pack.requested[index] = struct{}{}
 		pack.mu.Unlock()
@@ -1641,6 +1649,7 @@ func (conn *Conn) downloadResourcePackChunks(id, packetID string, pack *download
 			pack.mu.Lock()
 			delete(pack.requested, index)
 			pack.mu.Unlock()
+			<-conn.resourcePackChunkSlots
 			return fmt.Errorf("request resource pack chunk %d: %w", index, err)
 		}
 		return nil
@@ -1656,7 +1665,9 @@ func (conn *Conn) downloadResourcePackChunks(id, packetID string, pack *download
 	}
 
 	if err := fillWindow(); err != nil {
-		_ = conn.close(err)
+		if conn.ctx.Err() == nil {
+			_ = conn.close(err)
+		}
 		return
 	}
 	for nextWrite < pack.chunkCount {
@@ -1676,7 +1687,9 @@ func (conn *Conn) downloadResourcePackChunks(id, packetID string, pack *download
 				nextWrite++
 			}
 			if err := fillWindow(); err != nil {
-				_ = conn.close(err)
+				if conn.ctx.Err() == nil {
+					_ = conn.close(err)
+				}
 				return
 			}
 		}
@@ -1744,8 +1757,10 @@ func (conn *Conn) handleResourcePackChunkData(pk *packet.ResourcePackChunkData) 
 	fragment := resourcePackChunk{index: pk.ChunkIndex, data: bytes.Clone(pk.Data)}
 	select {
 	case <-conn.ctx.Done():
+		<-conn.resourcePackChunkSlots
 		return conn.closeErr("receive resource pack chunk")
 	case pack.newFrag <- fragment:
+		<-conn.resourcePackChunkSlots
 		return nil
 	}
 }

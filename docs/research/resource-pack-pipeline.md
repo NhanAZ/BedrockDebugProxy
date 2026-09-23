@@ -16,15 +16,23 @@ The [gophertunnel resource-pack pipeline PR](https://github.com/Sandertv/gophert
 
 ## Implementation decision
 
-BedrockDebugProxy now applies only the upstream part of that behavior. Each pack uses a maximum of 100 outstanding chunk requests, honors the server-advertised chunk size, and replenishes the window after each accepted response. Chunk indices, request membership, bounds, and exact fragment lengths are validated. Response bytes are copied before entering the bounded reorder buffer. The pack is appended in the original pack sequence only after all fragments are contiguous and the archive parses successfully.
+BedrockDebugProxy applies only the upstream part of that behavior. Each connection shares a maximum of 100 outstanding chunk requests across all offered packs, honors each server-advertised chunk size, and replenishes one connection-wide slot after each accepted response. Chunk indices, request membership, bounds, and exact fragment lengths are validated. Response bytes are copied before entering the bounded reorder buffer. A pack is appended in the original offer sequence only after all its fragments are contiguous and the archive parses successfully.
 
 The downstream listener remains sequential and retains its existing pacing. No packet is rewritten, dropped, injected, replayed, or reordered on the wire. Captures continue to record every request and response, including malformed or unexpected fragments that terminate the connection.
 
+## Galaxite regression and correction
+
+The `0.3.0-rc.3` Galaxite capture `captures/session-20260923T044137Z` at revision `1ede568486768047acc5d52b721f595b50907fcc` recorded 19 `ResourcePackDataInfo` packets and 460 outgoing `ResourcePackChunkRequest` packets in about 10.5 seconds, but only 97 `ResourcePackChunkData` responses during the five-minute session. The dial ended as `context canceled`, not as the configured fifteen-minute timeout, and the capture reported no packet decode errors. A prior Galaxite capture at revision `29fbfd8e0664be20cb3929f5916f961e4e07b66c` recorded 460 chunk requests and 460 chunk responses, then reached `session.spawned` about 2 minutes 45 seconds after the upstream dial began.
+
+Source inspection confirmed that every accepted `ResourcePackDataInfo` starts a separate downloader, while the 100-request window was enforced independently by each downloader. When a server offers multiple packs during the same exchange, those per-pack windows can multiply into a much larger connection-wide burst. The revised implementation places the bounded semaphore on the connection and releases a slot only after a requested response is accepted or a request write fails. The local capture supports the excessive aggregate request window as the regression. It does not show the server's internal handling, so whether rate limiting or another server-side behavior caused the low response count remains inferred.
+
+The global limit follows the bounded client request window described by the upstream [gophertunnel resource-pack pipeline PR #509](https://github.com/Sandertv/gophertunnel/pull/509). The PR is an implementation reference, not proof of Galaxite's internal policy. A new stamped Galaxite run is required to verify the correction.
+
 ## Confidence and limits
 
-- Confirmed: the old upstream loop was serial, the local Galaxite capture was active but slow, and the new code bounds the request window and reorder memory.
+- Confirmed: the old upstream loop was serial; the per-pack pipeline allowed requests to multiply across packs; and the connection-wide window is now capped at 100 with bounded per-pack reorder buffers.
 - Inferred: the vanilla-sized request window should reduce idle time for servers that tolerate concurrent chunk requests.
-- Unknown: the optimal window and server-side congestion behavior for each featured experience. The 100-request maximum is a bounded compatibility choice, not a claim that every server uses that exact value.
+- Unknown: the server-side reason for the low response count, whether the five-minute session was canceled by the operator or by the client, and the optimal server-side response pacing for every featured experience. The 100-request maximum is a bounded compatibility choice, not a claim that every server uses that exact value.
 
 Focused tests cover the chunk-count bound, the initial request window, window replenishment, requested-index validation, and copying of decoder-owned response bytes. A fresh stamped The Hive baseline and a fresh Galaxite session at the exact revision remain required before release approval.
 

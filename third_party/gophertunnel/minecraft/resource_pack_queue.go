@@ -11,8 +11,8 @@ import (
 )
 
 // DefaultResourcePackMaxInFlightChunks bounds the number of upstream resource-pack
-// chunk requests that may be outstanding for one pack. The vanilla client keeps
-// a bounded request window and replenishes it as responses arrive.
+// chunk requests that may be outstanding across one connection. The vanilla
+// client keeps a bounded request window and replenishes it as responses arrive.
 const DefaultResourcePackMaxInFlightChunks uint32 = 100
 
 const maxResourcePackChunkCount uint64 = 1<<31 - 1
