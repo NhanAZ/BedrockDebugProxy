@@ -1118,6 +1118,14 @@ Every new entry should state the symptom, root cause, implementation commits, ev
 - Evidence and validation: maintainer-provided Hive console trace dated 2026-09-23, the handler and downloader critical sections in vendored gophertunnel, `TestResourcePackDataInfoTransitionsConcurrentPacksSafely`, and focused nested-module tests including `go test -race`. No capture or account data was added to the repository.
 - Status: automated focused validation passes. A newly built binary must complete a fresh The Hive session before this runtime change can be treated as live-validated or used to continue release approval.
 
+### FIX-0139 - Share the upstream resource-pack request window
+
+- Symptom: the `0.3.0-rc.3` Galaxite capture sent 460 `ResourcePackChunkRequest` packets in about 10.5 seconds but recorded only 97 `ResourcePackChunkData` responses during the five-minute session. The dial ended with `context canceled`, not the configured timeout, and packet decoding reported no errors.
+- Root cause: the 100-request bound was local to each pack downloader. Multiple `ResourcePackDataInfo` packets start independent downloaders, so their windows could multiply across one connection and create a 460-request burst.
+- Implementation: add one connection-wide 100-slot request window. A downloader acquires a slot before writing a chunk request and releases it when the matching response is accepted or the write fails. Per-pack ordering, bounded reorder buffers, response validation, downstream sequential delivery, and pacing remain unchanged.
+- Evidence and provenance: captures `captures/session-20260923T044137Z` at revision `1ede568486768047acc5d52b721f595b50907fcc` and `captures/session-20260922T153826Z` at revision `29fbfd8e0664be20cb3929f5916f961e4e07b66c`; [`docs/research/resource-pack-pipeline.md`](research/resource-pack-pipeline.md); and the bounded client request window described by [gophertunnel PR #509](https://github.com/Sandertv/gophertunnel/pull/509). The request burst is confirmed. The server-side reason for its low response count remains inferred.
+- Status: focused tests verify that multiple packs share the cap and that accepted responses replenish it. Exact-revision The Hive and Galaxite live validation remain pending.
+
 ## Ordering safety contract
 
 The deferred-packet change is deliberately narrow. `expectedIDs` remains the only authority for what the current login state accepts. The queue scan selects the earliest packet that is currently expected, leaves packets for later states queued, and never mutates or reorders bytes on the wire. The regression tests cover canonical resource-pack order, featured early `ResourcePacksInfo`, a later-phase packet queued ahead of the current phase, and all six permutations of the three login packets.

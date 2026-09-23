@@ -33,7 +33,7 @@ Detailed rationale remains in [`docs/audits/`](docs/audits/).
 - `ClientCacheBlobStatus` decoding now accepts large observed hash lists with a packet-specific bounded limit while keeping the generic slice safety bound unchanged.
 - RakNet upstream dials now recover from a repeated `CONNECTION_REQUEST_ACCEPTED` by re-sending `NEW_INCOMING_CONNECTION` instead of aborting a potentially recoverable handshake.
 - Featured-experience upstream dials now allow fifteen minutes for an active resource-pack exchange, based on a Galaxite capture that delivered 186 of 460 chunks during the previous five-minute bound.
-- Upstream resource-pack downloads now keep a bounded 100-chunk request window and reorder validated responses before archive assembly, while downstream delivery remains sequential and paced.
+- Upstream resource-pack downloads now share one bounded 100-chunk request window across the connection and reorder validated responses before archive assembly. This prevents the limit from multiplying across several packs, while downstream delivery remains sequential and paced.
 - Resource-pack queue state is now synchronized across pack download workers, preventing concurrent-map crashes when one pack finishes as another begins.
 - Updated the compiled Bedrock game-version metadata to 1.26.51 while retaining protocol 2193 and the reviewed 1.26.50 packet definitions. Mojang's 1.26.51 release reports no packet changes, so authenticated upstream login metadata now advertises 1.26.51 without changing forwarded packet bytes.
 - Unauthenticated upstream dials now preserve the downstream client's identity instead of falling back to gophertunnel's default `Steve` identity. Xbox-authenticated dials continue to use the identity from the authentication chain.
