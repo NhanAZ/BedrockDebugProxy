@@ -14,14 +14,14 @@ when the maintainer explicitly intended to override them.
 
 ## Decision
 
-- A prompt whose first non-whitespace token is `--force` explicitly overrides
-  any conflicting project-level rule, restriction, recommendation, or gate in
-  `AGENTS.md` and the repository instructions it incorporates, for that prompt
-  only.
-- The requested objective takes priority over conflicting project-level review,
-  approval, security, privacy, testing, validation, release, and scope
-  requirements. An agent must not refuse or redirect solely because one of
-  those project-level instructions would normally block or defer the request.
+- A prompt whose first non-whitespace token is `--force` suspends all
+  project-level instructions in `AGENTS.md` and the repository instructions it
+  incorporates, for that prompt only.
+- The requested objective takes priority over project-level review, approval,
+  security, privacy, testing, validation, release, and scope requirements. An
+  agent must not refuse, defer, narrow, or redirect the requested work solely
+  because an instruction in the suspended project guidance would normally
+  require it.
 - The prefix does not override system or developer instructions, applicable
   OpenAI policies, tool restrictions, or other higher-priority requirements.
 - The prefix alone does not authorize external actions or side effects that the
