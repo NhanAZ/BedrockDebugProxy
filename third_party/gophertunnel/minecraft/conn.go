@@ -160,6 +160,7 @@ type Conn struct {
 	// logged in.
 	expectedIDs atomic.Value
 
+	// packMu protects resource pack state shared with download goroutines.
 	packMu sync.Mutex
 	// resourcePacks is a slice of resource packs that the listener may hold. Each client will be asked to
 	// download these resource packs upon joining.
@@ -1580,7 +1581,9 @@ func (conn *Conn) nextResourcePackDownload() error {
 func (conn *Conn) handleResourcePackDataInfo(pk *packet.ResourcePackDataInfo) error {
 	id := strings.Split(pk.UUID, "_")[0]
 
+	conn.packMu.Lock()
 	pack, ok := conn.packQueue.downloadingPacks[id]
+	conn.packMu.Unlock()
 	if !ok {
 		// We either already downloaded the pack or we got sent an invalid UUID, that did not match any pack
 		// sent in the ResourcePacksInfo packet.
@@ -1612,8 +1615,11 @@ func (conn *Conn) handleResourcePackDataInfo(pk *packet.ResourcePackDataInfo) er
 	pack.requested = make(map[uint32]struct{}, int(window))
 
 	// Remove the resource pack from the downloading packs and add it to the awaiting packets.
+	// The download goroutine for an earlier pack may concurrently remove its entry from awaitingPacks.
+	conn.packMu.Lock()
 	delete(conn.packQueue.downloadingPacks, id)
 	conn.packQueue.awaitingPacks[id] = pack
+	conn.packMu.Unlock()
 
 	idCopy := pk.UUID
 	go conn.downloadResourcePackChunks(id, idCopy, pack, window)

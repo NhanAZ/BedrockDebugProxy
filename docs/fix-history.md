@@ -1110,6 +1110,14 @@ Every new entry should state the symptom, root cause, implementation commits, ev
 - Evidence and provenance: local loopback regressions `TestRunPacksOnlyCapturesUpstreamWithoutListener` and `TestDialerResourcePackExchangeOnlyStopsBeforeWorldStartup` exercise the one-pack Bedrock exchange and a server `StartGame` immediately after the pack boundary. They verify the archive SHA-256, capture integrity, and absence of client world-spawn packets. The external references are gophertunnel `v1.61.0` at `283a5a97dfe65da94bcc0b401807f6aefa9e72ee`, bedrocktool revision `85d5cfe1545c8d853be2859144a8357539ffc0f2`, and the maintainer-authorized private EasySpecter revision `6939f8aa1ad70fc694d370e3b4b33e6d3e49482c`. No third-party source was copied. See [`docs/research/resource-pack-fetch-mode.md`](research/resource-pack-fetch-mode.md).
 - Status: the focused loopback test passes; the full project quality gate must be rerun after the final diff. No public-server session is implied by that test. A fresh stamped The Hive baseline and the complete release matrix are required before release approval.
 
+### FIX-0138 - Synchronize concurrent upstream resource-pack state
+
+- Symptom: a Hive run terminated with `fatal error: concurrent map writes` in `Conn.handleResourcePackDataInfo` while resource-pack responses were arriving.
+- Root cause: the per-pack download goroutine removed completed entries from `awaitingPacks` under `Conn.packMu`, while the next `ResourcePackDataInfo` handler inserted into the same map without the mutex. The bounded download pipeline permits these operations to overlap.
+- Implementation: guard the `downloadingPacks` lookup and the atomic move into `awaitingPacks` with `Conn.packMu`. Add a regression test that starts many pack-info handlers concurrently and verifies every pack reaches the awaiting state without corrupting either map.
+- Evidence and validation: maintainer-provided Hive console trace dated 2026-09-23, the handler and downloader critical sections in vendored gophertunnel, `TestResourcePackDataInfoTransitionsConcurrentPacksSafely`, and focused nested-module tests including `go test -race`. No capture or account data was added to the repository.
+- Status: automated focused validation passes. A newly built binary must complete a fresh The Hive session before this runtime change can be treated as live-validated or used to continue release approval.
+
 ## Ordering safety contract
 
 The deferred-packet change is deliberately narrow. `expectedIDs` remains the only authority for what the current login state accepts. The queue scan selects the earliest packet that is currently expected, leaves packets for later states queued, and never mutates or reorders bytes on the wire. The regression tests cover canonical resource-pack order, featured early `ResourcePacksInfo`, a later-phase packet queued ahead of the current phase, and all six permutations of the three login packets.

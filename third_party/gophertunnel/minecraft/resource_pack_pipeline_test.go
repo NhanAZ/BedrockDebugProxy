@@ -3,8 +3,10 @@ package minecraft
 import (
 	"bytes"
 	"context"
+	"fmt"
 	"io"
 	"log/slog"
+	"sync"
 	"testing"
 	"time"
 
@@ -61,6 +63,54 @@ func TestResourcePackDownloadWindowReplenishesAfterResponse(t *testing.T) {
 	}
 	waitForResourcePackPackets(t, conn, int(DefaultResourcePackMaxInFlightChunks)+1)
 	cancel()
+}
+
+func TestResourcePackDataInfoTransitionsConcurrentPacksSafely(t *testing.T) {
+	const packCount = 128
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+	conn := newResourcePackPipelineTestConn(ctx)
+	conn.packQueue = &resourcePackQueue{
+		downloadingPacks: make(map[string]*downloadingPack, packCount),
+		awaitingPacks:    make(map[string]*downloadingPack, packCount),
+	}
+	for index := range packCount {
+		id := fmt.Sprintf("pack-%d", index)
+		conn.packQueue.downloadingPacks[id] = &downloadingPack{
+			size: 1,
+			buf:  bytes.NewBuffer(nil),
+		}
+	}
+
+	start := make(chan struct{})
+	var handlers sync.WaitGroup
+	for index := range packCount {
+		index := index
+		handlers.Add(1)
+		go func() {
+			defer handlers.Done()
+			<-start
+			id := fmt.Sprintf("pack-%d", index)
+			if err := conn.handleResourcePackDataInfo(&packet.ResourcePackDataInfo{
+				UUID:          id + "_1",
+				Size:          1,
+				DataChunkSize: 1,
+			}); err != nil {
+				t.Errorf("handle ResourcePackDataInfo for %s: %v", id, err)
+			}
+		}()
+	}
+	close(start)
+	handlers.Wait()
+	waitForResourcePackPackets(t, conn, packCount)
+
+	conn.packMu.Lock()
+	awaiting := len(conn.packQueue.awaitingPacks)
+	downloading := len(conn.packQueue.downloadingPacks)
+	conn.packMu.Unlock()
+	if awaiting != packCount || downloading != 0 {
+		t.Fatalf("resource-pack queue has %d awaiting and %d downloading packs, want %d and 0", awaiting, downloading, packCount)
+	}
 }
 
 func TestHandleResourcePackChunkDataRequiresRequestedChunkAndCopiesBytes(t *testing.T) {
