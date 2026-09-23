@@ -212,6 +212,9 @@ func New(config Config) (*Runner, error) {
 }
 
 func (r *Runner) Run(ctx context.Context) error {
+	if r.config.PacksOnly {
+		return errors.New("standard proxy mode cannot run with packs-only configuration")
+	}
 	if ctx == nil {
 		ctx = context.Background()
 	}
@@ -280,6 +283,7 @@ func (r *Runner) Run(ctx context.Context) error {
 	}
 
 	if err := r.record("proxy.start", capture.SeverityInfo, map[string]any{
+		"mode":                         "proxy",
 		"listen_address":               r.config.ListenAddress,
 		"upstream_address":             r.config.UpstreamAddress,
 		"allow_unauthenticated_client": r.config.AllowUnauthenticatedClient,
@@ -360,7 +364,7 @@ func (r *Runner) Run(ctx context.Context) error {
 				if downstream := state.downstreamConn.Load(); downstream != nil {
 					enableClientCache = downstream.ClientCacheEnabled()
 				}
-				state.slot.conn, state.slot.resourcePacks, state.slot.err = r.connectUpstream(connectCtx, state.target, state.upstreamNetwork, observer, state.upstreamID, state.hop, state.upstreamLogger, live, identityData, clientData, enableClientCache, state.transferLocalAddr != nil, state.transferRouteProbed, func(conn *minecraft.Conn) {
+				state.slot.conn, state.slot.resourcePacks, state.slot.err = r.connectUpstream(connectCtx, state.target, state.upstreamNetwork, observer, state.upstreamID, state.hop, state.upstreamLogger, live, identityData, clientData, enableClientCache, state.transferLocalAddr != nil, state.transferRouteProbed, true, false, func(conn *minecraft.Conn) {
 					state.upstreamConn.Store(conn)
 				})
 			})
@@ -604,6 +608,102 @@ func (r *Runner) Run(ctx context.Context) error {
 	}
 }
 
+// RunPacksOnly performs the configured upstream login and resource-pack
+// exchange, records the same packet and archive evidence, and closes before the
+// dialled connection is spawned into a world.
+func (r *Runner) RunPacksOnly(ctx context.Context) (runErr error) {
+	if !r.config.PacksOnly {
+		return errors.New("packs-only mode is not enabled in the proxy configuration")
+	}
+	if ctx == nil {
+		ctx = context.Background()
+	}
+	runCtx, cancelRun := context.WithCancel(ctx)
+	defer cancelRun()
+	live := newLiveReporter(r.config.Output)
+	defer func() {
+		live.SetShuttingDown()
+		live.Close()
+	}()
+	failures := bedrock.NewFailureSink(cancelRun)
+	const connectionID = "upstream-1"
+	observer := bedrock.NewObserver(r.config.Recorder, failures, sessionID, 1, live.RawPacket)
+	logger := slog.New(bedrock.NewCaptureLogHandler(r.config.Recorder, failures, sessionID, connectionID, "upstream", live.LibraryLog))
+	live.SetHop(1)
+	if err := r.record("proxy.start", capture.SeverityInfo, map[string]any{
+		"mode":                   "packs_only",
+		"upstream_address":       r.config.UpstreamAddress,
+		"protocol_id":            minecraft.DefaultProtocol.ID(),
+		"game_version":           minecraft.DefaultProtocol.Ver(),
+		"client_metadata_source": "gophertunnel_default",
+	}); err != nil {
+		return err
+	}
+	_, _ = fmt.Fprintf(r.config.Output, "Downloading upstream resource packs without starting a local listener or spawning into the world.\n")
+
+	var upstreamConn *minecraft.Conn
+	network := bedrock.Network{
+		Transport:      r.config.UpstreamNetwork,
+		Recorder:       r.config.Recorder,
+		Observer:       observer,
+		Failures:       failures,
+		Logger:         logger,
+		SessionID:      sessionID,
+		ConnectionID:   connectionID,
+		Channel:        "upstream",
+		Hop:            1,
+		ReadDirection:  capture.DirectionServerToClient,
+		WriteDirection: capture.DirectionClientToServer,
+		PayloadMetadataFunc: func() map[string]any {
+			return transportMetadata(upstreamConn)
+		},
+	}
+	conn, packs, err := r.connectUpstream(runCtx, r.config.UpstreamAddress, network, observer, connectionID, 1, logger, live, login.IdentityData{}, login.ClientData{}, false, false, false, false, true, func(conn *minecraft.Conn) {
+		upstreamConn = conn
+	})
+	if err != nil {
+		return err
+	}
+	defer func() {
+		closeErr := conn.Close()
+		fields := map[string]any{
+			"reason":              "resource_pack_exchange_complete",
+			"resource_pack_count": len(packs),
+			"world_spawned":       false,
+		}
+		if closeErr != nil {
+			fields["close_error"] = closeErr.Error()
+		}
+		eventErr := r.recordAtHop("session.close", severityForError(errors.Join(runErr, closeErr)), fields, 1)
+		runErr = errors.Join(runErr, closeErr, eventErr)
+	}()
+	if err := failures.Err(); err != nil {
+		return fmt.Errorf("capture hook failed during resource-pack exchange: %w", err)
+	}
+	if err := r.recordStructuredViewAtHop("session.connection_metadata", newConnectionMetadata("upstream", conn), capture.DirectionInternal, connectionID, "upstream", "decoded_login_state", 1,
+		[]string{"Exact Login packet bytes remain in packet.raw; binary fields in this structured view use size, SHA-256, and preview metadata"}); err != nil {
+		return err
+	}
+	if err := r.recordStructuredViewAtHop("session.game_data", conn.GameData(), capture.DirectionServerToClient, connectionID, "upstream", "decoded_upstream_game_data", 1,
+		[]string{"This is a bounded GameData view exposed by gophertunnel; collections may be truncated and exact startup packets remain in packet.raw"}); err != nil {
+		return err
+	}
+	if err := r.recordAtHop("resource_pack.fetch_complete", capture.SeverityInfo, map[string]any{
+		"resource_pack_count":    len(packs),
+		"protocol_id":            conn.Proto().ID(),
+		"game_version":           conn.Proto().Ver(),
+		"world_spawned":          false,
+		"client_metadata_source": "gophertunnel_default",
+	}, 1); err != nil {
+		return err
+	}
+	if err := failures.Err(); err != nil {
+		return fmt.Errorf("capture hook failed after resource-pack exchange: %w", err)
+	}
+	live.Info("Resource-pack exchange complete - %d archives retained; no world spawn was requested", len(packs))
+	return nil
+}
+
 func (r *Runner) runHop(runCtx context.Context, localAddress string, state *hopState, clientConn, serverConn *minecraft.Conn, observer *bedrock.Observer, failures *bedrock.FailureSink, live *liveReporter, onTransfer func(string)) (runErr error) {
 	defer func() { _ = serverConn.Close() }()
 	keepClientOpen := false
@@ -759,7 +859,7 @@ func (r *Runner) probeTransferRouteNetwork(ctx context.Context, target string, l
 	return nil
 }
 
-func (r *Runner) connectUpstream(ctx context.Context, target string, network bedrock.Network, observer *bedrock.Observer, connectionID string, hop int, logger *slog.Logger, live *liveReporter, identityData login.IdentityData, clientData login.ClientData, enableClientCache, transferRoute, routeProbed bool, onConnection func(*minecraft.Conn)) (*minecraft.Conn, []*resource.Pack, error) {
+func (r *Runner) connectUpstream(ctx context.Context, target string, network bedrock.Network, observer *bedrock.Observer, connectionID string, hop int, logger *slog.Logger, live *liveReporter, identityData login.IdentityData, clientData login.ClientData, enableClientCache, transferRoute, routeProbed, prepareDownstream, resourcePackExchangeOnly bool, onConnection func(*minecraft.Conn)) (*minecraft.Conn, []*resource.Pack, error) {
 	if err := r.recordAtHop("upstream.dial_start", capture.SeverityInfo, map[string]any{"address": target}, hop); err != nil {
 		return nil, nil, err
 	}
@@ -795,6 +895,7 @@ func (r *Runner) connectUpstream(ctx context.Context, target string, network bed
 		DownloadResourcePack: func(_ uuid.UUID, _ string, _, _ int) bool {
 			return true
 		},
+		ResourcePackExchangeOnly: resourcePackExchangeOnly,
 	}
 	waitStarted := time.Now()
 	conn, err := dialer.DialContextNetwork(dialCtx, network, target)
@@ -824,7 +925,11 @@ func (r *Runner) connectUpstream(ctx context.Context, target string, network bed
 		setCaptureFailure(network.Failures, captureErr)
 		return nil, nil, errors.Join(fmt.Errorf("connect to upstream server: %w", err), captureErr)
 	}
-	live.Info("Upstream login and resource-pack exchange completed in %s - downstream pack delivery can begin (sequential buffered mode)", waitDuration)
+	if prepareDownstream {
+		live.Info("Upstream login and resource-pack exchange completed in %s - downstream pack delivery can begin (sequential buffered mode)", waitDuration)
+	} else {
+		live.Info("Upstream login and resource-pack exchange completed in %s", waitDuration)
+	}
 	// Dialer returns only after the upstream login and resource-pack exchange has
 	// completed. Waiting on a second cache barrier here can deadlock the listener
 	// login path because the URL offer is observed on the same decoder goroutine.
@@ -843,9 +948,12 @@ func (r *Runner) connectUpstream(ctx context.Context, target string, network bed
 		}
 		live.Info("Resource packs retained - %d archives in %s; plaintext derivation %s", count, r.config.Recorder.Root(), derivation)
 	}
-	deliveryPacks, err := resourcePacksForDownstream(resourcePacks)
-	if err != nil {
-		return nil, nil, closeAfterUpstreamError(conn, fmt.Errorf("prepare resource packs for downstream delivery: %w", err))
+	deliveryPacks := resourcePacks
+	if prepareDownstream {
+		deliveryPacks, err = resourcePacksForDownstream(resourcePacks)
+		if err != nil {
+			return nil, nil, closeAfterUpstreamError(conn, fmt.Errorf("prepare resource packs for downstream delivery: %w", err))
+		}
 	}
 	if err := r.recordAtHop("upstream.connected", capture.SeverityInfo, map[string]any{
 		"local_address":       conn.LocalAddr().String(),
