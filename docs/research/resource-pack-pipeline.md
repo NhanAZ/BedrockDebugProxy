@@ -27,3 +27,9 @@ The downstream listener remains sequential and retains its existing pacing. No p
 - Unknown: the optimal window and server-side congestion behavior for each featured experience. The 100-request maximum is a bounded compatibility choice, not a claim that every server uses that exact value.
 
 Focused tests cover the chunk-count bound, the initial request window, window replenishment, requested-index validation, and copying of decoder-owned response bytes. A fresh stamped The Hive baseline and a fresh Galaxite session at the exact revision remain required before release approval.
+
+## Concurrency incident
+
+On 2026-09-23, a live Hive session terminated with a Go `fatal error: concurrent map writes` in `Conn.handleResourcePackDataInfo`, at the transition from `downloadingPacks` to `awaitingPacks`. The stack and source establish the race: each completed pack has a downloader goroutine that removes its entry from `awaitingPacks` under `Conn.packMu`, while the next `ResourcePackDataInfo` handler inserted into that same map without taking the mutex. The download window made pack completion and the next pack's setup overlap.
+
+The fix uses the same connection mutex for pack-map lookup and the map transition. `TestResourcePackDataInfoTransitionsConcurrentPacksSafely` stresses simultaneous pack setup, and the focused nested-module test passes under Go's race detector. This addresses shared in-memory queue state only; it does not alter packet ordering, chunk scheduling, or packet contents. A fresh stamped The Hive session is still required to validate the runtime fix.
