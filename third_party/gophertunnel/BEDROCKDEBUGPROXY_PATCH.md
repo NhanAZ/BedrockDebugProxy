@@ -17,4 +17,6 @@ The dialer exposes an opt-in `ResourcePackExchangeOnly` completion boundary for 
 
 The protocol helper includes one additional project-specific safety-bound override for `ClientCacheBlobStatus`. Its two hash lists use a 16,384-entry bound because a real Galaxite client reported 1,302 hashes in one packet, while ordinary protocol slices retain the upstream 1,024-entry bound. This is a targeted decoder compatibility change, not a global limit relaxation.
 
+The packet decoder also exposes a configurable per-batch packet-count limit through `ListenConfig.MaxBatchPackets`. It retains the upstream default of 812 and its explicit disable method. BedrockDebugProxy sets a finite 16,384-packet cap only on its client-facing listener to accept larger accumulated client batches without removing the decoder's count bound. Dialer behavior is unchanged.
+
 The focused local compatibility regression test is `minecraft/conn_featured_experience_test.go`. The parent project's `internal/bedrock/protocol_update_test.go` verifies the selected protocol metadata, new packet IDs and pools, and exact new-packet bodies. See `docs/research/protocol-1.26.50.md`, `docs/research/protocol-1.26.51.md`, `docs/research/bedrock-ecosystem.md`, and `THIRD_PARTY_NOTICES.md` in the parent project for evidence and provenance.

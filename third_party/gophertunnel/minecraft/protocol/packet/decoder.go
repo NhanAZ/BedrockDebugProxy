@@ -33,7 +33,7 @@ type Decoder struct {
 	// even if it is requested on handshake during login.
 	disableEncryption bool
 
-	checkPacketLimit bool
+	maxBatchPacketCount int
 }
 
 // NewDecoder returns a new decoder decoding data from the io.Reader passed. One read call from the reader is
@@ -51,18 +51,18 @@ func NewDecoder(reader io.Reader) *Decoder {
 	}
 	if pr, ok := reader.(PacketReader); ok {
 		return &Decoder{
-			checkPacketLimit:  true,
-			pr:                pr,
-			header:            batch,
-			disableEncryption: disableEncryption,
+			maxBatchPacketCount: defaultMaximumInBatch,
+			pr:                  pr,
+			header:              batch,
+			disableEncryption:   disableEncryption,
 		}
 	}
 	return &Decoder{
-		r:                 reader,
-		buf:               make([]byte, 1024*1024*3),
-		header:            batch,
-		checkPacketLimit:  true,
-		disableEncryption: disableEncryption,
+		r:                   reader,
+		buf:                 make([]byte, 1024*1024*3),
+		header:              batch,
+		maxBatchPacketCount: defaultMaximumInBatch,
+		disableEncryption:   disableEncryption,
 	}
 }
 
@@ -88,15 +88,23 @@ func (decoder *Decoder) EnableCompression(compression Compression, maxDecompress
 // DisableBatchPacketLimit disables the check that limits the number of packets allowed in a single packet
 // batch. This should typically be called for Decoders decoding from a server connection.
 func (decoder *Decoder) DisableBatchPacketLimit() {
-	decoder.checkPacketLimit = false
+	decoder.maxBatchPacketCount = 0
+}
+
+// SetMaxBatchPacketCount sets the maximum amount of packets accepted in one batch.
+// A value less than one leaves the current limit unchanged. Use
+// DisableBatchPacketLimit to disable the check entirely.
+func (decoder *Decoder) SetMaxBatchPacketCount(max int) {
+	if max > 0 {
+		decoder.maxBatchPacketCount = max
+	}
 }
 
 const (
 	// header is the header of compressed 'batches' from Minecraft.
 	header = 0xfe
-	// maximumInBatch is the maximum amount of packets that may be found in a batch. If a compressed batch has
-	// more than this amount, decoding will fail.
-	maximumInBatch = 812
+	// defaultMaximumInBatch is the default packet count limit for one batch.
+	defaultMaximumInBatch = 812
 )
 
 // Decode decodes one 'packet' from the io.Reader passed in NewDecoder(), producing a slice of packets that it
@@ -165,8 +173,8 @@ func (decoder *Decoder) Decode() (packets [][]byte, err error) {
 		if length > uint32(b.Len()) {
 			return nil, fmt.Errorf("decode batch: packet length %v exceeds remaining %v", length, b.Len())
 		}
-		if len(packets) >= maximumInBatch && decoder.checkPacketLimit {
-			return nil, fmt.Errorf("decode batch: number of packets exceeds max=%v", maximumInBatch)
+		if decoder.maxBatchPacketCount > 0 && len(packets) >= decoder.maxBatchPacketCount {
+			return nil, fmt.Errorf("decode batch: number of packets exceeds max=%v", decoder.maxBatchPacketCount)
 		}
 		packets = append(packets, b.Next(int(length)))
 	}

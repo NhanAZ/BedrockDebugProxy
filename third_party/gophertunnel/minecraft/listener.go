@@ -142,6 +142,9 @@ type ListenConfig struct {
 	// MaxDecompressedLen is the maximum length of a decompressed packet to prevent potential exploits. If 0,
 	// the default value is 16MB (16 * 1024 * 1024). Setting this to a negative integer disables the limit.
 	MaxDecompressedLen int
+	// MaxBatchPackets is the maximum number of packets accepted in one batch. If zero or negative, the
+	// decoder uses its default limit.
+	MaxBatchPackets int
 
 	// Allow filters what connections are allowed to connect to the Server. The
 	// address, identity data, and client data of the connection are passed. If
@@ -444,6 +447,9 @@ func (listener *Listener) createConn(netConn net.Conn) {
 	listener.packsMu.RUnlock()
 
 	conn := newConn(netConn, listener.key, listener.cfg.ErrorLog, proto{}, listener.cfg.FlushRate, true)
+	if listener.cfg.MaxBatchPackets > 0 {
+		conn.dec.SetMaxBatchPacketCount(listener.cfg.MaxBatchPackets)
+	}
 	conn.disableEncryption = conn.disableEncryption || listener.cfg.DisablePacketEncryption
 	conn.acceptedProto = append(listener.cfg.AcceptedProtocols, proto{})
 	conn.compression = listener.cfg.Compression
