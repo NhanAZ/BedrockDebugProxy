@@ -1150,6 +1150,14 @@ Every new entry should state the symptom, root cause, implementation commits, ev
 - Evidence and provenance: GitHub Actions run `35947403349` for commit `d8724a45feed4889e92616fdb845ec9f2d2f50fa` reported the race in `TestRunnerForwardsBidirectionalPacketsAndCapturesSession` and `TestRunPacksOnlyCapturesUpstreamWithoutListener`. The write and read paths are `Conn.handleNetworkSettings` and `Conn.NetworkSettings` in the in-tree gophertunnel fork.
 - Status: the focused concurrency test and full local race-enabled quality gate pass. Exact-revision CI remains pending. The fix changes synchronization only; packet contents and negotiation order remain unchanged.
 
+### FIX-0143 - Classify remote disconnect writes as peer termination
+
+- Symptom: Enchanted captures recorded a server-to-client `Disconnect` packet and closed the upstream connection, then classified later writes to that closed connection as blocking `bridge.write_error` events.
+- Root cause: gophertunnel surfaces a received Bedrock `Disconnect` as a typed `minecraft.DisconnectError`. The bridge shutdown classifier handled context cancellation and closed sockets but not this explicit remote-close error. The downstream `RequestChunkRadius` callback also recorded the same typed close as a forwarding failure.
+- Implementation: recognize wrapped `minecraft.DisconnectError` as a peer-termination cause when classifying bridge shutdown and omit the downstream chunk-radius callback error when it is caused by that same remote close. Raw packet evidence and session-close diagnostics remain available; other write failures remain blocking.
+- Evidence and provenance: local captures `captures/session-20260924T152209Z` at revision `bfe0741fa4cc9fb74199bde0624ce38c16d4af76` and `captures/session-20260923T062327Z` at revision `bfc19102a312cbe5b0a18c9432c37afcbb446b24` each contain upstream packet ID 5 before connection closure and later bridge write errors. The packet message text was not inspected. The handling is based on the vendored gophertunnel `Conn.receive` and `Conn.closeErr` paths.
+- Status: focused regression tests cover wrapped remote-disconnect errors and first-write shutdown classification. Fresh stamped Enchanted and The Hive sessions are required; this does not prevent a server from disconnecting the session or make a failed manual normal-session check pass.
+
 ## Ordering safety contract
 
 The deferred-packet change is deliberately narrow. `expectedIDs` remains the only authority for what the current login state accepts. The queue scan selects the earliest packet that is currently expected, leaves packets for later states queued, and never mutates or reorders bytes on the wire. The regression tests cover canonical resource-pack order, featured early `ResourcePacksInfo`, a later-phase packet queued ahead of the current phase, and all six permutations of the three login packets.

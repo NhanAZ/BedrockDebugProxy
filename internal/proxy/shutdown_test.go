@@ -10,6 +10,7 @@ import (
 	"testing"
 
 	"github.com/NhanAZ/BedrockDebugProxy/internal/capture"
+	"github.com/sandertv/gophertunnel/minecraft"
 )
 
 func TestExpectedShutdownErrorRequiresCoordinatedShutdown(t *testing.T) {
@@ -28,6 +29,22 @@ func TestExpectedShutdownErrorRequiresCoordinatedShutdown(t *testing.T) {
 	}
 	if expectedShutdownError(errors.New("protocol violation"), &shuttingDown) {
 		t.Fatal("unrelated error was suppressed during shutdown")
+	}
+}
+
+func TestExpectedShutdownErrorRecognizesRemoteDisconnect(t *testing.T) {
+	remoteDisconnect := &net.OpError{
+		Op:  "write",
+		Net: "minecraft",
+		Err: fmt.Errorf("receive: %w", minecraft.DisconnectError("synthetic remote disconnect")),
+	}
+	var shuttingDown atomic.Bool
+	if expectedShutdownError(remoteDisconnect, &shuttingDown) {
+		t.Fatal("remote disconnect was suppressed before shutdown")
+	}
+	shuttingDown.Store(true)
+	if !expectedShutdownError(remoteDisconnect, &shuttingDown) {
+		t.Fatal("expected coordinated remote disconnect to be suppressed")
 	}
 }
 
@@ -132,5 +149,43 @@ func TestFinishForwardSuppressesFirstPeerCloseWriteError(t *testing.T) {
 	}
 	if bridgeErrors != 0 {
 		t.Fatalf("recorded %d first peer-close write errors", bridgeErrors)
+	}
+}
+
+func TestFinishForwardSuppressesFirstRemoteDisconnectWriteError(t *testing.T) {
+	root := filepath.Join(t.TempDir(), "capture")
+	recorder, err := capture.New(root, capture.Options{})
+	if err != nil {
+		t.Fatal(err)
+	}
+	runner := &Runner{config: Config{Recorder: recorder}}
+	var shuttingDown atomic.Bool
+	operationErr := &net.OpError{
+		Op:  "write",
+		Net: "minecraft",
+		Err: minecraft.DisconnectError("synthetic remote disconnect"),
+	}
+	err = runner.finishForward("bridge.write_error", capture.DirectionClientToServer, "upstream", "upstream-1", "write packet", operationErr, &shuttingDown)
+	var disconnect minecraft.DisconnectError
+	if !errors.As(err, &disconnect) {
+		t.Fatalf("finishForward() error = %v, want wrapped remote disconnect", err)
+	}
+	if !shuttingDown.Load() {
+		t.Fatal("finishForward() did not claim coordinated shutdown")
+	}
+	if err := recorder.Close("closed", nil); err != nil {
+		t.Fatal(err)
+	}
+	var bridgeErrors int
+	if err := capture.ScanEvents(root, func(event capture.Event) error {
+		if event.Kind == "bridge.write_error" {
+			bridgeErrors++
+		}
+		return nil
+	}); err != nil {
+		t.Fatal(err)
+	}
+	if bridgeErrors != 0 {
+		t.Fatalf("recorded %d expected remote-disconnect bridge errors", bridgeErrors)
 	}
 }

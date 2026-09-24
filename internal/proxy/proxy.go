@@ -336,7 +336,9 @@ func (r *Runner) Run(ctx context.Context) error {
 				forwardErr = forwardRequestChunkRadius(upstream, request)
 			}
 			if forwardErr != nil {
-				setCaptureFailure(failures, r.recordNetworkErrorAtHop("bridge.write_error", capture.DirectionClientToServer, "upstream", state.upstreamID, state.hop, "forward RequestChunkRadius", forwardErr))
+				if !isRemoteDisconnectError(forwardErr) {
+					setCaptureFailure(failures, r.recordNetworkErrorAtHop("bridge.write_error", capture.DirectionClientToServer, "upstream", state.upstreamID, state.hop, "forward RequestChunkRadius", forwardErr))
+				}
 			}
 		},
 		ConnectionFunc: func(conn *minecraft.Conn) {
@@ -1300,7 +1302,12 @@ func expectedShutdownError(err error, shuttingDown *atomic.Bool) bool {
 }
 
 func isExpectedTransportShutdown(err error) bool {
-	return errors.Is(err, context.Canceled) || errors.Is(err, net.ErrClosed)
+	return errors.Is(err, context.Canceled) || errors.Is(err, net.ErrClosed) || isRemoteDisconnectError(err)
+}
+
+func isRemoteDisconnectError(err error) bool {
+	var disconnect minecraft.DisconnectError
+	return errors.As(err, &disconnect)
 }
 
 func isWriteSideForwardError(kind string) bool {
