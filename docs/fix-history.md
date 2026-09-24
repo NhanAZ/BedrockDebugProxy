@@ -1140,7 +1140,15 @@ Every new entry should state the symptom, root cause, implementation commits, ev
 - Root cause: the normal RakNet close waits for the peer to acknowledge closure. Transfer following immediately probes and dials the next hop using that connection's source address, so the previous socket can still own the port.
 - Implementation: add an explicit immediate-close capability through go-raknet, gophertunnel, and the observing connection wrapper. Use it only after forwarding `Transfer`, and strengthen the loopback test to require a successful route probe.
 - Evidence and provenance: GitHub Actions run `35946284078` for commit `18e66b72daf1e01d9aa9a6ee0cfb43d68be31a52` showed `bind: address already in use` on Linux. The transfer decision and Enchanted handshake note already require reuse of the same local UDP address and client GUID. The focused loopback transfer test and go-raknet close test pass after the correction.
-- Status: automated fix is under release-candidate validation. Fresh stamped The Hive and the full six-server release matrix remain required.
+- Status: Windows CI passed; the Linux quality job found an independent network-settings metadata race tracked by FIX-0142. The transfer fix awaits the next exact-revision CI run and live validation. Fresh stamped The Hive and the full six-server release matrix remain required.
+
+### FIX-0142 - Synchronize negotiated network settings metadata
+
+- Symptom: the Linux race-enabled quality job reported concurrent access to `Conn.networkSettings` while an upstream packet reader handled `NetworkSettings` and the proxy captured per-payload connection metadata.
+- Root cause: the dial-side handler assigned the settings pointer while the public getter read and copied it without synchronization.
+- Implementation: protect both dial-side and listener-side settings publication with a read-write mutex, and return a value copy under a read lock. Add a concurrent getter and negotiation regression test.
+- Evidence and provenance: GitHub Actions run `35947403349` for commit `d8724a45feed4889e92616fdb845ec9f2d2f50fa` reported the race in `TestRunnerForwardsBidirectionalPacketsAndCapturesSession` and `TestRunPacksOnlyCapturesUpstreamWithoutListener`. The write and read paths are `Conn.handleNetworkSettings` and `Conn.NetworkSettings` in the in-tree gophertunnel fork.
+- Status: the focused concurrency test and full local race-enabled quality gate pass. Exact-revision CI remains pending. The fix changes synchronization only; packet contents and negotiation order remain unchanged.
 
 ## Ordering safety contract
 

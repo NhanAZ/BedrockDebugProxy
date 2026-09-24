@@ -24,7 +24,7 @@ GitHub Actions run `35946284078` for commit `18e66b72daf1e01d9aa9a6ee0cfb43d68be
 - Automated checks: `tools/quality.ps1 -Race` passed. The complete race-detected Go suite, build, viewer checks, module and license checks, static analysis (0 issues), and whitespace validation passed. The vulnerability scan found 0 reachable vulnerabilities, plus 4 in imported packages and 2 in required modules that the code does not appear to call.
 - Focused loopback transfer test: passed locally on Windows after the change.
 - go-raknet tests: passed locally, including the immediate-close regression test. The full vendored gophertunnel test suite also passed.
-- CI: pending for the commit containing this record.
+- CI: run `35947403349` passed Windows compatibility but failed the Linux race-enabled suite in `NetworkSettings()` metadata access. That independent synchronization fix is recorded in `AUDIT-0186-network-settings-synchronization.md`.
 - Live validation: not run. A stamped binary must complete the required The Hive baseline and release server matrix.
 
 ## Limitations and follow-up
