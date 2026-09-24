@@ -8,6 +8,7 @@ import (
 	"log/slog"
 	"reflect"
 	"strings"
+	"sync"
 	"testing"
 
 	"github.com/sandertv/gophertunnel/minecraft/protocol"
@@ -58,6 +59,31 @@ func TestHandleNetworkSettingsRetainsNegotiatedValues(t *testing.T) {
 	if !ok || !reflect.DeepEqual(&got, want) {
 		t.Fatalf("retained NetworkSettings = %#v, available=%t, want %#v", got, ok, want)
 	}
+}
+
+func TestNetworkSettingsCanBeReadDuringNegotiation(t *testing.T) {
+	conn := newLoginTestConn()
+	conn.dec = packet.NewDecoder(bytes.NewReader(nil))
+	const reads = 1000
+	var writers sync.WaitGroup
+	writers.Add(1)
+	go func() {
+		defer writers.Done()
+		for i := 0; i < reads; i++ {
+			settings := &packet.NetworkSettings{
+				CompressionThreshold: uint16(i),
+				CompressionAlgorithm: packet.CompressionAlgorithmFlate,
+			}
+			if err := conn.handleNetworkSettings(settings); err != nil {
+				t.Errorf("handle NetworkSettings: %v", err)
+				return
+			}
+		}
+	}()
+	for i := 0; i < reads; i++ {
+		conn.NetworkSettings()
+	}
+	writers.Wait()
 }
 
 func TestDeferredResourcePackOfferWaitsForClientCacheStatus(t *testing.T) {

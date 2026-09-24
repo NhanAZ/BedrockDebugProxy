@@ -98,6 +98,7 @@ type Conn struct {
 	compressionSelector  func(proto Protocol) packet.Compression
 	compressionThreshold int
 	maxDecompressedLen   int
+	networkSettingsMu    sync.RWMutex
 	networkSettings      *packet.NetworkSettings
 	readerLimits         bool
 
@@ -325,6 +326,8 @@ func (conn *Conn) Proto() Protocol {
 // sequence. The boolean is false when this connection has not completed that
 // part of negotiation yet.
 func (conn *Conn) NetworkSettings() (packet.NetworkSettings, bool) {
+	conn.networkSettingsMu.RLock()
+	defer conn.networkSettingsMu.RUnlock()
 	if conn.networkSettings == nil {
 		return packet.NetworkSettings{}, false
 	}
@@ -940,7 +943,9 @@ func (conn *Conn) handleRequestNetworkSettings(pk *packet.RequestNetworkSettings
 		CompressionThreshold: uint16(conn.compressionThreshold),
 		CompressionAlgorithm: conn.compression.EncodeCompression(),
 	}
+	conn.networkSettingsMu.Lock()
 	conn.networkSettings = settings
+	conn.networkSettingsMu.Unlock()
 	if err := conn.WritePacket(settings); err != nil {
 		return fmt.Errorf("send NetworkSettings: %w", err)
 	}
@@ -959,7 +964,9 @@ func (conn *Conn) handleNetworkSettings(pk *packet.NetworkSettings) error {
 		return fmt.Errorf("unknown compression algorithm %v", pk.CompressionAlgorithm)
 	}
 	settings := *pk
+	conn.networkSettingsMu.Lock()
 	conn.networkSettings = &settings
+	conn.networkSettingsMu.Unlock()
 	conn.encMu.Lock()
 	conn.enc.EnableCompression(alg, int(pk.CompressionThreshold))
 	conn.encMu.Unlock()
