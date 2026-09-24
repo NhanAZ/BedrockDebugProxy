@@ -1126,6 +1126,14 @@ Every new entry should state the symptom, root cause, implementation commits, ev
 - Evidence and provenance: local closed CubeCraft capture `captures/session-20260923T104518Z`, tested revision `bfc19102a312cbe5b0a18c9432c37afcbb446b24`, and `docs/research/client-batch-packet-limit.md`. The local decoder rejection is confirmed. Why the client accumulated this batch is unknown, and the capture does not establish a server kick or ban.
 - Status: focused nested gophertunnel tests and the full low-memory project quality gate pass. Fresh stamped The Hive and CubeCraft sessions are required to establish live behavior; the six-server release matrix remains separate.
 
+### FIX-0141 - Release the RakNet source address before a transfer probe
+
+- Symptom: Linux release CI could not bind the transfer route probe's local UDP address, and the following next-hop login failed on the same address.
+- Root cause: the normal RakNet close waits for the peer to acknowledge closure. Transfer following immediately probes and dials the next hop using that connection's source address, so the previous socket can still own the port.
+- Implementation: add an explicit immediate-close capability through go-raknet, gophertunnel, and the observing connection wrapper. Use it only after forwarding `Transfer`, and strengthen the loopback test to require a successful route probe.
+- Evidence and provenance: GitHub Actions run `35946284078` for commit `18e66b72daf1e01d9aa9a6ee0cfb43d68be31a52` showed `bind: address already in use` on Linux. The transfer decision and Enchanted handshake note already require reuse of the same local UDP address and client GUID. The focused loopback transfer test and go-raknet close test pass after the correction.
+- Status: automated fix is under release-candidate validation. Fresh stamped The Hive and the full six-server release matrix remain required.
+
 ## Ordering safety contract
 
 The deferred-packet change is deliberately narrow. `expectedIDs` remains the only authority for what the current login state accepts. The queue scan selects the earliest packet that is currently expected, leaves packets for later states queued, and never mutates or reorders bytes on the wire. The regression tests cover canonical resource-pack order, featured early `ResourcePacksInfo`, a later-phase packet queued ahead of the current phase, and all six permutations of the three login packets.

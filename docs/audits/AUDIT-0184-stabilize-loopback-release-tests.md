@@ -22,7 +22,7 @@ GitHub Actions run `35945153597` for candidate `1b8619945cd83cc641f8d066f4ffe630
 ## Validation
 
 - Automated checks: the repeated focused tests and focused race test passed. `tools/quality.ps1 -Race` passed, including the full race-detected Go suite, build, static analysis with 0 issues, vulnerability scan with 0 reachable vulnerabilities, viewer checks, module and license checks, and whitespace validation. The scan also reported 4 findings in imported packages and 2 in required modules that the code does not appear to call.
-- CI: pending for the commit containing this record.
+- CI: run `35946284078` passed Windows compatibility but failed the Linux quality job on the transfer test because the previous RakNet socket still held the source UDP address. The focused follow-up is recorded in `AUDIT-0185-release-transfer-source-address.md`.
 - Live validation: no runtime impact; existing release live-validation requirements remain separate.
 
 ## Limitations and follow-up

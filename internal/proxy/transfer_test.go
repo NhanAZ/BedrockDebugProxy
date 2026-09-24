@@ -203,7 +203,7 @@ func TestRunnerFollowsTransferAndAcceptsNextHop(t *testing.T) {
 	if err != nil || len(verification.Issues) != 0 {
 		t.Fatalf("capture verification = %+v, error = %v", verification, err)
 	}
-	var transferSeen, rewriteSeen, routeProbeSeen, hopTwo, postTransferRequestSeen bool
+	var transferSeen, rewriteSeen, routeProbeSeen, routeProbeSucceeded, hopTwo, postTransferRequestSeen bool
 	var transferSequence uint64
 	var postTransferRequestConnectionID string
 	if err := capture.ScanEvents(root, func(event capture.Event) error {
@@ -216,6 +216,7 @@ func TestRunnerFollowsTransferAndAcceptsNextHop(t *testing.T) {
 		}
 		if event.Kind == "transfer.route_probe" && event.Hop == 2 {
 			routeProbeSeen = true
+			routeProbeSucceeded = event.Error == nil
 		}
 		if event.Hop == 2 && event.Kind == "session.spawned" {
 			hopTwo = true
@@ -228,8 +229,8 @@ func TestRunnerFollowsTransferAndAcceptsNextHop(t *testing.T) {
 	}); err != nil {
 		t.Fatal(err)
 	}
-	if !transferSeen || !rewriteSeen || !routeProbeSeen || !hopTwo || !postTransferRequestSeen || postTransferRequestConnectionID != "downstream-1" {
-		t.Fatalf("transfer evidence = transfer %v, rewrite %v, route probe %v, hop2 %v, post-transfer request hop1 %v connection %q", transferSeen, rewriteSeen, routeProbeSeen, hopTwo, postTransferRequestSeen, postTransferRequestConnectionID)
+	if !transferSeen || !rewriteSeen || !routeProbeSeen || !routeProbeSucceeded || !hopTwo || !postTransferRequestSeen || postTransferRequestConnectionID != "downstream-1" {
+		t.Fatalf("transfer evidence = transfer %v, rewrite %v, route probe %v (success %v), hop2 %v, post-transfer request hop1 %v connection %q", transferSeen, rewriteSeen, routeProbeSeen, routeProbeSucceeded, hopTwo, postTransferRequestSeen, postTransferRequestConnectionID)
 	}
 	for i := 0; i < 2; i++ {
 		select {

@@ -38,6 +38,7 @@ type recordingPacketConn struct {
 	mu     sync.Mutex
 	writes [][]byte
 	local  net.Addr
+	closed bool
 }
 
 func (c *recordingPacketConn) ReadFrom([]byte) (int, net.Addr, error) { return 0, nil, net.ErrClosed }
@@ -49,7 +50,12 @@ func (c *recordingPacketConn) WriteTo(b []byte, _ net.Addr) (int, error) {
 	return len(b), nil
 }
 
-func (c *recordingPacketConn) Close() error                     { return nil }
+func (c *recordingPacketConn) Close() error {
+	c.mu.Lock()
+	c.closed = true
+	c.mu.Unlock()
+	return nil
+}
 func (c *recordingPacketConn) LocalAddr() net.Addr              { return c.local }
 func (c *recordingPacketConn) SetDeadline(time.Time) error      { return nil }
 func (c *recordingPacketConn) SetReadDeadline(time.Time) error  { return nil }
@@ -170,4 +176,25 @@ func (*cookieRefreshConn) SetWriteDeadline(time.Time) error { return nil }
 func testUDPAddr(address string) *net.UDPAddr {
 	addr, _ := net.ResolveUDPAddr("udp", address)
 	return addr
+}
+
+func TestConnCloseImmediatelyClosesPacketConn(t *testing.T) {
+	packetConn := &recordingPacketConn{local: testUDPAddr("192.0.2.20:50000")}
+	conn := newConn(packetConn, testUDPAddr("192.0.2.10:19132"), 1200, dialerConnectionHandler{})
+	defer conn.cancelFunc()
+	close(conn.connected)
+
+	conn.CloseImmediately()
+
+	select {
+	case <-conn.Context().Done():
+	default:
+		t.Fatal("transport context remained open after immediate close")
+	}
+	packetConn.mu.Lock()
+	closed := packetConn.closed
+	packetConn.mu.Unlock()
+	if !closed {
+		t.Fatal("underlying packet connection remained open after immediate close")
+	}
 }

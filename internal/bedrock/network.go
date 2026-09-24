@@ -334,6 +334,21 @@ func (c *observedConn) Close() error {
 	return c.closeErr
 }
 
+func (c *observedConn) CloseImmediately() error {
+	c.closeOnce.Do(func() {
+		if closer, ok := c.Conn.(interface{ CloseImmediately() error }); ok {
+			transportErr := closer.CloseImmediately()
+			captureErr := c.network.recordConnection("transport.connection_close", c.Conn, transportErr)
+			c.closeErr = errors.Join(transportErr, captureErr)
+			return
+		}
+		transportErr := c.Conn.Close()
+		captureErr := c.network.recordConnection("transport.connection_close", c.Conn, transportErr)
+		c.closeErr = errors.Join(transportErr, captureErr)
+	})
+	return c.closeErr
+}
+
 func (c *observedConn) Latency() time.Duration {
 	if source, ok := c.Conn.(interface{ Latency() time.Duration }); ok {
 		return source.Latency()
