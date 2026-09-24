@@ -41,6 +41,80 @@ func TestUpstreamDialTimeoutErrorPreservesCause(t *testing.T) {
 	}
 }
 
+func TestConnectUpstreamBoundsAddressDiscoveryPing(t *testing.T) {
+	tests := []struct {
+		name          string
+		transferRoute bool
+		maximum       time.Duration
+	}{
+		{name: "initial dial", maximum: upstreamDialPingTimeout},
+		{name: "transfer dial", transferRoute: true, maximum: transferRouteProbeTimeout},
+	}
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			root := filepath.Join(t.TempDir(), "capture")
+			recorder, err := capture.New(root, capture.Options{})
+			if err != nil {
+				t.Fatal(err)
+			}
+			failures := bedrock.NewFailureSink(nil)
+			transport := &pingDeadlineRecordingNetwork{}
+			network := bedrock.Network{
+				Transport:    transport,
+				Recorder:     recorder,
+				Failures:     failures,
+				SessionID:    sessionID,
+				ConnectionID: "upstream-1",
+				Channel:      "upstream",
+				Hop:          1,
+			}
+			observer := bedrock.NewObserver(recorder, failures, sessionID, 1, nil)
+			runner := &Runner{config: Config{Recorder: recorder}}
+			_, _, err = runner.connectUpstream(
+				context.Background(), "example.test:19132", network, observer,
+				"upstream-1", 1, nil, newLiveReporter(io.Discard), login.IdentityData{}, login.ClientData{},
+				false, test.transferRoute, false, false, false, nil,
+			)
+			if err == nil {
+				t.Fatal("connectUpstream() returned nil after the test transport rejected the dial")
+			}
+			if !transport.dialCalled {
+				t.Fatal("upstream dial did not continue after the optional ping failed")
+			}
+			if !transport.pingHasDeadline {
+				t.Fatal("address-discovery ping context has no deadline")
+			}
+			remaining := time.Until(transport.pingDeadline)
+			if remaining <= 0 || remaining > test.maximum {
+				t.Fatalf("address-discovery ping deadline has %s remaining, want at most %s", remaining, test.maximum)
+			}
+			if err := recorder.Close("closed", nil); err != nil {
+				t.Fatal(err)
+			}
+		})
+	}
+}
+
+type pingDeadlineRecordingNetwork struct {
+	dialCalled      bool
+	pingDeadline    time.Time
+	pingHasDeadline bool
+}
+
+func (n *pingDeadlineRecordingNetwork) DialContext(context.Context, string) (net.Conn, error) {
+	n.dialCalled = true
+	return nil, errors.New("test transport stopped after ping")
+}
+
+func (n *pingDeadlineRecordingNetwork) PingContext(ctx context.Context, _ string) ([]byte, error) {
+	n.pingDeadline, n.pingHasDeadline = ctx.Deadline()
+	return nil, context.DeadlineExceeded
+}
+
+func (*pingDeadlineRecordingNetwork) Listen(string) (minecraft.NetworkListener, error) {
+	return nil, errors.New("test transport does not listen")
+}
+
 func TestTransferRouteProbeCapturesPingResponse(t *testing.T) {
 	root := filepath.Join(t.TempDir(), "capture")
 	recorder, err := capture.New(root, capture.Options{})

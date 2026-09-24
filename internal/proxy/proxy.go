@@ -29,6 +29,7 @@ const (
 	sessionID                 = "session-1"
 	transferGracePeriod       = 5 * time.Second
 	transferRouteProbeTimeout = 750 * time.Millisecond
+	upstreamDialPingTimeout   = 5 * time.Second
 	// A resource-pack exchange can legitimately take many minutes on a
 	// featured experience. Galaxite advertises 460 chunks and the observed
 	// server pace delivered only 186 chunks in five minutes while still making
@@ -878,22 +879,23 @@ func (r *Runner) connectUpstream(ctx context.Context, target string, network bed
 	defer cancelDial()
 	urlResourcePacks := newURLResourcePackCache(dialCtx)
 	recordPacket := observer.PacketFunc("upstream", connectionID)
+	pingTimeout := upstreamDialPingTimeout
+	if transferRoute {
+		pingTimeout = transferRouteProbeTimeout
+	}
 	dialer := minecraft.Dialer{
 		TokenSource:       r.config.TokenSource,
 		IdentityData:      identityData,
 		ClientData:        clientData,
 		EnableClientCache: enableClientCache,
 		ErrorLog:          logger,
-		// A pre-probe can happen several seconds before Minecraft reconnects.
-		// Always perform a fresh bounded ping on the actual hop-2 dial so the
-		// featured-experience route is active when RakNet starts its handshake.
+		// The optional address-discovery ping must not inherit the 15-minute
+		// resource-pack dial deadline. RakNet documents that PingContext can
+		// otherwise wait indefinitely after a lost UDP packet.
 		SkipPing: false,
-		PingTimeout: func() time.Duration {
-			if transferRoute {
-				return transferRouteProbeTimeout
-			}
-			return 0
-		}(),
+		// A pre-probe can happen several seconds before Minecraft reconnects.
+		// Refresh the route with the existing short bound on transfer dials.
+		PingTimeout: pingTimeout,
 		PacketFunc: func(header packet.Header, payload []byte, src, dst net.Addr) {
 			recordPacket(header, payload, src, dst)
 			urlResourcePacks.Observe(header, payload)
