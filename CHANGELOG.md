@@ -20,6 +20,7 @@ Detailed rationale remains in [`docs/audits/`](docs/audits/).
 - Authenticated runs now print the selected local account label and store it in the capture manifest so the viewer can show the same account in its overview header. The label is local metadata, not token identity verification.
 - Follow live now selects the newest matching event after each live refresh, scrolls only the event table, and keeps the current Details content while the new event loads so packet-heavy sessions do not collapse or jump the page.
 - Large capture verification now reports scanned event and blob counts to the terminal and the live viewer while the closed capture is being checked, so a multi-minute verification is visibly active.
+- Writes that fail because the remote peer already sent a Bedrock `Disconnect` are treated as connection termination during shutdown. The raw packet and session-close diagnostics remain available, while unrelated write failures still block a passing validation report.
 - LAN listener examples now use an explicit `<LAN_IP>` placeholder instead of an operator-specific address.
 - The quality gate now offers `-LowMemory` to bound local Go worker and package parallelism without changing the default CI profile.
 - The owner-controlled ProxyFingerprint parity tool now compares lifecycle milestone timing in addition to identity, packet-order, and packet-count observations.
