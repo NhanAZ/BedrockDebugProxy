@@ -142,7 +142,7 @@ func TestRunnerFollowsTransferAndAcceptsNextHop(t *testing.T) {
 	dial := func() *minecraft.Conn {
 		client, dialErr := (minecraft.Dialer{IdentityData: login.IdentityData{Identity: "11111111-1111-1111-1111-111111111111", DisplayName: "TransferInt"}, ClientData: integrationClientData()}).DialContext(ctx, "raknet", proxyAddress)
 		if dialErr != nil {
-			t.Logf("proxy output: %s", output.buffer.String())
+			t.Logf("proxy output: %s", output.String())
 			t.Fatalf("dial proxy: %v", dialErr)
 		}
 		return client
@@ -156,7 +156,7 @@ func TestRunnerFollowsTransferAndAcceptsNextHop(t *testing.T) {
 	for {
 		value, readErr := client.ReadPacket()
 		if readErr != nil {
-			t.Logf("proxy output after transfer read: %s", output.buffer.String())
+			t.Logf("proxy output after transfer read: %s", output.String())
 			_ = client.Close()
 			t.Fatalf("read transfer: %v", readErr)
 		}
@@ -220,7 +220,7 @@ func TestRunnerFollowsTransferAndAcceptsNextHop(t *testing.T) {
 		if event.Hop == 2 && event.Kind == "session.spawned" {
 			hopTwo = true
 		}
-		if event.Kind == "packet.raw" && event.Packet != nil && event.Packet.ID == packet.IDRequestChunkRadius && event.Direction == capture.DirectionClientToServer && event.Channel == "downstream" && event.Sequence > transferSequence {
+		if !postTransferRequestSeen && event.Kind == "packet.raw" && event.Packet != nil && event.Packet.ID == packet.IDRequestChunkRadius && event.Direction == capture.DirectionClientToServer && event.Channel == "downstream" && event.Sequence > transferSequence {
 			postTransferRequestSeen = true
 			postTransferRequestConnectionID = event.ConnectionID
 		}

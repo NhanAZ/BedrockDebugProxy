@@ -470,6 +470,12 @@ func (w *listeningAddressWriter) Write(p []byte) (int, error) {
 	return len(p), nil
 }
 
+func (w *listeningAddressWriter) String() string {
+	w.mu.Lock()
+	defer w.mu.Unlock()
+	return w.buffer.String()
+}
+
 func TestRunnerStopsCleanlyWhenCancelledBeforeAccept(t *testing.T) {
 	root := filepath.Join(t.TempDir(), "capture")
 	recorder, err := capture.New(root, capture.Options{})
@@ -1470,7 +1476,16 @@ func TestRunnerPreservesMixedResourcePackOfferOrder(t *testing.T) {
 			return
 		}
 		defer func() { _ = serverConn.Close() }()
-		serverErrors <- serverConn.StartGame(mixedResourcePackGameData())
+		if err := serverConn.StartGame(mixedResourcePackGameData()); err != nil {
+			serverErrors <- err
+			return
+		}
+		for {
+			if _, err := serverConn.ReadPacket(); err != nil {
+				serverErrors <- nil
+				return
+			}
+		}
 	}()
 
 	root := filepath.Join(t.TempDir(), "capture")
@@ -1519,9 +1534,7 @@ func TestRunnerPreservesMixedResourcePackOfferOrder(t *testing.T) {
 		},
 	}).DialContext(ctx, "raknet", proxyAddress)
 	if err != nil {
-		output.mu.Lock()
-		proxyOutput := output.buffer.String()
-		output.mu.Unlock()
+		proxyOutput := output.String()
 		select {
 		case serverErr := <-serverErrors:
 			t.Fatalf("%v; upstream error: %v; proxy output: %s; capture: %s", err, serverErr, proxyOutput, root)
