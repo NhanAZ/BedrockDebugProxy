@@ -68,6 +68,7 @@ Detailed rationale remains in [`docs/audits/`](docs/audits/).
 - Terminating bridges now retain and reuse raw `DimensionData` and `ItemRegistry` startup packets when the downstream protocol matches, avoiding wire differences caused by typed re-serialization of NBT maps.
 - Terminating bridges now forward each observed downstream `RequestChunkRadius` to the paired upstream connection while retaining the existing 16/16 initial fallback.
 - Chunk-radius forwarding failures are now recorded as capture bridge errors instead of being silently ignored when the paired upstream connection is unavailable or closed.
+- Transfer-following now closes the previous upstream RakNet socket before probing and dialing the next hop with its reused UDP source address, preventing a source-port bind conflict while preserving ordinary close behavior.
 - Malformed observed chunk-radius requests now record packet decode errors with typed packet context while retaining their raw evidence.
 - Chunk-radius decode errors now retain sender and target sub-client header context in addition to the raw packet.
 - Same-protocol raw-forward decode failures now appear as packet decode errors instead of generic bridge read errors.

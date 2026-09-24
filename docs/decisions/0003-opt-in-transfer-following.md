@@ -18,6 +18,7 @@ The default remains non-mutating. Without the flag, the original `Transfer` is f
 
 - The local listener address sent to the client must be a concrete, reachable host and port. Wildcard addresses such as `0.0.0.0:19132` are rejected for the rewritten packet.
 - The old client connection is retained only long enough for the reliable transfer packet and reconnect handshake. A bounded grace period prevents a stalled client from holding the single-player listener forever.
+- After forwarding a transfer, the old upstream RakNet socket is closed immediately so the route probe and next hop can reuse its source UDP address without waiting for the peer's close acknowledgement. Ordinary connection closes keep the transport's normal acknowledgement behavior.
 - A session follows at most 64 hops. The limit prevents an accidental transfer loop from creating unbounded connections and capture output.
 - The original upstream packet and payload remain authoritative evidence. The rewritten downstream packet is separately observable through the downstream packet hook.
 - The feature does not follow arbitrary redirects outside the Bedrock `Transfer` packet or change any other gameplay packet.

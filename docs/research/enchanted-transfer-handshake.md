@@ -43,7 +43,7 @@ confirms that hop 2 completes its separate resource-pack exchange.
 
 The fix preserves the state that can matter to a flow-hashed featured-experience edge without changing gameplay packets.
 
-1. The upstream RakNet local address and client GUID observed on the first hop are carried into the route probe and next-hop dial when the transport exposes them.
+1. The upstream RakNet local address and client GUID observed on the first hop are carried into the route probe and next-hop dial when the transport exposes them. After forwarding `Transfer`, the old upstream socket is closed immediately so the same local UDP address is free for the probe and next hop; ordinary connection closes retain their acknowledgement behavior.
 2. The probe runs before the client reconnects. The actual next-hop dial still performs a fresh bounded status ping so that a stale probe is not treated as proof that the later handshake will work.
 3. Transfer handshakes use a 1200-byte maximum MTU. This is a targeted interoperability bound for edges that drop fragmented 1492-byte discovery probes; it is not a general claim about the Internet path MTU.
 4. The local go-raknet adapter refreshes the security cookie when an edge returns a new `OpenConnectionReply1` and refreshes the cookie during repeated `Request2` attempts. The change keeps the existing RakNet state machine and does not disable authentication or encryption.

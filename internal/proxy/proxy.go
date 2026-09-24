@@ -793,7 +793,9 @@ func (r *Runner) runHop(runCtx context.Context, localAddress string, state *hopS
 	if r.config.FollowTransfers && errors.As(bridgeErr, &transfer) {
 		keepClientOpen = true
 		shuttingDown.Store(true)
-		_ = serverConn.Close()
+		// The next hop reuses this RakNet source address. Release it now instead
+		// of waiting for the peer's reliable close acknowledgement.
+		_ = serverConn.CloseImmediately()
 		secondErr := <-first
 		if err := failures.Err(); err != nil {
 			return fmt.Errorf("capture hook failed: %w", err)

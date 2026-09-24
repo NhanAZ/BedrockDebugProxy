@@ -620,6 +620,13 @@ func (conn *Conn) Close() error {
 	return conn.close(net.ErrClosed)
 }
 
+// CloseImmediately closes the Conn and its underlying connection after
+// flushing pending packets. Transports that expose CloseImmediately are asked
+// to close without waiting for their peer to acknowledge the close.
+func (conn *Conn) CloseImmediately() error {
+	return conn.closeImmediately(net.ErrClosed)
+}
+
 // LocalAddr returns the local address of the underlying connection.
 func (conn *Conn) LocalAddr() net.Addr {
 	return conn.conn.LocalAddr()
@@ -2125,11 +2132,23 @@ func (conn *Conn) expect(packetIDs ...uint32) {
 }
 
 func (conn *Conn) close(cause error) error {
+	return conn.closeWithTransport(cause, false)
+}
+
+func (conn *Conn) closeImmediately(cause error) error {
+	return conn.closeWithTransport(cause, true)
+}
+
+func (conn *Conn) closeWithTransport(cause error, immediately bool) error {
 	var err error
 	conn.once.Do(func() {
 		err = conn.Flush()
 		conn.cancelFunc(cause)
-		_ = conn.conn.Close()
+		if closer, ok := conn.conn.(interface{ CloseImmediately() error }); immediately && ok {
+			err = errors.Join(err, closer.CloseImmediately())
+		} else {
+			_ = conn.conn.Close()
+		}
 	})
 	return err
 }

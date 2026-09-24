@@ -338,6 +338,13 @@ func (conn *Conn) Close() error {
 	return nil
 }
 
+// CloseImmediately sends a disconnect notification and closes the underlying
+// UDP connection without waiting for the peer to acknowledge the close.
+func (conn *Conn) CloseImmediately() error {
+	conn.closeImmediately()
+	return nil
+}
+
 // Context returns the connection's context. The context is canceled when
 // the connection is closed, allowing for cancellation of operations
 // that are tied to the lifecycle of the connection.
