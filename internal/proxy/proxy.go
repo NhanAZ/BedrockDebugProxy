@@ -40,6 +40,11 @@ const (
 	// single common UDP datagram while leaving initial connections unchanged.
 	transferRakNetMaxMTU = 1200
 	maxFollowedHops      = 64
+	// The default downstream decoder cap is 812 packets per batch. Real clients
+	// may deliver a larger accumulated batch after a stall, so keep a higher but
+	// finite cap for the proxy listener. The decoder still bounds packet count
+	// and retains its existing decompressed-payload limit.
+	maxDownstreamBatchPackets = 16_384
 )
 
 type upstreamSlot struct {
@@ -302,6 +307,7 @@ func (r *Runner) Run(ctx context.Context) error {
 		TexturePacksRequired:   true,
 		AllowUnknownPackets:    true,
 		AllowInvalidPackets:    true,
+		MaxBatchPackets:        maxDownstreamBatchPackets,
 		DeferResourcePackOfferUntilClientCacheStatus: true,
 		StatusProvider:     minecraft.NewStatusProvider("BedrockDebugProxy", r.config.UpstreamAddress),
 		MaxDecompressedLen: r.config.MaxDecompressedBytes,

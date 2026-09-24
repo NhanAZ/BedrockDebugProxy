@@ -119,6 +119,7 @@ Detailed rationale remains in [`docs/audits/`](docs/audits/).
 
 ### Fixed
 
+- The proxy listener now accepts client batches of up to 16,384 packets instead of closing a session at the vendored decoder's 812-packet default. Other listeners retain the default, and the proxy still enforces a finite batch bound.
 - Fixed the page-level footer overlapping the viewer inspector when decoded details extend beyond the initial viewport. The footer now stays below the complete workspace, including Blob bytes.
 
 ## [0.2.1] - 2026-09-17

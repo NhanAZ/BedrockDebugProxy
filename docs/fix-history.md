@@ -1126,6 +1126,14 @@ Every new entry should state the symptom, root cause, implementation commits, ev
 - Evidence and provenance: captures `captures/session-20260923T044137Z` at revision `1ede568486768047acc5d52b721f595b50907fcc` and `captures/session-20260922T153826Z` at revision `29fbfd8e0664be20cb3929f5916f961e4e07b66c`; [`docs/research/resource-pack-pipeline.md`](research/resource-pack-pipeline.md); and the bounded client request window described by [gophertunnel PR #509](https://github.com/Sandertv/gophertunnel/pull/509). The request burst is confirmed. The server-side reason for its low response count remains inferred.
 - Status: focused tests verify that multiple packs share the cap and that accepted responses replenish it. Exact-revision The Hive and Galaxite live validation remain pending.
 
+### FIX-0140 - Bound larger client packet batches
+
+- Symptom: the CubeCraft session reached spawn, then closed after the downstream listener reported `decode batch: number of packets exceeds max=812` for a client-originating batch.
+- Root cause: the vendored decoder's default 812-packet limit is enabled for listener connections. The proxy's client-facing listener inherited that server-oriented cap, so one accumulated client batch above 812 was rejected before normal forwarding.
+- Implementation: make the decoder's positive packet-count limit configurable and expose it through `minecraft.ListenConfig`. Keep 812 as the default and retain the listener's finite check. Set only the proxy's client-facing listener to 16,384 packets per batch; do not change dialer behavior or packet bytes.
+- Evidence and provenance: local closed CubeCraft capture `captures/session-20260923T104518Z`, tested revision `bfc19102a312cbe5b0a18c9432c37afcbb446b24`, and `docs/research/client-batch-packet-limit.md`. The local decoder rejection is confirmed. Why the client accumulated this batch is unknown, and the capture does not establish a server kick or ban.
+- Status: focused nested gophertunnel tests and the full low-memory project quality gate pass. Fresh stamped The Hive and CubeCraft sessions are required to establish live behavior; the six-server release matrix remains separate.
+
 ## Ordering safety contract
 
 The deferred-packet change is deliberately narrow. `expectedIDs` remains the only authority for what the current login state accepts. The queue scan selects the earliest packet that is currently expected, leaves packets for later states queued, and never mutates or reorders bytes on the wire. The regression tests cover canonical resource-pack order, featured early `ResourcePacksInfo`, a later-phase packet queued ahead of the current phase, and all six permutations of the three login packets.
