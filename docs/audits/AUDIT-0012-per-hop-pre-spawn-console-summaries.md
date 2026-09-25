@@ -17,7 +17,7 @@ The change is limited to live reporter hop state in `internal/proxy/live_reporte
 
 ## Evidence and provenance
 
-Enchanted capture `captures/session-20260916T044421Z` recorded hop 2 resource-pack packets and `session.spawned`, while the corresponding terminal run did not print pre-spawn packet summaries. The capture observer already retained these raw events, so this is an operator-observability fix and does not change packet bytes, ordering, resource-pack delivery, or transfer routing. No external source code was copied.
+Enchanted capture [captures/session-20260916T044421Z](https://github.com/BedrockDebugProxy-Captures/session-20260916T044421Z/releases/tag/capture-archive) recorded hop 2 resource-pack packets and `session.spawned`, while the corresponding terminal run did not print pre-spawn packet summaries. The capture observer already retained these raw events, so this is an operator-observability fix and does not change packet bytes, ordering, resource-pack delivery, or transfer routing. No external source code was copied.
 
 ## Automated validation
 

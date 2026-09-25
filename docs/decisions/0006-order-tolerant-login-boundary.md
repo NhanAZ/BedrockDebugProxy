@@ -37,7 +37,7 @@ boundary where gophertunnel must consume packets to establish the connection.
 
 ## Evidence and validation
 
-- Failed Enchanted capture `captures/session-20260914T105050Z` at revision `96d8a01201d48b4a069c0e649374452a12b9f207`.
+- Failed Enchanted capture [captures/session-20260914T105050Z](https://github.com/BedrockDebugProxy-Captures/session-20260914T105050Z/releases/tag/capture-archive) at revision `96d8a01201d48b4a069c0e649374452a12b9f207`.
 - Historical login-order evidence in [`docs/research/cubecraft-gophertunnel-discord-audit.md`](../research/cubecraft-gophertunnel-discord-audit.md).
 - Regression tests in `third_party/gophertunnel/minecraft/conn_featured_experience_test.go` cover all resource-pack login permutations and preserve later-phase packets until their state.
 - Exact-revision live validation for the latest queue implementation remains pending. The required next baseline is The Hive, followed by the affected Enchanted flow and the release matrix.

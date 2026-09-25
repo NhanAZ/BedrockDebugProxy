@@ -12,7 +12,7 @@ Clarify why a deferred login packet can have an early `packet.raw` event and a l
 
 ## Evidence and provenance
 
-- Owner-controlled capture `captures/session-20260921T122228Z` at revision `d272805fd571525cca6f7473b166fb1129bafd48` records raw login packets before `session.spawned` and their decoded views after the bridge consumes the deferred queue.
+- Owner-controlled capture [captures/session-20260921T122228Z](https://github.com/BedrockDebugProxy-Captures/session-20260921T122228Z/releases/tag/capture-archive) at revision `d272805fd571525cca6f7473b166fb1129bafd48` records raw login packets before `session.spawned` and their decoded views after the bridge consumes the deferred queue.
 - The in-tree gophertunnel `packet.go`, `conn.go`, and `raw_packet.go` source establishes that the packet hook runs before login decode and that deferred packets are returned later by `ReadPacketDataWithTime`.
 - The recorder assigns one ordered submission sequence across concurrent observer and bridge callbacks, so adjacent sequence numbers are not a raw-to-decoded pairing contract.
 

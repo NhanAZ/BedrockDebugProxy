@@ -19,8 +19,8 @@ The reported screenshot showed values such as `#934...` because the fixed 62-pix
 ## Validation
 
 - Automated checks: `git diff --check`, the project quality gate, viewer HTTP tests, JavaScript syntax validation, and a rebuilt binary.
-- Live validation: browser smoke on a clean committed viewer using the Hive capture `session-20260920T135412Z`; no new Hive connection is required or authorized.
-- Capture or report: the local Hive capture remains unchanged and sensitive.
+- Live validation: browser smoke on a clean committed viewer using the Hive capture [session-20260920T135412Z](https://github.com/BedrockDebugProxy-Captures/session-20260920T135412Z/releases/tag/capture-archive); no new Hive connection is required or authorized.
+- Capture or report: the Hive capture is archived privately and remains sensitive.
 
 ## Limitations and follow-up
 

@@ -38,5 +38,5 @@ Protocol conversion and intentional transfer-address rewriting still use the typ
 ## Evidence and provenance
 
 - Sandertv gophertunnel `v1.61.0`, commit [`283a5a97dfe65da94bcc0b401807f6aefa9e72ee`](https://github.com/Sandertv/gophertunnel/tree/283a5a97dfe65da94bcc0b401807f6aefa9e72ee), MIT. The packet hook and connection decoder establish the raw packet boundary and the internal disconnect handling.
-- BedrockDebugProxy capture `session-20260914T092052Z`, capture ID `6c6ab952-e3f0-4a8c-a4f5-0ca31e16a006`, generated from revision `2818a674915109993e994de5953c83ff50d3b165`. The session was closed and verified with 17,697 events and 5,689 blobs; its final upstream error was the server disconnect described above.
+- BedrockDebugProxy capture [session-20260914T092052Z](https://github.com/BedrockDebugProxy-Captures/session-20260914T092052Z/releases/tag/capture-archive), capture ID `6c6ab952-e3f0-4a8c-a4f5-0ca31e16a006`, generated from revision `2818a674915109993e994de5953c83ff50d3b165`. The session was closed and verified with 17,697 events and 5,689 blobs; its final upstream error was the server disconnect described above.
 - The raw adapter and bridge change are independent BedrockDebugProxy code. No source was copied from `bedrock-tool/bedrocktool` or another external repository.

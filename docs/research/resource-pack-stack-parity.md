@@ -6,7 +6,7 @@ Does the terminating bridge send the same resource-pack stack that the upstream 
 
 ## Confirmed observation
 
-The upstream Hive capture `captures/session-20260920T135412Z` recorded `ResourcePackStack` packet ID 7 with a 1,449-byte payload. The downstream copy was 1,446 bytes. Decoding the payload prefix shows that the upstream stack advertised 24 texture-pack entries while the old listener-generated stack advertised 32. The additional entries came from gophertunnel's built-in exempted-pack list, not from the upstream offer.
+The upstream Hive capture [captures/session-20260920T135412Z](https://github.com/BedrockDebugProxy-Captures/session-20260920T135412Z/releases/tag/capture-archive) recorded `ResourcePackStack` packet ID 7 with a 1,449-byte payload. The downstream copy was 1,446 bytes. Decoding the payload prefix shows that the upstream stack advertised 24 texture-pack entries while the old listener-generated stack advertised 32. The additional entries came from gophertunnel's built-in exempted-pack list, not from the upstream offer.
 
 This was a resource-pack protocol-boundary discrepancy. It did not change gameplay packet bytes, but it meant the client did not receive the same stack metadata and ordering as a direct client.
 
@@ -22,7 +22,7 @@ Before reusing a retained stack, the listener now decodes and compares the field
 
 ## Evidence and provenance
 
-- Affected capture: local Hive capture `captures/session-20260920T135412Z`, sequences 979 and 1,183, packet ID 7. The capture remains local sensitive evidence and is not committed.
+- Affected capture: Hive capture [captures/session-20260920T135412Z](https://github.com/BedrockDebugProxy-Captures/session-20260920T135412Z/releases/tag/capture-archive), sequences 979 and 1,183, packet ID 7. Its archive is stored privately and remains sensitive.
 - Packet definition: vendored gophertunnel `minecraft/protocol/packet/resource_pack_stack.go`, which serializes the required flag, stack entries, base game version, experiments, and remaining flags in that order.
 - Upstream reference: [gophertunnel ResourcePackStack](https://github.com/Sandertv/gophertunnel/blob/7a556a07335b663744b50d38062636ad8283f314/minecraft/protocol/packet/resource_pack_stack.go), reviewed 2026-09-21.
 

@@ -15,7 +15,7 @@ Preserve the exact upstream `ResourcePackStack` packet across a terminating brid
 ## Evidence and provenance
 
 - Local research note: [`docs/research/resource-pack-stack-parity.md`](../research/resource-pack-stack-parity.md).
-- Existing local Hive capture evidence: `captures/session-20260920T135412Z`, sequences 979 and 1,183. The capture remains local sensitive evidence and is not committed.
+- Existing Hive capture evidence: [captures/session-20260920T135412Z](https://github.com/BedrockDebugProxy-Captures/session-20260920T135412Z/releases/tag/capture-archive), sequences 979 and 1,183. Its archive is stored privately and remains sensitive.
 - Packet serializer: vendored gophertunnel `minecraft/protocol/packet/resource_pack_stack.go` at the repository-pinned source revision.
 - The change does not retrieve, decrypt, or redistribute resource-pack content. The downstream offer still uses archive-backed URLs owned by the local bridge.
 

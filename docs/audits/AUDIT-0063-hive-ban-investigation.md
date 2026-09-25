@@ -14,13 +14,13 @@ Add a research note for the affected and comparison captures, link the investiga
 
 ## Evidence and provenance
 
-The note records closed local captures `session-20260920T135412Z` and `session-20260917T034859Z`, the 23-capture search for `SrDuck84`, the runtime-path comparison between their generator commits, Hive's official VPN/proxy and client-modification policies, Hive's supported-version page and public changelog, and Mojang's protocol changelog. Sensitive identifiers and payloads are intentionally omitted. Confirmed facts are separated from hypotheses and unresolved questions.
+The note records the closed captures [session-20260920T135412Z](https://github.com/BedrockDebugProxy-Captures/session-20260920T135412Z/releases/tag/capture-archive) and [session-20260917T034859Z](https://github.com/BedrockDebugProxy-Captures/session-20260917T034859Z/releases/tag/capture-archive), the 23-capture search for `SrDuck84`, the runtime-path comparison between their generator commits, Hive's official VPN/proxy and client-modification policies, Hive's supported-version page and public changelog, and Mojang's protocol changelog. Sensitive identifiers and payloads are intentionally omitted. Confirmed facts are separated from hypotheses and unresolved questions.
 
 ## Validation
 
 - Automated checks: `git diff --check` and targeted documentation searches are required before commit.
 - Live validation: `not_observed`. This documentation change does not authorize a new Hive connection.
-- Capture or report: existing local captures are cited by session name and remain ignored sensitive evidence.
+- Capture or report: the cited captures are stored in private capture repositories and remain sensitive evidence.
 
 ## Limitations and follow-up
 

@@ -8,7 +8,7 @@ Does the terminating bridge expose the compression and client-throttle settings 
 
 The Bedrock `NetworkSettings` packet carries the compression threshold, compression algorithm, and client-throttle fields that control later packet batching and compression. The vendored gophertunnel listener creates this packet from its `ListenConfig`, while a dialled connection receives the packet from the upstream server during login.
 
-The owner-controlled capture `captures/session-20260921T003441Z` recorded different settings on the two sides before the startup parity fixes. The upstream payload began with `01-00-00-00`, which decodes to a compression threshold of `1` and algorithm `0`. The downstream payload began with `00-01-00-00`, which decodes to a threshold of `256` and algorithm `0`. The remaining fields in both payloads were zero. This is a confirmed wire difference, not a decoder inference.
+The owner-controlled capture [captures/session-20260921T003441Z](https://github.com/BedrockDebugProxy-Captures/session-20260921T003441Z/releases/tag/capture-archive) recorded different settings on the two sides before the startup parity fixes. The upstream payload began with `01-00-00-00`, which decodes to a compression threshold of `1` and algorithm `0`. The downstream payload began with `00-01-00-00`, which decodes to a threshold of `256` and algorithm `0`. The remaining fields in both payloads were zero. This is a confirmed wire difference, not a decoder inference.
 
 The local upstream value is also confirmed by the PocketMine source used for the controlled fixture. Its
 `src/network/mcpe/handler/SessionStartPacketHandler.php` sends `NetworkSettingsPacket::COMPRESS_EVERYTHING`, which
@@ -35,7 +35,7 @@ Each gophertunnel connection now retains the decoded `NetworkSettings` exchanged
 
 - Nested gophertunnel tests cover retention of all `NetworkSettings` fields.
 - The root loopback integration test checks that both sides expose equal settings in its deterministic fixture.
-- The real Android loopback in `captures/session-20260922T044324Z` at revision `9994e4e11f595f7980fc6795f5cc8b05271d4de7` observed downstream threshold `256` and upstream threshold `1`, with protocol 2193 and game version 1.26.51 on both sides. The session reached spawn and closed cleanly. This confirms the mismatch on the owner-controlled local path without implying a public-server policy signal.
+- The real Android loopback in [captures/session-20260922T044324Z](https://github.com/BedrockDebugProxy-Captures/session-20260922T044324Z/releases/tag/capture-archive) at revision `9994e4e11f595f7980fc6795f5cc8b05271d4de7` observed downstream threshold `256` and upstream threshold `1`, with protocol 2193 and game version 1.26.51 on both sides. The session reached spawn and closed cleanly. This confirms the mismatch on the owner-controlled local path without implying a public-server policy signal.
 - No public server or external account was contacted for this change.
 
 ## Follow-up

@@ -20,7 +20,7 @@ Sources are public Hive forum threads and one Reddit thread. The note records th
 
 - Automated checks: `git diff --check`, targeted documentation searches, and the existing documentation quality gate.
 - Live validation: `not_observed`. This documentation change does not authorize a new Hive connection.
-- Capture or report: existing local captures remain unchanged and sensitive.
+- Capture or report: existing Hive captures are archived in private repositories and remain sensitive.
 
 ## Limitations and follow-up
 

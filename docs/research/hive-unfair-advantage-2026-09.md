@@ -4,11 +4,11 @@
 
 This note records the investigation performed on 2026-09-20 after a BedrockDebugProxy session to The Hive received an `Unfair Advantage` ban response. It separates capture evidence, official server policy, public release information, and hypotheses. It is not a guide for bypassing a punishment or an anti-cheat system.
 
-The source captures remain local and sensitive. This note intentionally omits XUIDs, identity UUIDs, authentication data, packet payloads, and resource-pack keys. Do not use a live session to probe Hive enforcement. Any release baseline must follow the current project validation workflow and a direct maintainer request. An individual appeal outcome does not change Hive's public proxy policy.
+The source captures are stored in private capture repositories and remain sensitive. This note intentionally omits XUIDs, identity UUIDs, authentication data, packet payloads, and resource-pack keys. Do not use a live session to probe Hive enforcement. Any release baseline must follow the current project validation workflow and a direct maintainer request. An individual appeal outcome does not change Hive's public proxy policy.
 
 ## Incident evidence
 
-The affected capture is `captures/session-20260920T135412Z`.
+The affected capture is [captures/session-20260920T135412Z](https://github.com/BedrockDebugProxy-Captures/session-20260920T135412Z/releases/tag/capture-archive).
 
 - The capture is closed and verified with 93,461 events and 37,596 blobs.
 - The stamped generator commit is `1b7ff3a0b55ce5e8f5eea60b6e793cd29aab74bf`.
@@ -27,7 +27,7 @@ The maintainer later reported that Hive treated the punishment as a false positi
 
 A repository-wide search found 23 Hive captures containing the upstream display name `SrDuck84`. Twenty-two ended without a Hive ban and one is the affected capture above.
 
-The successful capture `captures/session-20260917T034859Z` is the closest comparison. It also contains the `NhanAZ` downstream and `SrDuck84` upstream identity pattern, the same Hive selector, protocol 2193, and the same upstream game baseline. Its options are not identical: it used a different listen/authentication setup, did not follow transfers, and enabled pack decryption. Those differences prevent a claim that the two sessions were identical.
+The successful capture [captures/session-20260917T034859Z](https://github.com/BedrockDebugProxy-Captures/session-20260917T034859Z/releases/tag/capture-archive) is the closest comparison. It also contains the `NhanAZ` downstream and `SrDuck84` upstream identity pattern, the same Hive selector, protocol 2193, and the same upstream game baseline. Its options are not identical: it used a different listen/authentication setup, did not follow transfers, and enabled pack decryption. Those differences prevent a claim that the two sessions were identical.
 
 The clearest client-side difference is in the login metadata. All successful Hive captures inspected for this comparison advertise client game version `1.26.50`; the affected capture advertises `1.26.51`. A direct read of the affected capture's login events further shows downstream `ClientData.GameVersion = 1.26.51` and authenticated upstream `ClientData.GameVersion = 1.26.50`; both sides use protocol 2193 and Android device OS metadata. The old proxy constant therefore introduced a concrete metadata mismatch, but the capture does not prove that this mismatch caused the ban.
 

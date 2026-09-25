@@ -18,7 +18,7 @@ forwarding path visible without changing the packet sent on the wire.
 
 ## Evidence and provenance
 
-- The local capture `captures/session-20260921T122228Z` established the
+- The local capture [captures/session-20260921T122228Z](https://github.com/BedrockDebugProxy-Captures/session-20260921T122228Z/releases/tag/capture-archive) established the
   downstream packet-69 body as raw evidence while the strict forwarding helper
   already rejected unread bytes.
 - The capture schema already defines `packet.decode_error`, `PacketInfo`, and a

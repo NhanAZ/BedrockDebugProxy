@@ -50,7 +50,7 @@ The transfer proxy also keeps XBL identity data when it dials a backend in [`tra
 
 ## Correlation with the CubeCraft capture
 
-The local CubeCraft ban capture `session-20260912T184553Z` recorded the following high-level differences between the two terminated sessions. Sensitive identifiers are intentionally omitted here:
+The local CubeCraft ban capture [session-20260912T184553Z](https://github.com/BedrockDebugProxy-Captures/session-20260912T184553Z/releases/tag/capture-archive) recorded the following high-level differences between the two terminated sessions. Sensitive identifiers are intentionally omitted here:
 
 - The downstream login advertised the local proxy address in `ClientData.ServerAddress`; the upstream login advertised the CubeCraft address.
 - Upstream identity data contained title and PlayFab metadata that was absent from the downstream identity record.

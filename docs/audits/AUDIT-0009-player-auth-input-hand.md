@@ -17,14 +17,14 @@ The change adds the missing `Hand` read and write operation to the in-tree gophe
 - Mojang's released [`ItemUseInventoryTransaction` schema](https://github.com/Mojang/bedrock-protocol-docs/blob/v1.26.50/json/ItemUseInventoryTransaction.json) requires the hand field between the hotbar slot and item descriptor.
 - Mojang's [`PackedItemUseLegacyInventoryTransaction` schema](https://github.com/Mojang/bedrock-protocol-docs/blob/v1.26.50/json/PackedItemUseLegacyInventoryTransaction.json) embeds that item-use structure in `PlayerAuthInput`.
 - The selected gophertunnel 1.26.50 feature revision added `Hand` to `UseItemTransactionData.Marshal` but omitted it from the packed `PlayerInventoryAction` reader and writer. The source revision is [`e95f6c6026d55625ec40089abac3c0131cb49355`](https://github.com/Sandertv/gophertunnel/commit/e95f6c6026d55625ec40089abac3c0131cb49355).
-- Local ignored capture `session-20260916T002518Z` contained a The Hive `PlayerAuthInput` body whose decoded fields shifted and left four bytes before this fix. The raw capture remains outside Git.
+- The Hive capture [session-20260916T002518Z](https://github.com/BedrockDebugProxy-Captures/session-20260916T002518Z/releases/tag/capture-archive) contained a `PlayerAuthInput` body whose decoded fields shifted and left four bytes before this fix. Its archive is stored in a private capture repository, while raw data remains outside this project's source Git history.
 - The detailed analysis is in [`docs/research/protocol-1.26.50.md`](../research/protocol-1.26.50.md).
 
 ## Validation
 
 - Automated checks: `pass - tools/format.ps1; tools/quality.ps1; nested gophertunnel go test ./...; focused protocol tests including TestPlayerInventoryActionRoundTripIncludesHand; git diff --check`
 - Live validation: `pending - rebuild a stamped binary and repeat the The Hive flow`
-- Capture or report: `session-20260916T002518Z` is diagnostic evidence only; a new exact-revision report is required.
+- Capture or report: [session-20260916T002518Z](https://github.com/BedrockDebugProxy-Captures/session-20260916T002518Z/releases/tag/capture-archive) is diagnostic evidence only; a new exact-revision report is required.
 
 ## Limitations and follow-up
 

@@ -12,7 +12,7 @@ Record a confirmed local XUID rejection when an authenticated downstream client 
 
 ## Evidence and provenance
 
-- Capture: `captures/session-20260921T121717Z`.
+- Capture: [captures/session-20260921T121717Z](https://github.com/BedrockDebugProxy-Captures/session-20260921T121717Z/releases/tag/capture-archive).
 - Capture binary revision: `d272805fd571525cca6f7473b166fb1129bafd48`.
 - The capture records `auth_mode=none`, an upstream `XUID does not match (possible impersonation attempt)` error, and no completed `session.negotiated` event.
 - The source-backed authenticated boundary and offline identity tests remain documented in `docs/research/local-identity-parity.md`.

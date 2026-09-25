@@ -22,7 +22,7 @@ false zero value.
 
 ## Evidence and provenance
 
-The owner-controlled capture `captures/session-20260921T122228Z` contains
+The owner-controlled capture [captures/session-20260921T122228Z](https://github.com/BedrockDebugProxy-Captures/session-20260921T122228Z/releases/tag/capture-archive) contains
 downstream packet ID 129 payload `01` and upstream payload `00`. The vendored
 gophertunnel listener and Dialer source show the ordering boundary and the
 existing `EnableClientCache` capability. The change does not infer a platform

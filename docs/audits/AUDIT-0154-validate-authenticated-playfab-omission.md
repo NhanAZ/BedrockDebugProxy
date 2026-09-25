@@ -13,7 +13,7 @@ Record the real-client local validation of the authenticated `ClientData.PlayFab
 ## Evidence and provenance
 
 - The stamped binary revision was `970531e7d7132a4e0f889e1ab9ad735a8d4002c1`.
-- Capture `captures/session-20260922T041204Z` closed with 12,750 events, 6,118 blobs, zero write errors, zero dropped events, zero truncation, and zero decode errors.
+- Capture [captures/session-20260922T041204Z](https://github.com/BedrockDebugProxy-Captures/session-20260922T041204Z/releases/tag/capture-archive) closed with 12,750 events, 6,118 blobs, zero write errors, zero dropped events, zero truncation, and zero decode errors.
 - The matching ProxyFingerprint report completed after `player_quit`, recorded `ClientData.PlayFabId` as absent, and emitted no `auth_client_playfab_mismatch` signal.
 - The test used only the owner-controlled local PocketMine server. No public server, credential, raw capture, or identifier was added to the repository.
 

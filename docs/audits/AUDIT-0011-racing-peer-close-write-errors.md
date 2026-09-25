@@ -16,7 +16,7 @@ The change is limited to terminal forwarding error classification in `internal/p
 
 ## Evidence and provenance
 
-The Mineville Zeqa capture `captures/session-20260916T025636Z` at revision `9a7859c351b55b66a89cfa7e3448b809f5a48584` recorded a downstream context-cancelled read followed by a concurrent upstream `bridge.write_error`. This is a race variant of FIX-0004 in [`docs/fix-history.md`](../fix-history.md). The transport error classification uses Go's `context.Canceled` and `net.ErrClosed` values exposed by gophertunnel connection shutdown.
+The Mineville Zeqa capture [captures/session-20260916T025636Z](https://github.com/BedrockDebugProxy-Captures/session-20260916T025636Z/releases/tag/capture-archive) at revision `9a7859c351b55b66a89cfa7e3448b809f5a48584` recorded a downstream context-cancelled read followed by a concurrent upstream `bridge.write_error`. This is a race variant of FIX-0004 in [`docs/fix-history.md`](../fix-history.md). The transport error classification uses Go's `context.Canceled` and `net.ErrClosed` values exposed by gophertunnel connection shutdown.
 
 ## Automated validation
 

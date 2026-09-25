@@ -20,7 +20,7 @@ describe the observed timing and the compatibility boundary.
 
 ## Evidence and provenance
 
-Capture `captures/session-20260916T053620Z` recorded seven hop-2 URL pack archives for
+Capture [captures/session-20260916T053620Z](https://github.com/BedrockDebugProxy-Captures/session-20260916T053620Z/releases/tag/capture-archive) recorded seven hop-2 URL pack archives for
 `factions-spawn.factions.connect.enchanted.gg:19132`, then `session.spawned`, followed immediately by the upstream
 message `You were kicked: Timed out`. The manifest has zero dropped, truncated, decode, or capture write errors. The
 serial prefetch timing is the root-cause hypothesis; the capture does not include RakNet acknowledgements or prove the

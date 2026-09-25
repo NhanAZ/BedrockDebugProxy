@@ -10,7 +10,7 @@ Add a bounded 100-request upstream chunk window, response validation, decoder-ow
 
 ## Evidence and provenance
 
-The Galaxite capture `captures/session-20260922T151050Z` at revision `a992d6c37f07ae04afb651ce2130712f9e4b209e` recorded 197 requests and 186 responses during the previous five-minute deadline while the exchange was still active. The pinned gophertunnel loop was serial. The request-window behavior is supported by [gophertunnel PR #509](https://github.com/Sandertv/gophertunnel/pull/509), reviewed as an open upstream research reference on 2026-09-22. No source was copied from the PR.
+The Galaxite capture [captures/session-20260922T151050Z](https://github.com/BedrockDebugProxy-Captures/session-20260922T151050Z/releases/tag/capture-archive) at revision `a992d6c37f07ae04afb651ce2130712f9e4b209e` recorded 197 requests and 186 responses during the previous five-minute deadline while the exchange was still active. The pinned gophertunnel loop was serial. The request-window behavior is supported by [gophertunnel PR #509](https://github.com/Sandertv/gophertunnel/pull/509), reviewed as an open upstream research reference on 2026-09-22. No source was copied from the PR.
 
 ## Automated validation
 

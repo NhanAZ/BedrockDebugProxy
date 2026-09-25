@@ -13,7 +13,7 @@ Record the confirmed difference between downstream and upstream
 
 ## Evidence and provenance
 
-- `captures/session-20260921T122228Z` contains downstream packet ID 129 with
+- [captures/session-20260921T122228Z](https://github.com/BedrockDebugProxy-Captures/session-20260921T122228Z/releases/tag/capture-archive) contains downstream packet ID 129 with
   payload `01` and upstream packet ID 129 with payload `00`.
 - The same closed capture records the two values in `session.spawned`.
 - The source path was reviewed in the vendored gophertunnel copy at commit

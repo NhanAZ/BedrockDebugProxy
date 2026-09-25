@@ -20,7 +20,7 @@ The screenshot shows `InitialConnection-55` alongside `You are banned from The H
 
 - Automated checks: `git diff --check`, the existing quality gate, and targeted documentation searches.
 - Live validation: `not_observed`. Documentation does not authorize another Hive connection.
-- Capture or report: existing local captures remain unchanged and sensitive.
+- Capture or report: existing Hive captures are archived in private repositories and remain sensitive.
 
 ## Limitations and follow-up
 
