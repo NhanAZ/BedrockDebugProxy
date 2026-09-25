@@ -455,25 +455,33 @@ type packReader struct {
 	*zip.ReadCloser
 }
 
-// find attempts to find a file in a zip reader. If found, it returns an Open()ed reader of the file that may
-// be used to read data from the file.
+// find attempts to find a file in a zip reader, preferring a file at the archive root over a nested file with
+// the same base name. If found, it returns an Open()ed reader of the file that may be used to read data from it.
 func (reader packReader) find(fileName string) (io.ReadCloser, error) {
-	for _, file := range reader.File {
-		base := filepath.Base(file.Name)
-		if file.Name != fileName && base != fileName {
-			continue
-		}
+	var nestedMatch *zip.File
+	open := func(file *zip.File) (io.ReadCloser, error) {
 		fileReader, err := file.Open()
 		if err != nil {
 			return nil, fmt.Errorf("open zip file %v: %w", file.Name, err)
 		}
 		return fileReader, nil
 	}
+	for _, file := range reader.File {
+		if file.Name == fileName {
+			return open(file)
+		}
+		if nestedMatch == nil && filepath.Base(file.Name) == fileName {
+			nestedMatch = file
+		}
+	}
+	if nestedMatch != nil {
+		return open(nestedMatch)
+	}
 	return nil, fmt.Errorf("'%v' not found in zip", fileName)
 }
 
-// readManifest reads the manifest from the resource pack located at the path passed. If not found in the root
-// of the resource pack, it will also attempt to find it deeper down into the archive.
+// readManifest reads the manifest from the resource pack located at the path passed. It prefers a manifest in
+// the archive root and, if none is found, attempts to find one deeper down in the archive.
 func readManifest(path string) (*Manifest, error) {
 	r, err := zip.OpenReader(path)
 	if err != nil {

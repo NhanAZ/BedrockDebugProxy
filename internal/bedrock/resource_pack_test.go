@@ -19,6 +19,45 @@ import (
 	"github.com/sandertv/gophertunnel/minecraft/resource"
 )
 
+func TestResourceReadPrefersRootManifestOverNestedPlaceholder(t *testing.T) {
+	const rootUUID = "11111111-1111-1111-1111-111111111111"
+	entries := []struct {
+		name string
+		data string
+	}{
+		{
+			name: "nested/manifest.json",
+			data: `{"format_version":2,"header":{"name":"Nested Placeholder","description":"Synthetic fixture","uuid":"aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa","version":[9,9,9],"min_engine_version":[1,20,0]},"modules":[{"type":"resources","uuid":"bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb","version":[9,9,9]}]}`,
+		},
+		{
+			name: "manifest.json",
+			data: `{"format_version":2,"header":{"name":"Root Manifest Pack","description":"Synthetic fixture","uuid":"` + rootUUID + `","version":[1,0,0],"min_engine_version":[1,20,0]},"modules":[{"type":"resources","uuid":"22222222-2222-2222-2222-222222222222","version":[1,0,0]}]}`,
+		},
+	}
+	var archive bytes.Buffer
+	writer := zip.NewWriter(&archive)
+	for _, entry := range entries {
+		file, err := writer.Create(entry.name)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if _, err := file.Write([]byte(entry.data)); err != nil {
+			t.Fatal(err)
+		}
+	}
+	if err := writer.Close(); err != nil {
+		t.Fatal(err)
+	}
+
+	pack, err := resource.Read(bytes.NewReader(archive.Bytes()))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if pack.Name() != "Root Manifest Pack" || pack.UUID().String() != rootUUID || pack.Version() != "1.0.0" {
+		t.Fatalf("parsed pack identity = %s v%s (%s)", pack.Name(), pack.Version(), pack.UUID())
+	}
+}
+
 func TestRecordResourcePacksPreservesArchiveMetadataAndContentKey(t *testing.T) {
 	archive := testResourcePackArchive(t)
 	pack, err := resource.Read(bytes.NewReader(archive))

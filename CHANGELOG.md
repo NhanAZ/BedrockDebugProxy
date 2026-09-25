@@ -8,6 +8,7 @@ Detailed rationale remains in [`docs/audits/`](docs/audits/).
 
 ### Changed
 
+- Resource-pack archives now prefer a root `manifest.json` over nested files with the same name, so a nested placeholder cannot override the pack identity.
 - RakNet dial cancellations while awaiting `CONNECTION_REQUEST_ACCEPTED` now retain that handshake stage in the reported error.
 
 ## [0.3.0] - 2026-09-25
