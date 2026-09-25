@@ -6,6 +6,10 @@ Detailed rationale remains in [`docs/audits/`](docs/audits/).
 
 ## [Unreleased]
 
+### Changed
+
+- RakNet dial cancellations while awaiting `CONNECTION_REQUEST_ACCEPTED` now retain that handshake stage in the reported error.
+
 ## [0.3.0] - 2026-09-25
 
 Supported Bedrock version: 1.26.51 (protocol 2193).

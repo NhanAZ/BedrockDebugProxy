@@ -291,7 +291,7 @@ func (dialer Dialer) connect(ctx context.Context, state *connState) (*Conn, erro
 		return conn, nil
 	case <-ctx.Done():
 		_ = conn.Close()
-		return nil, dialer.error("dial", ctx.Err())
+		return nil, dialer.error("dial", fmt.Errorf("await connection request acceptance: %w", ctx.Err()))
 	}
 }
 

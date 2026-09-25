@@ -76,6 +76,7 @@ The manual checks were `normal_session=pass`, `resource_pack_transfer=pass`, and
 ## Remaining uncertainty and next checks
 
 - The capture boundary does not include raw UDP datagrams, RakNet acknowledgements, fragmentation, retransmission, or loss details. A future transport diagnostic can add those observations without changing the canonical Bedrock event stream.
+- Two owner-controlled captures on 2026-09-25, `captures/session-20260925T022556Z` and `captures/session-20260925T023226Z`, completed six and four hops respectively, including spawn and resource-pack artifacts, with no upstream dial or decode errors. They show that the earlier stall did not reproduce, but do not establish its cause. RakNet cancellation while waiting for `CONNECTION_REQUEST_ACCEPTED` now retains that stage in the dial error; the diagnostic branch was not exercised by these successful runs.
 - The successful run does not identify the private edge behavior that made the earlier handshake fail. The GUID, source-address, MTU, and cookie changes are a supported explanation that fits the before and after event order, not a server-side confirmation.
 - The earlier The Hive report for `d1929d4` is not interchangeable with the current `a600bbf` candidate. The exact-revision The Hive baseline remains the next required live check.
 - An official release still needs reports for Galaxite, Lifeboat, and Mineville Zeqa. The Enchanted and The Hive reports cover two members of the five-server release matrix.
