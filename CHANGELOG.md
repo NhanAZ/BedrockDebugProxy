@@ -6,6 +6,12 @@ Detailed rationale remains in [`docs/audits/`](docs/audits/).
 
 ## [Unreleased]
 
+## [0.3.0] - 2026-09-25
+
+Supported Bedrock version: 1.26.51 (protocol 2193).
+
+[Published release](https://github.com/NhanAZ/BedrockDebugProxy/releases/tag/v0.3.0) | [All changes since v0.2.1](https://github.com/NhanAZ/BedrockDebugProxy/compare/v0.2.1...v0.3.0)
+
 ### Added
 
 - Added a read-only local capture viewer with paginated event filters, decoded JSON details, bounded blob hex previews, loopback-only serving, and per-run access URLs. Open captures can be followed with `view --live`, and `run --web-viewer` starts the live browser view automatically without putting browser work on the forwarding path.
