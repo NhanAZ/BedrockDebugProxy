@@ -61,9 +61,9 @@ Include `--follow-transfers` in the release command when the server's flow can s
 | `Lifeboat` | `experience:Lifeboat` | Connect, spawn, move, interact, and observe normal traffic |
 | `Mineville Zeqa` | `experience:Mineville Zeqa` | Enter the Zeqa flow and observe it directly |
 | `Enchanted` | `experience:Enchanted` | Receive the server-sent form, select any minigame, observe `Transfer`, follow the next hop, complete its resource-pack exchange when offered, and reach minigame spawn |
-| `CubeCraft` | `play.cubecraft.net:19132` | Only after the maintainer accepts the connection risk. Connect, spawn, perform normal read-only interaction, observe both traffic directions, and close cleanly |
+| `CubeCraft` | `experience:CubeCraft` | Only after the maintainer accepts the connection risk. Connect, spawn, perform normal read-only interaction, observe both traffic directions, and close cleanly |
 
-Use this command for an Experience target. Replace `<LAN_IP>` with the concrete LAN address used by the Minecraft client, and replace only the value after `--upstream` for each run. For CubeCraft, use the direct endpoint shown in the matrix only after the maintainer risk gate in [`server-targets.md`](server-targets.md) is satisfied. Do not add bypass, mutation, replay, or anti-cheat evasion behavior to the release command.
+Use this command with the selector shown in the matrix. Replace `<LAN_IP>` with the concrete LAN address used by the Minecraft client, and replace only the value after `--upstream` for each run. The `experience:` selector resolves both Featured and Creator Experiences through Minecraft services. For CubeCraft, satisfy the maintainer risk gate in [`server-targets.md`](server-targets.md) before connecting. Do not add bypass, mutation, replay, or anti-cheat evasion behavior to the release command.
 
 ```powershell
 .\bin\bedrock-debug-proxy.exe `

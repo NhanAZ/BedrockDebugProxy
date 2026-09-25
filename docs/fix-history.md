@@ -1002,7 +1002,7 @@ Every new entry should state the symptom, root cause, implementation commits, ev
 
 - Symptom: the release workflow and readiness checker omitted CubeCraft even when the maintainer wanted the private, owner-controlled test process to include it.
 - Root cause: the workflow treated CubeCraft's public Bedrock proxy prohibition as an unconditional project exclusion instead of separating the public policy warning from the maintainer's internal risk decision.
-- Implementation: add CubeCraft as the sixth release-matrix label and direct endpoint, require an explicit `risk_acknowledged=pass` check, retain the public policy warning, prohibit recording private server discussions, and keep the normal read-only capture path. No runtime forwarding or packet behavior changed.
+- Implementation: add CubeCraft as the sixth release-matrix label with its direct endpoint recorded as an initial reference, require an explicit `risk_acknowledged=pass` check, retain the public policy warning, prohibit recording private server discussions, and keep the normal read-only capture path. No runtime forwarding or packet behavior changed.
 - Evidence and validation: CubeCraft's [Rules](https://help.cubecraft.net/en/article/cubecraft-rules-1403lij/) and [Allowed Mods and Clients](https://www.cubecraft.net/threads/allowed-mods-and-clients.228596/) were reviewed on 2026-09-22. This change updates the release docs, agent guide, validation catalog, changelog, and readiness checker only.
 - Status: implemented as a documentation and release-workflow change. No CubeCraft connection was performed and no permission or policy exception is claimed.
 
@@ -1157,6 +1157,14 @@ Every new entry should state the symptom, root cause, implementation commits, ev
 - Implementation: bound initial upstream address-discovery pings to five seconds, matching go-raknet's `Ping` convenience method. Transfer-hop pings retain their existing 750 ms bound. A failed ping remains recorded and gophertunnel continues to the original address as before.
 - Evidence and provenance: capture `captures/session-20260924T161139Z` at revision `29795bbef1f266c9915d194e2d31410abfc5fbbb` ended after `upstream.dial_start` with no upstream transport connection. Source review of `third_party/gophertunnel/minecraft/dial.go` confirms a zero ping timeout inherits the caller deadline; `third_party/go-raknet/dial.go` documents the need for a bounded context and uses five seconds in `Ping`. This is a source-supported likely cause, not a claim that the capture isolated the ping stage.
 - Status: focused proxy regression coverage and the full low-memory quality gate pass. Fresh exact-revision live validation remains required; the interrupted Enchanted session is incomplete.
+
+### FIX-0145 - Use the Experience selector for CubeCraft release validation
+
+- Symptom: the release matrix documented CubeCraft's endpoint as its upstream target, which made it appear that CubeCraft must bypass the Experience selector.
+- Root cause: the docs confused a target's Featured server category and endpoint reference with the selector supported by the proxy. The selector resolves the Minecraft services catalog, which contains both Featured and Creator Experiences.
+- Implementation: document `experience:CubeCraft` as the CubeCraft release selector, preserve `play.cubecraft.net:19132` as an endpoint reference, and state that `experience:` is shared by Featured and Creator Experiences. The CubeCraft risk gate and read-only validation requirements are unchanged.
+- Evidence and validation: `internal/experience/target.go` resolves names from the Minecraft services discovery catalog through the shared `experience:` path and reports failures as "list featured and creator experiences"; `internal/experience/target_test.go` accepts `EXPERIENCE:CubeCraft`. Documentation review and `git diff --check`; no runtime code or live connection changed.
+- Status: documentation-only correction. Existing validation reports and their tested revisions remain unchanged.
 
 ## Ordering safety contract
 

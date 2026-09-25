@@ -13,6 +13,7 @@ Detailed rationale remains in [`docs/audits/`](docs/audits/).
 
 ### Changed
 
+- Release validation now uses `experience:CubeCraft` for CubeCraft. The Experience selector covers both Featured and Creator Experiences, while the endpoint remains a reference.
 - The release workflow now includes CubeCraft as a sixth, maintainer-risk-gated validation target. The normal read-only capture path is required, and a missing risk acknowledgement keeps the release incomplete. No private server discussion is recorded.
 - Owner-controlled server validation follows the maintainer's direct internal request without requiring private authorization messages in reports or source documentation.
 - Microsoft authentication now supports multiple named local accounts with one default account used automatically by `run`. The first interactive login requires a non-empty account username or local label, while later unlabeled logins may press Enter to reuse the selected default. `login`, `accounts`, `use`, `rename`, and `logout` cover account management without adding account flags to normal proxy commands. `rename` converts the legacy `default` cache to a named profile without reauthenticating. Interactive `login` asks once for an optional local cache age and Enter means no local limit. The `--max-age` form remains available for scripts and does not alter Microsoft token expiry.
