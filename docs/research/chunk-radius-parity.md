@@ -6,7 +6,7 @@ This note records the initial `RequestChunkRadius` difference observed in an own
 
 ## Confirmed capture evidence
 
-The closed capture `captures/session-20260921T122228Z` contains packet ID 69 (`RequestChunkRadius`) on both bridge channels.
+The closed capture [captures/session-20260921T122228Z](https://github.com/BedrockDebugProxy-Captures/session-20260921T122228Z/releases/tag/capture-archive) contains packet ID 69 (`RequestChunkRadius`) on both bridge channels.
 
 | Channel | Payload | Decoded request |
 | --- | --- | --- |

@@ -18,7 +18,7 @@ visible in the capture instead of silently discarding them.
 
 ## Evidence and provenance
 
-- Owner-controlled capture `captures/session-20260921T122228Z` records the
+- Owner-controlled capture [captures/session-20260921T122228Z](https://github.com/BedrockDebugProxy-Captures/session-20260921T122228Z/releases/tag/capture-archive) records the
   downstream `RequestChunkRadius` payload `301c` and the prior upstream
   `2010` fallback.
 - Source review found that the later typed write used `_ = upstream.WritePacket`

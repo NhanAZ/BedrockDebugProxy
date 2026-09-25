@@ -18,7 +18,7 @@ Preserve the decoded upstream `ResourcePacksInfo` metadata across the terminatin
 
 ## Evidence and provenance
 
-- Owner-controlled PocketMine capture `captures/session-20260921T003441Z` recorded an upstream `ResourcePacksInfo` payload beginning with `0x00` and a pre-fix downstream payload beginning with `0x01`. The capture is local sensitive evidence and is not committed.
+- Owner-controlled PocketMine capture [captures/session-20260921T003441Z](https://github.com/BedrockDebugProxy-Captures/session-20260921T003441Z/releases/tag/capture-archive) recorded an upstream `ResourcePacksInfo` payload beginning with `0x00` and a pre-fix downstream payload beginning with `0x01`. Its raw archive is stored privately and is excluded from this project's source history.
 - The packet field order is defined by the vendored gophertunnel `minecraft/protocol/packet/resource_packs_info.go` implementation.
 - The boundary and remaining URL-delivery constraint are documented in [`docs/research/resource-pack-negotiation.md`](../research/resource-pack-negotiation.md) and [`docs/resource-packs.md`](../resource-packs.md).
 

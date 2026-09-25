@@ -1,16 +1,16 @@
 # Galaxite repeated RakNet acceptance
 
-The first post-limit-fix Galaxite capture reached the upstream RakNet connection and then closed with a repeated `CONNECTION_REQUEST_ACCEPTED` error. The raw capture remains local because it contains endpoint and authenticated session evidence.
+The first post-limit-fix Galaxite capture reached the upstream RakNet connection and then closed with a repeated `CONNECTION_REQUEST_ACCEPTED` error. The raw capture is available from its private archive repository and remains sensitive because it contains endpoint and authenticated session evidence.
 
 ## Evidence
 
-- Capture: `captures/session-20260922T141819Z`
+- Capture: [captures/session-20260922T141819Z](https://github.com/BedrockDebugProxy-Captures/session-20260922T141819Z/releases/tag/capture-archive)
 - Capture ID: `1de1bf87-bc59-47fe-949d-6f0eee6ea9fc`
 - Runtime revision: `730e6b972dd16c21a94c3b9c2e2119d68e2ea7ea`
 - Event: `library.log` at sequence 23, `unexpected additional CONNECTION_REQUEST_ACCEPTED packet`
 - Result: the upstream login did not reach the Bedrock login or spawn phase
 
-The same build's second Galaxite attempt (`captures/session-20260922T142754Z`) failed earlier with `POST https://multiplayer.minecraft.net/authentication: unexpected EOF`. That is a separate authentication-service boundary and is not evidence about the RakNet acceptance path.
+The same build's second Galaxite attempt ([captures/session-20260922T142754Z](https://github.com/BedrockDebugProxy-Captures/session-20260922T142754Z/releases/tag/capture-archive)) failed earlier with `POST https://multiplayer.minecraft.net/authentication: unexpected EOF`. That is a separate authentication-service boundary and is not evidence about the RakNet acceptance path.
 
 ## Source comparison
 

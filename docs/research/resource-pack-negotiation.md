@@ -4,7 +4,7 @@
 
 This note records a narrow live observation from The Hive on 2026-08-30 using Minecraft Bedrock 1.26.45, protocol 2169. It exists to prevent a future change from assuming that `ResourcePacksInfo.TexturePackRequired` and `ResourcePackStack.TexturePackRequired` must always have the same value.
 
-The source capture remains local and sensitive. The evidence below records only packet identities, sequence numbers, blob digests, and the first serialized boolean. It contains no archive bytes, content keys, player identity, or authentication material.
+The source capture is sensitive, but this note does not record its session identifier or an archive link. The evidence below records only packet identities, sequence numbers, blob digests, and the first serialized boolean. It contains no archive bytes, content keys, player identity, or authentication material.
 
 ## Observed evidence
 
@@ -30,7 +30,7 @@ The rebuilt downstream entries now preserve the per-pack `ContentIdentity`, `Sub
 downstream `DownloadURL` remains controlled by the archive-backed delivery path and is not copied from the upstream
 offer. This closes a confirmed metadata-loss boundary without changing archive bytes or pack order.
 
-An owner-controlled PocketMine capture from `session-20260921T003441Z` provided a local regression fixture for this boundary. Its upstream `ResourcePacksInfo` payload began with `0x00`, while the pre-fix downstream payload began with `0x01`. The local server therefore exposed a concrete optional-offer mismatch. This is protocol metadata evidence from a local test server, not evidence about any public server's enforcement behavior.
+An owner-controlled PocketMine capture from [session-20260921T003441Z](https://github.com/BedrockDebugProxy-Captures/session-20260921T003441Z/releases/tag/capture-archive) provided a local regression fixture for this boundary. Its upstream `ResourcePacksInfo` payload began with `0x00`, while the pre-fix downstream payload began with `0x01`. The local server therefore exposed a concrete optional-offer mismatch. This is protocol metadata evidence from a local test server, not evidence about any public server's enforcement behavior.
 
 ## Mixed URL and RakNet offers
 

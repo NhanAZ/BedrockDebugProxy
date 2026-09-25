@@ -18,7 +18,7 @@ Preserve the upstream `ResourcePackStack` across the terminating bridge so a dow
 
 ## Evidence and provenance
 
-- Local Hive capture `captures/session-20260920T135412Z` recorded a 1,449-byte upstream stack and a 1,446-byte downstream stack. The serialized prefix showed 24 upstream texture-pack entries and 32 downstream entries because the old listener appended eight built-in exempted packs.
+- Local Hive capture [captures/session-20260920T135412Z](https://github.com/BedrockDebugProxy-Captures/session-20260920T135412Z/releases/tag/capture-archive) recorded a 1,449-byte upstream stack and a 1,446-byte downstream stack. The serialized prefix showed 24 upstream texture-pack entries and 32 downstream entries because the old listener appended eight built-in exempted packs.
 - Packet field order is defined by the vendored gophertunnel `ResourcePackStack` packet. The immutable upstream reference is [`resource_pack_stack.go`](https://github.com/Sandertv/gophertunnel/blob/7a556a07335b663744b50d38062636ad8283f314/minecraft/protocol/packet/resource_pack_stack.go), reviewed 2026-09-21.
 - Detailed reasoning is recorded in [`docs/research/resource-pack-stack-parity.md`](../research/resource-pack-stack-parity.md).
 

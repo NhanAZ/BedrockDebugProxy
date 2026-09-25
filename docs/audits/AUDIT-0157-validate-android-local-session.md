@@ -13,7 +13,7 @@ Record the owner-controlled Android client validation of the stamped authenticat
 ## Evidence and provenance
 
 - The tested binary was revision `9994e4e11f595f7980fc6795f5cc8b05271d4de7`.
-- Capture `captures/session-20260922T044324Z` closed with 11,325 events, 6,235 blobs, zero write errors, zero dropped events, zero truncation, and zero decode errors.
+- Capture [captures/session-20260922T044324Z](https://github.com/BedrockDebugProxy-Captures/session-20260922T044324Z/releases/tag/capture-archive) closed with 11,325 events, 6,235 blobs, zero write errors, zero dropped events, zero truncation, and zero decode errors.
 - The downstream client was Android account `ClientAccount`. The authenticated upstream local session used the cached `SampleAccount` token and PocketMine observed `SampleAccount` with `XUID match`.
 - ProxyFingerprint report `20260922T045726.014738Z_f5c3fe0b06ede822_unlabeled.json` completed after `player_quit`, recorded Android metadata, `ClientData.PlayFabId` as absent, and only `non_public_peer`.
 - The capture recorded downstream compression threshold `256` and upstream threshold `1`. This is documented as an existing local NetworkSettings boundary and was not changed by this test.

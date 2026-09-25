@@ -13,7 +13,7 @@ The previous listener callback started the upstream login before it could read
 the downstream status, so the Dialer used its false zero value even when a
 vanilla Windows client had advertised `true`.
 
-This was a confirmed local wire difference in `captures/session-20260921T122228Z`.
+This was a confirmed local wire difference in [captures/session-20260921T122228Z](https://github.com/BedrockDebugProxy-Captures/session-20260921T122228Z/releases/tag/capture-archive).
 The value is a client capability, not a platform default, so unconditionally
 enabling it would be incorrect for a client that reports `false`.
 

@@ -17,7 +17,7 @@ Avoid adding gophertunnel's empty listener compatibility `CreativeContent` packe
 
 ## Evidence and provenance
 
-- Owner-controlled capture `captures/session-20260921T005313Z` recorded upstream packet ID 145 at sequence 65 with a 49,283-byte payload, downstream generated packet ID 145 at sequence 455 with a 2-byte payload, and the original 49,283-byte payload at sequence 1077.
+- Owner-controlled capture [captures/session-20260921T005313Z](https://github.com/BedrockDebugProxy-Captures/session-20260921T005313Z/releases/tag/capture-archive) recorded upstream packet ID 145 at sequence 65 with a 49,283-byte payload, downstream generated packet ID 145 at sequence 455 with a 2-byte payload, and the original 49,283-byte payload at sequence 1077.
 - Vendored gophertunnel `minecraft/conn.go` showed the unconditional listener response in `handleRequestChunkRadius`.
 - The change does not copy external source and does not contact a public server.
 

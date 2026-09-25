@@ -16,7 +16,7 @@ Avoid reporting writes to an already-closed upstream connection as local bridge 
 
 ## Evidence and provenance
 
-The local Enchanted captures `captures/session-20260924T152209Z` at `bfe0741fa4cc9fb74199bde0624ce38c16d4af76` and `captures/session-20260923T062327Z` at `bfc19102a312cbe5b0a18c9432c37afcbb446b24` both recorded upstream packet ID 5, the protocol `Disconnect` ID, followed by upstream closure and later bridge write errors. Source review of the in-tree gophertunnel `Conn.receive` shows that it closes the connection with a typed `DisconnectError`; `Conn.closeErr` wraps the close cause for subsequent writes. The private packet message text was not inspected or added to this record.
+The local Enchanted captures [captures/session-20260924T152209Z](https://github.com/BedrockDebugProxy-Captures/session-20260924T152209Z/releases/tag/capture-archive) at `bfe0741fa4cc9fb74199bde0624ce38c16d4af76` and [captures/session-20260923T062327Z](https://github.com/BedrockDebugProxy-Captures/session-20260923T062327Z/releases/tag/capture-archive) at `bfc19102a312cbe5b0a18c9432c37afcbb446b24` both recorded upstream packet ID 5, the protocol `Disconnect` ID, followed by upstream closure and later bridge write errors. Source review of the in-tree gophertunnel `Conn.receive` shows that it closes the connection with a typed `DisconnectError`; `Conn.closeErr` wraps the close cause for subsequent writes. The private packet message text was not inspected or added to this record.
 
 ## Validation
 

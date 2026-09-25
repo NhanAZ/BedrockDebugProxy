@@ -20,7 +20,7 @@ client-cache startup ordering boundary without changing runtime behavior.
   `src/network/mcpe/NetworkSession.php` and
   `src/network/mcpe/handler/ResourcePacksPacketHandler.php` sends the resource
   pack offer before it observes the client response.
-- The closed capture `captures/session-20260921T122228Z` records the same
+- The closed capture [captures/session-20260921T122228Z](https://github.com/BedrockDebugProxy-Captures/session-20260921T122228Z/releases/tag/capture-archive) records the same
   downstream ordering and the downstream `01` versus upstream `00` values.
 
 ## Validation

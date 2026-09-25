@@ -18,7 +18,7 @@ Preserve the wire representation of upstream `DimensionData` and `ItemRegistry` 
 
 ## Evidence and provenance
 
-- Owner-controlled capture `captures/session-20260921T003441Z` contained upstream and downstream `ItemRegistry` payloads with equal size and different hashes. Decoding both yielded 2,076 equal entries. The first difference was inside an NBT compound, consistent with map-order changes during typed serialization.
+- Owner-controlled capture [captures/session-20260921T003441Z](https://github.com/BedrockDebugProxy-Captures/session-20260921T003441Z/releases/tag/capture-archive) contained upstream and downstream `ItemRegistry` payloads with equal size and different hashes. Decoding both yielded 2,076 equal entries. The first difference was inside an NBT compound, consistent with map-order changes during typed serialization.
 - The affected packet types are defined by the vendored gophertunnel protocol implementation. Raw ownership is copied before the login buffer can be released.
 - No external service or account data is required for the regression tests.
 

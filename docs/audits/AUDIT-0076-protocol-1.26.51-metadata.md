@@ -14,7 +14,7 @@ Align authenticated upstream `ClientData.GameVersion` with a 1.26.51 downstream 
 
 - Mojang [`bedrock-protocol-docs` release `v1.26.51`](https://github.com/Mojang/bedrock-protocol-docs/releases/tag/v1.26.51), commit `8667debe0adad27de6c692c88942c489a1193206`, reports network protocol 2193.
 - Mojang's [protocol changelog](https://mojang.github.io/bedrock-protocol-docs/changelog/) reports zero packet changes for stable 1.26.51.
-- The closed local Hive capture `captures/session-20260920T135412Z` records downstream ClientData 1.26.51 and authenticated upstream ClientData 1.26.50. This is evidence of a local metadata mismatch, not evidence of the server's punishment rule.
+- The closed local Hive capture [captures/session-20260920T135412Z](https://github.com/BedrockDebugProxy-Captures/session-20260920T135412Z/releases/tag/capture-archive) records downstream ClientData 1.26.51 and authenticated upstream ClientData 1.26.50. This is evidence of a local metadata mismatch, not evidence of the server's punishment rule.
 - The in-tree gophertunnel authenticated Android path assigns `protocol.CurrentVersion` to upstream ClientData. The change keeps the existing authentication and identity flow intact.
 
 ## Automated validation

@@ -25,7 +25,7 @@ Make the local capture viewer easier to scan by reducing the oversized text, rem
 ## Validation
 
 - Automated checks: pass - `tools/format.ps1`, `go test ./internal/viewer`, `tools/quality.ps1`, and `git diff --check` all passed. The quality gate also completed the full test suite, build, static analysis, vulnerability scan, and third-party license inventory.
-- Live validation: pass - exact binary revision `04869ec31093c5efc9699eb859efd2328da94da7` served closed capture `session-20260917T034859Z` in Chrome. Computed styles for body, headings, labels, table headers, controls, and footer were 12px, weight 400, Monocraft, and no text transform. The themed direction control opened and updated the native value to `server_to_client`.
+- Live validation: pass - exact binary revision `04869ec31093c5efc9699eb859efd2328da94da7` served closed capture [session-20260917T034859Z](https://github.com/BedrockDebugProxy-Captures/session-20260917T034859Z/releases/tag/capture-archive) in Chrome. Computed styles for body, headings, labels, table headers, controls, and footer were 12px, weight 400, Monocraft, and no text transform. The themed direction control opened and updated the native value to `server_to_client`.
 - Capture or report: `none`
 
 ## Limitations and follow-up

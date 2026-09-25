@@ -16,13 +16,13 @@ Preserve the RakNet handshake stage when a dial context is canceled while the di
 
 ## Evidence and provenance
 
-Source review confirms the affected branch runs after `CONNECTION_REQUEST` is sent and waits for the acceptance signal. The failed Enchanted capture `captures/session-20260925T013400Z` recorded a canceled hop 3 dial without transport-open evidence, but does not prove that this branch caused that failure. The change is diagnostic and does not claim a root-cause fix.
+Source review confirms the affected branch runs after `CONNECTION_REQUEST` is sent and waits for the acceptance signal. The failed Enchanted capture [captures/session-20260925T013400Z](https://github.com/BedrockDebugProxy-Captures/session-20260925T013400Z/releases/tag/capture-archive) recorded a canceled hop 3 dial without transport-open evidence, but does not prove that this branch caused that failure. The change is diagnostic and does not claim a root-cause fix.
 
 ## Validation
 
 - Automated checks: `tools/format.ps1` and `tools/quality.ps1 -LowMemory` passed, including tests, build, static analysis, vulnerability scan, and whitespace checks. The vulnerability scan found no issues reachable from this code and noted additional imported-package and required-module advisories.
 - Live validation: `pass` for the successful Enchanted transfer sessions below; the cancellation diagnostic itself was not exercised.
-- Capture or report: `captures/session-20260925T022556Z`, `captures/session-20260925T023226Z`
+- Capture or report: [captures/session-20260925T022556Z](https://github.com/BedrockDebugProxy-Captures/session-20260925T022556Z/releases/tag/capture-archive), [captures/session-20260925T023226Z](https://github.com/BedrockDebugProxy-Captures/session-20260925T023226Z/releases/tag/capture-archive)
 
 ## Live validation status
 

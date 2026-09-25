@@ -18,8 +18,8 @@ Prevent duplicate and empty startup `JigsawStructureData` and `VoxelShapes` pack
 
 ## Evidence and provenance
 
-- Local capture `captures/session-20260921T005313Z` recorded upstream packet IDs 313 and 337 before the generated downstream copies and later deferred copies.
-- The affected Hive capture `captures/session-20260920T135412Z` recorded the same duplicate shape. The captures remain local sensitive evidence and are not added to Git.
+- Local capture [captures/session-20260921T005313Z](https://github.com/BedrockDebugProxy-Captures/session-20260921T005313Z/releases/tag/capture-archive) recorded upstream packet IDs 313 and 337 before the generated downstream copies and later deferred copies.
+- The affected Hive capture [captures/session-20260920T135412Z](https://github.com/BedrockDebugProxy-Captures/session-20260920T135412Z/releases/tag/capture-archive) recorded the same duplicate shape. Both captures are archived in private repositories and remain sensitive; raw data is excluded from this project's source history.
 - Packet definitions and login handling come from the vendored gophertunnel composite already governed by the repository's provenance records.
 
 ## Automated validation

@@ -10,7 +10,7 @@ The proxy listener decodes packet ID 69 and writes its typed `ChunkRadius` and `
 
 ## Evidence and provenance
 
-- Owner-controlled closed capture: `captures/session-20260921T122228Z`.
+- Owner-controlled closed capture: [captures/session-20260921T122228Z](https://github.com/BedrockDebugProxy-Captures/session-20260921T122228Z/releases/tag/capture-archive).
 - Downstream packet ID 69 body: `301c`, decoded as 24/28.
 - Upstream packet ID 69 body: `2010`, decoded as 16/16.
 - Upstream source baseline: Sandertv gophertunnel commit `283a5a97dfe65da94bcc0b401807f6aefa9e72ee`.

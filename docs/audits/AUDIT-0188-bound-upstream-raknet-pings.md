@@ -17,7 +17,7 @@ Prevent a lost optional RakNet address-discovery ping from holding the upstream 
 
 ## Evidence and provenance
 
-Capture `captures/session-20260924T161139Z` at revision `29795bbef1f266c9915d194e2d31410abfc5fbbb` ended after `upstream.dial_start` without an upstream transport connection. It ended before a ping-completion event, so it does not independently identify the pending dial sub-step. Source inspection of `third_party/gophertunnel/minecraft/dial.go` confirms that `PingTimeout == 0` inherits the caller's deadline. `third_party/go-raknet/dial.go` warns that `PingContext` can wait indefinitely without a deadline and gives its `Ping` convenience method a five-second timeout. No external source code was copied.
+Capture [captures/session-20260924T161139Z](https://github.com/BedrockDebugProxy-Captures/session-20260924T161139Z/releases/tag/capture-archive) at revision `29795bbef1f266c9915d194e2d31410abfc5fbbb` ended after `upstream.dial_start` without an upstream transport connection. It ended before a ping-completion event, so it does not independently identify the pending dial sub-step. Source inspection of `third_party/gophertunnel/minecraft/dial.go` confirms that `PingTimeout == 0` inherits the caller's deadline. `third_party/go-raknet/dial.go` warns that `PingContext` can wait indefinitely without a deadline and gives its `Ping` convenience method a five-second timeout. No external source code was copied.
 
 ## Validation
 

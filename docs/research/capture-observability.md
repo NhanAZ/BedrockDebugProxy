@@ -44,7 +44,7 @@ fixture before changing forwarding behavior.
 
 ### Deferred-login ordering evidence
 
-The owner-controlled capture `captures/session-20260921T122228Z` at stamped
+The owner-controlled capture [captures/session-20260921T122228Z](https://github.com/BedrockDebugProxy-Captures/session-20260921T122228Z/releases/tag/capture-archive) at stamped
 revision `d272805fd571525cca6f7473b166fb1129bafd48` confirms the temporal
 separation between raw observation and bridge decoding. The downstream packet
 hook recorded `ServerBoundLoadingScreen` (ID 312), `ClientCacheStatus` (ID

@@ -23,7 +23,7 @@ Give the local capture viewer one readable evidence column instead of placing th
 ## Validation
 
 - Automated checks: pass - `tools/format.ps1`, `go test ./internal/viewer`, `tools/quality.ps1`, and `git diff --check` all passed. The quality gate also completed the full test suite, build, static analysis, vulnerability scan, and third-party license inventory.
-- Live validation: pass - exact binary revision `44b3e0e7f227316f2c49d71b64c6f34d8e0b3d6e` served closed capture `session-20260917T034859Z` in Chrome. The event panel and inspector had the same full width and different vertical positions, with decoded details above raw evidence. Workspace overflow was `auto`, and the direction filter interaction remained functional.
+- Live validation: pass - exact binary revision `44b3e0e7f227316f2c49d71b64c6f34d8e0b3d6e` served closed capture [session-20260917T034859Z](https://github.com/BedrockDebugProxy-Captures/session-20260917T034859Z/releases/tag/capture-archive) in Chrome. The event panel and inspector had the same full width and different vertical positions, with decoded details above raw evidence. Workspace overflow was `auto`, and the direction filter interaction remained functional.
 - Capture or report: `none`
 
 ## Limitations and follow-up

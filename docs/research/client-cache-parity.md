@@ -7,7 +7,7 @@ the downstream Bedrock client advertises?
 
 ## Confirmed observation
 
-The pre-FIX-0091 owner-controlled capture `captures/session-20260921T122228Z`
+The pre-FIX-0091 owner-controlled capture [captures/session-20260921T122228Z](https://github.com/BedrockDebugProxy-Captures/session-20260921T122228Z/releases/tag/capture-archive)
 records a different `ClientCacheStatus` value on the two connections. The downstream raw
 packet with ID 129 at sequence 197 has a one-byte payload of `01`, which means
 the vanilla Windows client enabled the blob cache. The upstream raw packet with

@@ -17,7 +17,7 @@ Expose the compression and client-throttle settings negotiated on each side of a
 
 ## Evidence and provenance
 
-- Owner-controlled capture `captures/session-20260921T003441Z` recorded upstream threshold `1` and downstream threshold `256`, with algorithm `0` on both sides.
+- Owner-controlled capture [captures/session-20260921T003441Z](https://github.com/BedrockDebugProxy-Captures/session-20260921T003441Z/releases/tag/capture-archive) recorded upstream threshold `1` and downstream threshold `256`, with algorithm `0` on both sides.
 - The packet fields and login handling are defined by the vendored gophertunnel `NetworkSettings` packet and connection handlers.
 - No public server, external account, authentication token, or external service was used.
 

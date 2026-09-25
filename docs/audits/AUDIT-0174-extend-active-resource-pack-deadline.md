@@ -10,7 +10,7 @@ Increase the bounded upstream login and resource-pack deadline from five to fift
 
 ## Evidence and provenance
 
-The Galaxite capture `captures/session-20260922T151050Z` at revision `a992d6c37f07ae04afb651ce2130712f9e4b209e` recorded 186 server-to-client chunk packets and 197 client-to-server chunk requests across the five-minute interval. The final event was an explicit `upstream.dial_error` timeout, with no decode error or resource-pack error. The earlier Galaxite research capture documented 460 advertised chunks and the same pacing pattern.
+The Galaxite capture [captures/session-20260922T151050Z](https://github.com/BedrockDebugProxy-Captures/session-20260922T151050Z/releases/tag/capture-archive) at revision `a992d6c37f07ae04afb651ce2130712f9e4b209e` recorded 186 server-to-client chunk packets and 197 client-to-server chunk requests across the five-minute interval. The final event was an explicit `upstream.dial_error` timeout, with no decode error or resource-pack error. The earlier Galaxite research capture documented 460 advertised chunks and the same pacing pattern.
 
 ## Automated validation
 
