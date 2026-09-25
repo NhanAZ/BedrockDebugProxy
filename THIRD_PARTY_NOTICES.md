@@ -32,7 +32,7 @@ The Go module uses the following direct dependencies. Their source remains under
 | Module | Version | License | Role |
 | --- | --- | --- | --- |
 | [`github.com/coder/websocket`](https://github.com/coder/websocket) | `v1.8.14` | ISC | Minecraft signaling WebSocket transport |
-| [`github.com/df-mc/go-nethernet`](https://github.com/df-mc/go-nethernet) | `v1.0.20-0.20260818142457-6fc1eb6f907c` | MIT | NetherNet and WebRTC upstream transport |
+| [`github.com/df-mc/go-nethernet`](https://github.com/df-mc/go-nethernet) | `v1.0.23` | MIT | NetherNet and WebRTC upstream transport |
 | [`github.com/df-mc/go-playfab/v2`](https://github.com/df-mc/go-playfab) | `v2.0.2` | MIT | Minecraft services authentication |
 | [`github.com/df-mc/go-xsapi/v2`](https://github.com/df-mc/go-xsapi) | `v2.0.3` | MIT | Xbox Live session used for service authentication |
 | [`github.com/go-gl/mathgl`](https://github.com/go-gl/mathgl) | `v1.1.0` | BSD-3-Clause | Vector and matrix types used by the Bedrock protocol model |
