@@ -8,6 +8,7 @@ Detailed rationale remains in [`docs/audits/`](docs/audits/).
 
 ### Changed
 
+- Updated go-nethernet to v1.0.23. Its default server-identity path verifies self-signed JWT signatures without enforcing temporal claims, following the upstream Bedrock-compatibility policy. See [the JWT research note](docs/research/nethernet-server-identity-jwt.md).
 - Resource-pack archives now prefer a root `manifest.json` over nested files with the same name, so a nested placeholder cannot override the pack identity.
 - RakNet dial cancellations while awaiting `CONNECTION_REQUEST_ACCEPTED` now retain that handshake stage in the reported error.
 
