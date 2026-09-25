@@ -134,6 +134,18 @@ Every behavior change needs validation proportional to its risk. Prefer small de
 
 Transport, compression, encryption, batching, framing, packet decoding, resource-pack reconstruction, and schema compatibility require focused regression coverage when changed.
 
+### Required BedrockPackArchive synchronization
+
+BedrockPackArchive is the required downstream consumer at the sibling checkout `..\BedrockPackArchive` and the private repository [NhanAZ-Tools/BedrockPackArchive](https://github.com/NhanAZ-Tools/BedrockPackArchive). Keep that repository private.
+
+Every code change that handles resource-pack offers, metadata, ordering or selection, archive transfer, encryption or decryption results, `contents.json`, per-file keys, capture events or fields, or reconstructed pack output must include a coordinated BedrockPackArchive update in the same task. Before editing, inspect both repositories and their working-tree status, trace the changed BedrockDebugProxy producer behavior into the BedrockPackArchive consumer, and preserve unrelated changes in either checkout.
+
+Update the BedrockPackArchive importer, its focused regression coverage, and its documentation to match the new behavior. If the consumer-facing contract is unchanged, still update or extend a focused BedrockPackArchive fixture or compatibility check that proves it imports output from the changed producer, and record why no importer code change was needed. Do not leave compatibility review only in chat, and do not use an empty commit or version-only bump as a substitute for verification.
+
+Validate both sides before considering the resource-pack change complete. Run the BedrockDebugProxy quality gate and focused regression checks, build and run the relevant BedrockPackArchive checks, and exercise the changed import path with a synthetic fixture or an authorized closed capture. Verify the archive, manifest, per-file-key, and index data affected by the change. Do not commit captures, authentication state, `ContentKey` values, or decrypted pack contents. The BedrockPackArchive fixture and its test report must not contain real server captures or private pack data.
+
+Keep commits separate by repository and cross-reference both commit SHAs in the BedrockDebugProxy audit record. Push the matched BedrockPackArchive change to its existing private origin when publishing the related BedrockDebugProxy change. Verify both remote refs and applicable CI. This paired check does not replace The Hive baseline or any required release validation.
+
 Run formatting, unit tests, static analysis, build checks, and `git diff --check` before committing. A successful local build is not evidence of compatibility with a real Bedrock client or public server. Keep manual and live verification status explicit.
 
 Use `tools/quality.ps1` as the project-wide pre-commit quality gate and `tools/format.ps1` as the canonical formatting command. Do not replace, bypass, or duplicate this workflow in an issue-specific script. Add a linter only when it provides actionable signal for this codebase, and prefer resolving valid findings over broad exclusions. Keep tool versions pinned and review version changes separately from unrelated behavior changes.
