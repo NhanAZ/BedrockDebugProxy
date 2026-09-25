@@ -21,7 +21,7 @@ The Microsoft Learn Add-Ons manifest reference describes `manifest.json` as pack
 
 ## Validation
 
-- Automated checks: `tools/format.ps1` passed. `tools/quality.ps1 -LowMemory` passed, including Go tests, build, static analysis, and vulnerability scan. BedrockPackArchive `go test -count=1 ./...`, `go vet ./...`, and `go build ./...` passed. Its synthetic importer test stubs only the external `verify` process. BedrockPackArchive commit `95c919474fb2dfa9549527a2c5f6389fdc8f165f` was pushed to its existing private `main` branch. GitHub Actions are not configured in that repository. BedrockDebugProxy GitHub Actions will be checked after its push.
+- Automated checks: `tools/format.ps1` passed. `tools/quality.ps1 -LowMemory` passed, including Go tests, build, static analysis, and vulnerability scan. BedrockPackArchive `go test -count=1 ./...`, `go vet ./...`, and `go build ./...` passed. Its synthetic importer test stubs only the external `verify` process. BedrockPackArchive commit `95c919474fb2dfa9549527a2c5f6389fdc8f165f` was pushed to its existing private `main` branch. GitHub Actions are not configured in that repository. BedrockDebugProxy's pushed commit passed both jobs in run [36143436642](https://github.com/NhanAZ/BedrockDebugProxy/actions/runs/36143436642); the paired commit hashes are recorded in AUDIT-0195.
 - Live validation: `pending` for the exact runtime revision. The Hive baseline and direct OneBlockOnline resource-pack flow have not been recorded as stamped reports for this revision.
 - Capture or report: `none for this revision`. No captures, account data, keys, or third-party pack contents were added.
 
