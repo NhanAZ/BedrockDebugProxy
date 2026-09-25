@@ -95,7 +95,7 @@ baseline server.
 - Lifeboat
 - Mineville Zeqa (`experience:Mineville Zeqa`)
 - Enchanted (`experience:Enchanted`)
-- CubeCraft (`play.cubecraft.net:19132`)
+- CubeCraft (`experience:CubeCraft`)
 
 For each server, check connection, authentication, resource packs when offered, spawn, both traffic directions, packet decoding, stability, and unexplained protocol or decode errors. Do not assume the six servers use the same packet order, timing, optional packets, software, or infrastructure.
 

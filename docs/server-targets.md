@@ -23,7 +23,7 @@ These six targets are the required release matrix. Use the exact selector with t
 | Lifeboat | `experience:Lifeboat` | `mco.lbsg.net:19132` | Creator Experience |
 | Mineville Zeqa | `experience:Mineville Zeqa` | `play.inpvp.net:19132` | Creator Experience |
 | Enchanted | `experience:Enchanted` | `play.enchanted.gg:19132` | Creator Experience |
-| CubeCraft | `play.cubecraft.net:19132` | `play.cubecraft.net:19132` | Featured server |
+| CubeCraft | `experience:CubeCraft` | `play.cubecraft.net:19132` | Featured server |
 
 For release validation, follow [`validation.md`](validation.md) and [`releasing.md`](releasing.md). Use a concrete reachable LAN address for `--listen` when testing `--follow-transfers`. Do not place raw addresses, credentials, or captures in sanitized reports.
 
@@ -50,7 +50,7 @@ These entries are useful for exploratory research but are not release gates.
 | --- | --- | --- |
 | MegaSMP | `experience:MegaSMP` | By InPvP, `play.megasmp.gg:19132` |
 
-The five Experience targets above use Creator Experience selectors. The provider and endpoint references in this document came from the maintainer's current test catalog and must be rechecked if a service changes its routing.
+The `experience:` selector is the common Minecraft services lookup for both Featured Experiences and Creator Experiences. The category column describes the server listing, not which selector form it accepts. CubeCraft is a Featured server and its release selector is `experience:CubeCraft`; its endpoint is listed as a reference only. Provider and endpoint references in this document came from the maintainer's test catalog and must be rechecked if a service changes its routing.
 
 ## CubeCraft maintainer risk gate
 
