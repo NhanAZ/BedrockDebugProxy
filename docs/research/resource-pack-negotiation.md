@@ -2,13 +2,13 @@
 
 ## Scope
 
-This note records a narrow live observation from The Hive on 2026-08-30 using Minecraft Bedrock 1.26.45, protocol 2169. It exists to prevent a future change from assuming that `ResourcePacksInfo.TexturePackRequired` and `ResourcePackStack.TexturePackRequired` must always have the same value.
+This note preserves a previously recorded observation, reported as a The Hive session on 2026-08-30 using Minecraft Bedrock 1.26.45, protocol 2169. The original source capture has not been identified in the private archive, so the capture-dependent claims below are unverified until the source can be identified and linked.
 
 The source capture is sensitive, but this note does not record its session identifier or an archive link. The evidence below records only packet identities, sequence numbers, blob digests, and the first serialized boolean. It contains no archive bytes, content keys, player identity, or authentication material.
 
-## Observed evidence
+## Previously recorded evidence (unverified)
 
-The closed capture passed the project verifier and later reached `session.spawned`. Its upstream server-to-client packet evidence contains the following values.
+An earlier local inspection recorded that the capture passed the project verifier and later reached `session.spawned`. It reported the following upstream server-to-client packet values. The source archive is unavailable for independent verification.
 
 | Packet | Sequence | Raw blob SHA-256 | First payload byte |
 | --- | ---: | --- | ---: |
@@ -17,11 +17,11 @@ The closed capture passed the project verifier and later reached `session.spawne
 
 At gophertunnel `v1.61.0`, commit `283a5a97dfe65da94bcc0b401807f6aefa9e72ee`, [`minecraft/packet.go`](https://github.com/Sandertv/gophertunnel/blob/283a5a97dfe65da94bcc0b401807f6aefa9e72ee/minecraft/packet.go) passes `PacketFunc` the payload after reading the packet header. Both packet definitions serialize `TexturePackRequired` as their first field. See the immutable [`ResourcePacksInfo`](https://github.com/Sandertv/gophertunnel/blob/283a5a97dfe65da94bcc0b401807f6aefa9e72ee/minecraft/protocol/packet/resource_packs_info.go) and [`ResourcePackStack`](https://github.com/Sandertv/gophertunnel/blob/283a5a97dfe65da94bcc0b401807f6aefa9e72ee/minecraft/protocol/packet/resource_pack_stack.go) definitions.
 
-The observation therefore decodes to `true` in `ResourcePacksInfo` and `false` in `ResourcePackStack`. The session completing spawn shows that this difference is accepted in at least this real server flow. It is not evidence that every server uses the same values or ordering.
+If the recorded payload bytes are accurate, they decode to `true` in `ResourcePacksInfo` and `false` in `ResourcePackStack`. The earlier note reported that the session reached spawn, but the missing archive prevents independent verification of that flow. Do not treat this observation as verified evidence of server behavior.
 
 ## Project impact
 
-BedrockDebugProxy marks the initial downstream `ResourcePacksInfo` offer as required so Minecraft can present the normal download-and-join or leave choice. The pinned gophertunnel listener creates the later downstream `ResourcePackStack` with its default false value. The observed The Hive flow demonstrates that forcing the later stack flag to match the initial offer is not justified by this evidence.
+BedrockDebugProxy marks the initial downstream `ResourcePacksInfo` offer as required so Minecraft can present the normal download-and-join or leave choice. The pinned gophertunnel listener creates the later downstream `ResourcePackStack` with its default false value. The unverified observation is insufficient on its own to justify changing that behavior. Use a verified archive or fresh evidence before relying on the reported Hive flow.
 
 The patched connection API now retains the decoded upstream `ResourcePacksInfo` on dialled `GameData`. BedrockDebugProxy uses that value to mirror offer metadata downstream while rebuilding the pack entries from the archive-backed resources it can serve. The upstream URL list is therefore not forwarded verbatim, and a listener without an upstream offer still uses its configured policy. A real Minecraft client still has to validate the visible prompt on each release candidate.
 
