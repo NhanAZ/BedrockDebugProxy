@@ -1166,6 +1166,14 @@ Every new entry should state the symptom, root cause, implementation commits, ev
 - Evidence and validation: `internal/experience/target.go` resolves names from the Minecraft services discovery catalog through the shared `experience:` path and reports failures as "list featured and creator experiences"; `internal/experience/target_test.go` accepts `EXPERIENCE:CubeCraft`. Documentation review and `git diff --check`; no runtime code or live connection changed.
 - Status: documentation-only correction. Existing validation reports and their tested revisions remain unchanged.
 
+### FIX-0146 - Name the RakNet acceptance wait on cancellation
+
+- Symptom: a canceled RakNet dial while waiting for `CONNECTION_REQUEST_ACCEPTED` reported only `context canceled`, hiding the handshake stage from the capture error.
+- Root cause: the dialer's acceptance-wait cancellation branch returned the context error without operation context.
+- Implementation: wrap that cancellation with `await connection request acceptance`. No packet, retry, timeout, or connection behavior changes.
+- Evidence and validation: source review of `third_party/go-raknet/dial.go` confirms that this branch runs after sending `CONNECTION_REQUEST` and waiting for the acceptance signal. The Enchanted capture `captures/session-20260925T013400Z` contains a canceled hop 3 dial without transport-open evidence, but does not prove that this specific branch produced the observed error. `tools/format.ps1` and `tools/quality.ps1 -LowMemory` passed. Enchanted captures `captures/session-20260925T022556Z` and `captures/session-20260925T023226Z` completed six and four hops; the new cancellation diagnostic was not exercised.
+- Status: implemented as a diagnostic improvement. The underlying cause of the earlier Enchanted stall remains unconfirmed.
+
 ## Ordering safety contract
 
 The deferred-packet change is deliberately narrow. `expectedIDs` remains the only authority for what the current login state accepts. The queue scan selects the earliest packet that is currently expected, leaves packets for later states queued, and never mutates or reorders bytes on the wire. The regression tests cover canonical resource-pack order, featured early `ResourcePacksInfo`, a later-phase packet queued ahead of the current phase, and all six permutations of the three login packets.

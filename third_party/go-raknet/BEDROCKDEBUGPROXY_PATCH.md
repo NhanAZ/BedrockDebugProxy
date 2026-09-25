@@ -8,4 +8,6 @@ The project-specific `Conn.CloseImmediately` method sends the RakNet disconnect 
 
 The dialer also tolerates a repeated `CONNECTION_REQUEST_ACCEPTED` during the initial reliable connection setup by re-sending `NEW_INCOMING_CONNECTION`. A Galaxite capture recorded the repeated acceptance after the first response was sent, and treating the retransmission as fatal prevented the upstream session from completing. The local regression test covers this recovery path. This is a transport reliability correction and does not alter Bedrock packet payloads.
 
+When the dial context is canceled while waiting for `CONNECTION_REQUEST_ACCEPTED`, the returned error now names that wait stage. This improves capture diagnostics only. It does not change retries, packet contents, or connection behavior.
+
 The patch was informed by owner-controlled transfer captures and project research reviewed on 2026-09-13. The source baseline and license remain those of go-raknet.
