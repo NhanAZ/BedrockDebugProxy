@@ -4,7 +4,7 @@ The ignored `validation/local/<REVISION>/` directory may contain small `bedrockd
 
 A report identifies the tested revision and records sanitized evidence for one server session. It is not a raw capture, a compatibility guarantee, or permission to publish captured content. Review every report before uploading it.
 
-Runtime-affecting pull requests require a passing The Hive report for the exact revision. Flow-specific changes require an additional report that observes the changed flow. Each official release requires reports for the six servers listed in `docs/validation.md`. The CubeCraft report also requires the maintainer to accept the connection risk for the exact diagnostic session. Do not record or publish private server discussions. Without the acknowledgement, use `incomplete` and keep the release gate blocked.
+Routine runtime pull requests may use an exact-revision packs-only smoke report when it observes the affected login or resource-pack flow. Such reports are expected to say `incomplete` because packs-only mode does not request world spawn. Changes outside that boundary need focused automated, fixture, or loopback evidence. Each official release requires passing real-client reports for the six servers listed in `docs/validation.md`. The CubeCraft release report also requires the maintainer to accept the connection risk for the exact diagnostic session. Do not record or publish private server discussions. Without the acknowledgement, use `incomplete` and keep the release gate blocked.
 
 The Enchanted server sends an in-game form when the player joins. The release report must select any minigame from that form and observe the resulting transfer and next-hop resource-pack flow. A hub-only connection does not pass the release gate.
 
