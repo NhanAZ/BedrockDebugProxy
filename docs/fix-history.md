@@ -29,7 +29,7 @@ Every new entry should state the symptom, root cause, implementation commits, ev
 - Root cause: bytes.Reader returns EOF for the protocol string reader's zero-length read at the end of an empty final DownloadURL. Observe missed the valid offer, so Merge appended both the connection's downloaded list and its cache entries.
 - Implementation: use bytes.Buffer, matching the canonical packet decoder. Keep full-consumption validation and the established merge logic. Packet bytes, original and derived archives, contents.json, keys, and schema are unchanged.
 - Evidence and validation: the empty-final-URL and chunk-only ordering cases fail before the fix and pass afterward. The loopback check now requires exactly one archive and a count of one for its one-pack offer. The paired BedrockPackArchive fixture includes the empty-URL offer and checks archive hash, manifests, contents.json, key count, and event provenance. See [research](research/resource-pack-empty-final-url.md) and [AUDIT-0208](audits/AUDIT-0208-empty-final-pack-url.md).
-- Status: automated validation is recorded in the commit audit. Stamped The Hive packs-only evidence follows the runtime commit. Retail gameplay and release validation remain separate.
+- Status: the canonical gate, paired synthetic verifier check, and stamped The Hive pack exchange pass. The live capture has 24 offers, 24 original archives, 24 derived archives, and 24 contents manifests. See [AUDIT-0209](audits/AUDIT-0209-exact-hive-pack-archive-validation.md) for the private evidence citation and matched revisions. Retail gameplay and release validation remain separate.
 
 ### FIX-0152 - Preserve plaintext pack metadata with declared keys
 

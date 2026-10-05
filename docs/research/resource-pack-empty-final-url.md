@@ -26,3 +26,9 @@ BedrockPackArchive's matched fixture adds an empty-URL offer at initial and tran
 A display name is not an archive identity. Distinct UUIDs can share a name and a changed pack can retain its version string. Capture preserves the exact encrypted archive before deriving the plaintext archive and contents.json. Asset intake must preserve those reconstructed bytes without pretty-printing JSON. For a maintainer-selected latest-offer-only main, old variants and historical formatting stay in their immutable snapshots.
 
 Synthetic evidence establishes the root cause. A stamped The Hive packs-only report must confirm the affected login and pack flow. It does not establish retail-client spawn or gameplay.
+
+## Stamped live verification
+
+The Hive [session-20261005T160935Z](https://github.com/BedrockDebugProxy-Captures/session-20261005T160935Z/releases/tag/capture-archive) used runtime revision 7242b9aff8a9865361c9e55903d2ed9e927b31a2 and completed the affected pack exchange. The raw offer and stack each contain 24 distinct UUIDs. Capture records 24 original archives, 24 decrypted archives, and 24 plaintext contents manifests. BedrockPackArchive produces 24 folders and 24 index entries. All 6,935 reconstructed asset files match the derived archive entries and associated contents blobs byte for byte. Capture verification reports no dropped, truncated, write-error, or decode-error counts.
+
+The complete unchanged capture was archived privately and its uploaded ZIP was downloaded again to verify SHA-256. Its sanitized report remains incomplete because no world spawn was requested. See [AUDIT-0209](../audits/AUDIT-0209-exact-hive-pack-archive-validation.md) for the matched revisions, archive digest, and current asset snapshot.
