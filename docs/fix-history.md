@@ -14,6 +14,14 @@ Every new entry should state the symptom, root cause, implementation commits, ev
 
 ## Compatibility and bug index
 
+### FIX-0153 - Preserve transfer after a racing client close
+
+- Symptom: an opt-in transfer could close the proxy instead of reaching the next hop when the downstream close result arrived first.
+- Root cause: runHop recognized only the first forwarding-loop result as a transfer. A completed server-to-client transfer in the second result was discarded after a normal context-canceled client close.
+- Implementation: recognize the completed transfer in either supported completion order. Preserve both terminal diagnostics and the transfer's original source address and client GUID. Other first-result failures remain authoritative.
+- Evidence and validation: deterministic completion-order tests fail before the fix. The existing two-hop loopback test checks reconnect, route probe, source-flow provenance, and closed capture integrity. The [research note](research/transfer-close-order.md) distinguishes this root cause from FIX-0005, FIX-0013, and FIX-0141. BedrockPackArchive's synthetic fixture checks both hops and the child menu path.
+- Status: the [commit audit](audits/AUDIT-0206-transfer-close-order.md) records automated and paired verification. Retail-client and release-matrix validation remain separate.
+
 ### FIX-0152 - Preserve plaintext pack metadata with declared keys
 
 - Symptom: decrypted archives transformed plaintext root manifest and icon bytes when contents.json declared keys for those metadata paths.

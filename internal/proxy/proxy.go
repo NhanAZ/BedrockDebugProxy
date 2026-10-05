@@ -83,6 +83,17 @@ func (e *transferError) Error() string {
 	return "server transfer to " + e.target
 }
 
+func transferFromLoops(first, second error) *transferError {
+	var transfer *transferError
+	if errors.As(first, &transfer) {
+		return transfer
+	}
+	if errors.Is(first, context.Canceled) && errors.As(second, &transfer) {
+		return transfer
+	}
+	return nil
+}
+
 type transferRewriteError struct {
 	err error
 }
@@ -792,8 +803,8 @@ func (r *Runner) runHop(runCtx context.Context, localAddress string, state *hopS
 		first <- r.forward(serverConn, clientConn, failures, live, &shuttingDown, transferAddress, capture.DirectionServerToClient, "upstream", state.upstreamID, state.hop, onTransfer)
 	}()
 	bridgeErr := <-first
-	var transfer *transferError
-	if r.config.FollowTransfers && errors.As(bridgeErr, &transfer) {
+	transfer := transferFromLoops(bridgeErr, nil)
+	if r.config.FollowTransfers && transfer != nil {
 		keepClientOpen = true
 		shuttingDown.Store(true)
 		// The next hop reuses this RakNet source address. Release it now instead
@@ -817,6 +828,20 @@ func (r *Runner) runHop(runCtx context.Context, localAddress string, state *hopS
 	secondErr := <-first
 	if err := failures.Err(); err != nil {
 		return fmt.Errorf("capture hook failed: %w", err)
+	}
+	if r.config.FollowTransfers {
+		if transfer = transferFromLoops(bridgeErr, secondErr); transfer != nil {
+			// A client may close as soon as the flushed Transfer arrives, before
+			// the server-to-client loop returns its completed transfer result.
+			_ = serverConn.CloseImmediately()
+			if err := r.recordAtHop("session.close", capture.SeverityInfo, map[string]any{
+				"first_loop_error": errorString(bridgeErr), "second_loop_error": errorString(secondErr), "transfer_target": transfer.target,
+			}, state.hop); err != nil {
+				return err
+			}
+			live.Info("Session hop %d ended after transfer - target %s", state.hop, transfer.target)
+			return transfer
+		}
 	}
 	if err := r.recordAtHop("session.close", severityForError(bridgeErr), map[string]any{
 		"first_loop_error": errorString(bridgeErr), "second_loop_error": errorString(secondErr),

@@ -18,6 +18,28 @@ import (
 	"github.com/sandertv/gophertunnel/minecraft/protocol/packet"
 )
 
+func TestTransferFromLoopsPreservesTransferAfterClientClose(t *testing.T) {
+	transfer := &transferError{target: "127.0.0.1:19133", localAddr: &net.UDPAddr{IP: net.IPv4(127, 0, 0, 1), Port: 19134}, clientGUID: 42}
+	for _, test := range []struct {
+		name          string
+		first, second error
+		want          *transferError
+	}{
+		{name: "transfer first", first: transfer, second: context.Canceled, want: transfer},
+		{name: "client close first", first: fmt.Errorf("read packet: %w", context.Canceled), second: transfer, want: transfer},
+		{name: "wrapped transfer second", first: context.Canceled, second: fmt.Errorf("forward: %w", transfer), want: transfer},
+		{name: "unrelated failure first", first: errors.New("failed packet write"), second: transfer},
+		{name: "client close without transfer", first: context.Canceled, second: net.ErrClosed},
+		{name: "no transfer", first: nil, second: nil},
+	} {
+		t.Run(test.name, func(t *testing.T) {
+			if got := transferFromLoops(test.first, test.second); got != test.want {
+				t.Fatalf("selected transfer = %v, want %v with the original route and GUID", got, test.want)
+			}
+		})
+	}
+}
+
 func TestFinishTransferRewriteErrorAtHopAllowsDecodedPacketWithoutRawRead(t *testing.T) {
 	root := filepath.Join(t.TempDir(), "capture")
 	recorder, err := capture.New(root, capture.Options{SyncEachEvent: true})
