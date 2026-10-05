@@ -12,6 +12,8 @@ The downstream listener mirrors the decoded upstream `ResourcePacksInfo` metadat
 
 The later `ResourcePackStack` is a separate parity boundary. Dialled connections retain the complete upstream stack, and the proxy listener reuses it when available, preserving pack order, base game version, experiments, and stack flags. Before raw reuse, the listener compares the fields known by the current protocol revision with the prepared stack. A changed prepared stack uses typed serialization, while trailing fields not understood by this revision remain in the retained raw bytes. The normal gophertunnel-generated stack remains the fallback for standalone listener callers. The evidence and implementation boundary are recorded in [`docs/research/resource-pack-stack-parity.md`](research/resource-pack-stack-parity.md).
 
+The auxiliary offer decoder accepts an empty final DownloadURL for normal chunk-delivered packs. It uses the canonical packet decoder's byte-buffer read behavior and still rejects trailing data. The merge then selects a cached or downloaded archive once for each offered entry in offer order. It does not filter genuine repeated wire offers or rewrite archives. See [empty final URL handling](research/resource-pack-empty-final-url.md).
+
 ## Packs-only capture
 
 Use `run --packs-only` to capture the upstream login and resource-pack exchange without starting a local Bedrock listener or requiring a second Minecraft client.

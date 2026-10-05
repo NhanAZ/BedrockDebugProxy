@@ -22,6 +22,15 @@ Every new entry should state the symptom, root cause, implementation commits, ev
 - Evidence and validation: deterministic completion-order tests fail before the fix. The existing two-hop loopback test checks reconnect, route probe, source-flow provenance, and closed capture integrity. The [research note](research/transfer-close-order.md) distinguishes this root cause from FIX-0005, FIX-0013, and FIX-0141. BedrockPackArchive's synthetic fixture checks both hops and the child menu path.
 - Status: the [commit audit](audits/AUDIT-0206-transfer-close-order.md) records automated and paired verification. Retail-client and release-matrix validation remain separate.
 
+### FIX-0154 - Accept an empty final resource-pack URL
+
+- Symptom: a chunk-only offer could produce two archive records per downloaded pack and retain download completion order instead of offer order.
+- Classification: local integration regression in the existing FIX-0075 path.
+- Root cause: bytes.Reader returns EOF for the protocol string reader's zero-length read at the end of an empty final DownloadURL. Observe missed the valid offer, so Merge appended both the connection's downloaded list and its cache entries.
+- Implementation: use bytes.Buffer, matching the canonical packet decoder. Keep full-consumption validation and the established merge logic. Packet bytes, original and derived archives, contents.json, keys, and schema are unchanged.
+- Evidence and validation: the empty-final-URL and chunk-only ordering cases fail before the fix and pass afterward. The loopback check now requires exactly one archive and a count of one for its one-pack offer. The paired BedrockPackArchive fixture includes the empty-URL offer and checks archive hash, manifests, contents.json, key count, and event provenance. See [research](research/resource-pack-empty-final-url.md) and [AUDIT-0208](audits/AUDIT-0208-empty-final-pack-url.md).
+- Status: automated validation is recorded in the commit audit. Stamped The Hive packs-only evidence follows the runtime commit. Retail gameplay and release validation remain separate.
+
 ### FIX-0152 - Preserve plaintext pack metadata with declared keys
 
 - Symptom: decrypted archives transformed plaintext root manifest and icon bytes when contents.json declared keys for those metadata paths.

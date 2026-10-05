@@ -8,6 +8,7 @@ Detailed rationale remains in [`docs/audits/`](docs/audits/).
 
 ### Changed
 
+- Resource-pack capture now accepts offers whose final download URL is empty, preserving offer order without counting downloaded archives again through the cache.
 - Transfer following now retains a completed server transfer when the client closes before the server-to-client forwarding loop returns.
 - Resource-pack decryption now preserves plaintext root manifests and icons even when contents.json declares keys for those metadata files.
 - The Mojang protocol watcher now reads formatted release protocol numbers and preserves resolved metadata and UTC publication times in its issue tables.

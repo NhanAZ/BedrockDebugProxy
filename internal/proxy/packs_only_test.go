@@ -163,7 +163,8 @@ spawnPacketsChecked:
 		t.Fatal("packs-only capture unexpectedly records a local listen address")
 	}
 
-	var fetchComplete, archiveCaptured bool
+	var fetchComplete bool
+	archiveCount := 0
 	if err := capture.ScanEvents(root, func(event capture.Event) error {
 		switch event.Kind {
 		case "resource_pack.fetch_complete":
@@ -174,8 +175,8 @@ spawnPacketsChecked:
 			if err := json.Unmarshal(event.Data, &data); err != nil {
 				return err
 			}
-			if data.ResourcePackCount < 1 || data.WorldSpawned {
-				t.Errorf("fetch-complete data = %#v, want a non-empty pack list and no world spawn", data)
+			if data.ResourcePackCount != 1 || data.WorldSpawned {
+				t.Errorf("fetch-complete data = %#v, want one offered pack and no world spawn", data)
 			}
 			fetchComplete = true
 		case "resource_pack.archive":
@@ -192,7 +193,7 @@ spawnPacketsChecked:
 			if event.Blob.Size != int64(len(archive)) {
 				t.Errorf("captured pack archive size = %d, want %d", event.Blob.Size, len(archive))
 			}
-			archiveCaptured = true
+			archiveCount++
 		}
 		return nil
 	}); err != nil {
@@ -201,8 +202,8 @@ spawnPacketsChecked:
 	if !fetchComplete {
 		t.Fatal("capture lacks resource_pack.fetch_complete")
 	}
-	if !archiveCaptured {
-		t.Fatal("capture lacks the offered resource_pack.archive")
+	if archiveCount != 1 {
+		t.Fatalf("capture has %d archive events, want one for the offered pack", archiveCount)
 	}
 }
 

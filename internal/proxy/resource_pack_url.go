@@ -383,7 +383,9 @@ func decodeResourcePacksInfo(payload []byte) (info *packet.ResourcePacksInfo, er
 		}
 	}()
 	info = &packet.ResourcePacksInfo{}
-	reader := bytes.NewReader(payload)
+	// Buffer accepts the zero-length read for an empty final DownloadURL at EOF,
+	// matching the canonical gophertunnel packet decoder's input.
+	reader := bytes.NewBuffer(payload)
 	info.Marshal(protocol.NewReader(reader, 0, true))
 	if reader.Len() != 0 {
 		return nil, fmt.Errorf("decode ResourcePacksInfo: %d unread bytes", reader.Len())

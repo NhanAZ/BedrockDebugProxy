@@ -282,6 +282,54 @@ func TestURLResourcePackCacheMergePreservesMixedOfferOrder(t *testing.T) {
 	}
 }
 
+func TestURLResourcePackCacheMergePreservesChunkOnlyOfferOrder(t *testing.T) {
+	firstUUID := uuid.MustParse("11111111-1111-1111-1111-111111111111")
+	secondUUID := uuid.MustParse("22222222-2222-2222-2222-222222222222")
+	firstArchive := testURLResourcePackArchiveWith(t, firstUUID, "1.0.0")
+	secondArchive := testURLResourcePackArchiveWith(t, secondUUID, "2.0.0")
+	first, err := resource.Read(bytes.NewReader(firstArchive))
+	if err != nil {
+		t.Fatal(err)
+	}
+	second, err := resource.Read(bytes.NewReader(secondArchive))
+	if err != nil {
+		t.Fatal(err)
+	}
+	info := &packet.ResourcePacksInfo{TexturePacks: []protocol.TexturePackInfo{
+		{UUID: firstUUID, Version: "1.0.0", Size: uint64(len(firstArchive))},
+		{UUID: secondUUID, Version: "2.0.0", Size: uint64(len(secondArchive))},
+	}}
+	cache := newURLResourcePackCache(context.Background())
+	cache.Observe(packet.Header{PacketID: packet.IDResourcePacksInfo}, encodeResourcePacksInfo(t, info))
+	for _, pack := range []*resource.Pack{second, first} {
+		if err := cache.Store(context.Background(), resourcePackKey(pack), pack); err != nil {
+			t.Fatal(err)
+		}
+	}
+	merged := cache.Merge([]*resource.Pack{second, first})
+	if len(merged) != 2 || merged[0] != first || merged[1] != second {
+		t.Fatalf("merged packs = %#v, want two original packs in offer order", merged)
+	}
+}
+
+func TestDecodeResourcePacksInfoAcceptsFinalEmptyDownloadURL(t *testing.T) {
+	info := &packet.ResourcePacksInfo{TexturePacks: []protocol.TexturePackInfo{{
+		UUID: uuid.MustParse("11111111-1111-1111-1111-111111111111"), Version: "1.0.0", Size: 123,
+	}}}
+	payload := encodeResourcePacksInfo(t, info)
+	original := bytes.Clone(payload)
+	decoded, err := decodeResourcePacksInfo(payload)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(decoded.TexturePacks) != 1 || decoded.TexturePacks[0] != info.TexturePacks[0] {
+		t.Fatalf("decoded offer = %#v, want original chunk-delivered offer", decoded)
+	}
+	if !bytes.Equal(payload, original) {
+		t.Fatal("decoder changed the observed packet bytes")
+	}
+}
+
 func TestURLResourcePackCacheStoreClearsPreviousPrefetchError(t *testing.T) {
 	packUUID := uuid.MustParse("11111111-1111-1111-1111-111111111111")
 	archive := testURLResourcePackArchive(t)
