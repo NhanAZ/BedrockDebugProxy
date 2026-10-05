@@ -31,17 +31,19 @@ The Go module uses the following direct dependencies. Their source remains under
 
 | Module | Version | License | Role |
 | --- | --- | --- | --- |
-| [`github.com/coder/websocket`](https://github.com/coder/websocket) | `v1.8.14` | ISC | Minecraft signaling WebSocket transport |
-| [`github.com/df-mc/go-nethernet`](https://github.com/df-mc/go-nethernet) | `v1.0.23` | MIT | NetherNet and WebRTC upstream transport |
-| [`github.com/df-mc/go-playfab/v2`](https://github.com/df-mc/go-playfab) | `v2.0.2` | MIT | Minecraft services authentication |
+| [`github.com/coder/websocket`](https://github.com/coder/websocket) | `v1.8.15` | ISC | Minecraft signaling WebSocket transport |
+| [`github.com/df-mc/go-nethernet`](https://github.com/df-mc/go-nethernet) | `v1.0.24` | MIT | NetherNet and WebRTC upstream transport |
+| [`github.com/df-mc/go-playfab/v2`](https://github.com/df-mc/go-playfab) | `v2.0.3` | MIT | Minecraft services authentication |
 | [`github.com/df-mc/go-xsapi/v2`](https://github.com/df-mc/go-xsapi) | `v2.0.3` | MIT | Xbox Live session used for service authentication |
-| [`github.com/go-gl/mathgl`](https://github.com/go-gl/mathgl) | `v1.1.0` | BSD-3-Clause | Vector and matrix types used by the Bedrock protocol model |
+| [`github.com/go-gl/mathgl`](https://github.com/go-gl/mathgl) | `v1.2.0` | BSD-3-Clause | Vector and matrix types used by the Bedrock protocol model |
 | [`github.com/google/uuid`](https://github.com/google/uuid) | `v1.6.0` | BSD-3-Clause | UUID parsing and values |
 | [`github.com/sandertv/go-raknet`](https://github.com/Sandertv/go-raknet) | `v1.15.2-0.20260705184311-0d1fd09e2cf6` plus the local GUID, repeated-acceptance recovery, and cancellation-stage diagnostic patches | MIT | RakNet transport |
 | [`github.com/sandertv/gophertunnel`](https://github.com/Sandertv/gophertunnel) | Declared `v1.61.0`, with reviewed merged `v1.62.0` 1.26.50 corrections and local patches | MIT | Bedrock sessions, protocol, authentication, and resource packs |
-| [`golang.org/x/oauth2`](https://github.com/golang/oauth2) | `v0.36.0` | BSD-3-Clause | Authentication token source API |
+| [`golang.org/x/oauth2`](https://github.com/golang/oauth2) | `v0.37.0` | BSD-3-Clause | Authentication token source API |
 
 The complete direct and transitive module graph and exact checksums are recorded in `go.mod` and `go.sum`. `tools/collect-third-party-licenses.ps1` verifies that every module compiled into the product has root license material and creates the deterministic license bundle used by binary releases. Distributions that include dependency source or compiled dependency code must preserve the license and notice material required by those dependencies.
+
+The go-nethernet v1.0.24 update is dependency use, not copied source. Its immutable revision is `90bfcd1be9a4762a2d0c06243f880d195408561f`. The root and in-tree gophertunnel module graphs select it with its required Pion versions. See the [2026-10-05 maintenance review](docs/research/protocol-maintenance-2026-10-05.md) for source review, identity-validation boundaries, and test scope.
 
 The in-tree copy under [`third_party/gophertunnel`](third_party/gophertunnel) uses Sandertv gophertunnel `v1.61.0` at commit `283a5a97dfe65da94bcc0b401807f6aefa9e72ee` as its stable base. Reviewed Bedrock 1.26.50 source is merged from the upstream feature branch through `481f3bd138766304a73d7a0412a47a87acec15ed`, together with the required `ClientboundUpdateSoundData` correction from master through `b8bd7357c24fcba3e32f940d1afb1d3b4e43b96d`. The final upstream merge is `v1.62.0` at `7a556a07335b663744b50d38062636ad8283f314`; its `709768d` height-map correction is now represented in the in-tree protocol source, while the `d564b7d` packed `Hand` correction was already present locally. The selected result preserves later stable fixes that are absent from the feature branch and retains the project-specific compatibility and observation changes described in [`third_party/gophertunnel/BEDROCKDEBUGPROXY_PATCH.md`](third_party/gophertunnel/BEDROCKDEBUGPROXY_PATCH.md). The packet codec remains the 1.26.50 composite, while the selected game-version metadata is 1.26.51 because Mojang's 1.26.51 release reports no packet changes. The upstream source and MIT license are retained.
 The upstream resource-pack request-window behavior was researched against [gophertunnel PR #509](https://github.com/Sandertv/gophertunnel/pull/509), which is an open MIT-licensed upstream discussion. The project implementation is an independent narrow adaptation in `minecraft/conn.go` and `minecraft/resource_pack_queue.go`; the PR's source was not copied into the vendor tree. The research note records the source state, scope, and unresolved server-specific behavior.
