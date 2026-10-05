@@ -1206,6 +1206,14 @@ Every new entry should state the symptom, root cause, implementation commits, ev
 - Evidence and validation: synthetic cases before and during an active download failed on the previous source and pass after the guard. The canonical quality gate passed. BedrockPackArchive's paired synthetic fixture passes through the actual producer verifier and preserves archive bytes, both manifests, contents.json, key count, and index provenance. See [AUDIT-0201](audits/AUDIT-0201-empty-pack-download-request.md).
 - Status: automated producer and consumer checks pass. The capture contract is unchanged. Public-server and retail-client pack-cache behavior remain unobserved.
 
+### FIX-0151 - Preserve formatted Mojang release metadata
+
+- Symptom: the protocol watcher reported `unknown` for the official `*2193*` value and could miss a change to the network protocol alone. Generated issue tables also contained literal variable names and a locale-formatted publication timestamp.
+- Root cause: the regex accepted plain digits only, the here-string escaped interpolation, and parsed DateTime values were implicitly cast to strings.
+- Implementation: accept balanced Markdown emphasis or inline code, interpolate actual release metadata, and retain UTC publication time in the existing issue template.
+- Evidence and validation: the seven mocked script cases pass, including malformed markup, unchanged-release silence, new protocol-only detection, and new-version issue contents. Every API request and issue post is mocked. A read-only real release check reports protocol 2193 and no newer stable release. The canonical quality gate passed. See [AUDIT-0202](audits/AUDIT-0202-mojang-watcher-metadata.md).
+- Status: implemented. No public issue or runtime packet behavior changed during validation.
+
 ## Ordering safety contract
 
 The deferred-packet change is deliberately narrow. `expectedIDs` remains the only authority for what the current login state accepts. The queue scan selects the earliest packet that is currently expected, leaves packets for later states queued, and never mutates or reorders bytes on the wire. The regression tests cover canonical resource-pack order, featured early `ResourcePacksInfo`, a later-phase packet queued ahead of the current phase, and all six permutations of the three login packets.

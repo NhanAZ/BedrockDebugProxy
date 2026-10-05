@@ -98,8 +98,8 @@ $releaseBody = [string]$release.body
 if ([string]::IsNullOrWhiteSpace($releaseBody)) {
     $latestProtocol = "unknown"
 } else {
-    $releaseProtocolMatch = [regex]::Match($releaseBody, '(?im)^\s*(?:-\s*)?Network protocol version:\s*([0-9]+)\s*$')
-    $latestProtocol = if ($releaseProtocolMatch.Success) { $releaseProtocolMatch.Groups[1].Value } else { "unknown" }
+    $releaseProtocolMatch = [regex]::Match($releaseBody, '(?im)^\s*(?:-\s*)?Network protocol version:\s*(?<format>\*{1,2}|`)?(?<protocol>[0-9]+)(?(format)\k<format>)\s*$')
+    $latestProtocol = if ($releaseProtocolMatch.Success) { $releaseProtocolMatch.Groups["protocol"].Value } else { "unknown" }
 }
 $releaseUrl = [string]$release.html_url
 if ([string]::IsNullOrWhiteSpace($releaseUrl)) {
@@ -117,6 +117,10 @@ if (-not $versionChanged -and -not $protocolChanged) {
 }
 
 $issueTitle = "[Protocol update] Mojang $latestTag (protocol $latestProtocol)"
+$published = $release.published_at
+if ($published -is [DateTime] -or $published -is [DateTimeOffset]) {
+    $published = $published.ToUniversalTime().ToString("yyyy-MM-ddTHH:mm:ssZ", [Globalization.CultureInfo]::InvariantCulture)
+}
 $issueBody = @"
 ## Official Bedrock protocol release detected
 
@@ -124,11 +128,11 @@ The scheduled protocol watcher found a Mojang Bedrock protocol release that diff
 
 | Field | Current baseline | Detected release |
 | --- | --- | --- |
-| Game version | `$baselineVersion` | `$latestVersion` |
-| Network protocol | `$baselineProtocol` | `$latestProtocol` |
-| Release tag | n/a | `$latestTag` |
-| Release commit | n/a | `$sourceCommit` |
-| Published | n/a | `$([string]$release.published_at)` |
+| Game version | ``$baselineVersion`` | ``$latestVersion`` |
+| Network protocol | ``$baselineProtocol`` | ``$latestProtocol`` |
+| Release tag | n/a | ``$latestTag`` |
+| Release commit | n/a | ``$sourceCommit`` |
+| Published | n/a | ``$published`` |
 
 Source: [$latestTag]($releaseUrl)
 

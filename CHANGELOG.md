@@ -8,6 +8,7 @@ Detailed rationale remains in [`docs/audits/`](docs/audits/).
 
 ### Changed
 
+- The Mojang protocol watcher now reads formatted release protocol numbers and preserves resolved metadata and UTC publication times in its issue tables.
 - Empty resource-pack download requests now preserve the active exchange instead of failing login or replacing the download queue.
 - Fixed-width NBT arrays now reject overflow and truncated input before allocating their advertised payload size.
 - Concurrent RakNet handshakes now synchronize their shared request cache to prevent data races and process crashes.
