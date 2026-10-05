@@ -8,6 +8,7 @@ Detailed rationale remains in [`docs/audits/`](docs/audits/).
 
 ### Changed
 
+- Concurrent RakNet handshakes now synchronize their shared request cache to prevent data races and process crashes.
 - Updated go-nethernet to v1.0.24 with SDP candidate, fingerprint, and cancellable SCTP startup fixes. Its existing server-identity temporal-validation policy remains documented in [the JWT research note](docs/research/nethernet-server-identity-jwt.md).
 - Resource-pack archives now prefer a root `manifest.json` over nested files with the same name, so a nested placeholder cannot override the pack identity.
 - RakNet dial cancellations while awaiting `CONNECTION_REQUEST_ACCEPTED` now retain that handshake stage in the reported error.

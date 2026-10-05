@@ -37,7 +37,7 @@ The Go module uses the following direct dependencies. Their source remains under
 | [`github.com/df-mc/go-xsapi/v2`](https://github.com/df-mc/go-xsapi) | `v2.0.3` | MIT | Xbox Live session used for service authentication |
 | [`github.com/go-gl/mathgl`](https://github.com/go-gl/mathgl) | `v1.2.0` | BSD-3-Clause | Vector and matrix types used by the Bedrock protocol model |
 | [`github.com/google/uuid`](https://github.com/google/uuid) | `v1.6.0` | BSD-3-Clause | UUID parsing and values |
-| [`github.com/sandertv/go-raknet`](https://github.com/Sandertv/go-raknet) | `v1.15.2-0.20260705184311-0d1fd09e2cf6` plus the local GUID, repeated-acceptance recovery, and cancellation-stage diagnostic patches | MIT | RakNet transport |
+| [`github.com/sandertv/go-raknet`](https://github.com/Sandertv/go-raknet) | `v1.15.2-0.20260705184311-0d1fd09e2cf6` plus the upstream handshake-cache mutex and local GUID, repeated-acceptance recovery, and cancellation-stage diagnostic patches | MIT | RakNet transport |
 | [`github.com/sandertv/gophertunnel`](https://github.com/Sandertv/gophertunnel) | Declared `v1.61.0`, with reviewed merged `v1.62.0` 1.26.50 corrections and local patches | MIT | Bedrock sessions, protocol, authentication, and resource packs |
 | [`golang.org/x/oauth2`](https://github.com/golang/oauth2) | `v0.37.0` | BSD-3-Clause | Authentication token source API |
 
@@ -49,6 +49,8 @@ The in-tree copy under [`third_party/gophertunnel`](third_party/gophertunnel) us
 The upstream resource-pack request-window behavior was researched against [gophertunnel PR #509](https://github.com/Sandertv/gophertunnel/pull/509), which is an open MIT-licensed upstream discussion. The project implementation is an independent narrow adaptation in `minecraft/conn.go` and `minecraft/resource_pack_queue.go`; the PR's source was not copied into the vendor tree. The research note records the source state, scope, and unresolved server-specific behavior.
 
 The in-tree copy under [`third_party/go-raknet`](third_party/go-raknet) is based on the selected go-raknet revision above and retains its MIT license. It contains the documented `Dialer.ClientGUID`, `Dialer.clientGUID`, `Conn.ClientGUID`, and connection-state propagation needed to preserve RakNet identity across featured-experience transfers, the documented recovery for repeated `CONNECTION_REQUEST_ACCEPTED` packets during dial setup, and a cancellation-stage diagnostic for the acceptance wait. See [`third_party/go-raknet/BEDROCKDEBUGPROXY_PATCH.md`](third_party/go-raknet/BEDROCKDEBUGPROXY_PATCH.md).
+
+The mutex protecting the first connection-request payload cache is copied from MIT upstream revision [`0667bace52851f53ca3f1c916689620db017e7a3`](https://github.com/Sandertv/go-raknet/commit/0667bace52851f53ca3f1c916689620db017e7a3), `internal/message/open_connection_request_1.go`. This focused backport preserves the original source base and local transport extensions. The regression test is project-authored.
 
 ## Development tools
 

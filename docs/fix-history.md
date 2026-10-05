@@ -1182,6 +1182,14 @@ Every new entry should state the symptom, root cause, implementation commits, ev
 - Evidence and validation: the original OneBlockOnline symptom was observed during a pack-only run, but its temporary capture was removed and is unavailable for independent review. A synthetic regression test now puts a valid nested placeholder before the root manifest and verifies that `resource.Read` selects the root identity. `tools/format.ps1` and `tools/quality.ps1 -LowMemory` passed. The paired BedrockPackArchive synthetic capture test confirms the unchanged capture contract preserves both manifests, the decrypted archive, `contents.json`, the key count, and index metadata. Earlier OneBlockOnline and The Hive pack-only runs completed, but were not stamped reports for this committed revision.
 - Status: automated checks pass. Exact-revision The Hive baseline and direct OneBlockOnline manifest-selection validation remain pending; the release matrix remains unverified.
 
+### FIX-0148 - Synchronize the shared RakNet handshake cache
+
+- Symptom: concurrent first connection-request marshals produced a data race and a fatal concurrent map read or write.
+- Root cause: the payload cache was shared by all dials without synchronization.
+- Implementation: backport the mutex from go-raknet `0667bace52851f53ca3f1c916689620db017e7a3` while retaining the selected source base and local transport patches.
+- Evidence and validation: the new synthetic concurrent marshal test failed on the previous source and passed after the backport with `go test -race -count=1 ./...` in the replacement module. The canonical quality gate passed. See [AUDIT-0199](audits/AUDIT-0199-raknet-handshake-cache.md) and [the maintenance review](research/protocol-maintenance-2026-10-05.md).
+- Status: deterministic regression coverage passes. Live overlapping-dial and retail-client validation are not observed.
+
 ## Ordering safety contract
 
 The deferred-packet change is deliberately narrow. `expectedIDs` remains the only authority for what the current login state accepts. The queue scan selects the earliest packet that is currently expected, leaves packets for later states queued, and never mutates or reorders bytes on the wire. The regression tests cover canonical resource-pack order, featured early `ResourcePacksInfo`, a later-phase packet queued ahead of the current phase, and all six permutations of the three login packets.

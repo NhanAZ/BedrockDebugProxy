@@ -2,6 +2,8 @@
 
 This directory is based on Sandertv go-raknet `v1.15.2-0.20260705184311-0d1fd09e2cf6` and retains its MIT license.
 
+It also includes the upstream mutex correction from `0667bace52851f53ca3f1c916689620db017e7a3` in `internal/message/open_connection_request_1.go`. The first connection-request payload cache is shared by all dials, so concurrent lookups and writes must be synchronized. The backport preserves cached wire bytes and is covered by a concurrent marshal test run with the race detector.
+
 The project-specific change exposes the client RakNet GUID used during a dial and lets callers configure it. The proxy uses this narrow hook to preserve the vanilla client's RakNet identity across a Bedrock `Transfer`, together with the UDP source address. The upstream `MaxMTU` option is used for transfer handshakes so the route does not require a fragmented 1492-byte probe. No packet mutation or authentication bypass is added.
 
 The project-specific `Conn.CloseImmediately` method sends the RakNet disconnect notification and closes the dialled UDP socket without waiting for the peer's close acknowledgement. Transfer-following uses it only after forwarding `Transfer`, before probing or dialing the next hop with the same source address. Ordinary connection closes retain the upstream acknowledgement behavior.
