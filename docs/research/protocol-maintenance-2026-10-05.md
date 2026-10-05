@@ -29,3 +29,9 @@ The clean starting revision `7927dd4f545016e4c91d5e449aa164bae2122bf3` passed `t
 Each selected fix requires a focused deterministic regression check and the canonical quality gate. Nested replacement-module tests must be run explicitly because the root module's `go test ./...` does not traverse them. The BedrockPackArchive compatibility fixture must verify raw empty download-request evidence, archive bytes, both manifests, plaintext contents.json, per-file key count, and index provenance using synthetic data.
 
 No public server, Microsoft account, retail client, or third-party pack is used by the deterministic checks. Automated results do not establish live NetherNet, retail-client, or six-server release compatibility. Those remain separate validation work.
+
+## Completed checks
+
+The canonical formatter and quality gate passed on the reviewed maintenance source. The replacement RakNet module passed its race-enabled suite. The replacement gophertunnel minecraft, NBT, and packet suites passed, and fixed-width NBT tests also passed on 32-bit Windows. The go-nethernet v1.0.24 module suite passed, including local transport, candidate, identity, endpoint, and discovery cases. The watcher passed seven mocked cases and the read-only current-release check.
+
+BedrockPackArchive passed its tests, vet, build, and the synthetic importer fixture with the stamped producer binary. [AUDIT-0203](../audits/AUDIT-0203-paired-protocol-maintenance-validation.md) records both repository revisions and the exact tested binary. The importer and archive contract required no production code change.
