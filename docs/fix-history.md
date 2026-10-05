@@ -14,6 +14,14 @@ Every new entry should state the symptom, root cause, implementation commits, ev
 
 ## Compatibility and bug index
 
+### FIX-0152 - Preserve plaintext pack metadata with declared keys
+
+- Symptom: decrypted archives transformed plaintext root manifest and icon bytes when contents.json declared keys for those metadata paths.
+- Root cause: the decoder applied every non-empty file-key declaration without the root metadata exception.
+- Implementation: copy the selected root manifest and both root icons unchanged. Continue decrypting keyed non-metadata paths, including files with the same basenames below another directory.
+- Evidence and validation: the synthetic regression failed before the fix and passes under the race detector for flat and nested pack roots. The [research note](research/plaintext-resource-pack-metadata.md) records the reviewed primary implementation and scope. BedrockPackArchive's matched fixture retains plaintext metadata, archive hashes, contents.json, three declared keys, and event provenance.
+- Status: focused checks pass. The [commit audit](audits/AUDIT-0204-plaintext-pack-metadata.md) records the canonical gate and paired verification. Retail-client and release-matrix validation remain separate.
+
 ### FIX-0001 - Experience destination resolution
 
 - Symptom: default or named experience destinations could resolve to the wrong address or fail to select the intended featured experience.

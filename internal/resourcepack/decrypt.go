@@ -280,7 +280,14 @@ func DecryptArchive(ctx context.Context, source io.ReaderAt, archiveSize int64, 
 			return Result{}, fmt.Errorf("open resource pack entry %s: %w", name, err)
 		}
 		input := io.Reader(sourceEntry)
-		if entryKey := declarations[name]; entryKey != "" {
+		entryKey := declarations[name]
+		// Root pack metadata is read before decryption. A contents declaration
+		// may still carry a key for these plaintext files. Preserve their bytes.
+		switch name {
+		case rootManifest, joinArchivePath(root, "pack_icon.png"), joinArchivePath(root, "bug_pack_icon.png"):
+			entryKey = ""
+		}
+		if entryKey != "" {
 			stream, streamErr := newCFB8Decrypter([]byte(entryKey), []byte(entryKey)[:aes.BlockSize])
 			if streamErr != nil {
 				_ = sourceEntry.Close()

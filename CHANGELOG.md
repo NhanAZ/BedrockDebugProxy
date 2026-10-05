@@ -8,6 +8,7 @@ Detailed rationale remains in [`docs/audits/`](docs/audits/).
 
 ### Changed
 
+- Resource-pack decryption now preserves plaintext root manifests and icons even when contents.json declares keys for those metadata files.
 - The Mojang protocol watcher now reads formatted release protocol numbers and preserves resolved metadata and UTC publication times in its issue tables.
 - Empty resource-pack download requests now preserve the active exchange instead of failing login or replacing the download queue.
 - Fixed-width NBT arrays now reject overflow and truncated input before allocating their advertised payload size.

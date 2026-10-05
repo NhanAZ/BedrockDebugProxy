@@ -120,6 +120,53 @@ func TestDecryptArchiveRootAndSubpack(t *testing.T) {
 	}
 }
 
+func TestDecryptArchivePreservesKeyedRootMetadata(t *testing.T) {
+	t.Parallel()
+
+	fileKey := "ZYXWVUTSRQPONMLKJIHGFEDCBA654321"
+	for _, prefix := range []string{"", "outer/"} {
+		t.Run(prefix, func(t *testing.T) {
+			plain := map[string][]byte{
+				"manifest.json":     []byte(`{"format_version":2}`),
+				"pack_icon.png":     []byte("plain pack icon"),
+				"bug_pack_icon.png": []byte("plain bug icon"),
+			}
+			entries := []testArchiveEntry{}
+			declarations := []contentsEntry{}
+			for _, name := range []string{"manifest.json", "pack_icon.png", "bug_pack_icon.png"} {
+				entries = append(entries, testArchiveEntry{name: prefix + name, data: plain[name]})
+				declarations = append(declarations, contentsEntry{Path: name, Key: fileKey})
+			}
+			for _, name := range []string{"assets/manifest.json", "assets/pack_icon.png"} {
+				data := []byte("encrypted non-metadata payload")
+				entries = append(entries, testArchiveEntry{name: prefix + name, data: encryptCFB8(t, []byte(fileKey), data)})
+				declarations = append(declarations, contentsEntry{Path: name, Key: fileKey})
+			}
+			entries = append(entries, testArchiveEntry{name: prefix + "contents.json", data: encryptedContents(t, testContentKey, testContentID, declarations)})
+			input := buildEncryptedArchive(t, entries)
+			var output bytes.Buffer
+			result, err := DecryptArchive(context.Background(), bytes.NewReader(input), int64(len(input)), testContentKey, &output)
+			if err != nil {
+				t.Fatal(err)
+			}
+			files := readArchiveFiles(t, output.Bytes())
+			for name, want := range plain {
+				if !bytes.Equal(files[prefix+name], want) {
+					t.Errorf("root metadata %s changed", prefix+name)
+				}
+			}
+			for _, name := range []string{"assets/manifest.json", "assets/pack_icon.png"} {
+				if string(files[prefix+name]) != "encrypted non-metadata payload" {
+					t.Errorf("non-metadata entry %s was not decrypted", prefix+name)
+				}
+			}
+			if result.Report.CopiedFiles != 3 || result.Report.DecryptedFiles != 2 {
+				t.Errorf("actual copy/decrypt counts = %+v", result.Report)
+			}
+		})
+	}
+}
+
 func TestDecryptArchiveAllowsImplicitDirectoryDeclarations(t *testing.T) {
 	t.Parallel()
 

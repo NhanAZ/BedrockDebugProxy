@@ -56,7 +56,7 @@ Select that flag on the initial `run` command. Supported plaintext archives are 
 For the documented 32-byte-key AES-256-CFB8 format, an enabled run writes the following derived events with the original `resource_pack.archive` sequence as their parent.
 
 - `resource_pack.contents_manifest` retains each decrypted root or subpack `contents.json` as a sensitive JSON blob. Its event metadata contains counts, paths, and identifiers but not per-file keys.
-- `resource_pack.decrypted_archive` retains a deterministic ZIP containing copied plaintext files and decrypted declared files. It omits the encrypted `contents.json` files because their plaintext is already preserved separately.
+- `resource_pack.decrypted_archive` retains a deterministic ZIP containing copied plaintext files and decrypted declared files. The selected root manifest.json, pack_icon.png, and bug_pack_icon.png remain byte-identical to the original archive even when contents.json declares keys for those metadata paths. Other paths retain keyed decryption. It omits the encrypted `contents.json` files because their plaintext is already preserved separately. See the [metadata research note](research/plaintext-resource-pack-metadata.md).
 - `resource_pack.decrypt_error` records an unsupported format or failed derivation as a warning. It also adds a capture limitation and does not abort the connection or discard the raw archive.
 
 AES-CFB8 is not authenticated. A derived archive is useful for analysis but is not integrity proof and never replaces the original captured bytes. The supported header, key, subpack, path, size, provenance, and verification boundaries are documented in [`docs/research/resource-pack-encryption.md`](research/resource-pack-encryption.md).
