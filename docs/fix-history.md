@@ -1190,6 +1190,14 @@ Every new entry should state the symptom, root cause, implementation commits, ev
 - Evidence and validation: the new synthetic concurrent marshal test failed on the previous source and passed after the backport with `go test -race -count=1 ./...` in the replacement module. The canonical quality gate passed. See [AUDIT-0199](audits/AUDIT-0199-raknet-handshake-cache.md) and [the maintenance review](research/protocol-maintenance-2026-10-05.md).
 - Status: deterministic regression coverage passes. Live overlapping-dial and retail-client validation are not observed.
 
+### FIX-0149 - Validate fixed-width NBT array lengths before allocation
+
+- Symptom: a synthetic int32 array count of `0x40000000` overflowed the byte-length multiplication and caused an index panic. Incomplete arrays could request large allocations before their bytes were available.
+- Root cause: both fixed-width endian readers multiplied int32 counts before validating byte lengths.
+- Implementation: backport gophertunnel `398154f44e601be70335de0d739c78890e4b6a1c` to check platform limits, buffered bytes, and received stream lengths before exposing array values.
+- Evidence and validation: the overflow fixture failed on the previous reader and passed after the backport. Both byte orders, streaming and buffered input, negative and overflowing counts, truncation, empty arrays, offsets, and trailing bytes pass. The NBT tests also pass on `GOARCH=386`, and the canonical quality gate passed. See [AUDIT-0200](audits/AUDIT-0200-nbt-fixed-width-arrays.md).
+- Status: focused regression coverage passes. No new size limit or packet definition is introduced, and live fixed-width NBT evidence is not observed.
+
 ## Ordering safety contract
 
 The deferred-packet change is deliberately narrow. `expectedIDs` remains the only authority for what the current login state accepts. The queue scan selects the earliest packet that is currently expected, leaves packets for later states queued, and never mutates or reorders bytes on the wire. The regression tests cover canonical resource-pack order, featured early `ResourcePacksInfo`, a later-phase packet queued ahead of the current phase, and all six permutations of the three login packets.
