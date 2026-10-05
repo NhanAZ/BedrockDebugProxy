@@ -8,6 +8,7 @@ Detailed rationale remains in [`docs/audits/`](docs/audits/).
 
 ### Changed
 
+- Empty resource-pack download requests now preserve the active exchange instead of failing login or replacing the download queue.
 - Fixed-width NBT arrays now reject overflow and truncated input before allocating their advertised payload size.
 - Concurrent RakNet handshakes now synchronize their shared request cache to prevent data races and process crashes.
 - Updated go-nethernet to v1.0.24 with SDP candidate, fingerprint, and cancellable SCTP startup fixes. Its existing server-identity temporal-validation policy remains documented in [the JWT research note](docs/research/nethernet-server-identity-jwt.md).

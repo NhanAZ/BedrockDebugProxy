@@ -1198,6 +1198,14 @@ Every new entry should state the symptom, root cause, implementation commits, ev
 - Evidence and validation: the overflow fixture failed on the previous reader and passed after the backport. Both byte orders, streaming and buffered input, negative and overflowing counts, truncation, empty arrays, offsets, and trailing bytes pass. The NBT tests also pass on `GOARCH=386`, and the canonical quality gate passed. See [AUDIT-0200](audits/AUDIT-0200-nbt-fixed-width-arrays.md).
 - Status: focused regression coverage passes. No new size limit or packet definition is introduced, and live fixed-width NBT evidence is not observed.
 
+### FIX-0150 - Preserve the resource-pack queue on empty download requests
+
+- Symptom: a `PackResponseSendPacks` with no requested packs returned `no resource packs to download` and replaced an existing queue.
+- Root cause: the response handler started a download without checking whether an archive was selected.
+- Implementation: backport the empty-list guard from gophertunnel `e86a90de9b1087c17952d1d123b175a89c214d5d`. Empty requests preserve the queue, current offset, expected packet IDs, and login state.
+- Evidence and validation: synthetic cases before and during an active download failed on the previous source and pass after the guard. The canonical quality gate passed. BedrockPackArchive's paired synthetic fixture passes through the actual producer verifier and preserves archive bytes, both manifests, contents.json, key count, and index provenance. See [AUDIT-0201](audits/AUDIT-0201-empty-pack-download-request.md).
+- Status: automated producer and consumer checks pass. The capture contract is unchanged. Public-server and retail-client pack-cache behavior remain unobserved.
+
 ## Ordering safety contract
 
 The deferred-packet change is deliberately narrow. `expectedIDs` remains the only authority for what the current login state accepts. The queue scan selects the earliest packet that is currently expected, leaves packets for later states queued, and never mutates or reorders bytes on the wire. The regression tests cover canonical resource-pack order, featured early `ResourcePacksInfo`, a later-phase packet queued ahead of the current phase, and all six permutations of the three login packets.
