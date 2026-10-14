@@ -23,7 +23,9 @@ The exact source URLs were read on 2026-10-15. Mojang material is specification 
 
 ## Local reproduction
 
-An isolated Axolotl-PM 5.49.2+dev runtime uses the owner's existing source and vendor checkout, protocol 2193, an empty plugin directory, and disposable world data. The baseline packs-only login failed before resource-pack negotiation. The local server explicitly reported an empty SkinArmSizeType value. This reproduces the need behind one discarded skin-default hot fix independently of the old patch. Inspect the matching PHP enum, color parser, and client-data conversion before selecting a correction. Preserve supplied skin fields and cover authenticated and offline default generation.
+An isolated Axolotl-PM 5.49.2+dev runtime uses the owner's existing source and vendor checkout, protocol 2193, an empty plugin directory, and disposable world data. The [baseline packs-only capture](https://github.com/BedrockDebugProxy-Captures/session-20261014T173916Z/releases/tag/capture-archive) failed before resource-pack negotiation. The local server explicitly reported an empty SkinArmSizeType value. This reproduces the need behind one discarded skin-default hot fix independently of the old patch.
+
+The installed BedrockProtocol revision is `0e13c077d1060ae9e293908eff81fbef600ead5c`. Its [SkinArmSizeType](https://github.com/axolotl-pm/BedrockProtocol/blob/0e13c077d1060ae9e293908eff81fbef600ead5c/src/types/skin/SkinArmSizeType.php) accepts only slim or wide. [ClientDataToSkinDataHelper](https://github.com/axolotl-pm/BedrockProtocol/blob/0e13c077d1060ae9e293908eff81fbef600ead5c/src/types/login/clientdata/ClientDataToSkinDataHelper.php) also requires a leading # and one to eight hexadecimal color digits. Both immutable source files match the installed sources apart from line endings. The source is LGPL reference evidence and is not copied. A synthetic client supplied with valid skin values reaches login and spawn on this unchanged server. Select wide and #000000 only for omitted fields in the existing default path. Preserve supplied valid and invalid fields, and cover both authenticated and offline generation.
 
 ## Validation boundaries
 

@@ -14,6 +14,15 @@ Every new entry should state the symptom, root cause, implementation commits, ev
 
 ## Compatibility and bug index
 
+### FIX-0156 - Supply valid defaults for generated login skins
+
+- Symptom: the default packs-only login to the owner-controlled Axolotl-PM server failed with an empty SkinArmSizeType before pack negotiation.
+- Classification: a reproduced generated-client-metadata defect, independent of the discarded uncommitted patch.
+- Root cause: defaultClientData generated a skin image but left ArmSize and SkinColor empty. The matching BedrockProtocol enum and hex parser reject those values.
+- Implementation: fill omitted arm size and color in the existing default path. Preserve all supplied fields and do not normalize invalid observed values.
+- Evidence and validation: the [failed baseline capture](https://github.com/BedrockDebugProxy-Captures/session-20261014T173916Z/releases/tag/capture-archive), matching PHP source at `0e13c077d1060ae9e293908eff81fbef600ead5c`, and a synthetic serialized-client-data regression that failed before the correction. See [the maintenance review](research/maintenance-2026-10-15.md) and [AUDIT-0212](audits/AUDIT-0212-generated-skin-defaults.md).
+- Status: focused regression and final stamped local and public-server checks are recorded in the audit. Retail gameplay remains separate.
+
 ### FIX-0155 - Separate game metadata from the schema watcher baseline
 
 - Symptom: selecting client version 1.26.52 made the watcher report the existing 1.26.51 schema as a new release and suppress a future 1.26.52 schema.

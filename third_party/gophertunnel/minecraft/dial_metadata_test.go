@@ -6,11 +6,55 @@ import (
 	"crypto/elliptic"
 	cryptorand "crypto/rand"
 	"encoding/json"
+	"regexp"
 	"testing"
 
 	"github.com/sandertv/gophertunnel/minecraft/protocol"
 	"github.com/sandertv/gophertunnel/minecraft/protocol/login"
 )
+
+func TestGeneratedLoginSkinMetadataAcceptsAxolotlConstraints(t *testing.T) {
+	for _, offline := range []bool{false, true} {
+		data := login.ClientData{}
+		defaultClientData("127.0.0.1:19132", "SyntheticProbe", &data, offline)
+		encoded, err := json.Marshal(data)
+		if err != nil {
+			t.Fatal(err)
+		}
+		var wire struct {
+			ArmSize   string
+			SkinColor string
+		}
+		if err := json.Unmarshal(encoded, &wire); err != nil {
+			t.Fatal(err)
+		}
+		// BedrockProtocol's SkinArmSizeType and parseColorString reject empty values.
+		if wire.ArmSize != "wide" && wire.ArmSize != "slim" {
+			t.Fatalf("offline=%v: generated ArmSize %q is rejected by SkinArmSizeType", offline, wire.ArmSize)
+		}
+		if !regexp.MustCompile(`^#[a-fA-F0-9]{1,8}$`).MatchString(wire.SkinColor) {
+			t.Fatalf("offline=%v: generated SkinColor %q is rejected by parseColorString", offline, wire.SkinColor)
+		}
+	}
+}
+
+func TestLoginSkinDefaultsPreserveSuppliedMetadata(t *testing.T) {
+	for _, offline := range []bool{false, true} {
+		for _, input := range []login.ClientData{
+			{ArmSize: "slim", SkinColour: "#ffabcdef", SkinData: "synthetic-skin", SkinImageWidth: 64, SkinImageHeight: 64},
+			{ArmSize: "invalid-observed-value", SkinColour: "invalid-observed-value"},
+		} {
+			got := input
+			defaultClientData("127.0.0.1:19132", "SyntheticProbe", &got, offline)
+			if got.ArmSize != input.ArmSize || got.SkinColour != input.SkinColour {
+				t.Fatalf("offline=%v: supplied skin metadata was replaced", offline)
+			}
+			if input.SkinData != "" && (got.SkinData != input.SkinData || got.SkinImageWidth != input.SkinImageWidth || got.SkinImageHeight != input.SkinImageHeight) {
+				t.Fatalf("offline=%v: supplied skin image was replaced", offline)
+			}
+		}
+	}
+}
 
 func TestSetAndroidDataUsesCurrentVersion(t *testing.T) {
 	data := &login.ClientData{

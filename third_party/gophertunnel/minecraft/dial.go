@@ -599,6 +599,12 @@ func defaultClientData(address, username string, d *login.ClientData, generatePl
 	if d.SkinID == "" {
 		d.SkinID = uuid.New().String()
 	}
+	if d.ArmSize == "" {
+		d.ArmSize = "wide"
+	}
+	if d.SkinColour == "" {
+		d.SkinColour = "#000000"
+	}
 	if d.SkinData == "" {
 		d.SkinData = base64.StdEncoding.EncodeToString(bytes.Repeat([]byte{0, 0, 0, 255}, 32*64))
 		d.SkinImageHeight = 32
