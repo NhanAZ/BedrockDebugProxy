@@ -8,7 +8,7 @@ $ErrorActionPreference = "Stop"
 Set-StrictMode -Version Latest
 
 $golangCILintVersion = "v2.14.0"
-$govulncheckVersion = "v1.1.4"
+$govulncheckVersion = "v1.9.0"
 $projectRoot = (Resolve-Path (Join-Path $PSScriptRoot "..")).Path
 $previousGoMaxProcs = [Environment]::GetEnvironmentVariable("GOMAXPROCS", "Process")
 $previousGoFlags = [Environment]::GetEnvironmentVariable("GOFLAGS", "Process")

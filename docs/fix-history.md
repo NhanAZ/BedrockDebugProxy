@@ -14,6 +14,15 @@ Every new entry should state the symptom, root cause, implementation commits, ev
 
 ## Compatibility and bug index
 
+### FIX-0157 - Update the scanner for Go 1.27 Linux analysis
+
+- Symptom: Linux CI passed race tests, build, and static analysis, then govulncheck panicked with an unexpected ast.KeyValueExpr.
+- Classification: a toolchain integration incompatibility exposed by the Go maintenance update.
+- Root cause: govulncheck v1.1.4 uses x/tools v0.29.0 and cannot build SSA for this Linux-selected Go 1.27.2 source graph. The old scanner's Windows scan passed and did not establish Linux compatibility.
+- Implementation: select reviewed stable govulncheck v1.9.0 with x/tools v0.52.0 in the canonical gate. Preserve source and symbol-level scanning, normal failure propagation, and all existing quality checks.
+- Evidence and validation: [the failing exact-revision CI run](https://github.com/NhanAZ/BedrockDebugProxy/actions/runs/38614252382), the same panic in a Linux-target local analysis, and [the research note](research/govulncheck-go127-linux.md). [AUDIT-0214](audits/AUDIT-0214-govulncheck-go127-linux.md) records validation status.
+- Status: new-scanner regression and fresh CI results are recorded in the audit. Runtime, capture, and consumer behavior are unchanged.
+
 ### FIX-0156 - Supply valid defaults for generated login skins
 
 - Symptom: the default packs-only login to the owner-controlled Axolotl-PM server failed with an empty SkinArmSizeType before pack negotiation.
