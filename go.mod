@@ -2,7 +2,7 @@ module github.com/NhanAZ/BedrockDebugProxy
 
 go 1.26.0
 
-toolchain go1.26.6
+toolchain go1.27.2
 
 require (
 	github.com/coder/websocket v1.8.15
@@ -48,10 +48,10 @@ require (
 	github.com/pion/turn/v5 v5.1.2 // indirect
 	github.com/pion/webrtc/v4 v4.2.21-0.20260920133716-91bfc6c2039f // indirect
 	github.com/wlynxg/anet v0.0.5 // indirect
-	golang.org/x/crypto v0.53.0 // indirect
+	golang.org/x/crypto v0.57.0 // indirect
 	golang.org/x/exp v0.0.0-20240909161429-701f63a606c0 // indirect
-	golang.org/x/net v0.56.0 // indirect
-	golang.org/x/sys v0.46.0 // indirect
-	golang.org/x/text v0.38.0 // indirect
+	golang.org/x/net v0.60.0 // indirect
+	golang.org/x/sys v0.48.0 // indirect
+	golang.org/x/text v0.42.0 // indirect
 	golang.org/x/time v0.14.0 // indirect
 )

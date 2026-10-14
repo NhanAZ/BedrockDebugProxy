@@ -8,6 +8,7 @@ Detailed rationale remains in [`docs/audits/`](docs/audits/).
 
 ### Changed
 
+- Updated the preferred Go toolchain to 1.27.2 and the networking dependency security patches required by the current vulnerability scan.
 - Resource-pack capture now accepts offers whose final download URL is empty, preserving offer order without counting downloaded archives again through the cache.
 - Transfer following now retains a completed server transfer when the client closes before the server-to-client forwarding loop returns.
 - Resource-pack decryption now preserves plaintext root manifests and icons even when contents.json declares keys for those metadata files.
