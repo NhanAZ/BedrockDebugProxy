@@ -14,6 +14,15 @@ Every new entry should state the symptom, root cause, implementation commits, ev
 
 ## Compatibility and bug index
 
+### FIX-0155 - Separate game metadata from the schema watcher baseline
+
+- Symptom: selecting client version 1.26.52 made the watcher report the existing 1.26.51 schema as a new release and suppress a future 1.26.52 schema.
+- Classification: a newly exposed coupling in the existing FIX-0151 watcher.
+- Root cause: the script used advertised game metadata as its reviewed protocol-schema baseline.
+- Implementation: add an explicit Mojang schema version row and read that row in the watcher. Keep client metadata and schema provenance independently visible.
+- Evidence and validation: the existing seven mocked release cases failed after the metadata change and pass with the new baseline selection. No public issue was posted. [AUDIT-0211](audits/AUDIT-0211-stable-12652-metadata.md) records the stable metadata scope and paired consumer checks.
+- Status: focused regressions pass. The canonical gate and stamped server checks are recorded in the audit.
+
 ### FIX-0153 - Preserve transfer after a racing client close
 
 - Symptom: an opt-in transfer could close the proxy instead of reaching the next hop when the downstream close result arrived first.

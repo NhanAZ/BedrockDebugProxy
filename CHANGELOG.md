@@ -8,6 +8,7 @@ Detailed rationale remains in [`docs/audits/`](docs/audits/).
 
 ### Changed
 
+- Upstream login metadata now advertises the stable Bedrock 1.26.52 game hotfix while retaining protocol 2193 and the reviewed packet codec. The protocol watcher compares the latest reviewed Mojang schema independently of the client game version.
 - Updated the preferred Go toolchain to 1.27.2 and the networking dependency security patches required by the current vulnerability scan.
 - Resource-pack capture now accepts offers whose final download URL is empty, preserving offer order without counting downloaded archives again through the cache.
 - Transfer following now retains a completed server transfer when the client closes before the server-to-client forwarding loop returns.

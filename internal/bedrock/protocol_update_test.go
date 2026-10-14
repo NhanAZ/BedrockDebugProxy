@@ -9,11 +9,11 @@ import (
 	"github.com/sandertv/gophertunnel/minecraft/protocol/packet"
 )
 
-func TestProtocolVersion12651(t *testing.T) {
+func TestProtocolVersion12652(t *testing.T) {
 	if got, want := protocol.CurrentProtocol, 2193; got != want {
 		t.Fatalf("protocol ID = %d, want %d", got, want)
 	}
-	if got, want := protocol.CurrentVersion, "1.26.51"; got != want {
+	if got, want := protocol.CurrentVersion, "1.26.52"; got != want {
 		t.Fatalf("game version = %q, want %q", got, want)
 	}
 }

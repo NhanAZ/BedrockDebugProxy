@@ -77,10 +77,10 @@ if (-not (Test-Path -LiteralPath $baselinePath -PathType Leaf)) {
 }
 
 $baselineText = Get-Content -Raw -LiteralPath $baselinePath
-$versionMatch = [regex]::Match($baselineText, '(?m)^\| Bedrock game version \| `([^`]+)` \|')
+$versionMatch = [regex]::Match($baselineText, '(?m)^\| Mojang schema version \| `([^`]+)` \|')
 $protocolMatch = [regex]::Match($baselineText, '(?m)^\| Bedrock protocol \| `([^`]+)` \|')
 if (-not $versionMatch.Success -or -not $protocolMatch.Success) {
-    throw "Could not read the Bedrock game version and protocol baseline from $baselinePath."
+    throw "Could not read the Mojang schema version and protocol baseline from $baselinePath."
 }
 $baselineVersion = $versionMatch.Groups[1].Value
 $baselineProtocol = $protocolMatch.Groups[1].Value
