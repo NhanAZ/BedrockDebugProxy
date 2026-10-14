@@ -23,7 +23,7 @@ The protocol watcher compares the Mojang schema version and protocol rows below.
 | Component | Pinned value | Evidence |
 | --- | --- | --- |
 | Go toolchain | `go1.27.2` | `go.mod` toolchain directive and [the maintenance review](research/maintenance-2026-10-15.md) |
-| gophertunnel | Declared as `v1.61.0`; in-tree composite includes reviewed merged `v1.62.0` 1.26.50 corrections, the 1.26.51 metadata selection, focused NBT and empty-pack maintenance backports, and local compatibility patches | `go.mod`, `third_party/gophertunnel/BEDROCKDEBUGPROXY_PATCH.md`, `docs/research/protocol-1.26.51.md`, and the 2026-10-05 maintenance review |
+| gophertunnel | Declared as `v1.61.0`; in-tree composite includes reviewed merged `v1.62.0` 1.26.50 corrections, 1.26.52 client metadata, focused NBT and empty-pack maintenance backports, and local compatibility patches | `go.mod`, `third_party/gophertunnel/BEDROCKDEBUGPROXY_PATCH.md`, and the maintenance reviews on 2026-10-05 and 2026-10-15 |
 | gophertunnel source | `283a5a97dfe65da94bcc0b401807f6aefa9e72ee`, `481f3bd138766304a73d7a0412a47a87acec15ed`, `b8bd7357c24fcba3e32f940d1afb1d3b4e43b96d`, and merged `v1.62.0` at `7a556a07335b663744b50d38062636ad8283f314` | Stable base, reviewed feature and correction commits, and final upstream merge used to verify 1.26.50 protocol fixes |
 | Bedrock protocol | `2193` | Mojang `bedrock-protocol-docs` release `v1.26.51` and `minecraft/protocol/info.go` |
 | Mojang schema version | `1.26.51` | Latest non-prerelease `bedrock-protocol-docs` release, at `8667debe0adad27de6c692c88942c489a1193206` |

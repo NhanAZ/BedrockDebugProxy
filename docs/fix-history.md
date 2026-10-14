@@ -21,7 +21,7 @@ Every new entry should state the symptom, root cause, implementation commits, ev
 - Root cause: defaultClientData generated a skin image but left ArmSize and SkinColor empty. The matching BedrockProtocol enum and hex parser reject those values.
 - Implementation: fill omitted arm size and color in the existing default path. Preserve all supplied fields and do not normalize invalid observed values.
 - Evidence and validation: the [failed baseline capture](https://github.com/BedrockDebugProxy-Captures/session-20261014T173916Z/releases/tag/capture-archive), matching PHP source at `0e13c077d1060ae9e293908eff81fbef600ead5c`, and a synthetic serialized-client-data regression that failed before the correction. See [the maintenance review](research/maintenance-2026-10-15.md) and [AUDIT-0212](audits/AUDIT-0212-generated-skin-defaults.md).
-- Status: focused regression and final stamped local and public-server checks are recorded in the audit. Retail gameplay remains separate.
+- Status: focused regressions pass. [AUDIT-0213](audits/AUDIT-0213-stable-maintenance-server-validation.md) records the final stamped local and five-public-target checks and paired consumer verification. Retail gameplay remains separate.
 
 ### FIX-0155 - Separate game metadata from the schema watcher baseline
 
@@ -30,7 +30,7 @@ Every new entry should state the symptom, root cause, implementation commits, ev
 - Root cause: the script used advertised game metadata as its reviewed protocol-schema baseline.
 - Implementation: add an explicit Mojang schema version row and read that row in the watcher. Keep client metadata and schema provenance independently visible.
 - Evidence and validation: the existing seven mocked release cases failed after the metadata change and pass with the new baseline selection. No public issue was posted. [AUDIT-0211](audits/AUDIT-0211-stable-12652-metadata.md) records the stable metadata scope and paired consumer checks.
-- Status: focused regressions pass. The canonical gate and stamped server checks are recorded in the audit.
+- Status: focused regressions and the canonical gate pass. [AUDIT-0213](audits/AUDIT-0213-stable-maintenance-server-validation.md) records the stamped server checks and remaining validation limits.
 
 ### FIX-0153 - Preserve transfer after a racing client close
 
@@ -1265,7 +1265,7 @@ This is a compatibility guard, not permission to assume a universal Bedrock sequ
 
 ## Open and pending items
 
-- Generate a stamped binary from the current commit and run The Hive minimum baseline.
-- Re-run the direct Enchanted transfer and resource-pack flow with the same binary.
+- The stamped maintenance runtime has a passing synthetic The Hive baseline and local plus five-public-target evidence recorded in [AUDIT-0213](audits/AUDIT-0213-stable-maintenance-server-validation.md). Retail gameplay remains unobserved.
+- Re-run the direct Enchanted minigame transfer and child resource-pack flow. The maintenance session reached the hub only.
 - Complete the exact-revision matrix for Galaxite, Lifeboat, Mineville Zeqa, Enchanted, and CubeCraft after the The Hive baseline before release. CubeCraft requires maintainer risk acknowledgement first.
 - If a server fails, record the capture and classify the failure before changing the generic state machine.
