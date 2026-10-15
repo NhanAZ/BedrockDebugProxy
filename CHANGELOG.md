@@ -6,6 +6,10 @@ Detailed rationale remains in [`docs/audits/`](docs/audits/).
 
 ## [Unreleased]
 
+### Added
+
+- Added an optional Golem CLI and development-server companion for multi-player plugin tests, including movement, block and entity interactions, inventories, forms, permissions, event observations, assertions, and trusted PHP test scripts. JSON Lines requests and retained simulation journals support AI agents without a dashboard or Minecraft client. This workflow requires the pinned Golem runtime and does not establish network or retail-client compatibility.
+
 ### Changed
 
 - Updated the vulnerability scanner to handle the Go 1.27 Linux source graph without crashing, while preserving the full source-analysis gate.

@@ -1,0 +1,9 @@
+name: GolemAgent
+main: BedrockDebugProxy\GolemAgent\Agent
+src-namespace-prefix: BedrockDebugProxy\GolemAgent
+version: 0.1.0
+api: 5.0.0
+depend: [Golem]
+description: Local CLI automation for simulated players on disposable development servers.
+author: NhanAZ
+website: https://github.com/NhanAZ/BedrockDebugProxy

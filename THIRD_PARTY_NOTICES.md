@@ -10,6 +10,12 @@ The legacy signaling portions of `internal/experience/signaling.go` are substant
 
 The resource-pack decryption behavior was cross-checked against MIT, Apache-2.0, LGPL-3.0, and AGPL-3.0 implementations plus official NIST AES validation material. No source from those projects was copied or adapted. Exact revisions, file links, licenses, the resolved header-field discrepancy, and validation boundaries are recorded in [`docs/research/resource-pack-encryption.md`](docs/research/resource-pack-encryption.md).
 
+## Optional Golem development runtime
+
+The optional GolemAgent companion uses `achedon12/golem` 0.7.0 at revision `18c86ea25b1d67fa9ceb6079c46ade2f8f99fc31`, copyright (c) 2026 Achedon12, under MIT. The source context in `dev/golem-agent/golem-0.7.0.patch` is adapted from `src/Runtime/Network/GolemSession.php` at that revision. The patch selects the current Axolotl resource-pack response enum while retaining the legacy API. The complete upstream notice is preserved in `dev/golem-agent/GOLEM-LICENSE.txt` and both built PHAR distributions retain their applicable licenses. The source hash lock identifies the reviewed runtime and local patch. See [the review](docs/research/golem-development-runtime.md).
+
+FakePlayer and Specter are architectural references only. No source from them is copied into this implementation. GolemAgent itself is project code under GPL-3.0-or-later.
+
 ## Embedded viewer fonts
 
 The local capture viewer embeds the following unmodified font files. They remain under the SIL Open Font License 1.1 and are not relicensed under the project GPL. Their copyright notices and full license text are preserved in [`internal/viewer/assets/fonts/OFL-1.1.txt`](internal/viewer/assets/fonts/OFL-1.1.txt) and in the generated binary release license bundle.

@@ -1,0 +1,8 @@
+{"id":"join-one","op":"spawn","args":{"name":"AgentOne"}}
+{"id":"join-two","op":"spawn","args":{"name":"AgentTwo"}}
+{"id":"chat","op":"chat","player":"AgentOne","args":{"message":"Golem test message"}}
+{"id":"help","op":"command","player":"AgentOne","args":{"command":"help"}}
+{"id":"alive","op":"assert","player":"AgentOne","args":{"path":"alive","equals":true}}
+{"id":"inbox","op":"messages","player":"AgentTwo"}
+{"id":"players","op":"list"}
+{"id":"cleanup","op":"reset"}

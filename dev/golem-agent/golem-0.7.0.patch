@@ -1,0 +1,9 @@
+diff --git a/src/Runtime/Network/GolemSession.php b/src/Runtime/Network/GolemSession.php
+index c8e5f8a..7a3a39d 100644
+--- a/src/Runtime/Network/GolemSession.php
++++ b/src/Runtime/Network/GolemSession.php
+@@ -120,3 +120,3 @@ final class GolemSession extends NetworkSession
+             $handler instanceof ResourcePacksPacketHandler => $this->queue(
+-                ResourcePackClientResponsePacket::create(ResourcePackClientResponsePacket::STATUS_COMPLETED, []),
++                ResourcePackClientResponsePacket::create(class_exists(\pocketmine\network\mcpe\protocol\types\ResourcePackClientResponseStatus::class) ? \pocketmine\network\mcpe\protocol\types\ResourcePackClientResponseStatus::COMPLETED : ResourcePackClientResponsePacket::STATUS_COMPLETED, []),
+             ),
