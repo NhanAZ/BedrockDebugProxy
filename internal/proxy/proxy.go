@@ -914,10 +914,12 @@ func (r *Runner) connectUpstream(ctx context.Context, target string, network bed
 		ClientData:        clientData,
 		EnableClientCache: enableClientCache,
 		ErrorLog:          logger,
+		// HTTPS NetherNet endpoints do not support RakNet status pings. Their
+		// endpoint status was checked when the Experience was resolved.
+		SkipPing: strings.HasPrefix(target, "https://"),
 		// The optional address-discovery ping must not inherit the 15-minute
 		// resource-pack dial deadline. RakNet documents that PingContext can
 		// otherwise wait indefinitely after a lost UDP packet.
-		SkipPing: false,
 		// A pre-probe can happen several seconds before Minecraft reconnects.
 		// Refresh the route with the existing short bound on transfer dials.
 		PingTimeout: pingTimeout,

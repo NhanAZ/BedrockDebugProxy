@@ -14,7 +14,7 @@ Detailed rationale remains in [`docs/audits/`](docs/audits/).
 
 ### Changed
 
-- Experience resolution now connects NetherNet destinations that advertise an HTTPS hostname and port, including CubeCraft's current join response. It checks the server's NetherNet status endpoint before accepting the route and retains the existing ID-based signaling paths.
+- Experience resolution now connects NetherNet destinations that advertise an HTTPS hostname and port, including CubeCraft's current join response. It checks the server's NetherNet status endpoint, skips the unsupported RakNet status ping for HTTPS routes, and retains the existing ID-based signaling paths.
 - Updated the vulnerability scanner to handle the Go 1.27 Linux source graph without crashing, while preserving the full source-analysis gate.
 - Generated login skins now include valid arm-size and color defaults for strict Bedrock server parsers. Supplied client skin metadata remains preserved.
 - Upstream login metadata now advertises the stable Bedrock 1.26.52 game hotfix while retaining protocol 2193 and the reviewed packet codec. The protocol watcher compares the latest reviewed Mojang schema independently of the client game version.

@@ -14,6 +14,15 @@ Every new entry should state the symptom, root cause, implementation commits, ev
 
 ## Compatibility and bug index
 
+### FIX-0159 - Skip unsupported status pings for HTTPS NetherNet routes
+
+- Symptom: a retail CubeCraft session spawned and forwarded traffic, but release validation remained incomplete because the optional upstream status ping emitted a blocking `transport.ping` error.
+- Classification: a new transport-specific limitation exposed by FIX-0158, not a CubeCraft gameplay failure.
+- Root cause: the dialer tried RakNet address-discovery ping on an HTTPS NetherNet target. Gophertunnel reports that `NetherNet.PingContext` is unsupported and continues dialing successfully, while the capture correctly retained the failed operation as an error.
+- Implementation: skip the optional address-discovery ping for HTTPS targets. The Experience resolver already performs the supported HTTPS endpoint status check before listening. RakNet targets retain their bounded ping and response capture.
+- Evidence and validation: the sanitized retail validation report for revision `973f72dadad8b4931af7c25b5b219cc49c40a003` records spawn, two-way traffic, decoded packets, and one blocking `transport.ping` event. Local inspection identified the unsupported NetherNet ping. The vendored `minecraft.Dialer.prepareDialAddress` supports `SkipPing`. See [the routing research note](research/cubecraft-experience-routing-2026-10-15.md) and [AUDIT-0220](audits/AUDIT-0220-skip-https-nethernet-ping.md).
+- Status: code fix prepared. Fresh retail validation at the new runtime revision is required before release.
+
 ### FIX-0158 - Resolve HTTPS NetherNet Experience destinations
 
 - Symptom: `experience:CubeCraft` stopped before listening with `no usable destination returned for network protocol "NetherNet"` during the v0.4.0 release check.
