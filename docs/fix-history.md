@@ -14,6 +14,15 @@ Every new entry should state the symptom, root cause, implementation commits, ev
 
 ## Compatibility and bug index
 
+### FIX-0158 - Resolve HTTPS NetherNet Experience destinations
+
+- Symptom: `experience:CubeCraft` stopped before listening with `no usable destination returned for network protocol "NetherNet"` during the v0.4.0 release check.
+- Classification: a new Experience routing variant that the resolver did not implement.
+- Root cause: the authenticated join response supplied a hostname and port under `ipV4Address` for a NetherNet route, without a `netherNetId`. The resolver accepted only ID-based NetherNet or a literal IPv4 RakNet destination. The advertised HTTPS `/v1/join` endpoint returned a valid status response, while plaintext HTTP did not.
+- Implementation: select the installed go-nethernet HTTPS endpoint client for this response shape, check the advertised endpoint before listening, and preserve the existing ID-based signaling routes. Invalid destinations and failed HTTPS checks remain errors. No alternate endpoint or transport is guessed.
+- Evidence and validation: [the routing research note](research/cubecraft-experience-routing-2026-10-15.md), [the official NetherNet onboarding guide](https://github.com/Mojang/bedrock-protocol-docs/blob/main/additional_docs/NetherNetOnboardingGuide.md), and focused Experience tests. A development build resolved CubeCraft and opened the local listener after the HTTPS status check. Its separate `--packs-only` session completed authenticated upstream login and pack exchange without spawning. See [AUDIT-0219](audits/AUDIT-0219-https-nethernet-experience.md).
+- Status: endpoint resolution and upstream pack exchange are observed. Retail spawn and the six-server release matrix remain to be validated from a clean stamped build.
+
 ### FIX-0157 - Update the scanner for Go 1.27 Linux analysis
 
 - Symptom: Linux CI passed race tests, build, and static analysis, then govulncheck panicked with an unexpected ast.KeyValueExpr.

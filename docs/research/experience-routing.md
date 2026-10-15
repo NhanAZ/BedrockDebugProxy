@@ -4,7 +4,7 @@
 
 This note records the evidence behind `experience:<name-or-uuid>` routing. The feature resolves a destination offered to the authenticated Minecraft user. It does not scan server infrastructure, guess addresses, or maintain a hardcoded server list.
 
-Research was last checked on 2026-08-30.
+Initial research was checked on 2026-08-30. HTTPS NetherNet endpoint routing was checked on 2026-10-15.
 
 ## Sources
 
@@ -17,6 +17,7 @@ Research was last checked on 2026-08-30.
 | [`thejfkvis/BedrockX` transport selection](https://github.com/thejfkvis/BedrockX/blob/1f4b30d990116612cdc0a4c4ded0a26c0bc4aa08/example/src/client/Instance.js) | `1f4b30d990116612cdc0a4c4ded0a26c0bc4aa08` | Independent MIT-licensed evidence that `DEFAULT` selects the ordinary host and port path while NetherNet variants select a network ID. No source was copied. |
 | [`gophertunnel` service discovery and tokens](https://github.com/Sandertv/gophertunnel/tree/v1.61.0/minecraft/service) | `v1.61.0`, commit `283a5a97dfe65da94bcc0b401807f6aefa9e72ee` | Current public APIs for service discovery, PlayFab-backed service tokens, and key-bound multiplayer tokens. |
 | [`gophertunnel` NetherNet adapter](https://github.com/Sandertv/gophertunnel/blob/v1.61.0/minecraft/nethernet.go) and [`go-nethernet`](https://github.com/df-mc/go-nethernet/tree/v1.0.20) | `v1.61.0` and `v1.0.20` | NetherNet requires signaling and transport-specific batch framing, packet reads, and encryption behavior that wrappers must preserve. |
+| [Mojang NetherNet onboarding guide](https://github.com/Mojang/bedrock-protocol-docs/blob/main/additional_docs/NetherNetOnboardingGuide.md) and [`go-nethernet` HTTPS endpoint client](https://github.com/df-mc/go-nethernet/blob/v1.0.24/endpoint/client.go) | Official guide inspected 2026-10-15 and `go-nethernet` `v1.0.24` | HTTPS NetherNet servers expose `GET /v1/join` and exchange the SDP offer and answer through `POST /v1/join/{networkId}`. The installed endpoint client implements this signaling path and requires full ICE gathering. No source was copied. |
 
 The Minecraft service endpoints used here are discovered dynamically from the current retail service discovery response. They are not treated as a stable public API. A successful historical implementation is evidence, not a guarantee that the service contract will not change.
 
@@ -26,7 +27,7 @@ The Minecraft service endpoints used here are discovered dynamically from the cu
 2. `experience:` requires device authentication. The same reusable Microsoft token source supports service discovery and the eventual upstream login.
 3. A non-UUID selector is matched against the current discovery titles using exact case-insensitive equality. Partial matching is deliberately rejected to avoid silently choosing the wrong destination.
 4. A result with only a static address uses RakNet directly. A result with an Experience ID calls the join endpoint for the current authorized session.
-5. The join result selects RakNet, legacy NetherNet, or JSON-RPC NetherNet. `DEFAULT` selects RakNet and reuses the static endpoint from the same authenticated discovery item when the join response does not repeat an endpoint. A missing discovery endpoint remains an error. The proxy does not replace a returned NetherNet route with a guessed IP address.
+5. The join result selects RakNet, ID-based legacy or JSON-RPC NetherNet, or HTTPS NetherNet when `NetherNet` supplies a hostname and port instead of `netherNetId`. The HTTPS route checks the advertised `/v1/join` endpoint with normal certificate validation before accepting the target. `DEFAULT` selects RakNet and reuses the static endpoint from the same authenticated discovery item when the join response does not repeat an endpoint. A missing discovery endpoint remains an error. The proxy does not replace a returned NetherNet route with a guessed IP address or silently downgrade HTTPS to HTTP.
 6. The capture manifest retains the original selector, resolved name, Experience ID, selected transport, and resolved destination. Validation reports continue to omit addresses and opaque network identifiers.
 7. The observation wrapper preserves NetherNet's packet-reader, batch-header, encryption-disable, context, and latency capabilities. Losing those optional methods would change framing or encryption rather than merely reducing diagnostics.
 

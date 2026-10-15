@@ -86,6 +86,26 @@ func TestJoinExperienceDestinations(t *testing.T) {
 			want:     resolvedDestination{Address: netherNetID, Transport: transportJSONRPC},
 		},
 		{
+			name:     "https nethernet hostname",
+			response: `{"result":{"networkProtocol":"NetherNet","ipV4Address":"server.example","port":19132}}`,
+			want:     resolvedDestination{Address: "https://server.example:19132", Transport: transportNetherHTTPS},
+		},
+		{
+			name:     "https nethernet ipv4",
+			response: `{"result":{"networkProtocol":"NetherNet","ipV4Address":"192.0.2.10","port":19132}}`,
+			want:     resolvedDestination{Address: "https://192.0.2.10:19132", Transport: transportNetherHTTPS},
+		},
+		{
+			name:     "https nethernet invalid host",
+			response: `{"result":{"networkProtocol":"NetherNet","ipV4Address":"host@example","port":19132}}`,
+			wantErr:  "invalid NetherNet HTTPS destination",
+		},
+		{
+			name:     "https nethernet invalid port",
+			response: `{"result":{"networkProtocol":"NetherNet","ipV4Address":"server.example","port":0}}`,
+			wantErr:  "invalid port",
+		},
+		{
 			name:           "default uses discovery address",
 			response:       `{"result":{"networkProtocol":"Default"}}`,
 			defaultAddress: "hive.example:19132",
@@ -139,6 +159,26 @@ func TestJoinExperienceDestinations(t *testing.T) {
 				t.Fatalf("joinExperience() = %#v, want %#v", got, test.want)
 			}
 		})
+	}
+}
+
+func TestHTTPSNetherNetNetworkChecksEndpoint(t *testing.T) {
+	server := newTLSServer(t, func(w http.ResponseWriter, request *http.Request) {
+		if request.Method != http.MethodGet || request.URL.Path != "/v1/join" {
+			t.Fatalf("request = %s %s", request.Method, request.URL.Path)
+		}
+		w.Header().Set("Content-Type", "application/json")
+		_, _ = w.Write([]byte(`{"name":"Test server","protocol":2193,"version":"1.26.52"}`))
+	})
+	network, err := newHTTPSNetherNetNetwork(context.Background(), server.Client(), server.URL)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, ok := network.(authenticatedNetherNet); !ok {
+		t.Fatalf("network type = %T", network)
+	}
+	if _, err := newHTTPSNetherNetNetwork(context.Background(), server.Client(), strings.Replace(server.URL, "https://", "http://", 1)); err == nil || !strings.Contains(err.Error(), "must use HTTPS") {
+		t.Fatalf("HTTP endpoint error = %v", err)
 	}
 }
 

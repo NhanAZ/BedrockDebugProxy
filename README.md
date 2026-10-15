@@ -114,7 +114,7 @@ The `experience:` form resolves the current destination through Minecraft servic
 --upstream "experience:<Experience UUID>"
 ```
 
-Experience names are matched exactly without case sensitivity. An Experience UUID is also accepted. Device authentication is required because the resolver uses the same authorized Minecraft services session as the upstream connection. The resolver preserves the transport returned by the service, including RakNet and supported NetherNet variants.
+Experience names are matched exactly without case sensitivity. An Experience UUID is also accepted. Device authentication is required because the resolver uses the same authorized Minecraft services session as the upstream connection. The resolver preserves the transport returned by the service, including RakNet, ID-based NetherNet signaling, and HTTPS NetherNet endpoints. HTTPS endpoints are checked through `/v1/join` before the proxy begins listening. The resolver does not fall back to a different transport when that check fails.
 
 For a normal Bedrock server, use its address directly.
 

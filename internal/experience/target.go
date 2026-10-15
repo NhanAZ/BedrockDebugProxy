@@ -16,6 +16,7 @@ import (
 	"sync"
 
 	"github.com/df-mc/go-nethernet"
+	"github.com/df-mc/go-nethernet/endpoint"
 	"github.com/df-mc/go-playfab/v2"
 	"github.com/df-mc/go-xsapi/v2"
 	"github.com/google/uuid"
@@ -26,15 +27,16 @@ import (
 )
 
 const (
-	selectorPrefix      = "experience:"
-	maxServiceResponse  = 8 << 20
-	minecraftUserAgent  = "libhttpclient/1.0.0.0"
-	identityDomain      = "https://authorization.franchise.minecraft-services.net/"
-	transportRakNet     = "raknet"
-	transportNetherNet  = "nethernet"
-	transportJSONRPC    = "nethernet-jsonrpc"
-	protocolDefaultName = "Default"
-	protocolJSONRPCName = "NetherNet_JsonRpc"
+	selectorPrefix       = "experience:"
+	maxServiceResponse   = 8 << 20
+	minecraftUserAgent   = "libhttpclient/1.0.0.0"
+	identityDomain       = "https://authorization.franchise.minecraft-services.net/"
+	transportRakNet      = "raknet"
+	transportNetherNet   = "nethernet"
+	transportNetherHTTPS = "nethernet-https"
+	transportJSONRPC     = "nethernet-jsonrpc"
+	protocolDefaultName  = "Default"
+	protocolJSONRPCName  = "NetherNet_JsonRpc"
 )
 
 // Target is a resolved upstream destination. Network is nil for RakNet.
@@ -237,6 +239,13 @@ func (s *serviceSession) resolve(ctx context.Context, selector, name string) (*T
 	if destination.Transport == transportRakNet {
 		return s.newTarget(selector, displayName, id.String(), destination, nil), nil
 	}
+	if destination.Transport == transportNetherHTTPS {
+		network, err := newHTTPSNetherNetNetwork(ctx, s.httpClient, destination.Address)
+		if err != nil {
+			return nil, err
+		}
+		return s.newTarget(selector, displayName, id.String(), destination, networkTarget(network)), nil
+	}
 
 	var signaling signalingEnvironment
 	if err := s.discovery.Environment(&signaling); err != nil {
@@ -257,6 +266,18 @@ func networkTarget(network minecraft.Network) func(*Target) {
 	return func(target *Target) {
 		target.Network = network
 	}
+}
+
+func newHTTPSNetherNetNetwork(ctx context.Context, client *http.Client, address string) (minecraft.Network, error) {
+	parsed, err := url.Parse(address)
+	if err != nil || parsed.Scheme != "https" {
+		return nil, errors.New("NetherNet endpoint must use HTTPS")
+	}
+	signaling := (endpoint.ClientConfig{HTTPClient: client}).New()
+	if _, err := signaling.Status(ctx, address); err != nil {
+		return nil, fmt.Errorf("query NetherNet HTTPS endpoint: %w", err)
+	}
+	return authenticatedNetherNet{NetherNet: minecraft.NetherNet{Signaling: signaling}}, nil
 }
 
 func (s *serviceSession) newTarget(selector, name, experienceID string, destination resolvedDestination, configure func(*Target)) *Target {
@@ -361,6 +382,17 @@ func joinExperience(ctx context.Context, client *http.Client, baseURI string, to
 			transport = transportJSONRPC
 		}
 		return resolvedDestination{Address: networkID.String(), Transport: transport}, nil
+	}
+	if strings.EqualFold(result.NetworkProtocol, "NetherNet") && result.IPv4Address != "" {
+		if !validPort(result.Port) {
+			return resolvedDestination{}, fmt.Errorf("invalid port %d", result.Port)
+		}
+		address := (&url.URL{Scheme: "https", Host: net.JoinHostPort(result.IPv4Address, strconv.Itoa(result.Port))}).String()
+		parsed, err := url.Parse(address)
+		if err != nil || parsed.Hostname() != result.IPv4Address || parsed.Port() != strconv.Itoa(result.Port) || parsed.User != nil {
+			return resolvedDestination{}, errors.New("invalid NetherNet HTTPS destination")
+		}
+		return resolvedDestination{Address: address, Transport: transportNetherHTTPS}, nil
 	}
 	if net.ParseIP(result.IPv4Address) != nil {
 		if !validPort(result.Port) {
