@@ -1,6 +1,6 @@
 # BedrockDebugProxy
 
-For plugin development without opening Minecraft, see [Golem CLI automation](docs/golem.md). The optional server companion provides simulated players, actions, assertions and event observations for AI agents on a disposable PocketMine-MP or Axolotl-PM development server.
+For plugin development without opening Minecraft, see [Golem CLI automation](docs/golem.md). The optional server companion provides persistent simulated players with individual personalities, interactive control, bounded autonomous behaviour, assertions and event observations for AI agents on a disposable PocketMine-MP or Axolotl-PM development server.
 
 BedrockDebugProxy is a high-fidelity Minecraft Bedrock traffic observation and research proxy. It records one client-to-server session as structured, machine-readable evidence that can be inspected again later.
 

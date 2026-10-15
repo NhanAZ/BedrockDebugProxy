@@ -13,6 +13,9 @@ use Golem\Runtime\Network\GolemSession;
 use pocketmine\event\Cancellable;
 use pocketmine\event\Event;
 use pocketmine\event\EventPriority;
+use pocketmine\event\entity\EntityDamageEvent;
+use pocketmine\event\entity\EntityDamageByEntityEvent;
+use pocketmine\player\Player;
 use pocketmine\event\player\PlayerDataSaveEvent;
 use pocketmine\plugin\PluginBase;
 use pocketmine\scheduler\ClosureTask;
@@ -20,13 +23,15 @@ use pocketmine\scheduler\ClosureTask;
 final class Agent extends PluginBase{
 	public const SCHEMA = 'bedrockdebugproxy.golem.v1';
 	public const RUNTIME = 'achedon12/golem@18c86ea25b1d67fa9ceb6079c46ade2f8f99fc31+bdp-resource-pack-status-1';
-	private const SESSION_ACTIONS = ['capabilities' => [], 'spawn' => ['name'], 'list' => [], 'reset' => [], 'wait' => ['ticks'], 'subscribe' => ['class'], 'events' => ['after'], 'assert' => ['path', 'equals', 'contains'], 'waitFor' => ['path', 'equals', 'contains', 'ticks'], 'script' => ['file', 'params']];
+	private const SESSION_ACTIONS = ['capabilities' => [], 'spawn' => ['name', 'profile', 'seed', 'traits'], 'list' => [], 'reset' => [], 'wait' => ['ticks'], 'subscribe' => ['class'], 'events' => ['after'], 'assert' => ['path', 'equals', 'contains'], 'waitFor' => ['path', 'equals', 'contains', 'ticks'], 'script' => ['file', 'params']];
 	private const MAX_BYTES = 1048576;
 	private const MAX_JOURNAL = 268435456;
 	private GolemFactory $factory;
 	private Clock $clock;
 	/** @var array<string, Golem> */
 	private array $golems = [];
+	/** @var array<string, Behaviour> */
+	private array $behaviours = [];
 	private array $subscriptions = [];
 	private array $events = [];
 	private int $eventSequence = 0;
@@ -64,6 +69,13 @@ final class Agent extends PluginBase{
 		$this->getServer()->getPluginManager()->registerEvent(PlayerDataSaveEvent::class, static function(PlayerDataSaveEvent $event) : void{
 			if($event->getPlayer()?->getNetworkSession() instanceof GolemSession){ $event->cancel(); }
 		}, EventPriority::MONITOR, $this, true);
+		$this->getServer()->getPluginManager()->registerEvent(EntityDamageEvent::class, function(EntityDamageEvent $event) : void{
+			$victim = $event->getEntity();
+			if($event->isCancelled() || !$victim instanceof Player || $event->getFinalDamage() <= 0){ return; }
+			$controller = $this->behaviours[strtolower($victim->getName())] ?? null;
+			$damager = $event instanceof EntityDamageByEntityEvent ? $event->getDamager() : null;
+			$controller?->damaged($damager instanceof Player ? strtolower($damager->getName()) : null);
+		}, EventPriority::MONITOR, $this, false);
 		$this->record('runtime.start', ['runtime' => self::RUNTIME, 'server' => $this->getServer()->getVersion(), 'limits' => ['message_bytes' => self::MAX_BYTES, 'journal_bytes' => self::MAX_JOURNAL, 'players' => 32, 'events_in_memory' => 4096, 'packets_per_player_inbox' => 16384], 'evidence' => 'server_side_simulation']);
 		$this->write($this->getDataFolder() . 'ready.json', ['schema' => self::SCHEMA, 'boot' => $this->boot, 'runtime' => self::RUNTIME]);
 		$this->getScheduler()->scheduleRepeatingTask(new ClosureTask(function() : void{
@@ -78,7 +90,7 @@ final class Agent extends PluginBase{
 		$ready = $this->getDataFolder() . 'ready.json';
 		if(is_file($ready)){ unlink($ready); }
 		$this->coroutine?->cancel();
-		if(isset($this->factory)){ $this->factory->despawnAll(); }
+		if(isset($this->factory)){ $this->resetGolems(); }
 		if($this->active !== null){
 			try{ $this->finish(null, new \RuntimeException('GolemAgent disabled')); }
 			catch(\Throwable $error){ $this->getLogger()->logException($error); }
@@ -87,6 +99,25 @@ final class Agent extends PluginBase{
 
 	public function clock() : Clock{ return $this->clock; }
 	public function golem(string $name) : Golem{ return $this->golems[strtolower($name)] ?? throw new \InvalidArgumentException("Unknown golem $name"); }
+	public function behaviour(Golem $golem) : Behaviour{ return $this->behaviours[strtolower($golem->name())]; }
+	public function state(Golem $golem) : array{ return Actions::state($golem) + ['behaviour' => $this->behaviour($golem)->snapshot()]; }
+	public function observeBehaviour(string $name, array $data) : void{ $this->record('behaviour', ['player' => $name] + $data); }
+
+	public function nearestGolem(Golem $self, float $radius) : ?Golem{
+		$nearest = null; $distance = $radius ** 2;
+		foreach($this->golems as $other){
+			if($other === $self || !$other->isOnline() || !$other->isAlive() || $other->player()->getWorld() !== $self->player()->getWorld()){ continue; }
+			$current = $self->position()->distanceSquared($other->position());
+			if($current < $distance){ $distance = $current; $nearest = $other; }
+		}
+		return $nearest;
+	}
+
+	private function resetGolems() : void{
+		$this->behaviours = [];
+		$this->factory->despawnAll();
+		$this->golems = [];
+	}
 
 	private function pump() : void{
 		foreach($this->golems as $golem){
@@ -94,14 +125,14 @@ final class Agent extends PluginBase{
 				$this->record('runtime.limit', ['player' => $golem->name(), 'limit' => 'packets_per_player_inbox', 'value' => 16384]);
 				throw new \LengthException('Golem packet inbox limit reached. Read packets and explicitly clearInbox between test phases.');
 			}
+			$this->behaviour($golem)->tick();
 		}
 		if($this->active !== null){
 			$id = $this->active['transport_id'];
 			if($this->expired($this->active) || is_file($this->getDataFolder() . "requests/$id.cancel")){
 				$this->coroutine?->cancel();
 				++$this->generation;
-				$this->factory->despawnAll();
-				$this->golems = [];
+				$this->resetGolems();
 				$this->finish(null, new \RuntimeException('Request interrupted. Simulated players were reset. Earlier effects are not rolled back.'));
 			}
 			return;
@@ -172,11 +203,11 @@ final class Agent extends PluginBase{
 		}
 		switch($op){
 			case 'capabilities':
-				return ['runtime' => self::RUNTIME, 'evidence' => 'server_side_simulation', 'player_actions' => Actions::METHODS, 'session_actions' => self::SESSION_ACTIONS, 'limitations' => ['No real network connection, Xbox handshake, PlayerPreLoginEvent, rendering or resource-pack validation', 'Upstream simple physics does not implement swimming or ladders', 'Events are recorded only after explicit subscription', 'Packets and inbox are retained in runtime memory until explicit clearInbox or reset. Read them to persist a response before clearing. They are not automatically copied to the journal.']];
-			case 'spawn': return $this->spawn(Actions::text($args, 'name'));
-			case 'list': return array_map(fn(Golem $g) => Actions::state($g), array_values($this->golems));
+				return ['runtime' => self::RUNTIME, 'evidence' => 'server_side_simulation', 'player_actions' => Actions::METHODS, 'session_actions' => self::SESSION_ACTIONS, 'personality_profiles' => Personality::PROFILES, 'control' => 'interactive_jsonl_and_individual_requests', 'limitations' => ['No real network connection, Xbox handshake, PlayerPreLoginEvent, rendering or resource-pack validation', 'Upstream simple physics does not implement swimming or ladders', 'Events are recorded only after explicit subscription', 'Packets and inbox are retained in runtime memory until explicit clearInbox or reset. Read them to persist a response before clearing. They are not automatically copied to the journal.']];
+			case 'spawn': return $this->spawn(Actions::text($args, 'name'), $args);
+			case 'list': return array_map(fn(Golem $g) => $this->state($g), array_values($this->golems));
 			case 'reset':
-				++$this->generation; $this->factory->despawnAll(); $this->golems = []; return null;
+				++$this->generation; $this->resetGolems(); return null;
 			case 'wait': return $this->clock->wait(Actions::integer($args, 'ticks', 1, 0, 12000));
 			case 'subscribe': return $this->subscribe(Actions::text($args, 'class'));
 			case 'events': return $this->events(Actions::integer($args, 'after', 0, 0, PHP_INT_MAX));
@@ -190,7 +221,10 @@ final class Agent extends PluginBase{
 		return Actions::execute($this, $this->golem(Actions::text($request, 'player')), $op, $args);
 	}
 
-	private function spawn(string $name) : Deferred{
+	private function spawn(string $name, array $args) : Deferred{
+		$traits = $args['traits'] ?? [];
+		if(!is_array($traits)){ throw new \InvalidArgumentException('traits must be an object'); }
+		$personality = new Personality(isset($args['profile']) ? Actions::text($args, 'profile') : 'balanced', Actions::integer($args, 'seed', random_int(0, 2147483647), 0, 2147483647), $traits);
 		if(!preg_match('/^[A-Za-z][A-Za-z0-9_]{0,15}$/D', $name)){ throw new \InvalidArgumentException('Use a 1-16 character ASCII test name beginning with a letter'); }
 		if(count($this->golems) >= 32){ throw new \LengthException('Explicit 32-golem limit reached'); }
 		$server = $this->getServer();
@@ -199,11 +233,15 @@ final class Agent extends PluginBase{
 		}
 		$generation = $this->generation;
 		try{ $result = $this->factory->spawn($name); }
-		catch(\Throwable $error){ $this->factory->despawnAll(); $this->golems = []; throw $error; }
-		$result->then(function(Golem $golem) use ($generation) : void{
-			if($generation === $this->generation){ $this->golems[strtolower($golem->name())] = $golem; }
+		catch(\Throwable $error){ $this->resetGolems(); throw $error; }
+		$result->then(function(Golem $golem) use ($generation, $personality) : void{
+			if($generation === $this->generation){
+				$this->golems[strtolower($golem->name())] = $golem;
+				$this->behaviours[strtolower($golem->name())] = new Behaviour($this, $golem, $personality);
+				$this->observeBehaviour($golem->name(), ['action' => 'created', 'personality' => $personality->snapshot()]);
+			}
 		}, function(\Throwable $error) use ($generation) : void{
-			if($generation === $this->generation){ ++$this->generation; $this->factory->despawnAll(); $this->golems = []; }
+			if($generation === $this->generation){ ++$this->generation; $this->resetGolems(); }
 		});
 		return $result;
 	}
@@ -233,7 +271,7 @@ final class Agent extends PluginBase{
 	}
 
 	private function assertion(array $request, array $args) : array{
-		$actual = Actions::state($this->golem(Actions::text($request, 'player')));
+		$actual = $this->state($this->golem(Actions::text($request, 'player')));
 		$path = Actions::text($args, 'path');
 		foreach(explode('.', $path) as $part){
 			if(!is_array($actual) || !array_key_exists($part, $actual)){ throw new \UnexpectedValueException("Assertion path $path is absent"); }

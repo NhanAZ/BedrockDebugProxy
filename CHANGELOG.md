@@ -8,6 +8,8 @@ Detailed rationale remains in [`docs/audits/`](docs/audits/).
 
 ### Added
 
+- Golems have seeded, adjustable personalities and optional bounded autonomous behaviour. Agents can control online players interactively, observe nonblocking movement, change direction, stop, and resume control across CLI processes. Direct actions pause autonomy. Personality affects exploration, pace, greetings and reactions to damage.
+
 - Added an optional Golem CLI and development-server companion for multi-player plugin tests, including movement, block and entity interactions, inventories, forms, permissions, event observations, assertions, and trusted PHP test scripts. JSON Lines requests and retained simulation journals support AI agents without a dashboard or Minecraft client. This workflow requires the pinned Golem runtime and does not establish network or retail-client compatibility.
 
 ### Changed

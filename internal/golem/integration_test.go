@@ -19,33 +19,38 @@ func TestDevelopmentServerIntegration(t *testing.T) {
 	if directory == "" {
 		t.Skip("set BDP_GOLEM_TEST_DATA to a disposable GolemAgent data directory for server integration")
 	}
-	source, err := os.ReadFile(filepath.Join("..", "..", "dev", "golem-agent", "tests", "smoke.php"))
-	if err != nil {
-		t.Fatal(err)
-	}
-	name := "integration-" + uuid.NewString() + ".php"
 	root, err := os.OpenRoot(directory)
 	if err != nil {
 		t.Fatal(err)
 	}
 	defer func() { _ = root.Close() }()
-	if err := root.WriteFile(filepath.Join("scripts", name), source, 0o600); err != nil {
-		t.Fatal(err)
+	for _, fixture := range []struct {
+		file   string
+		checks int
+	}{{"smoke.php", 74}, {"behaviour-smoke.php", 25}} {
+		source, err := os.ReadFile(filepath.Join("..", "..", "dev", "golem-agent", "tests", fixture.file))
+		if err != nil {
+			t.Fatal(err)
+		}
+		name := "integration-" + uuid.NewString() + ".php"
+		if err := root.WriteFile(filepath.Join("scripts", name), source, 0o600); err != nil {
+			t.Fatal(err)
+		}
+		ctx, cancel := context.WithTimeout(context.Background(), time.Minute)
+		response, err := Call(ctx, directory, Request{Op: "script", Args: map[string]any{"file": name}})
+		cancel()
+		if err != nil || !response.OK {
+			t.Fatalf("server fixture %s: %v, %+v", fixture.file, err, response)
+		}
+		var report struct {
+			Passed int `json:"passed"`
+		}
+		if err := json.Unmarshal(response.Result, &report); err != nil || report.Passed < fixture.checks {
+			t.Fatalf("incomplete fixture report: %s, %v", response.Result, err)
+		}
+		t.Logf("%s passed %d checks", fixture.file, report.Passed)
 	}
-	ctx, cancel := context.WithTimeout(context.Background(), time.Minute)
-	response, err := Call(ctx, directory, Request{Op: "script", Args: map[string]any{"file": name}})
-	cancel()
-	if err != nil || !response.OK {
-		t.Fatalf("server fixture: %v, %+v", err, response)
-	}
-	var report struct {
-		Passed int `json:"passed"`
-	}
-	if err := json.Unmarshal(response.Result, &report); err != nil || report.Passed < 74 {
-		t.Fatalf("incomplete fixture report: %s, %v", response.Result, err)
-	}
-	t.Logf("server simulation passed %d checks", report.Passed)
-	ctx, cancel = context.WithTimeout(context.Background(), 100*time.Millisecond)
+	ctx, cancel := context.WithTimeout(context.Background(), 100*time.Millisecond)
 	_, err = Call(ctx, directory, Request{Op: "wait", Args: map[string]any{"ticks": 20}})
 	cancel()
 	if !errors.Is(err, context.DeadlineExceeded) {
@@ -53,7 +58,7 @@ func TestDevelopmentServerIntegration(t *testing.T) {
 	}
 	started := time.Now()
 	ctx, cancel = context.WithTimeout(context.Background(), 5*time.Second)
-	response, err = Call(ctx, directory, Request{Op: "wait", Args: map[string]any{"ticks": 40}})
+	response, err := Call(ctx, directory, Request{Op: "wait", Args: map[string]any{"ticks": 40}})
 	cancel()
 	if err != nil || !response.OK || time.Since(started) < 1800*time.Millisecond {
 		t.Fatalf("expired callback completed another request: %v, %+v, %s", err, response, time.Since(started))

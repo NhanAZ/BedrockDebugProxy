@@ -1006,7 +1006,7 @@ func printUsage(writer io.Writer) {
 	_, _ = fmt.Fprintln(writer)
 	_, _ = fmt.Fprintln(writer, "Proxy")
 	_, _ = fmt.Fprintln(writer, "  run --upstream HOST:PORT|experience:NAME [options]  Start the observation proxy or capture packs only")
-	_, _ = fmt.Fprintln(writer, "  golem --data DIRECTORY [--request JSON | --input FILE]  Control simulated players on a development server")
+	_, _ = fmt.Fprintln(writer, "  golem --data DIRECTORY [--request JSON | --input FILE]  Interactively control simulated players and personalities")
 	_, _ = fmt.Fprintln(writer)
 	_, _ = fmt.Fprintln(writer, "Authentication accounts")
 	_, _ = fmt.Fprintln(writer, "  login [--max-age 7d] [ACCOUNT_NAME]                 Add or reauthenticate an account")
@@ -1037,6 +1037,7 @@ func printCommandHelp(writer io.Writer, command string) bool {
 		_, _ = fmt.Fprintln(writer, "Requires the optional Golem and GolemAgent plugins on a PocketMine-MP development server. DIRECTORY is GolemAgent's plugin data folder.")
 		_, _ = fmt.Fprintln(writer, "Input defaults to JSON Lines on stdin. Output is one JSON response per request. Execution stops on the first failure. Exit codes are 0 success, 1 runtime/assertion failure, 2 invalid input.")
 		_, _ = fmt.Fprintln(writer, "Send {\"op\":\"capabilities\"} to discover actions. The timeout applies to each request and must be positive and at most 10m.")
+		_, _ = fmt.Fprintln(writer, "Keep stdin open to choose each next request after reading a response. move returns immediately, state observes progress, and stop cancels movement. Direct actions pause autonomy. personality and autonomy configure seeded behaviour.")
 		_, _ = fmt.Fprintln(writer, "Players persist until reset or server shutdown. These are server-side simulations, not network captures or retail-client validation. See docs/golem.md for installation, actions, events, assertions, and trusted PHP scripts.")
 	case "run":
 		_, _ = fmt.Fprintln(writer, "Usage - bedrock-debug-proxy run --upstream HOST:PORT|experience:NAME [options]")

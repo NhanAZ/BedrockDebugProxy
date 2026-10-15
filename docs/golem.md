@@ -66,12 +66,65 @@ All player actions require `player`. `capabilities` lists optional argument name
 | Player state | `state`, `health`, `hunger` with optional numeric `value`, `kill`, `respawn` |
 | Output | `titles`, `subtitles`, `actionBars`, `popups`, `tips`, `toasts`, `scoreboard`, `bossBar`, `sounds`, `packets` with optional packet `class`, `clearInbox` |
 | Tests | `assert`, `waitFor`, `wait`, `subscribe`, `events`, `script` |
+| Interactive control | `move` with `x`, `y`, `z`, optional `speed`, `stop`, `placeBlock` with clicked block `x`, `y`, `z` and optional `face` |
+| Personality | `personality` with optional `profile`, `seed`, `traits`, `autonomy` with optional `enabled`, `ticks`, `radius`, `combatTarget` |
 
 `chat` uses the player chat path, including slash commands and chat preprocess behavior. `command` directly dispatches a command as the player. Choose `chat` to test typed command events. `give`, `setSlot`, `op`, `teleport`, health and hunger setters are test setup through server APIs. They do not simulate survival acquisition or a network client request. `clickSlot` executes a real server inventory transaction. Block, entity, movement and form operations use the runtime's Player methods and respect applicable plugin cancellation.
 
 `walkTo` uses the runtime's simple collision and gravity model. Its target height is ignored, as documented upstream. It does not implement swimming, ladder climbing, or complete client physics. Entity interaction returns whether the entity handled it. A generic player target may legitimately return false.
 
+## Interactive agent control
+
+An agent can start `bedrock-debug-proxy golem --data DIRECTORY`, keep stdin/stdout open, write one JSON line, read its response, inspect the result and decide what to write next. Output is emitted for each request before the next input line is required. Each line must end with a newline. Requests are sequential. EOF ends the CLI but leaves owned players online. A later CLI process can list and control the same players. Errors end that CLI process without silently retrying a potentially completed action.
+
+For example, send these requests individually, choosing the next one only after observing the response:
+
+```jsonl
+{"id":"join","op":"spawn","args":{"name":"Scout","profile":"curious","seed":42}}
+{"id":"observe","op":"state","player":"Scout"}
+{"id":"start-moving","op":"move","player":"Scout","args":{"x":260,"y":4,"z":256,"speed":3}}
+{"id":"observe-moving","op":"state","player":"Scout"}
+{"id":"take-control","op":"stop","player":"Scout"}
+{"id":"speak","op":"chat","player":"Scout","args":{"message":"Ready for the next test."}}
+```
+
+Choose movement coordinates from the observed world. `move` starts movement and returns immediately. `state.behaviour.movement.status` is `pending`, `arrived`, `failed`, `cancelled` or `idle`. Failure details remain in `error` and the journal. Another `move` replaces the destination and `stop` cancels it. Completion of the old movement cannot complete the replacement. `walk` and `walkTo` continue to wait for arrival for sequential tests. A pending blocking request occupies the mailbox, so use `move` when observation or intervention must remain available during movement.
+
+Direct actions take control from autonomous behaviour and cancel its pending movement. Reading state, events, output, forms or inventories does not pause it. `wait`, `assert` and `waitFor` also leave autonomy running. `personality` or `autonomy` without arguments reads configuration. A personality change stops autonomy. `stop` and `autonomy` with `enabled: false` stop controller-owned movement. Arbitrary trusted PHP code can manipulate Player state directly and is responsible for coordinating its own actions.
+
+Once under manual control, chat, jump, sprint and interactions can run while a nonblocking manual move continues. A new movement destination, teleport, stop or lifecycle action replaces or cancels that movement. Sprint toggles player state. Use `move.speed` to choose the actual movement speed, since the underlying runtime does not infer it from the sprint flag.
+
+`placeBlock` requires a block item in hand, supplied with `hold` or an inventory action. Coordinates identify the existing block clicked, and `face` selects its face, defaulting to UP (1). It uses the Player interaction path, so permissions, plugin cancellation and interactive blocks still apply. Sneak when the test requires placement against an interactive block. The returned boolean indicates accepted interaction. Assert the resulting world state with a trusted script when proving placement. It does not bypass the inventory or directly overwrite a world block.
+
+## Personalities and autonomy
+
+Every spawned Golem gets an independent seed and personality. `spawn` accepts optional `profile`, `seed` and `traits`. Available profiles are `balanced`, `calm`, `curious`, `bold` and `social`, also exposed by `capabilities`. An omitted seed is generated and recorded. An omitted profile is balanced. Each non-overridden trait varies by at most 0.1 around its profile baseline, using that seed, so actors are individually distinct. Traits are numeric from 0 to 1:
+
+| Trait | Effect |
+| --- | --- |
+| `pace` | Walk speed, sprint preference and delay between decisions |
+| `curiosity` | Exploration frequency and jumping after a blocked route |
+| `sociability` | Greeting nearby owned Golems, limited to once per 200 ticks |
+| `boldness` | Defend or retreat after damage. Low health always favors retreat |
+
+```jsonl
+{"op":"personality","player":"Scout","args":{"profile":"curious","seed":42,"traits":{"curiosity":0.9,"sociability":0.3}}}
+{"op":"autonomy","player":"Scout","args":{"enabled":true,"ticks":400,"radius":8}}
+{"op":"state","player":"Scout"}
+{"op":"autonomy","player":"Scout","args":{"enabled":false}}
+```
+
+Autonomy is opt-in and runs on the server scheduler, not in the CLI. It defaults to 200 ticks with an 8-block home radius. The accepted ranges are 1-12000 ticks and 1-32 blocks. Closing the CLI does not stop autonomy before its deadline. It stops on expiry, death, disconnect, world change, reset, manual intervention or a behaviour error. Each decision and movement error is retained in the simulation journal. State includes the personality, home, deadline, last action, decision count and movement result.
+
+The lightweight policy senses nearby owned Golems, damage, blocked movement and local terrain. It wanders in short segments, looks around, greets, jumps in place when blocked, retreats or responds to an attack. Proposed routes check loaded chunks, solid ground, headroom and liquid at the feet. It avoids unsupported ground instead of pathfinding through arbitrary obstacles. The home radius bounds proposed destinations, not external teleports, knockback or changes made by another plugin. This is a limited heuristic, not full Minecraft navigation or a human-level AI.
+
+Autonomous combat is disabled unless `combatTarget` names another online companion-owned Golem. A sufficiently bold actor may retaliate against that specific attacker within three blocks. Other damage leads to avoidance. Autonomous behaviour does not break/place blocks or operate menus on its own. Direct CLI actions and trusted tests provide those interactions without uncontrolled world edits. Read-only status does not imply a world snapshot is frozen while autonomy runs.
+
+The same profile, seed, trait overrides and sequence of observations produce the same personality choices. Complete world execution is not guaranteed identical when plugin timing, event order, peers or terrain differ. Record both the seed and journal. Changing only a profile or seed rebuilds traits from that profile. Explicit overrides are needed to preserve custom values across a change.
+
 ## Scenarios and assertions
+
+Scenarios are optional. See interactive control below for agents that choose each action after observing the server.
 
 Save a scenario as `scenario.jsonl` and use `--input scenario.jsonl`. This example runs a plugin's menu command and confirms its observable reply. Adapt the command and expected text to your plugin.
 
@@ -135,7 +188,7 @@ There is no real Xbox handshake, client rendering, pack transfer, transport capt
 
 ## Validation
 
-The normal `tools/quality.ps1` gate tests the Go mailbox and CLI. When PHP is installed it also checks companion syntax and packaging. A PHP-less environment skips that optional companion check explicitly. The full server suite requires an isolated server and is separate from the network proxy gate.
+The normal `tools/quality.ps1` gate tests the Go mailbox and CLI. When PHP is installed it also checks companion syntax, deterministic personality regressions and packaging. A PHP-less environment skips that optional companion check explicitly. The full server suite requires an isolated server and is separate from the network proxy gate.
 
 Copy `dev/golem-agent/tests/smoke.php` into the companion's scripts directory, then run:
 
@@ -145,4 +198,11 @@ bin/bedrock-debug-proxy.exe golem --data $data --timeout 60s --request '{"op":"s
 
 This fixture changes a small flat-world area and exercises player actions, event delivery, negative inputs, forms, inventory transactions, HUD observations and cleanup. Use it only in a disposable world. See the commit audit for the exact server revision and verified results. Real network login, public-server checks and retail gameplay are not part of this local simulation feature's evidence.
 
-For a reproducible Go-to-PHP integration check, set `BDP_GOLEM_TEST_DATA` to the absolute data directory of that disposable companion and run `go test -count=1 -run TestDevelopmentServerIntegration -v ./internal/golem`. This copies the synthetic PHP fixture into scripts, runs it, and checks that an expired request cannot complete a later request. Without the environment variable this server-dependent test is skipped explicitly. Unset the variable after testing.
+For reproducible Go-to-PHP integration checks, set `BDP_GOLEM_TEST_DATA` to the absolute data directory of that disposable companion. Run these commands sequentially because both tests control the same owned players:
+
+```powershell
+go test -count=1 -run TestDevelopmentServerIntegration -v ./internal/golem
+go test -count=1 -run TestGolemInteractiveServerControl -v ./cmd/bedrock-debug-proxy
+```
+
+The first copies and runs both `smoke.php` and `behaviour-smoke.php`, then checks that an expired request cannot complete a later request. The second keeps stdin open, chooses movement from observed coordinates, reads state during movement, stops it, chats, closes the CLI and controls the same player through another invocation. Without the environment variable these server-dependent tests are skipped explicitly. Unset the variable after testing.

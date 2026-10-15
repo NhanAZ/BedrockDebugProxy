@@ -15,7 +15,7 @@ func TestGolemHelpAndInvalidInput(t *testing.T) {
 	if code := run([]string{"help", "golem"}, &out, &diagnostic); code != 0 {
 		t.Fatal(code)
 	}
-	for _, text := range []string{"--data", "--request", "--input", "--timeout", "stdin", "simulation", "capabilities"} {
+	for _, text := range []string{"--data", "--request", "--input", "--timeout", "stdin", "simulation", "capabilities", "move", "stop", "personality", "autonomy"} {
 		if !strings.Contains(out.String(), text) {
 			t.Errorf("help lacks %q", text)
 		}
@@ -43,7 +43,7 @@ func TestGolemCompanionSyntaxAndPackage(t *testing.T) {
 		t.Skip("PHP is optional for the network proxy; required for the Golem companion")
 	}
 	root := filepath.Join("..", "..", "dev", "golem-agent")
-	for _, path := range []string{"src/Agent.php", "src/Actions.php", "src/View.php", "build.php", "tests/smoke.php"} {
+	for _, path := range []string{"src/Agent.php", "src/Actions.php", "src/View.php", "src/Personality.php", "src/Behaviour.php", "build.php", "tests/smoke.php", "tests/personality.php", "tests/behaviour-smoke.php"} {
 		ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 		// #nosec G204 -- Fixed repository PHP sources are linted with an installed runtime.
 		output, err := exec.CommandContext(ctx, php, "-l", filepath.Join(root, filepath.FromSlash(path))).CombinedOutput()
@@ -54,6 +54,10 @@ func TestGolemCompanionSyntaxAndPackage(t *testing.T) {
 	}
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 	defer cancel()
+	// #nosec G204 -- Execute the fixed deterministic personality regression fixture.
+	if output, err := exec.CommandContext(ctx, php, filepath.Join(root, "tests/personality.php")).CombinedOutput(); err != nil {
+		t.Fatalf("personality regression: %v\n%s", err, output)
+	}
 	// #nosec G204 -- Fixed packaging script and an isolated test output, without a shell.
 	output, err := exec.CommandContext(ctx, php, "-d", "phar.readonly=0", filepath.Join(root, "build.php"), filepath.Join(t.TempDir(), "GolemAgent.phar")).CombinedOutput()
 	if err != nil {

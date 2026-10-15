@@ -27,6 +27,8 @@ final class Actions{
 		'actionBars' => [], 'popups' => [], 'tips' => [], 'toasts' => [], 'scoreboard' => [],
 		'bossBar' => [], 'sounds' => [], 'packets' => ['class'], 'clearInbox' => [],
 		'position' => [], 'isOnline' => [], 'isAlive' => [], 'disconnectReason' => [], 'state' => [],
+		'personality' => ['profile', 'seed', 'traits'], 'autonomy' => ['enabled', 'ticks', 'radius', 'combatTarget'],
+		'move' => ['x', 'y', 'z', 'speed'], 'stop' => [], 'placeBlock' => ['x', 'y', 'z', 'face'],
 	];
 
 	public static function execute(Agent $agent, Golem $golem, string $op, array $args) : mixed{
@@ -39,7 +41,14 @@ final class Actions{
 			}
 		}
 		$player = $golem->player();
+		$readOnly = in_array($op, ['inventory', 'window', 'waitForWindow', 'formData', 'messages', 'rawMessages', 'lastMessage', 'titles', 'subtitles', 'actionBars', 'popups', 'tips', 'toasts', 'scoreboard', 'bossBar', 'sounds', 'packets', 'clearInbox', 'position', 'isOnline', 'isAlive', 'disconnectReason', 'state'], true) || (in_array($op, ['health', 'hunger'], true) && $args === []);
+		if(!$readOnly && !in_array($op, ['personality', 'autonomy'], true)){ $agent->behaviour($golem)->takeControl($op); }
 		return match($op){
+			'personality' => $agent->behaviour($golem)->personality($args),
+			'autonomy' => $agent->behaviour($golem)->configure($args),
+			'move' => $agent->behaviour($golem)->move(self::vector($args), self::speed($args)),
+			'stop' => $agent->behaviour($golem)->stop(),
+			'placeBlock' => self::placeBlock($golem, $args),
 			'chat' => $golem->chat(self::text($args, 'message')),
 			'command' => $golem->command(self::text($args, 'command')),
 			'grant' => $golem->grant(self::text($args, 'permission'), self::boolean($args, 'value', true)),
@@ -65,7 +74,7 @@ final class Actions{
 			'submitForm' => $golem->submitForm(array_key_exists('data', $args) ? $args['data'] : throw new \InvalidArgumentException('data is required')),
 			'clickButton' => $golem->clickButton($args['button'] ?? throw new \InvalidArgumentException('button is required')),
 			'packets' => $golem->packets(isset($args['class']) ? self::text($args, 'class') : null),
-			'state' => self::state($golem),
+			'state' => $agent->state($golem),
 			default => $golem->$op(),
 		};
 	}
@@ -118,6 +127,11 @@ final class Actions{
 		$inventory = $golem->player()->getInventory();
 		$inventory->setItem(self::integer($args, 'slot', null, 0, $inventory->getSize() - 1), self::item($args));
 		return null;
+	}
+
+	private static function placeBlock(Golem $golem, array $args) : bool{
+		if(!$golem->player()->getInventory()->getItemInHand() instanceof \pocketmine\item\ItemBlock){ throw new \InvalidArgumentException('placeBlock requires a held block item'); }
+		return $golem->interactBlock(self::vector($args), self::integer($args, 'face', 1, 0, 5));
 	}
 
 	private static function target(Agent $agent, Golem $golem, array $args) : Entity|Golem{

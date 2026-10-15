@@ -15,7 +15,7 @@ $phar->addFile(__DIR__ . '/plugin.yml', 'plugin.yml');
 $phar->addFile(dirname(__DIR__, 2) . '/LICENSE', 'LICENSE');
 $phar->addFile(__DIR__ . '/runtime-lock.json', 'runtime-lock.json');
 $phar->addFile(__DIR__ . '/GOLEM-LICENSE.txt', 'GOLEM-LICENSE.txt');
-foreach(['Agent', 'Actions', 'View'] as $class){
+foreach(['Agent', 'Actions', 'View', 'Personality', 'Behaviour'] as $class){
 	$phar->addFile(__DIR__ . '/src/' . $class . '.php', 'src/' . $class . '.php');
 }
 $phar->setStub('<?php __HALT_COMPILER();');

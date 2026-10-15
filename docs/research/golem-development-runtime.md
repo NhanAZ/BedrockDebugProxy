@@ -69,3 +69,11 @@ The patch changes only the fake session's internal completion reply. It does not
 The bridge runs actions on the server main thread. Golem's Deferred and Coroutine types allow tick-based waits without blocking that thread. Player data saves for simulated players are cancelled, names colliding with real/offline players or operators are rejected, and the factory restores temporary operator grants on reset.
 
 The source review does not prove every third-party plugin works. Local integration tests must exercise the actual installed fork and report unsupported behavior explicitly. Custom events and API assertions are available through trusted PHP scripts instead of claiming a finite generic command list covers every future plugin.
+
+## Personality and interactive control follow-up
+
+The controller uses the pinned Golem public `movement()`, `walkTo()`, `jump()`, Player actions and Deferred callbacks. The runtime's `Movement::abort()` cancels an active movement. A controller generation number rejects stale completion callbacks after an agent changes destination or takes control. No simulation dependency patch was added for personalities.
+
+PHP's built-in [Random Engine Xoshiro256StarStar](https://www.php.net/manual/en/class.random-engine-xoshiro256starstar.php) accepts a seed and is available in the installed PHP 8.4 runtime. Its official manual and local availability were checked on 2026-10-15. It supplies independent per-player choices without a new library. The decision policy and terrain probes are independently authored project code. They do not reuse FakePlayer's movement implementation, randomized PvP heuristic or assets.
+
+Environment sensing uses owned-player positions, loaded local blocks and the server's damage events. Decisions prefer damage reaction over blocked-route handling, social behaviour and wandering. This fixed priority and explicit inputs are intentionally inspectable. Terrain probing avoids unsupported ground and obstruction but does not provide a pathfinding guarantee. Damage is observed at MONITOR priority, so another later MONITOR listener could still alter the final event. Full world determinism and retail-client parity remain unproven.

@@ -16,7 +16,15 @@ The CLI supports independent requests and sequential scenarios. Golems persist b
 
 The complete Golem action families are exposed, including multi-player lifecycle, chat, commands, permissions, movement, block and entity interactions, inventories, forms, HUD observations, and state assertions. Explicit event subscriptions include custom plugin event classes. Trusted PHP scripts cover plugin-specific APIs through the real Player and server objects without adding speculative JSON methods.
 
-## Evidence boundary
+## Personality and interactive control extension
+
+The maintainer subsequently requested basic autonomous behaviour, individual personalities and agent control of already online players without a prewritten scenario. Keep the same mailbox and Player runtime. Add a small seeded policy and one controller per owned player. The policy selects from observations, while the controller invokes the existing runtime and records decisions. No model service, remote AI dependency, navigation framework or second physics implementation is needed.
+
+Manual commands take priority. Nonblocking `move` plus observable movement state and `stop` provide intervention while movement is active. Existing blocking walks retain their sequential-test semantics. JSON Lines stdin already supports request-response interaction without EOF, and separate CLI invocations share the server-owned players. Closing a CLI is not a player disconnect.
+
+Autonomy is explicitly enabled for a finite number of ticks and a local home radius. Personality adjusts pace, exploration, social interaction and damage response. Keep terrain checks conservative and make failures observable. Combat reactions require a named owned target. Block editing and plugin menus remain explicit commands or trusted tests. Seeded choices are repeatable only for matching observations and ordering, not arbitrary changing worlds.
+
+## Simulation evidence boundary
 
 These are server-side simulation results. They do not establish Xbox authentication, PlayerPreLoginEvent, wire transport, resource-pack delivery, rendering, sound playback, or retail-client compatibility. Physics retains upstream limitations such as swimming and climbing. A successful command dispatch is not proof that the plugin achieved its intended effect. Assert the relevant state or event.
 

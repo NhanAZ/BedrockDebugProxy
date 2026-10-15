@@ -90,7 +90,7 @@ return static function(Agent $agent, array $params) : Generator{
 		}finally{ HandlerListManager::global()->unregisterAll($protection); }
 		$check($call('breakBlock', ['x' => 256, 'y' => 4, 'z' => 257]) === true, 'break block through player');
 		$call('hold', ['item' => 'stone', 'count' => 3]);
-		$check($call('interactBlock', ['x' => 256, 'y' => 3, 'z' => 257, 'face' => 1]) === true, 'place held block');
+		$check($call('placeBlock', ['x' => 256, 'y' => 3, 'z' => 257, 'face' => 1]) === true && $world->getBlockAt(256, 4, 257)->isSolid(), 'place held block');
 		$call('hold', ['item' => 'apple']); $call('hunger', ['value' => 10]);
 		$check(is_bool($call('useItem')), 'use held item');
 		$call('health', ['value' => 12]); $check($call('health') === 12.0, 'set health');
