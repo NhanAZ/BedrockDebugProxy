@@ -14,7 +14,7 @@ Give Details cells a dedicated class and allow normal and unbroken text wrapping
 
 ## Evidence and provenance
 
-The reported Hive capture row `#93459` displayed a long `bridge.read_error` summary with the server address and ban reason truncated in the Details column. The existing shared cell rule applied `white-space: nowrap`, hidden overflow, and ellipsis to every table cell.
+The reported Hive capture row `#93459` displayed a long `bridge.read_error` summary with long diagnostic details truncated in the Details column. The existing shared cell rule applied `white-space: nowrap`, hidden overflow, and ellipsis to every table cell.
 
 ## Validation
 

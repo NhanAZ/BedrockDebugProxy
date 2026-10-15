@@ -14,7 +14,7 @@ Embedded the supplied favicon package, served the icon variants and web manifest
 
 ## Evidence and provenance
 
-The assets were supplied in `[local path]`. Only the generated icon files and a project-local manifest were copied into the embedded viewer. The package's README states that the source logo was not uploaded, so no external source code or third-party license text was imported.
+The assets were supplied in `the supplied icon package`. Only the generated icon files and a project-local manifest were copied into the embedded viewer. The package's README states that the source logo was not uploaded, so no external source code or third-party license text was imported.
 
 ## Validation
 

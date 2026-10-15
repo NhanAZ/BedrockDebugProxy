@@ -37,7 +37,7 @@ Use a local label only when adding or switching accounts:
 .\bin\bedrock-debug-proxy.exe use NhanAZ
 
 # Rename a legacy default cache without reauthenticating it.
-.\bin\bedrock-debug-proxy.exe rename default SampleAccount
+.\bin\bedrock-debug-proxy.exe rename default ExampleAccount
 
 # Sign out the default account, or name another account explicitly.
 .\bin\bedrock-debug-proxy.exe logout

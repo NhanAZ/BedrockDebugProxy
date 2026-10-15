@@ -32,7 +32,7 @@ The 1.26.51 vanilla-client loopback run on 2026-09-21 exposed a second local par
 
 ## Post-fix vanilla-client loopback
 
-After the fix was rebuilt into `bin/bedrock-debug-proxy.exe`, the real Windows Bedrock client signed in as `SampleAccount` through the proxy to the operator-controlled PocketMine server. The session ran for approximately 220.9 seconds, completed login, resource-pack negotiation, spawn, normal movement, and quit, and captured 4,350 packets. The proxy and upstream both negotiated protocol 2193 and game version 1.26.51 with Windows device metadata.
+After the fix was rebuilt into `bin/bedrock-debug-proxy.exe`, the real Windows Bedrock client signed in as `upstream account` through the proxy to the operator-controlled PocketMine server. The session ran for approximately 220.9 seconds, completed login, resource-pack negotiation, spawn, normal movement, and quit, and captured 4,350 packets. The proxy and upstream both negotiated protocol 2193 and game version 1.26.51 with Windows device metadata.
 
 The closed ProxyFingerprint report for this run contained no `auth_client_playfab_mismatch` signal. Its only heuristic signals were `non_public_peer` and `non_full_authentication`, both expected for the loopback server configured with `xbox-auth=off` and `verify-xuid=false`. The upstream self-signed identity fields were empty while the forwarded ClientData remained structurally valid. This is evidence that the local offline identity-parity defect is fixed for a real vanilla client. It is not evidence about a public server's anti-cheat or acceptance policy.
 
@@ -50,7 +50,7 @@ The mismatch removal is confirmed by source, deterministic unit coverage, and th
 
 ### Post-fix authenticated vanilla loopback
 
-On 2026-09-22, a real Windows Bedrock client signed in as `SampleAccount` through the stamped `970531e7d7132a4e0f889e1ab9ad735a8d4002c1` binary to the operator-controlled local PocketMine server. The session reached spawn, remained active for roughly one minute, and ended with `player_quit`.
+On 2026-09-22, a real Windows Bedrock client signed in as `upstream account` through the stamped `970531e7d7132a4e0f889e1ab9ad735a8d4002c1` binary to the operator-controlled local PocketMine server. The session reached spawn, remained active for roughly one minute, and ended with `player_quit`.
 
 The closed proxy capture [captures/session-20260922T041204Z](https://github.com/BedrockDebugProxy-Captures/session-20260922T041204Z/releases/tag/capture-archive) contains 12,750 events and 6,118 blobs with zero write errors, dropped events, truncation, or decode errors. Its manifest records the exact tested revision. The matching ProxyFingerprint report completed with 1,391 packets, `ClientData.PlayFabId` absent, and only the expected `non_public_peer` signal. The earlier `auth_client_playfab_mismatch` signal is absent after the change. The PocketMine log still reported an `Unexpected JSON property for ClientData: PlayFabId` warning during this run because the empty field was omitted from the selected report but was still serialized on the wire. The follow-up JSON-tag change omits the key itself when empty.
 
@@ -58,7 +58,7 @@ After that follow-up was built into revision `9994e4e11f595f7980fc6795f5cc8b0527
 
 ### Android downstream loopback with a separate authenticated upstream
 
-On 2026-09-22, an Android Bedrock client signed in as `ClientAccount` connected over the LAN to `<LAN_IP>:19134`. The proxy used the cached `SampleAccount` device-auth token for its separate authenticated upstream dial to the local PocketMine server. The upstream therefore correctly reported `SampleAccount`, while the downstream transport peer was the Android client. This was an intentional two-identity local test, not an attempt to merge or forge account identities.
+On 2026-09-22, an Android Bedrock client signed in as `downstream account` connected over the LAN to `<LAN_IP>:19134`. The proxy used the cached `upstream account` device-auth token for its separate authenticated upstream dial to the local PocketMine server. The upstream therefore correctly reported `upstream account`, while the downstream transport peer was the Android client. This was an intentional two-identity local test, not an attempt to merge or forge account identities.
 
 The stamped revision was `9994e4e11f595f7980fc6795f5cc8b05271d4de7`. Capture [captures/session-20260922T044324Z](https://github.com/BedrockDebugProxy-Captures/session-20260922T044324Z/releases/tag/capture-archive) closed with 11,325 events and 6,235 blobs, with zero write errors, dropped events, truncation, or decode errors. The session negotiated protocol 2193 and game version 1.26.51 on both sides, reached spawn, carried bidirectional gameplay traffic, and ended with `player_quit`. The matching ProxyFingerprint report `20260922T045726.014738Z_f5c3fe0b06ede822_unlabeled.json` recorded Android device metadata, `ClientData.PlayFabId` absent, and only `non_public_peer`; PocketMine recorded `XUID match` and no `PlayFabId` parser warning.
 

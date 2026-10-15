@@ -24,4 +24,4 @@ The screenshot showed a native `▼` marker beside expanded JSON event fields. T
 
 ## Limitations and follow-up
 
-The SVG artwork is bundled as an embedded project asset. Its source file is the maintainer-supplied `[local path]`.
+The SVG artwork is bundled as an embedded project asset. Its source file is the maintainer-supplied `glyph_e031.svg`.

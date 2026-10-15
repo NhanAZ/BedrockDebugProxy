@@ -26,7 +26,7 @@ The account label comes from the local account registry already selected by `run
 
 ## Live validation
 
-Pass via a clean committed build at `[local viewer URL]` using a local closed capture with synthetic `account_name=ClientAccount` metadata. The Account metric rendered `ClientAccount`, and the browser console had no errors or warnings. No public-server or real-client validation is implied by this presentation-only change.
+Pass via a clean committed build at `[local viewer URL]` using a local closed capture with synthetic `account_name=ExampleAccount` metadata. The Account metric rendered `ExampleAccount`, and the browser console had no errors or warnings. No public-server or real-client validation is implied by this presentation-only change.
 
 ## Known limitations and follow-up
 

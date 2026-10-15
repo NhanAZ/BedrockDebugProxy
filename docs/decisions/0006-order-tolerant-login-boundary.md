@@ -7,8 +7,7 @@ Accepted on 2026-09-14.
 ## Context
 
 Featured Experiences do not all use one observable login sequence. The project has observed an early
-`ResourcePacksInfo` on Enchanted and has documented historical Hive and CubeCraft differences in
-[`docs/research/cubecraft-gophertunnel-discord-audit.md`](../research/cubecraft-gophertunnel-discord-audit.md). A fix for one sequence must not become a generic packet reorderer.
+`ResourcePacksInfo` on Enchanted. A fix for one sequence must not become a generic packet reorderer.
 
 The in-tree gophertunnel connection defers packets whose IDs are not valid for the current login state. The
 state transition must revisit already-received packets or a valid early packet can leave the dialer waiting
@@ -38,7 +37,6 @@ boundary where gophertunnel must consume packets to establish the connection.
 ## Evidence and validation
 
 - Failed Enchanted capture [captures/session-20260914T105050Z](https://github.com/BedrockDebugProxy-Captures/session-20260914T105050Z/releases/tag/capture-archive) at revision `96d8a01201d48b4a069c0e649374452a12b9f207`.
-- Historical login-order evidence in [`docs/research/cubecraft-gophertunnel-discord-audit.md`](../research/cubecraft-gophertunnel-discord-audit.md).
 - Regression tests in `third_party/gophertunnel/minecraft/conn_featured_experience_test.go` cover all resource-pack login permutations and preserve later-phase packets until their state.
 - Exact-revision live validation for the latest queue implementation remains pending. The required next baseline is The Hive, followed by the affected Enchanted flow and the release matrix.
 

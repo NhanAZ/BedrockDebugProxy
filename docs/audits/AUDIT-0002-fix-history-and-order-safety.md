@@ -27,7 +27,7 @@ gophertunnel login-order evidence. No source code was copied from another projec
 
 ## Validation
 
-- `gofmt -w [local path]`
+- `gofmt -w third_party/gophertunnel/minecraft/conn_featured_experience_test.go`
 - `go test ./minecraft` from `third_party/gophertunnel`
 - `git diff --check`
 - Live validation: `not_observed`; this commit has no runtime impact. The latest queue implementation still needs a stamped The Hive run and the affected Enchanted flow before release.

@@ -27,4 +27,3 @@ Server-side policy, blocklists, and anti-abuse decisions are external outcomes. 
 - [`docs/decisions/0001-capture-first-terminating-proxy.md`](0001-capture-first-terminating-proxy.md) defines the default observational bridge.
 - [`docs/decisions/0004-same-protocol-raw-forwarding.md`](0004-same-protocol-raw-forwarding.md) records raw forwarding without gameplay packet mutation.
 - [`docs/research/local-identity-parity.md`](../research/local-identity-parity.md) records the local identity and ClientData parity fixes and their validation limits.
-- [`docs/research/hive-unfair-advantage-2026-09.md`](../research/hive-unfair-advantage-2026-09.md) records the unresolved public-server incident without inferring its cause.

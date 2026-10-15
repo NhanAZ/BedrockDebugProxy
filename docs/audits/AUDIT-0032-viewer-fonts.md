@@ -19,7 +19,7 @@ Packet forwarding, capture recording, capture schema, authentication, protocol h
 - `IdreesInc/Monocraft` commit `e498bf70aeb25b4bdcff1e44d878fb2cb4f7c2a9` distributes `dist/Monocraft-ttf/Monocraft.ttf` under SIL Open Font License 1.1 and describes it as a fan-made implementation containing no original game font or asset files.
 - `IdreesInc/Minecraft-Font` commit `261ac77fbf28796ca09c22eb83ecdfe386c4b838` distributes `Minecraft-Bold.otf` under SIL Open Font License 1.1 and describes it as a fan-made implementation containing no original game font or asset files.
 - The exact file hashes, immutable source links, attribution, and license boundary are recorded in `THIRD_PARTY_NOTICES.md`.
-- The proprietary files at `[local path]` and `[local path]` were inspected but were not copied into the repository or executable.
+- The proprietary files at `Mojangles.ttf` and `minecraft-ten.ttf` were inspected but were not copied into the repository or executable.
 
 ## Validation
 

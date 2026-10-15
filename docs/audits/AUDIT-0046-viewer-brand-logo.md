@@ -14,7 +14,7 @@ Embedded `original-logo.png`, served it from the token-scoped viewer handler, an
 
 ## Evidence and provenance
 
-The asset was supplied in `[local path]` alongside the deployed favicon variants.
+The asset was supplied in `original-logo.png` alongside the deployed favicon variants.
 
 ## Validation
 
