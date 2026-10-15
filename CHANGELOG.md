@@ -6,6 +6,12 @@ Detailed rationale remains in [`docs/audits/`](docs/audits/).
 
 ## [Unreleased]
 
+## [0.4.0] - 2026-10-15
+
+Supported Bedrock version: 1.26.52 (protocol 2193).
+
+[Published release](https://github.com/NhanAZ/BedrockDebugProxy/releases/tag/v0.4.0) | [All changes since v0.3.0](https://github.com/NhanAZ/BedrockDebugProxy/compare/v0.3.0...v0.4.0)
+
 ### Added
 
 - Golems have seeded, adjustable personalities and optional bounded autonomous behaviour. Agents can control online players interactively, observe nonblocking movement, change direction, stop, and resume control across CLI processes. Direct actions pause autonomy. Personality affects exploration, pace, greetings and reactions to damage.

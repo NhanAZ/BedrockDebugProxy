@@ -21,3 +21,7 @@ The focused fix selects that HTTPS path only when the authenticated join respons
 A stamped retail session at revision `973f72dadad8b4931af7c25b5b219cc49c40a003` reached spawn, forwarded traffic in both directions, and closed with a verified capture. Its sanitized report could not pass because the optional pre-dial `transport.ping` failed with `NetherNet.PingContext: not supported`. The vendored gophertunnel dialer ignored that ping failure and continued to the successful HTTPS connection. This is not evidence of a gameplay failure. The HTTP endpoint status check had already succeeded during Experience resolution.
 
 The follow-up fix uses the dialer's existing `SkipPing` option only when the selected target starts with `https://`. The skipped operation has no response bytes to preserve. RakNet routes keep their ping and capture behavior. Fresh exact-revision retail evidence is needed after this change.
+
+## Exact-revision release validation
+
+The stamped v0.4.0 runtime at `aa103ac5d88ef4ca24a9e24f06789a60b8490864` produced passing sanitized retail reports for The Hive, Galaxite, Lifeboat, Mineville Zeqa, Enchanted, and CubeCraft. CubeCraft spawned, forwarded traffic in both directions, and reported no blocking errors. Enchanted followed the selected minigame transfer to hop 2 and spawned there. The release-readiness gate passed all six reports. These observations establish the named flows for that runtime, not universal compatibility with every server or later protocol version.

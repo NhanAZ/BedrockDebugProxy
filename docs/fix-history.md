@@ -21,7 +21,7 @@ Every new entry should state the symptom, root cause, implementation commits, ev
 - Root cause: the dialer tried RakNet address-discovery ping on an HTTPS NetherNet target. Gophertunnel reports that `NetherNet.PingContext` is unsupported and continues dialing successfully, while the capture correctly retained the failed operation as an error.
 - Implementation: skip the optional address-discovery ping for HTTPS targets. The Experience resolver already performs the supported HTTPS endpoint status check before listening. RakNet targets retain their bounded ping and response capture.
 - Evidence and validation: the sanitized retail validation report for revision `973f72dadad8b4931af7c25b5b219cc49c40a003` records spawn, two-way traffic, decoded packets, and one blocking `transport.ping` event. Local inspection identified the unsupported NetherNet ping. The vendored `minecraft.Dialer.prepareDialAddress` supports `SkipPing`. See [the routing research note](research/cubecraft-experience-routing-2026-10-15.md) and [AUDIT-0220](audits/AUDIT-0220-skip-https-nethernet-ping.md).
-- Status: code fix prepared. Fresh retail validation at the new runtime revision is required before release.
+- Status: the exact-revision retail CubeCraft report passes without a blocking ping error. The six-server release matrix passes at runtime revision `aa103ac5d88ef4ca24a9e24f06789a60b8490864`.
 
 ### FIX-0158 - Resolve HTTPS NetherNet Experience destinations
 
@@ -30,7 +30,7 @@ Every new entry should state the symptom, root cause, implementation commits, ev
 - Root cause: the authenticated join response supplied a hostname and port under `ipV4Address` for a NetherNet route, without a `netherNetId`. The resolver accepted only ID-based NetherNet or a literal IPv4 RakNet destination. The advertised HTTPS `/v1/join` endpoint returned a valid status response, while plaintext HTTP did not.
 - Implementation: select the installed go-nethernet HTTPS endpoint client for this response shape, check the advertised endpoint before listening, and preserve the existing ID-based signaling routes. Invalid destinations and failed HTTPS checks remain errors. No alternate endpoint or transport is guessed.
 - Evidence and validation: [the routing research note](research/cubecraft-experience-routing-2026-10-15.md), [the official NetherNet onboarding guide](https://github.com/Mojang/bedrock-protocol-docs/blob/main/additional_docs/NetherNetOnboardingGuide.md), and focused Experience tests. A development build resolved CubeCraft and opened the local listener after the HTTPS status check. Its separate `--packs-only` session completed authenticated upstream login and pack exchange without spawning. See [AUDIT-0219](audits/AUDIT-0219-https-nethernet-experience.md).
-- Status: endpoint resolution and upstream pack exchange are observed. Retail spawn and the six-server release matrix remain to be validated from a clean stamped build.
+- Status: endpoint resolution, upstream pack exchange, and retail spawn are observed. The six-server release matrix passes at runtime revision `aa103ac5d88ef4ca24a9e24f06789a60b8490864` after FIX-0159.
 
 ### FIX-0157 - Update the scanner for Go 1.27 Linux analysis
 
