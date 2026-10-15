@@ -206,3 +206,17 @@ go test -count=1 -run TestGolemInteractiveServerControl -v ./cmd/bedrock-debug-p
 ```
 
 The first copies and runs both `smoke.php` and `behaviour-smoke.php`, then checks that an expired request cannot complete a later request. The second keeps stdin open, chooses movement from observed coordinates, reads state during movement, stops it, chats, closes the CLI and controls the same player through another invocation. Without the environment variable these server-dependent tests are skipped explicitly. Unset the variable after testing.
+
+### Development plugin validation
+
+An isolated Axolotl-PM 5.49.2+dev server was also exercised with existing plugin PHARs. The [real-plugin validation audit](audits/AUDIT-0217-golem-real-plugin-validation.md) records source revisions, plugin artifact hashes, commands, observed effects and compatibility failures. This checks server-side plugin behavior through the CLI, not a real Bedrock network client or resource-pack rendering.
+
+| Plugin | Observed CLI-driven behavior |
+| --- | --- |
+| DevTools 1.0.15 | A Golem ran `/devtools status` and received the running development environment summary. |
+| SimpleEconomy 1.0.0 | Two Golems joined, transferred 125 units with `/pay`, received both sides' messages, and exposed transaction events to a subscription. A later `/money` returned the recipient's updated 1,125 balance. |
+| BlockDataExample 1.0.0 | One Golem placed a block. The other could inspect ownership but its break attempt was cancelled. The owner could break the block and received the plugin's cleanup message. |
+| FormApiDemo 1.0.0 | The CLI opened and answered simple, modal and custom forms. The plugin's own audit recorded the selected button, boolean and custom input values. |
+| CustomToastExample 1.0.0 | With the plugin's optional sound disabled, `/toast` emitted a synthetic server-side TextPacket containing the expected toast payload. Visual rendering was not checked. |
+
+The tested ClientboundUpdateSoundDataPacket PHAR crashed the server on `/soundtest repro 2` because it called the installed protocol's `ClientboundUpdateSoundDataPacket::create()` with `null` where that API requires `SoundDataEvent`. The CustomToastExample PHAR's default sound path likewise called `PlaySoundPacket::create()` with `null` where the installed API requires an integer loop count. These are plugin and protocol API compatibility failures observed through Golem, not evidence of a Golem player-control defect. Use a compatible plugin build before testing those sound paths. The CLI returned the direct CustomToast error; the delayed sound task terminated the server, so the companion stopped accepting requests.
