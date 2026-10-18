@@ -99,6 +99,11 @@ type Dialer struct {
 	// been accepted and the final client response has been flushed. The returned
 	// connection has not completed the world-spawn sequence.
 	ResourcePackExchangeOnly bool
+	// DeferResourcePackCompletion returns after the server's pack stack is
+	// validated, before sending PackResponseCompleted. DoSpawn resumes login.
+	// A terminating proxy uses this to finish downstream pack delivery before
+	// allowing the upstream server to start the world.
+	DeferResourcePackCompletion bool
 	// ResourcePackCache, if set, reuses resource packs downloaded on earlier logins. Misses and errors
 	// fall back to a normal download.
 	ResourcePackCache ResourcePackCache
@@ -214,6 +219,9 @@ func (d Dialer) DialTimeout(network, address string, timeout time.Duration) (*Co
 // and send packets to. If a connection is not established before the context passed is cancelled,
 // DialContextNetwork returns an error.
 func (d Dialer) DialContextNetwork(ctx context.Context, network Network, address string) (conn *Conn, err error) {
+	if d.ResourcePackExchangeOnly && d.DeferResourcePackCompletion {
+		return nil, errors.New("resource-pack exchange-only and deferred completion cannot be combined")
+	}
 	if ctx == nil {
 		ctx = context.Background()
 	}
@@ -330,6 +338,10 @@ func (d Dialer) DialContextNetwork(ctx context.Context, network Network, address
 	if d.ResourcePackExchangeOnly {
 		conn.resourcePackExchangeDone = make(chan struct{})
 	}
+	if d.DeferResourcePackCompletion {
+		conn.resourcePackCompletionDeferred = make(chan struct{})
+		conn.resourcePackCompletionResume = make(chan struct{})
+	}
 	if d.ConnectionFunc != nil {
 		d.ConnectionFunc(conn)
 	}
@@ -367,6 +379,9 @@ func (d Dialer) DialContextNetwork(ctx context.Context, network Network, address
 	var dialComplete <-chan struct{} = connected
 	if d.ResourcePackExchangeOnly {
 		dialComplete = conn.resourcePackExchangeDone
+	}
+	if d.DeferResourcePackCompletion {
+		dialComplete = conn.resourcePackCompletionDeferred
 	}
 	ctx, cancel := context.WithCancelCause(ctx)
 	go listenConn(conn, readyForLogin, connected, cancel)
@@ -481,6 +496,7 @@ func listenConn(conn *Conn, readyForLogin, connected chan struct{}, cancel conte
 		_ = conn.Close()
 	}()
 	cancelContext := true
+	resourcePacksResumed := false
 	for {
 		// We finally arrived at the packet decoding loop. We constantly decode packets that arrive
 		// and push them to the Conn so that they may be processed.
@@ -524,6 +540,29 @@ func listenConn(conn *Conn, readyForLogin, connected chan struct{}, cancel conte
 					// connection open until that caller closes it.
 					<-conn.ctx.Done()
 					return
+				default:
+				}
+			}
+			if conn.resourcePackCompletionDeferred != nil && !resourcePacksResumed {
+				select {
+				case <-conn.resourcePackCompletionDeferred:
+					// The dial caller now owns the connection. Later decode errors
+					// must be logged instead of sent only to the completed dial.
+					cancelContext = false
+					select {
+					case <-conn.ctx.Done():
+						return
+					case <-conn.resourcePackCompletionResume:
+					}
+					if err := conn.completeResourcePackStack(); err != nil {
+						_ = conn.close(err)
+						return
+					}
+					if err := conn.Flush(); err != nil {
+						_ = conn.close(err)
+						return
+					}
+					resourcePacksResumed = true
 				default:
 				}
 			}

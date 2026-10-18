@@ -742,6 +742,13 @@ func (r *Runner) runHop(runCtx context.Context, localAddress string, state *hopS
 	if err := failures.Err(); err != nil {
 		return fmt.Errorf("capture hook failed during login: %w", err)
 	}
+	spawnCtx, cancelSpawn := context.WithTimeout(clientConn.Context(), time.Minute)
+	defer cancelSpawn()
+	if err := serverConn.DoSpawnContext(spawnCtx); err != nil {
+		captureErr := r.recordAtHop("session.spawn_error", capture.SeverityError, map[string]any{"error": err.Error(), "type": fmt.Sprintf("%T", err)}, state.hop)
+		setCaptureFailure(failures, captureErr)
+		return errors.Join(err, captureErr)
+	}
 	downstreamClientData := clientConn.ClientData()
 	upstreamClientData := serverConn.ClientData()
 	downstreamNetworkSettings, downstreamNetworkSettingsOK := clientConn.NetworkSettings()
@@ -934,7 +941,8 @@ func (r *Runner) connectUpstream(ctx context.Context, target string, network bed
 		DownloadResourcePack: func(_ uuid.UUID, _ string, _, _ int) bool {
 			return true
 		},
-		ResourcePackExchangeOnly: resourcePackExchangeOnly,
+		ResourcePackExchangeOnly:    resourcePackExchangeOnly,
+		DeferResourcePackCompletion: prepareDownstream,
 	}
 	waitStarted := time.Now()
 	conn, err := dialer.DialContextNetwork(dialCtx, network, target)
@@ -965,12 +973,12 @@ func (r *Runner) connectUpstream(ctx context.Context, target string, network bed
 		return nil, nil, errors.Join(fmt.Errorf("connect to upstream server: %w", err), captureErr)
 	}
 	if prepareDownstream {
-		live.Info("Upstream login and resource-pack exchange completed in %s - downstream pack delivery can begin (sequential buffered mode)", waitDuration)
+		live.Info("Upstream packs and stack ready in %s - delivering packs downstream before world startup (sequential buffered mode)", waitDuration)
 	} else {
 		live.Info("Upstream login and resource-pack exchange completed in %s", waitDuration)
 	}
-	// Dialer returns only after the upstream login and resource-pack exchange has
-	// completed. Waiting on a second cache barrier here can deadlock the listener
+	// Dialer returns only after the upstream packs and stack are validated at
+	// the selected completion boundary. A second cache barrier can deadlock the listener
 	// login path because the URL offer is observed on the same decoder goroutine.
 	// The connection's pack list is therefore authoritative at this point.
 	resourcePacks := conn.ResourcePacks()

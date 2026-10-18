@@ -14,6 +14,15 @@ Every new entry should state the symptom, root cause, implementation commits, ev
 
 ## Compatibility and bug index
 
+### FIX-0161 - Defer upstream world startup during downstream pack delivery
+
+- Symptom: an Enchanted OP SMP transfer retained all seven child packs but the upstream disconnected while the downstream client was still downloading them. A cached client reached the world.
+- Classification: a new startup-barrier defect, separate from FIX-0160 source-read errors and the older transfer route fixes.
+- Root cause: the proxy's upstream dial completed pack negotiation and world startup before offering the same packs downstream. Queued gameplay could not reach the client until the second pack exchange finished.
+- Implementation: an opt-in dial boundary retains the validated stack without sending PackResponseCompleted. After the downstream listener accepts pack completion, DoSpawnContext resumes upstream startup before GameData is read. The ordinary library and packs-only completion paths are unchanged.
+- Evidence and validation: the [completion-order decision](decisions/0014-defer-upstream-pack-completion.md) records protocol sources and alternatives. The mixed-pack loopback fails with the old ordering and passes with deferred completion. The paired consumer fixture includes both completion packets and preserves archive, manifest, key, index, and hop provenance. See [AUDIT-0225](audits/AUDIT-0225-deferred-resource-pack-completion.md).
+- Status: implemented. The audit separates automated checks, preliminary authenticated flow evidence, and exact-revision follow-up validation. No retail rendering or gameplay claim is made.
+
 ### FIX-0160 - Preserve resource-pack source stream errors
 
 - Symptom: a failed archive stream could be reported only as an invalid ZIP, or accepted when its received bytes already formed a complete ZIP.

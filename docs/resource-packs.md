@@ -2,6 +2,8 @@
 
 ## Current behavior
 
+Normal proxy sessions retain the upstream archives and validated stack before sending the final upstream PackResponseCompleted response. The listener first finishes the downstream resource-pack exchange. The proxy then resumes upstream world startup, obtains GameData, and starts the downstream world. This prevents downstream pack delivery from occupying time inside an already active upstream world. Ordinary library dials and the packs-only boundary described below retain their existing behavior. See [the completion-order decision](decisions/0014-defer-upstream-pack-completion.md).
+
 The selected in-tree gophertunnel dialer normally downloads every upstream resource pack accepted by `DownloadResourcePack` over its RakNet chunk path. BedrockDebugProxy adds a narrow per-connection adapter for the HTTP URL form of `ResourcePacksInfo`: when an upstream offer contains a URL, the adapter downloads and validates that archive before gophertunnel handles the offer, then exposes it through gophertunnel's public `ResourcePackCache` hook. This allows URL-delivered packs to complete negotiation while retaining the URL on the reconstructed pack for capture.
 
 Before the listener offers a prefetched URL pack to the real Bedrock client, the proxy creates an equivalent archive-backed pack with an empty `DownloadURL`. The URL form is not forwarded to the client because the client must receive the bytes through the proxy's RakNet connection. This keeps the CDN request and its exact URL observable upstream while making downstream delivery use the same chunk path as a normal local listener.

@@ -1,5 +1,7 @@
 # BedrockDebugProxy patch
 
+The opt-in `Dialer.DeferResourcePackCompletion` boundary returns after retaining and validating the upstream pack stack, before sending `PackResponseCompleted`. `Conn.DoSpawnContext` releases the decoder to flush that response and finish world startup. Normal proxy sessions use it while delivering packs downstream. Ordinary dials and `ResourcePackExchangeOnly` retain their existing boundaries. The modes cannot be combined. This independently written change keeps packet codecs, pack content, and the MIT license unchanged. See the parent project's `docs/decisions/0014-defer-upstream-pack-completion.md` and the synthetic completion-order and cancellation regressions.
+
 The local `minecraft/resource/pack.go` correction preserves `io.Copy` and temporary-file close failures before parsing an archive. It rejects failed source streams even when their received bytes form a valid ZIP and cleans up the temporary file. This is an independently written local correction, with synthetic reader and HTTP regression coverage. It does not add retries, change resource-pack metadata, or modify the capture schema. See the parent project's `docs/research/capture-failure-review-2026-10-18.md`.
 
 This directory retains Sandertv gophertunnel's MIT license and is a reviewed composite of:

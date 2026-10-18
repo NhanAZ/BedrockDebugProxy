@@ -188,8 +188,11 @@ type Conn struct {
 	downloadResourcePack func(id uuid.UUID, version string, currentPack, totalPacks int) bool
 	// resourcePackExchangeDone is signalled by dial-only sessions after the server's
 	// ResourcePackStack has been accepted and the final client response is flushed.
-	resourcePackExchangeDone chan struct{}
-	resourcePackExchangeOnce sync.Once
+	resourcePackExchangeDone       chan struct{}
+	resourcePackExchangeOnce       sync.Once
+	resourcePackCompletionDeferred chan struct{}
+	resourcePackCompletionResume   chan struct{}
+	resourcePackCompletionOnce     sync.Once
 	// fetchResourcePacks is an optional function passed from a Listener. If set, the returned resource packs from the function
 	// will determine which resource packs to send to the client based on its identity and client data.
 	fetchResourcePacks func(identityData login.IdentityData, clientData login.ClientData, current []*resource.Pack) []*resource.Pack
@@ -427,7 +430,15 @@ func (conn *Conn) DoSpawnTimeout(timeout time.Duration) error {
 // Conn obtained using a minecraft.Listener.
 // DoSpawnContext will start the spawning sequence using the game data found in conn.GameData(), which was
 // sent earlier by the server.
+// With Dialer.DeferResourcePackCompletion, it first resumes pack completion and
+// receives world metadata. GameData is complete only after this call succeeds.
 func (conn *Conn) DoSpawnContext(ctx context.Context) error {
+	if conn.resourcePackCompletionResume != nil {
+		if err := ctx.Err(); err != nil {
+			return conn.wrap(err, "do spawn")
+		}
+		conn.resourcePackCompletionOnce.Do(func() { close(conn.resourcePackCompletionResume) })
+	}
 	select {
 	case <-conn.ctx.Done():
 		return conn.closeErr("do spawn")
@@ -1316,6 +1327,15 @@ func (conn *Conn) handleResourcePackStack(pk *packet.ResourcePackStack, raw *pac
 			return fmt.Errorf("texture pack (UUID=%v, version=%v) not downloaded", pack.UUID, pack.Version)
 		}
 	}
+	if conn.resourcePackCompletionDeferred != nil {
+		close(conn.resourcePackCompletionDeferred)
+		return nil
+	}
+	return conn.completeResourcePackStack()
+}
+
+// completeResourcePackStack allows world startup after the validated pack stack.
+func (conn *Conn) completeResourcePackStack() error {
 	conn.expect(packet.IDDimensionData, packet.IDStartGame, packet.IDJigsawStructureData, packet.IDVoxelShapes)
 	if err := conn.WritePacket(&packet.ResourcePackClientResponse{Response: packet.PackResponseCompleted}); err != nil {
 		return fmt.Errorf("send resource pack completion: %w", err)

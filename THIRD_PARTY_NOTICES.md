@@ -2,6 +2,8 @@
 
 ## Project code
 
+The deferred resource-pack completion boundary in the retained MIT gophertunnel dialer and its synthetic regressions are independently written project changes. They add no copied upstream source. The [completion-order decision](docs/decisions/0014-defer-upstream-pack-completion.md) records the protocol sources, evidence, and scope.
+
 The archive stream error correction in the retained MIT gophertunnel `minecraft/resource/pack.go` and its synthetic regressions are independently written project changes. They preserve the existing dependency license and add no copied upstream patch. The [capture failure review](docs/research/capture-failure-review-2026-10-18.md) records the local reproduction and scope.
 
 Except where this file states otherwise, the source in this repository was written independently for BedrockDebugProxy and is licensed `GPL-3.0-or-later` under the root `LICENSE` file.

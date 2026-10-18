@@ -1536,6 +1536,7 @@ func TestRunnerPreservesMixedResourcePackOfferOrder(t *testing.T) {
 
 	serverErrors := make(chan error, 1)
 	serverDone := make(chan struct{})
+	serverSpawned := make(chan struct{})
 	go func() {
 		defer close(serverDone)
 		accepted, acceptErr := upstreamListener.Accept()
@@ -1554,6 +1555,7 @@ func TestRunnerPreservesMixedResourcePackOfferOrder(t *testing.T) {
 			serverErrors <- err
 			return
 		}
+		close(serverSpawned)
 		for {
 			if _, err := serverConn.ReadPacket(); err != nil {
 				serverErrors <- nil
@@ -1641,6 +1643,11 @@ func TestRunnerPreservesMixedResourcePackOfferOrder(t *testing.T) {
 		t.Fatalf("downstream mixed stack = %#v, want %#v", gotStack, stack)
 	}
 
+	select {
+	case <-serverSpawned:
+	case <-ctx.Done():
+		t.Fatalf("upstream did not observe client readiness: %v", ctx.Err())
+	}
 	cancel()
 	select {
 	case err := <-runnerErrors:
@@ -1679,6 +1686,41 @@ func TestRunnerPreservesMixedResourcePackOfferOrder(t *testing.T) {
 	}
 	if len(verification.Issues) != 0 {
 		t.Fatalf("capture issues = %v", verification.Issues)
+	}
+	assertResourcePackCompletionOrder(t, root)
+}
+
+func assertResourcePackCompletionOrder(t *testing.T, root string) {
+	t.Helper()
+	var downstream, upstream uint64
+	if err := capture.ScanEvents(root, func(event capture.Event) error {
+		if event.Kind != "packet.raw" || event.Packet == nil || event.Packet.ID != packet.IDResourcePackClientResponse || event.Direction != capture.DirectionClientToServer {
+			return nil
+		}
+		payload, err := os.ReadFile(filepath.Join(root, event.Blob.Path))
+		if err != nil {
+			return err
+		}
+		var response packet.ResourcePackClientResponse
+		response.Marshal(protocol.NewReader(bytes.NewBuffer(payload), 0, true))
+		if response.Response != packet.PackResponseCompleted {
+			return nil
+		}
+		switch event.Channel {
+		case "downstream":
+			downstream = event.Sequence
+		case "upstream":
+			if upstream != 0 {
+				t.Error("upstream pack completion was sent twice")
+			}
+			upstream = event.Sequence
+		}
+		return nil
+	}); err != nil {
+		t.Fatal(err)
+	}
+	if downstream == 0 || upstream <= downstream {
+		t.Fatalf("pack completion order: downstream=%d upstream=%d", downstream, upstream)
 	}
 }
 
