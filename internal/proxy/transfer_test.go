@@ -231,6 +231,22 @@ func testRunnerFollowsTransfer(t *testing.T, overlap bool) {
 		_ = client.Close()
 		t.Fatal(err)
 	}
+	// The client spawn notification can precede the upstream acknowledgement.
+	// Wait for a child packet forwarded after the proxy completes both sides.
+	deadline, _ := ctx.Deadline()
+	if err := client.SetReadDeadline(deadline); err != nil {
+		t.Fatal(err)
+	}
+	for {
+		value, err := client.ReadPacket()
+		if err != nil {
+			_ = client.Close()
+			t.Fatalf("wait for initialized child bridge: %v", err)
+		}
+		if value, ok := value.(*packet.SetTime); ok && value.Time == 42 {
+			break
+		}
+	}
 	if err := client.Close(); err != nil {
 		t.Fatal(err)
 	}
@@ -344,6 +360,14 @@ func serveTransferHop(ctx context.Context, listener *minecraft.Listener, target 
 		return
 	}
 	if !sendTransfer {
+		if err := conn.WritePacket(&packet.SetTime{Time: 42}); err != nil {
+			errorsChannel <- fmt.Errorf("write child ready marker: %w", err)
+			return
+		}
+		if err := conn.Flush(); err != nil {
+			errorsChannel <- fmt.Errorf("flush child ready marker: %w", err)
+			return
+		}
 		for {
 			if _, err := conn.ReadPacket(); err != nil {
 				errorsChannel <- nil

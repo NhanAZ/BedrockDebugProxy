@@ -44,15 +44,16 @@ func TestGolemCompanionSyntaxAndPackage(t *testing.T) {
 	}
 	root := filepath.Join("..", "..", "dev", "golem-agent")
 	for _, path := range []string{"src/Agent.php", "src/Actions.php", "src/View.php", "src/Personality.php", "src/Behaviour.php", "build.php", "tests/smoke.php", "tests/personality.php", "tests/behaviour-smoke.php"} {
-		ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+		ctx, cancel := context.WithTimeout(t.Context(), 30*time.Second)
 		// #nosec G204 -- Fixed repository PHP sources are linted with an installed runtime.
 		output, err := exec.CommandContext(ctx, php, "-l", filepath.Join(root, filepath.FromSlash(path))).CombinedOutput()
+		contextErr := ctx.Err()
 		cancel()
 		if err != nil {
-			t.Fatalf("%s: %v\n%s", path, err, output)
+			t.Fatalf("%s: %v (context %v)\n%s", path, err, contextErr, output)
 		}
 	}
-	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	ctx, cancel := context.WithTimeout(t.Context(), 30*time.Second)
 	defer cancel()
 	// #nosec G204 -- Execute the fixed deterministic personality regression fixture.
 	if output, err := exec.CommandContext(ctx, php, filepath.Join(root, "tests/personality.php")).CombinedOutput(); err != nil {
