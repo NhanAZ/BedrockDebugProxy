@@ -21,7 +21,7 @@ Every new entry should state the symptom, root cause, implementation commits, ev
 - Root cause: `resource.Read` discarded the result of `io.Copy` before closing and parsing its temporary archive.
 - Implementation: retain copy and close errors, remove the temporary file, preserve error identity through wrapping, and stop before ZIP parsing. No retry, endpoint fallback, protocol mutation, schema change, or server-specific exception is added.
 - Evidence and validation: [the capture failure review](research/capture-failure-review-2026-10-18.md) distinguishes observed network failures from the deterministic reader reproduction. Reader regressions fail before the fix, including a valid ZIP followed by a stream error. The URL cache regression checks an incomplete chunked HTTP body. The paired consumer retains the existing capture contract and accepts the reviewed numeric 0.4.x producer builds.
-- Status: automated and exact-revision live results are recorded in [AUDIT-0223](audits/AUDIT-0223-resource-pack-stream-errors.md) and its follow-up validation record. This fix does not establish recovery from external network or backend failures.
+- Status: automated and exact-revision live results are recorded in [AUDIT-0223](audits/AUDIT-0223-resource-pack-stream-errors.md) and [AUDIT-0224](audits/AUDIT-0224-paired-stream-error-validation.md). This fix does not establish recovery from external network or backend failures.
 
 ### FIX-0159 - Skip unsupported status pings for HTTPS NetherNet routes
 
