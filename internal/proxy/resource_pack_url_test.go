@@ -105,6 +105,49 @@ func TestURLResourcePackCacheReportsAdvertisedPackMismatch(t *testing.T) {
 	}
 }
 
+func TestURLResourcePackCacheRejectsIncompleteHTTPBody(t *testing.T) {
+	archive := testURLResourcePackArchive(t)
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		hijacker, ok := w.(http.Hijacker)
+		if !ok {
+			t.Error("test server does not support hijacking")
+			return
+		}
+		conn, rw, err := hijacker.Hijack()
+		if err != nil {
+			t.Error(err)
+			return
+		}
+		defer func() { _ = conn.Close() }()
+		// Deliver a complete ZIP but omit the final HTTP chunk. The archive
+		// parser must not turn the failed HTTP body into a successful pack.
+		_, _ = fmt.Fprintf(rw, "HTTP/1.1 200 OK\r\nTransfer-Encoding: chunked\r\n\r\n%x\r\n", len(archive))
+		_, _ = rw.Write(archive)
+		_, _ = rw.WriteString("\r\n")
+		if err := rw.Flush(); err != nil {
+			t.Error(err)
+		}
+	}))
+	defer server.Close()
+	info := &packet.ResourcePacksInfo{TexturePacks: []protocol.TexturePackInfo{{
+		UUID:        uuid.MustParse("11111111-1111-1111-1111-111111111111"),
+		Version:     "1.0.0",
+		Size:        uint64(len(archive)),
+		DownloadURL: server.URL,
+	}}}
+	cache := newURLResourcePackCache(context.Background())
+	cache.Observe(packet.Header{PacketID: packet.IDResourcePacksInfo}, encodeResourcePacksInfo(t, info))
+	pack, err := cache.Load(context.Background(), minecraft.ResourcePackCacheKey{
+		UUID: info.TexturePacks[0].UUID, Version: "1.0.0", Size: uint64(len(archive)),
+	})
+	if !errors.Is(err, io.ErrUnexpectedEOF) {
+		t.Fatalf("cache error = %v, want the HTTP body read failure", err)
+	}
+	if pack != nil || len(cache.Packs()) != 0 {
+		t.Fatal("accepted an archive from an incomplete HTTP body")
+	}
+}
+
 func TestURLResourcePackCacheBoundsResponseBodyToAdvertisedSize(t *testing.T) {
 	archive := testURLResourcePackArchive(t)
 	extra := bytes.Repeat([]byte{'x'}, 1024*1024)

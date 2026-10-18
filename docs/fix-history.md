@@ -14,6 +14,15 @@ Every new entry should state the symptom, root cause, implementation commits, ev
 
 ## Compatibility and bug index
 
+### FIX-0160 - Preserve resource-pack source stream errors
+
+- Symptom: a failed archive stream could be reported only as an invalid ZIP, or accepted when its received bytes already formed a complete ZIP.
+- Classification: a new reproduced error-propagation defect in the retained resource reader, related to the URL bounds and cancellation paths in FIX-0078 and FIX-0079. It is separate from authentication, DNS, backend refusal, and transfer completion ordering.
+- Root cause: `resource.Read` discarded the result of `io.Copy` before closing and parsing its temporary archive.
+- Implementation: retain copy and close errors, remove the temporary file, preserve error identity through wrapping, and stop before ZIP parsing. No retry, endpoint fallback, protocol mutation, schema change, or server-specific exception is added.
+- Evidence and validation: [the capture failure review](research/capture-failure-review-2026-10-18.md) distinguishes observed network failures from the deterministic reader reproduction. Reader regressions fail before the fix, including a valid ZIP followed by a stream error. The URL cache regression checks an incomplete chunked HTTP body. The paired consumer retains the existing capture contract and accepts the reviewed numeric 0.4.x producer builds.
+- Status: automated and exact-revision live results are recorded in [AUDIT-0223](audits/AUDIT-0223-resource-pack-stream-errors.md) and its follow-up validation record. This fix does not establish recovery from external network or backend failures.
+
 ### FIX-0159 - Skip unsupported status pings for HTTPS NetherNet routes
 
 - Symptom: a retail CubeCraft session spawned and forwarded traffic, but release validation remained incomplete because the optional upstream status ping emitted a blocking `transport.ping` error.

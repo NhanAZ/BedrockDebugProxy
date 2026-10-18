@@ -6,6 +6,10 @@ Detailed rationale remains in [`docs/audits/`](docs/audits/).
 
 ## [Unreleased]
 
+### Fixed
+
+- Preserve resource-pack stream read errors instead of reporting only an invalid ZIP or accepting a complete-looking archive from a failed HTTP response. Temporary archive cleanup still runs on failure.
+
 ## [0.4.0] - 2026-10-15
 
 Supported Bedrock version: 1.26.52 (protocol 2193).

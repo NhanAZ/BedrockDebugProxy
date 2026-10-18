@@ -1,5 +1,7 @@
 # BedrockDebugProxy patch
 
+The local `minecraft/resource/pack.go` correction preserves `io.Copy` and temporary-file close failures before parsing an archive. It rejects failed source streams even when their received bytes form a valid ZIP and cleans up the temporary file. This is an independently written local correction, with synthetic reader and HTTP regression coverage. It does not add retries, change resource-pack metadata, or modify the capture schema. See the parent project's `docs/research/capture-failure-review-2026-10-18.md`.
+
 This directory retains Sandertv gophertunnel's MIT license and is a reviewed composite of:
 
 - stable `v1.61.0` at commit `283a5a97dfe65da94bcc0b401807f6aefa9e72ee`

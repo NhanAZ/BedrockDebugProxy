@@ -2,6 +2,8 @@
 
 ## Project code
 
+The archive stream error correction in the retained MIT gophertunnel `minecraft/resource/pack.go` and its synthetic regressions are independently written project changes. They preserve the existing dependency license and add no copied upstream patch. The [capture failure review](docs/research/capture-failure-review-2026-10-18.md) records the local reproduction and scope.
+
 Except where this file states otherwise, the source in this repository was written independently for BedrockDebugProxy and is licensed `GPL-3.0-or-later` under the root `LICENSE` file.
 
 Reviewing another implementation, protocol definition, or packet capture does not by itself mean its source was copied. Research influences, source revisions, licenses, observations, and unresolved differences are recorded in `docs/research/`.

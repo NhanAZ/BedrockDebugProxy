@@ -5,6 +5,7 @@ import (
 	"bytes"
 	"context"
 	"crypto/sha256"
+	"errors"
 	"fmt"
 	"io"
 	"net/http"
@@ -158,9 +159,12 @@ func Read(r io.Reader) (*Pack, error) {
 	if err != nil {
 		return nil, fmt.Errorf("create temp zip archive: %w", err)
 	}
-	_, _ = io.Copy(temp, r)
-	if err := temp.Close(); err != nil {
-		return nil, fmt.Errorf("close temp zip archive: %w", err)
+	_, copyErr := io.Copy(temp, r)
+	if err := errors.Join(copyErr, temp.Close()); err != nil {
+		if removeErr := os.Remove(temp.Name()); removeErr != nil {
+			err = errors.Join(err, fmt.Errorf("remove temp zip archive: %w", removeErr))
+		}
+		return nil, fmt.Errorf("write temp zip archive: %w", err)
 	}
 	pack, parseErr := ReadPath(temp.Name())
 	if err := os.Remove(temp.Name()); err != nil {
