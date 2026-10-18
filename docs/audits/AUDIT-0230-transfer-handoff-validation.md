@@ -1,0 +1,15 @@
+# AUDIT-0230 - Record exact-revision transfer handoff validation
+
+This documentation-only change records validation of runtime 59b8af8cfb0bcd655784222f555be8fd963ab6cd and its paired private BedrockPackArchive fixture commit 13409fcf6208270ab6661c712e95a0fcec9f465b. It changes no runtime, protocol, schema, archive, or viewer behavior.
+
+The runtime passed canonical formatting and tools/quality.ps1 -LowMemory, repeated loopback transfer regressions, and focused race tests. The paired consumer passed full tests, vet, build, and whitespace checks. Its initial and transferred-hop importer matrix also passed with the actual clean stamped 0.4.1-dev producer at the runtime revision above. Synthetic fixtures preserve archive hashes, manifest bytes, contents.json, synthetic per-file key counts, source sequence, hop, and child path.
+
+Authenticated headless The Hive startup completed in [session-20261018T203919Z](https://github.com/BedrockDebugProxy-Captures/session-20261018T203919Z/releases/tag/capture-archive). The sanitized report is tied to the exact runtime and passes every automatic requirement. Its result remains incomplete because normal_session is not_observed. Neither the report facts nor the retail-client requirement are changed.
+
+The exact consumer completed DUELS in [session-20261018T203120Z](https://github.com/BedrockDebugProxy-Captures/session-20261018T203120Z/releases/tag/capture-archive). Both hops spawned and retained nine Hub archives followed by two child archives. The nonzero upstream GUID and local UDP endpoint remained equal across hops. Hub, PVP PIT, EARTH, and PRISON also completed their reviewed flows in that fetch. The walks recorded no prediction corrections. The combined fetch still returned failure because BEDWARS did not spawn.
+
+BEDWARS retained its two child archives before the same upstream startup refusal in [session-20261018T203306Z](https://github.com/BedrockDebugProxy-Captures/session-20261018T203306Z/releases/tag/capture-archive). Its GUID and source endpoint are now preserved. Therefore the fixed local handoff race is not sufficient to explain or resolve that refusal. The capture remains failed and is excluded from new imports. This finding does not establish an external outage or justify a server-specific workaround.
+
+Each linked private archive preserves the complete unchanged capture. Repository privacy, README SHA-256, uploaded asset size, and uploaded digest were verified. The maintainer authorized private capture archival including derived packs for this collection. Source captures remain local. No capture, account state, key, or third-party asset is committed here.
+
+The next consumer investigation compares client metadata across the retail and loopback transfer flows. Its results and any subsequent consumer runtime validation belong to a separate record. For human follow-up, use the same account to select Mineville BEDWARS through the normal lobby route, observe whether the child reaches world startup, and retain the closed capture if it fails. The producer's official six-server retail gate remains unfulfilled. No official producer release is made.
