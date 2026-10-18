@@ -914,6 +914,8 @@ func (r *Runner) connectUpstream(ctx context.Context, target string, network bed
 	pingTimeout := upstreamDialPingTimeout
 	if transferRoute {
 		pingTimeout = transferRouteProbeTimeout
+		// The transfer dial refreshes the same non-fatal route hint as the probe.
+		network.BestEffortPing = true
 	}
 	dialer := minecraft.Dialer{
 		TokenSource:       r.config.TokenSource,

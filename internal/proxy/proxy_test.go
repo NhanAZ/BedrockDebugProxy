@@ -91,6 +91,32 @@ func TestConnectUpstreamBoundsAddressDiscoveryPing(t *testing.T) {
 			if err := recorder.Close("closed", nil); err != nil {
 				t.Fatal(err)
 			}
+			var pingSeen bool
+			if err := capture.ScanEvents(root, func(event capture.Event) error {
+				if event.Kind != "transport.ping" {
+					return nil
+				}
+				pingSeen = true
+				var fields struct {
+					BestEffort bool `json:"best_effort"`
+				}
+				if err := json.Unmarshal(event.Data, &fields); err != nil {
+					return err
+				}
+				wantSeverity := capture.SeverityError
+				if test.transferRoute {
+					wantSeverity = capture.SeverityWarn
+				}
+				if fields.BestEffort != test.transferRoute || event.Severity != wantSeverity || event.Error == nil {
+					t.Errorf("ping evidence best_effort=%t severity=%s error=%v, want best_effort=%t severity=%s with retained error", fields.BestEffort, event.Severity, event.Error, test.transferRoute, wantSeverity)
+				}
+				return nil
+			}); err != nil {
+				t.Fatal(err)
+			}
+			if !pingSeen {
+				t.Fatal("address-discovery ping evidence was not retained")
+			}
 		})
 	}
 }

@@ -1182,6 +1182,8 @@ Every new entry should state the symptom, root cause, implementation commits, ev
 - Evidence and validation: Enchanted capture [captures/session-20260922T164833Z](https://github.com/BedrockDebugProxy-Captures/session-20260922T164833Z/releases/tag/capture-archive) at revision `3a77b024ef44f37479f925ed1cba0aacddffc448`, where hop 2 connected and spawned after the 750 ms DNS timeout, plus focused network, proxy, analysis, and report-generation checks.
 - Status: implemented with explicit evidence classification. A fresh stamped Enchanted session is required before release approval.
 
+The transfer dial refreshes its route hint independently of the earlier probe. Its observing network now carries the same best-effort marker. The previous marker applied only to the explicit probe, leaving a later optional dial ping as a blocking error even when the child connected. The extended address-discovery regression retains the error and checks warning classification for transfer dials while preserving error classification for initial dials. See [AUDIT-0227](audits/AUDIT-0227-transfer-dial-route-hint.md).
+
 ### FIX-0137 - Capture upstream resource packs without a local listener
 
 - Symptom: capturing the packs offered during an upstream login required starting a local proxy listener and joining it with a separate Minecraft client.

@@ -8,6 +8,8 @@ Detailed rationale remains in [`docs/audits/`](docs/audits/).
 
 ### Fixed
 
+- Mark optional transfer-dial status pings as route hints, matching the pre-reconnect probe. Retain ping failures without making a successful next-hop session fail validation.
+
 - Finish downstream resource-pack delivery before completing upstream pack negotiation and starting its world. This prevents a slow initial pack download from leaving upstream gameplay waiting behind the loading client.
 
 - Preserve resource-pack stream read errors instead of reporting only an invalid ZIP or accepting a complete-looking archive from a failed HTTP response. Temporary archive cleanup still runs on failure.
