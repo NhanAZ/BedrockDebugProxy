@@ -21,7 +21,7 @@ Every new entry should state the symptom, root cause, implementation commits, ev
 - Root cause: the proxy's upstream dial completed pack negotiation and world startup before offering the same packs downstream. Queued gameplay could not reach the client until the second pack exchange finished.
 - Implementation: an opt-in dial boundary retains the validated stack without sending PackResponseCompleted. After the downstream listener accepts pack completion, DoSpawnContext resumes upstream startup before GameData is read. The ordinary library and packs-only completion paths are unchanged.
 - Evidence and validation: the [completion-order decision](decisions/0014-defer-upstream-pack-completion.md) records protocol sources and alternatives. The mixed-pack loopback fails with the old ordering and passes with deferred completion. The paired consumer fixture includes both completion packets and preserves archive, manifest, key, index, and hop provenance. See [AUDIT-0225](audits/AUDIT-0225-deferred-resource-pack-completion.md).
-- Status: implemented. The audit separates automated checks, preliminary authenticated flow evidence, and exact-revision follow-up validation. No retail rendering or gameplay claim is made.
+- Status: implemented. [AUDIT-0226](audits/AUDIT-0226-deferred-pack-live-validation.md) verifies the stamped runtime on The Hive and Enchanted OP SMP, Box PvP, and Mines, including cold pack delivery, spawn, and 60 seconds of traffic. No retail rendering or gameplay claim is made.
 
 ### FIX-0160 - Preserve resource-pack source stream errors
 
