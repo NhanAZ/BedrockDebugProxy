@@ -14,6 +14,15 @@ Every new entry should state the symptom, root cause, implementation commits, ev
 
 ## Compatibility and bug index
 
+### FIX-0162 - Prepare transfer identity before a fast reconnect
+
+- Symptom: an immediate client reconnect could use a different upstream RakNet GUID or UDP source address at the next hop despite the existing identity-preservation path.
+- Classification: a new handoff race, related to the source-socket release correction in FIX-0141 and physical capture provenance in FIX-0118.
+- Root cause: the proxy flushed Transfer before publishing the pending hop, then populated its source address and GUID only after the bridge returned. The concurrent listener could start the next upstream dial before those fields or the route probe were ready.
+- Implementation: publish the complete pending identity before writing Transfer and gate its upstream dial until the preceding socket is released and the bounded route probe completes. The existing linked client and session context cancels the wait. No retry, delay, server exception, packet layout, or capture schema is added.
+- Evidence and validation: the loopback transfer test now checks both normal close and reconnect overlap, equal nonzero GUIDs, equal local UDP addresses, route-probe-before-dial ordering, both world startups, and unchanged physical provenance for the late first-hop packet. The pre-fix test reproduced changed GUIDs. The paired archive importer fixture retains the new ordering and verifies unchanged archive and index data. See [AUDIT-0229](audits/AUDIT-0229-transfer-handoff-order.md).
+- Status: focused loopback checks pass. Canonical quality checks and fresh exact-revision live transfer evidence are recorded in the audit before publication. This race explains a local identity failure. It does not establish the cause of a particular upstream startup refusal until a fresh session confirms it.
+
 ### FIX-0161 - Defer upstream world startup during downstream pack delivery
 
 - Symptom: an Enchanted OP SMP transfer retained all seven child packs but the upstream disconnected while the downstream client was still downloading them. A cached client reached the world.

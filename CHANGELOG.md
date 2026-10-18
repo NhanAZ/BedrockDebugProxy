@@ -8,6 +8,8 @@ Detailed rationale remains in [`docs/audits/`](docs/audits/).
 
 ### Fixed
 
+- Preserve the previous upstream GUID and UDP source address when a client reconnects quickly after Transfer. Wait for the preceding socket and bounded route probe before dialing the next hop.
+
 - Mark optional transfer-dial status pings as route hints, matching the pre-reconnect probe. Retain ping failures without making a successful next-hop session fail validation.
 
 - Finish downstream resource-pack delivery before completing upstream pack negotiation and starting its world. This prevents a slow initial pack download from leaving upstream gameplay waiting behind the loading client.

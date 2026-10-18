@@ -66,11 +66,14 @@ type hopState struct {
 	transferLocalAddr   *net.UDPAddr
 	transferClientGUID  int64
 	transferRouteProbed bool
-	upstreamNetwork     bedrock.Network
-	upstreamLogger      *slog.Logger
-	downstreamConn      atomic.Pointer[minecraft.Conn]
-	upstreamConn        atomic.Pointer[minecraft.Conn]
-	slot                upstreamSlot
+	// transferReady closes after the preceding socket is released and its
+	// bounded route probe finishes. A fast reconnect must wait before dialing.
+	transferReady   chan struct{}
+	upstreamNetwork bedrock.Network
+	upstreamLogger  *slog.Logger
+	downstreamConn  atomic.Pointer[minecraft.Conn]
+	upstreamConn    atomic.Pointer[minecraft.Conn]
+	slot            upstreamSlot
 }
 
 type transferError struct {
@@ -362,6 +365,14 @@ func (r *Runner) Run(ctx context.Context) error {
 				clientContext := connectionLifecycleContext(downstreamContext, state.downstreamConn.Load())
 				connectCtx, releaseContext := linkedConnectionContext(runCtx, clientContext)
 				defer releaseContext()
+				if state.transferReady != nil {
+					select {
+					case <-state.transferReady:
+					case <-connectCtx.Done():
+						state.slot.err = connectCtx.Err()
+						return
+					}
+				}
 				state.upstreamLogger = slog.New(bedrock.NewCaptureLogHandler(r.config.Recorder, failures, sessionID, state.upstreamID, "upstream", live.LibraryLog))
 				transport := r.config.UpstreamNetwork
 				if transport == nil && (state.transferLocalAddr != nil || state.transferClientGUID != 0) {
@@ -556,30 +567,29 @@ func (r *Runner) Run(ctx context.Context) error {
 			_ = clientConn.Close()
 			return errors.New("upstream connection was not established during resource-pack negotiation")
 		}
+		var nextHop *hopState
 		bridgeErr := r.runHop(runCtx, actualAddress, state, clientConn, state.slot.conn, observer, failures, live, func(target string) {
-			setPendingState(&hopState{hop: state.hop + 1, target: target, downstreamID: fmt.Sprintf("downstream-%d", state.hop+1), upstreamID: fmt.Sprintf("upstream-%d", state.hop+1)})
+			clientGUID, _ := state.slot.conn.RakNetClientGUID()
+			nextHop = &hopState{
+				hop: state.hop + 1, target: target,
+				downstreamID: fmt.Sprintf("downstream-%d", state.hop+1), upstreamID: fmt.Sprintf("upstream-%d", state.hop+1),
+				transferLocalAddr: udpAddress(state.slot.conn.LocalAddr()), transferClientGUID: clientGUID,
+				transferReady: make(chan struct{}),
+			}
+			setPendingState(nextHop)
 		})
 		var followed *transferError
 		if r.config.FollowTransfers && errors.As(bridgeErr, &followed) {
 			if state.hop >= maxFollowedHops {
 				return fmt.Errorf("transfer hop limit %d reached at %s", maxFollowedHops, followed.target)
 			}
-			stateMu.Lock()
-			if pending != nil {
-				pending.transferLocalAddr = followed.localAddr
-				pending.transferClientGUID = followed.clientGUID
-			}
-			stateMu.Unlock()
 			if followed.localAddr != nil && r.config.UpstreamNetwork == nil {
 				if err := r.probeTransferRoute(runCtx, followed.target, followed.localAddr, followed.clientGUID, state.hop+1, state.upstreamLogger, failures, live); err != nil {
 					live.Info("Transfer route probe failed - %s", err)
 				}
-				stateMu.Lock()
-				if pending != nil {
-					pending.transferRouteProbed = true
-				}
-				stateMu.Unlock()
+				nextHop.transferRouteProbed = true
 			}
+			close(nextHop.transferReady)
 			live.Info("Following transfer to %s; waiting for the client to reconnect", followed.target)
 			select {
 			case <-clientConn.Context().Done():
@@ -1251,6 +1261,11 @@ func (r *Runner) forward(source, destination *minecraft.Conn, failures *bedrock.
 				if err := r.recordTransferRewriteForForward(rawRead, transfer, rewritten, target, connectionID, hop); err != nil {
 					return err
 				}
+				// Publish the complete next-hop identity before the rewritten
+				// Transfer can reach the client and trigger its reconnect.
+				if onTransfer != nil {
+					onTransfer(target)
+				}
 			}
 		}
 		writeStarted := time.Now()
@@ -1286,9 +1301,6 @@ func (r *Runner) forward(source, destination *minecraft.Conn, failures *bedrock.
 		if outgoing != decoded {
 			if transfer, ok := decoded.(*packet.Transfer); ok {
 				_, target, _ := transferForProxyAddress(transfer, localAddress)
-				if onTransfer != nil {
-					onTransfer(target)
-				}
 				clientGUID, _ := source.RakNetClientGUID()
 				return &transferError{target: target, localAddr: udpAddress(source.LocalAddr()), clientGUID: clientGUID}
 			}

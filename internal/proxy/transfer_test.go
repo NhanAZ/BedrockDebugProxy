@@ -2,6 +2,7 @@ package proxy
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"net"
@@ -124,6 +125,14 @@ func TestTransferRakNetHandshakeMTUIsCapped(t *testing.T) {
 }
 
 func TestRunnerFollowsTransferAndAcceptsNextHop(t *testing.T) {
+	for _, overlap := range []bool{false, true} {
+		t.Run(fmt.Sprintf("overlap_%t", overlap), func(t *testing.T) {
+			testRunnerFollowsTransfer(t, overlap)
+		})
+	}
+}
+
+func testRunnerFollowsTransfer(t *testing.T, overlap bool) {
 	ctx, cancel := context.WithTimeout(context.Background(), 20*time.Second)
 	defer cancel()
 	firstListener, err := (minecraft.ListenConfig{AuthenticationDisabled: true, AllowUnknownPackets: true, AllowInvalidPackets: true}).Listen("raknet", "127.0.0.1:0")
@@ -161,8 +170,9 @@ func TestRunnerFollowsTransferAndAcceptsNextHop(t *testing.T) {
 	case <-ctx.Done():
 		t.Fatalf("wait for proxy listener: %v", ctx.Err())
 	}
+	var onDial func(*minecraft.Conn)
 	dial := func() *minecraft.Conn {
-		client, dialErr := (minecraft.Dialer{IdentityData: login.IdentityData{Identity: "11111111-1111-1111-1111-111111111111", DisplayName: "TransferInt"}, ClientData: integrationClientData()}).DialContext(ctx, "raknet", proxyAddress)
+		client, dialErr := (minecraft.Dialer{ConnectionFunc: onDial, IdentityData: login.IdentityData{Identity: "11111111-1111-1111-1111-111111111111", DisplayName: "TransferInt"}, ClientData: integrationClientData()}).DialContext(ctx, "raknet", proxyAddress)
 		if dialErr != nil {
 			t.Logf("proxy output: %s", output.String())
 			t.Fatalf("dial proxy: %v", dialErr)
@@ -199,10 +209,24 @@ func TestRunnerFollowsTransferAndAcceptsNextHop(t *testing.T) {
 		_ = client.Close()
 		t.Fatalf("flush post-transfer request: %v", err)
 	}
-	if err := client.Close(); err != nil {
-		t.Fatal(err)
+	previousClient := client
+	if overlap {
+		dialStarted := make(chan struct{})
+		onDial = func(*minecraft.Conn) { close(dialStarted) }
+		go func() {
+			select {
+			case <-dialStarted:
+			case <-ctx.Done():
+			}
+			_ = previousClient.Close()
+		}()
+	} else {
+		if err := previousClient.Close(); err != nil {
+			t.Fatal(err)
+		}
 	}
 	client = dial()
+	_ = previousClient.Close()
 	if err := client.DoSpawnContext(ctx); err != nil {
 		_ = client.Close()
 		t.Fatal(err)
@@ -227,8 +251,31 @@ func TestRunnerFollowsTransferAndAcceptsNextHop(t *testing.T) {
 	}
 	var transferSeen, rewriteSeen, routeProbeSeen, routeProbeSucceeded, hopTwo, postTransferRequestSeen bool
 	var transferSequence uint64
+	var probeSequence, childDialSequence uint64
 	var postTransferRequestConnectionID string
+	upstreamGUIDs := make(map[int]int64)
+	upstreamAddresses := make(map[int]string)
 	if err := capture.ScanEvents(root, func(event capture.Event) error {
+		if event.Channel == "upstream" && event.Kind == "transport.payload" {
+			var data struct {
+				GUID int64 `json:"raknet_client_guid"`
+			}
+			if err := json.Unmarshal(event.Data, &data); err != nil {
+				return err
+			}
+			if data.GUID != 0 {
+				upstreamGUIDs[event.Hop] = data.GUID
+			}
+		}
+		if event.Kind == "upstream.connected" {
+			var data struct {
+				LocalAddress string `json:"local_address"`
+			}
+			if err := json.Unmarshal(event.Data, &data); err != nil {
+				return err
+			}
+			upstreamAddresses[event.Hop] = data.LocalAddress
+		}
 		if event.Kind == "packet.decoded" && event.Packet != nil && event.Packet.Name == "Transfer" && event.Hop == 1 {
 			transferSeen = true
 			transferSequence = event.Sequence
@@ -239,6 +286,10 @@ func TestRunnerFollowsTransferAndAcceptsNextHop(t *testing.T) {
 		if event.Kind == "transfer.route_probe" && event.Hop == 2 {
 			routeProbeSeen = true
 			routeProbeSucceeded = event.Error == nil
+			probeSequence = event.Sequence
+		}
+		if event.Kind == "transport.connection_open" && event.Channel == "upstream" && event.Hop == 2 {
+			childDialSequence = event.Sequence
 		}
 		if event.Hop == 2 && event.Kind == "session.spawned" {
 			hopTwo = true
@@ -250,6 +301,15 @@ func TestRunnerFollowsTransferAndAcceptsNextHop(t *testing.T) {
 		return nil
 	}); err != nil {
 		t.Fatal(err)
+	}
+	if upstreamGUIDs[1] == 0 || upstreamGUIDs[1] != upstreamGUIDs[2] {
+		t.Fatalf("upstream GUID changed across transfer: %v", upstreamGUIDs)
+	}
+	if upstreamAddresses[1] == "" || upstreamAddresses[1] != upstreamAddresses[2] {
+		t.Fatalf("upstream source address changed across transfer: %v", upstreamAddresses)
+	}
+	if probeSequence == 0 || childDialSequence <= probeSequence {
+		t.Fatalf("child dial sequence %d must follow route probe %d", childDialSequence, probeSequence)
 	}
 	if !transferSeen || !rewriteSeen || !routeProbeSeen || !routeProbeSucceeded || !hopTwo || !postTransferRequestSeen || postTransferRequestConnectionID != "downstream-1" {
 		t.Fatalf("transfer evidence = transfer %v, rewrite %v, route probe %v (success %v), hop2 %v, post-transfer request hop1 %v connection %q", transferSeen, rewriteSeen, routeProbeSeen, routeProbeSucceeded, hopTwo, postTransferRequestSeen, postTransferRequestConnectionID)
