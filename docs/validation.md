@@ -1,6 +1,6 @@
 # Real-world validation workflow
 
-Automated tests establish that the implementation matches local expectations. They do not establish that those expectations match live Minecraft Bedrock servers. Runtime, networking, protocol, authentication, session, resource-pack, capture, encoding, and decoding changes need the scoped development evidence below. Retail Minecraft client testing is reserved for the official release gate.
+Automated tests establish that the implementation matches local expectations. They do not establish that those expectations match live Minecraft Bedrock servers. Runtime, networking, protocol, authentication, session, resource-pack, capture, encoding, and decoding changes need the scoped development evidence below. Official releases accept full authenticated CLI sessions or retail Minecraft client sessions. CLI evidence does not establish rendering or visible gameplay.
 
 Changes that can affect the local web viewer have an additional same-change requirement. The commit must include the viewer asset and HTTP integration tests and the embedded JavaScript syntax check. Presentation or interaction changes must also be smoke-tested in a browser from a clean committed build. Use [`web-validation.md`](web-validation.md) for the exact scope and checklist.
 
@@ -16,13 +16,13 @@ For a routine pull request with one focused runtime commit, `run --packs-only` i
 
 A packs-only report is expected to have `result=incomplete` and `normal_session=not_observed`; it is scoped evidence for development pull requests and is never a release pass. Mark `packs_exchange=pass` only when the capture shows that the offered packs completed the supported exchange. If no pack is offered or the connection stops before exchange completes, record the relevant check as `not_observed` or `fail`. A general successful connection is not proof of a flow that the capture did not observe.
 
-Changes outside the packs-only boundary still need focused automated, fixture, or loopback coverage for the affected flow. For example, a transfer-following change must test the `Transfer` path and next-hop behavior without treating a first-hop packs-only login as coverage. Resource-pack decryption changes require evidence of the supported decryption path. Record remaining live behavior as unobserved and defer retail-client end-to-end testing to the release gate.
+Changes outside the packs-only boundary still need focused automated, fixture, or loopback coverage for the affected flow. For example, a transfer-following change must test the `Transfer` path and next-hop behavior without treating a first-hop packs-only login as coverage. Resource-pack decryption changes require evidence of the supported decryption path. Record remaining live behavior as unobserved and complete the full CLI or retail session at the release gate.
 
 For transfer-following changes, focused automated or loopback coverage must exercise the `Transfer` rewrite, a successful next-hop transport and upstream connection, and the next hop's resource-pack exchange when offered. When the route probe exposes it, inspect `client_guid_preserved: true` as evidence that the RakNet identity was carried into the next-hop handshake. A first-hop packs-only connection alone is not sufficient evidence for a transfer fix. The full client flow through a later spawn remains part of Enchanted's release validation.
 
 The pre-reconnect route probe is a best-effort route hint. Its ping response or failure remains in the raw capture and analysis, and a failure marked `best_effort=true` is non-blocking only when the normal next-hop session still connects and reaches the required flow. The optional upstream address-discovery ping is bounded to five seconds for an initial dial and 750 ms for a transfer hop so a lost UDP ping cannot consume the full login and resource-pack deadline. Status-ping errors without the `best_effort` marker remain blocking.
 
-The Enchanted release report has an additional mandatory flow. The server sends its form when the player joins. Select any available minigame in that server-sent form and wait for the server to send `Transfer`. The report passes only when the proxy follows that transfer, captures the next-hop login and resource-pack exchange when offered, and reaches the minigame spawn. Connecting to the Enchanted hub without selecting a minigame is not sufficient. Record `transfer_following=pass` and `resource_pack_transfer=pass` for this flow.
+The Enchanted release report has an additional mandatory flow. The server sends its form when the player joins. Select a known pack-bearing child, such as OP SMP, in that server-sent form and wait for the server to send `Transfer`. The report passes only when the proxy follows that transfer, captures the next-hop login and resource-pack exchange when offered, and reaches the minigame spawn. Connecting to the Enchanted hub without selecting a minigame is not sufficient. Record `transfer_following=pass` and `resource_pack_transfer=pass` for this flow.
 
 CubeCraft has an additional maintainer risk gate. Before connecting, the maintainer must explicitly accept the possibility of rejection, kick, or ban for the exact diagnostic session. CubeCraft's public rules prohibit Bedrock proxies, so a risk acknowledgement must not be described as permission or a policy exception. If the acknowledgement is unavailable, do not connect and record `incomplete` with the relevant `risk_acknowledged=not_observed` check. The session must use the normal read-only proxy path and must not add bypass, mutation, replay, or anti-cheat evasion behavior.
 
@@ -63,7 +63,7 @@ Device authentication is cached in the selected default account after the first 
 
 Use public server labels rather than addresses in `-Server`. A manual check uses `lowercase_name=pass`, `lowercase_name=fail`, or `lowercase_name=not_observed`. Add one for each flow reviewed, such as `resource_pack_transfer=pass` or `resource_pack_decryption=pass`.
 
-A full-session report cannot claim `pass` unless `normal_session=pass`, every other manual check passes, and capture-derived evidence proves all of the following facts.
+A full-session report requires exactly one accepted client mode. Retail reports use `normal_session=pass`. CLI reports use `cli_session=pass`, `authenticated_upstream=pass`, and `post_spawn_stability=pass`. For CLI stability, review at least 30 seconds of post-spawn traffic without an unexplained disconnect or protocol error. Every other supplied review check must pass, and capture-derived evidence must prove all of the following facts.
 
 - The capture is closed and free of verifier issues, write errors, dropped events, and truncated events.
 - The upstream connected and the session negotiated, spawned, and closed.
@@ -88,8 +88,7 @@ Add `--decrypt-resource-packs` only when the change or release test explicitly n
 
 ## Release gate
 
-Every official release requires a full retail Minecraft client session and a passing report tied to a validated runtime revision for each
-baseline server.
+Every official release requires a full authenticated CLI session or a retail Minecraft client session and a passing report tied to a validated runtime revision for each baseline server. A retail application is optional. See [the maintainer decision](decisions/0015-cli-release-validation.md).
 
 - The Hive
 - Galaxite
@@ -106,8 +105,37 @@ A baseline failure starts an investigation. Determine whether the cause is a pro
 
 After generating all six reports for one runtime revision, run
 `tools/check-release-readiness.ps1 -Revision <40-character-commit>`. It checks that every required label has a
-passing report with automatic and manual gates for that exact revision. It does not replace human review of the
-local captures.
+passing report with automatic and manual gates for that exact revision. It does not replace review of the local captures by the operator or agent.
+
+### CLI session workflow
+
+Start the stamped proxy with device authentication, a concrete loopback listener, and the existing self-signed downstream opt-in. Connect a reviewed CLI protocol client to that listener, accept offered resource packs, complete spawn, consume packets, and perform ordinary required protocol responses for at least 30 seconds after spawn. Retain the driver revision or exact local source with the private evidence. Close the client and let the proxy finalize artifacts and verification. Use a single approved account session at a time.
+
+```powershell
+.\bin\bedrock-debug-proxy.exe run `
+    --listen "127.0.0.1:19134" `
+    --upstream "experience:The Hive" `
+    --auth device `
+    --allow-unauthenticated-client `
+    --follow-transfers `
+    --decrypt-resource-packs
+```
+
+The self-signed downstream is confined to loopback. Upstream Microsoft authentication remains required. This is an existing diagnostic opt-in and does not change the default listener authentication. Packs-only and server-side Golem simulations cannot satisfy this workflow. For a retail client, use the normal authenticated downstream path instead.
+
+Generate a new report after reviewing the closed capture. Keep older incomplete reports unchanged.
+
+```powershell
+.\tools\create-validation-report.ps1 `
+    -Binary .\bin\bedrock-debug-proxy.exe `
+    -Capture .\captures\<CLI-SESSION> `
+    -Server "The Hive" `
+    -Result pass `
+    -Check @("cli_session=pass", "authenticated_upstream=pass", "post_spawn_stability=pass", "experience_resolution=pass") `
+    -Output ".\validation\local\<REVISION>\the-hive.json"
+```
+
+For Enchanted, also supply transfer_following=pass and resource_pack_transfer=pass after the known child reaches spawn and the stability interval. For CubeCraft, also supply risk_acknowledged=pass after the maintainer risk gate. CLI reports establish the observed protocol flow, not retail rendering, input handling, or gameplay. Release notes must identify this evidence type.
 
 ### Documentation-only release delta
 

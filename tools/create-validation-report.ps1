@@ -205,11 +205,13 @@ try {
         $automaticRequirements["artifact_folders_complete"] = $artifactComplete
     }
     $automaticChecksPassed = -not ($automaticRequirements.Values -contains $false)
-    $manualChecksPassed = $manualChecks.Count -gt 0 -and $manualChecksByName.ContainsKey("normal_session") -and
-        $manualChecksByName["normal_session"] -eq "pass" -and -not ($manualChecksByName.Values -contains "fail") -and
+    $retailSessionPassed = $manualChecksByName["normal_session"] -eq "pass"
+    $cliSessionPassed = $manualChecksByName["cli_session"] -eq "pass" -and
+        $manualChecksByName["authenticated_upstream"] -eq "pass" -and $manualChecksByName["post_spawn_stability"] -eq "pass"
+    $manualChecksPassed = ($retailSessionPassed -xor $cliSessionPassed) -and -not ($manualChecksByName.Values -contains "fail") -and
         -not ($manualChecksByName.Values -contains "not_observed")
     if ($Result -eq "pass" -and (-not $automaticChecksPassed -or -not $manualChecksPassed)) {
-        throw "A passing report requires all automatic evidence and manual checks, including normal_session=pass, to pass."
+        throw "A passing report requires all automatic evidence and review checks, plus either normal_session=pass or cli_session=pass with authenticated_upstream=pass and post_spawn_stability=pass."
     }
 
     $protocol = Get-ObjectProperty $analysis "protocol"

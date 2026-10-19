@@ -25,9 +25,9 @@ These six targets are the required release matrix. Use the exact selector with t
 | Enchanted | `experience:Enchanted` | `play.enchanted.gg:19132` | Creator Experience |
 | CubeCraft | `experience:CubeCraft` | `play.cubecraft.net:19132` | Featured server |
 
-For release validation, follow [`validation.md`](validation.md) and [`releasing.md`](releasing.md). Use a concrete reachable LAN address for `--listen` when testing `--follow-transfers`. Do not place raw addresses, credentials, or captures in sanitized reports.
+For release validation, follow [`validation.md`](validation.md) and [`releasing.md`](releasing.md). Use a concrete loopback address for a CLI client or a reachable LAN address for a retail client when testing `--follow-transfers`. Do not place raw addresses, credentials, or captures in sanitized reports.
 
-Enchanted has a required release flow beyond hub connectivity. The server sends its form automatically when the player joins. Select any available minigame in that form and observe the resulting `Transfer` and next-hop resource-pack exchange before recording a passing report. A hub-only session is not sufficient.
+Enchanted has a required release flow beyond hub connectivity. The server sends its form automatically when the player joins. Select a known pack-bearing child, such as OP SMP, in that form and observe the resulting `Transfer` and next-hop resource-pack exchange before recording a passing report. A hub-only session is not sufficient.
 
 ## Additional Experience references
 

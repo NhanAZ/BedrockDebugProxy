@@ -8,8 +8,8 @@ When the maintainer says "I want to release", the AI agent should drive this doc
 
 1. The agent audits the commits since the latest release, proposes or confirms the version, checks the working tree, documentation, licenses, provenance, known limitations, CI, and unresolved review findings.
 2. The agent runs the automated quality gate and builds the exact stamped candidate.
-3. The agent asks the maintainer to perform the live Minecraft sessions that cannot be automated. A short instruction should identify the server, target command, actions to perform, approximate duration, and when to press `Ctrl+C`.
-4. The maintainer reports that the session is complete and mentions any visible problem. The agent locates and inspects the closed capture, verifies the revision and evidence, and generates the sanitized report. The maintainer does not need to run report scripts unless they are performing the release without an agent.
+3. The agent runs the live six-server matrix through an authenticated CLI client using the approved cached account. A retail Minecraft client is optional for additional rendering or gameplay observations. Ask the maintainer only for unavailable account or signing interactions, or an explicitly requested visual check.
+4. The agent inspects each closed capture, verifies its exact revision, authentication, pack exchange, spawn, post-spawn traffic, errors, and artifacts, then generates the sanitized report. The maintainer does not need to run report scripts.
 5. After all required sessions, the agent runs the release gate, prepares the checksum and release notes, and reports any exact blocker. A candidate that adds only allowed Markdown documentation after the matrix may use the documented docs-only equivalence with the original validated runtime revision; the reports themselves must not be edited.
 6. If the maintainer explicitly requested a release, the version is settled, every gate passes, and signing or GitHub access is available, the agent creates and pushes the tag, publishes the release assets, and verifies the result. It must not publish from an incomplete or mismatched validation set.
 7. After the published release is verified, the agent synchronizes the Git-tracked source history, branches, and tags with the private recovery mirror described in section 7. The release is not reported as fully complete until this synchronization and ref check succeed.
@@ -48,42 +48,44 @@ If the candidate can affect the local web viewer, complete the automated and bro
 
 ## 3. Validate the six-server baseline
 
-Use a real Minecraft Bedrock client. For each server, start the same stamped binary, complete a normal session, exercise the named flow, stop with `Ctrl+C`, and wait for the capture verification message.
+Use a reviewed CLI protocol client or an optional retail Minecraft Bedrock client. For each server, start the same stamped binary, complete the required flow, retain at least 30 seconds of bidirectional traffic after spawn, close the client, and wait for automatic capture verification. CLI sessions do not establish retail rendering, UI, input, or gameplay behavior.
 
-The first successful device login creates the selected default account cache, so later server runs normally do not require another device code. If the machine has multiple profiles, select the intended account with `bedrock-debug-proxy use NAME` before starting the stamped binary. Wait for `Listening on` before connecting Minecraft. Use the default Xbox-authenticated downstream path for the required release reports, normally through the Servers tab. Do not add `--allow-unauthenticated-client` to the release command unless the release is separately validating the trusted-LAN opt-in flow.
+The first successful device login creates the selected default account cache, so later server runs normally do not require another device code. If the machine has multiple profiles, select the intended account with `bedrock-debug-proxy use NAME` before starting the stamped binary. Wait for `Listening on` before connecting the client. A CLI driver may use the existing `--allow-unauthenticated-client` option on a concrete loopback listener while the proxy authenticates upstream with the approved Microsoft account. A retail client uses the default Xbox-authenticated downstream path, normally through the Servers tab. Do not expose the self-signed validation listener beyond loopback.
 
-Include `--follow-transfers` in the release command when the server's flow can send a `Transfer` packet. This keeps subsequent hops in the same capture. Use a concrete reachable address in `--listen` for that mode; a wildcard listener address cannot be sent back to the client.
+Include `--follow-transfers` in the release command when the server's flow can send a `Transfer` packet. This keeps subsequent hops in the same capture. Use a concrete loopback address for CLI tests or a reachable LAN address for a retail client. A wildcard listener address cannot be sent back to the client.
 
-| Report label | Upstream target | Required manual flow |
+| Report label | Upstream target | Required live flow |
 | --- | --- | --- |
-| `The Hive` | `experience:The Hive` | Connect, spawn, move, interact, and observe normal traffic |
-| `Galaxite` | `experience:Galaxite` | Connect, spawn, move, interact, and observe normal traffic |
-| `Lifeboat` | `experience:Lifeboat` | Connect, spawn, move, interact, and observe normal traffic |
+| `The Hive` | `experience:The Hive` | Connect, complete packs, spawn, and retain normal lobby traffic |
+| `Galaxite` | `experience:Galaxite` | Connect, complete packs, spawn, and retain normal lobby traffic |
+| `Lifeboat` | `experience:Lifeboat` | Connect, complete packs, spawn, and retain normal lobby traffic |
 | `Mineville Zeqa` | `experience:Mineville Zeqa` | Enter the Zeqa flow and observe it directly |
-| `Enchanted` | `experience:Enchanted` | Receive the server-sent form, select any minigame, observe `Transfer`, follow the next hop, complete its resource-pack exchange when offered, and reach minigame spawn |
+| `Enchanted` | `experience:Enchanted` | Receive the server-sent form, select the known pack-bearing OP SMP child, observe `Transfer`, follow the next hop, complete its resource-pack exchange, and retain child traffic after spawn |
 | `CubeCraft` | `experience:CubeCraft` | Only after the maintainer accepts the connection risk. Connect, spawn, perform normal read-only interaction, observe both traffic directions, and close cleanly |
 
-Use this command with the selector shown in the matrix. Replace `<LAN_IP>` with the concrete LAN address used by the Minecraft client, and replace only the value after `--upstream` for each run. The `experience:` selector resolves both Featured and Creator Experiences through Minecraft services. For CubeCraft, satisfy the maintainer risk gate in [`server-targets.md`](server-targets.md) before connecting. Do not add bypass, mutation, replay, or anti-cheat evasion behavior to the release command.
+Use this command with the selector shown in the matrix and connect the reviewed CLI client to its loopback listener. Replace only the value after `--upstream` for each run. For an optional retail test, use a reachable LAN listener and remove the self-signed client option. The `experience:` selector resolves both Featured and Creator Experiences through Minecraft services. For CubeCraft, satisfy the maintainer risk gate in [`server-targets.md`](server-targets.md) before connecting. Do not add bypass, mutation, replay, or anti-cheat evasion behavior to the release command.
 
 ```powershell
 .\bin\bedrock-debug-proxy.exe `
     run `
-    --listen "<LAN_IP>:19132" `
+    --listen "127.0.0.1:19134" `
     --upstream "experience:The Hive" `
     --auth device `
-    --follow-transfers
+    --allow-unauthenticated-client `
+    --follow-transfers `
+    --decrypt-resource-packs
 ```
 
 For every server, confirm all of the following before recording `pass`.
 
 1. Device authentication and Experience resolution succeed when applicable.
-2. The Minecraft client connects to the proxy and reaches spawn.
-3. The session remains stable during normal movement and interaction.
+2. The CLI or retail client connects to the proxy and reaches spawn.
+3. The session retains bidirectional decoded traffic for at least 30 seconds after spawn without an unexplained disconnect. Record only interactions actually performed.
 4. Client-to-server and server-to-client traffic are present.
 5. Decoded packets are present.
 6. Offered resource packs complete without an unexplained error.
 7. No unexplained decode, protocol, authentication, signaling, or connection error appears.
-8. `Ctrl+C` closes the proxy and the capture verifier succeeds.
+8. Client closure lets the proxy finish its capture and artifacts, and the verifier succeeds.
 
 If a server cannot be tested, create an `incomplete` report. If an anomaly occurs, create a `fail` report and investigate. Neither result passes the release gate.
 
@@ -101,7 +103,7 @@ Use the exact capture directory printed by the matching run. The following examp
     -Capture .\captures\<THE-HIVE-SESSION> `
     -Server "The Hive" `
     -Result pass `
-    -Check @("normal_session=pass", "experience_resolution=pass") `
+    -Check @("cli_session=pass", "authenticated_upstream=pass", "post_spawn_stability=pass", "experience_resolution=pass") `
     -Output ".\validation\local\$revision\the-hive.json"
 ```
 
@@ -113,7 +115,7 @@ Review each JSON file before using it. Then run the matrix gate.
 .\tools\check-release-readiness.ps1 -Revision $revision
 ```
 
-The command must print `pass` for all six servers. This gate verifies report structure and revision matching. It does not replace human review of the local captures, risk acknowledgement, and anomalies.
+The command must print `pass` for all six servers. This gate verifies report structure, client-mode checks, required transfer and risk checks, and revision matching. It does not replace operator or agent review of local captures and anomalies. Retail reports use normal_session=pass instead of the three CLI session checks.
 
 ## 5. Create the release
 

@@ -106,13 +106,24 @@ try {
             $candidates = @($reportsByServer[$server])
         }
         $passing = @($candidates | Where-Object {
+                $checks = @{}
+                foreach ($check in $_.ManualChecks) {
+                    $checks[[string]$check.name] = [string]$check.result
+                }
+                $retailSession = $checks["normal_session"] -eq "pass"
+                $cliSession = $checks["cli_session"] -eq "pass" -and $checks["authenticated_upstream"] -eq "pass" -and
+                    $checks["post_spawn_stability"] -eq "pass"
+                $sessionGate = ($retailSession -xor $cliSession) -and -not ($checks.Values -contains "fail") -and
+                    -not ($checks.Values -contains "not_observed")
+                $transferGate = $server -ne "Enchanted" -or
+                    ($checks["transfer_following"] -eq "pass" -and $checks["resource_pack_transfer"] -eq "pass")
                 $riskGate = $true
                 if ($server -eq "CubeCraft") {
                     $riskGate = @($_.ManualChecks | Where-Object {
                             [string]$_.name -eq "risk_acknowledged" -and [string]$_.result -eq "pass"
                         }).Count -gt 0
                 }
-                $_.Result -eq "pass" -and $_.Automatic -and $_.Manual -and $riskGate
+                $_.Result -eq "pass" -and $_.Automatic -and $_.Manual -and $sessionGate -and $transferGate -and $riskGate
             })
         if ($passing.Count -eq 0) {
             $state = if ($candidates.Count -eq 0) { "missing" } else { "not passing" }

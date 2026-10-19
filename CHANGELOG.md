@@ -6,6 +6,10 @@ Detailed rationale remains in [`docs/audits/`](docs/audits/).
 
 ## [Unreleased]
 
+### Changed
+
+- Official releases now accept full authenticated CLI sessions across the six-server matrix. Reports distinguish CLI evidence from retail-client observations and still require spawn, stable traffic, verified captures, the Enchanted pack-bearing transfer, and CubeCraft risk acknowledgement.
+
 ### Fixed
 
 - Preserve the previous upstream GUID and UDP source address when a client reconnects quickly after Transfer. Wait for the preceding socket and bounded route probe before dialing the next hop.
