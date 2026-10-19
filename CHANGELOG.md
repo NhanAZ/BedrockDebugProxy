@@ -6,6 +6,12 @@ Detailed rationale remains in [`docs/audits/`](docs/audits/).
 
 ## [Unreleased]
 
+## [0.4.1] - 2026-10-19
+
+Supported Bedrock version: 1.26.52 (protocol 2193).
+
+[Published release](https://github.com/NhanAZ/BedrockDebugProxy/releases/tag/v0.4.1) | [All changes since v0.4.0](https://github.com/NhanAZ/BedrockDebugProxy/compare/v0.4.0...v0.4.1)
+
 ### Changed
 
 - Official releases now accept full authenticated CLI sessions across the six-server matrix. Reports distinguish CLI evidence from retail-client observations and still require spawn, stable traffic, verified captures, the Enchanted pack-bearing transfer, and CubeCraft risk acknowledgement.
