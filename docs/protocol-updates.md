@@ -18,6 +18,8 @@ The network protocol value may be plain digits or enclosed in balanced Markdown 
 
 The current baseline combines the reviewed Bedrock 1.26.50 packet definitions and the stable 1.26.51 protocol schema with client metadata for the 26.52 game hotfix. The latest official stable schema remains 1.26.51, protocol 2193. There is no official 1.26.52 schema to establish an exhaustive absence of wire changes. Retain the reviewed codec and validate the selected 1.26.52 login metadata against the observed flows. See [the maintenance review](research/maintenance-2026-10-15.md).
 
+The [stable recheck on 2026-10-19](research/stable-protocol-review-2026-10-19.md) confirmed the same released schema, game hotfix, and upstream stable tag. No protocol, dependency, or client-version change was needed.
+
 The protocol watcher compares the Mojang schema version and protocol rows below. It does not compare the advertised client version, so a future 1.26.52 schema is still reported even though the client metadata already uses that game version.
 
 | Component | Pinned value | Evidence |
