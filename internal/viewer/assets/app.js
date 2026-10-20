@@ -529,12 +529,12 @@ function textValue(key, value, className) {
 }
 
 function renderHex(encoded, truncated, blob) {
-  if (!encoded || !blob) {
+  if (!blob) {
     elements["byte-status"].textContent = "No blob selected";
     elements["hex-view"].textContent = "This event has no content-addressed blob.";
     return;
   }
-  const binary = atob(encoded);
+  const binary = atob(encoded || "");
   const bytes = Uint8Array.from(binary, (character) => character.charCodeAt(0));
   const lines = [];
   for (let offset = 0; offset < bytes.length; offset += 16) {

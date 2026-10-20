@@ -229,6 +229,9 @@ func (v *Viewer) CompleteVerification(result capture.Verification, verifyErr err
 	if result.Manifest.CaptureID != "" {
 		v.verification = result
 	}
+	if _, err := v.indexAppendedEvents(false); err != nil {
+		verifyErr = errors.Join(verifyErr, fmt.Errorf("index completed capture: %w", err))
+	}
 	v.verificationProgress = nil
 	v.verificationDone = true
 	v.tailing = false

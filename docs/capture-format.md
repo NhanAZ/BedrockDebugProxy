@@ -20,6 +20,8 @@ capture-directory/
 
 A capture with `completeness.complete` set to `false` is still useful. The adjacent limitations and counters explain known missing, dropped, truncated, or failed data. An `open` status after the process is gone means the session did not close cleanly.
 
+Schema v1 requires `events_path` to be `events.jsonl` and `blob_root` to be `blobs/sha256`. These fields describe the fixed layout, not configurable locations. Verification rejects other values so the manifest cannot advertise files different from those readers inspect.
+
 ## Event stream
 
 `events.jsonl` contains one JSON object per newline-terminated line. Sequence numbers start at one and define the canonical order. Each event also has UTC wall time, Unix nanoseconds, and elapsed monotonic nanoseconds from capture start. Nanosecond fields are decimal JSON strings so JavaScript and other limited-number readers do not lose precision.

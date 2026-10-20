@@ -159,7 +159,7 @@ func runLogin(args []string, stdout, stderr io.Writer) int {
 func runLoginWithInput(args []string, input io.Reader, stdout, stderr io.Writer) int {
 	flags := flag.NewFlagSet("login", flag.ContinueOnError)
 	flags.SetOutput(stderr)
-	maxAgeText := flags.String("max-age", "", "optional local cache age such as 7d or 168h")
+	maxAgeText := flags.String("max-age", "", "optional local cache age in whole seconds, such as 7d or 168h")
 	flags.Usage = func() {
 		_, _ = fmt.Fprintln(stderr, "Usage - bedrock-debug-proxy login [--max-age 7d] [ACCOUNT_NAME]")
 		flags.PrintDefaults()
@@ -264,7 +264,7 @@ func loginCachePolicy(flagText string, input io.Reader, output io.Writer, intera
 	if !interactive {
 		return 0, true, nil
 	}
-	_, _ = fmt.Fprint(output, "Local cache age (Enter for no limit, for example 7d): ")
+	_, _ = fmt.Fprint(output, "Local cache age in whole seconds (Enter for no limit, for example 7d): ")
 	line, err := bufio.NewReader(input).ReadString('\n')
 	if err != nil && !errors.Is(err, io.EOF) {
 		return 0, false, err
@@ -689,11 +689,6 @@ func runProxy(args []string, stdout, stderr io.Writer) int {
 			_, _ = fmt.Fprintf(stderr, "Capture issue - %s\n", issue)
 		}
 	}
-	if liveCaptureViewer != nil {
-		if err := liveCaptureViewer.Refresh(); err != nil {
-			_, _ = fmt.Fprintf(stderr, "Refresh completed capture in viewer - %v\n", err)
-		}
-	}
 	_, _ = fmt.Fprintln(stdout, "Capture verification complete.")
 	if runErr != nil {
 		if *packsOnly {
@@ -1014,6 +1009,7 @@ func printUsage(writer io.Writer) {
 	_, _ = fmt.Fprintln(writer, "  use ACCOUNT_NAME                                     Select the default account")
 	_, _ = fmt.Fprintln(writer, "  rename OLD_ACCOUNT NEW_ACCOUNT                       Rename a local cache")
 	_, _ = fmt.Fprintln(writer, "  logout [ACCOUNT_NAME]                                Remove a local cache")
+	_, _ = fmt.Fprintln(writer, "  --max-age accepts whole seconds, such as 7d or 168h, or 0 for no local limit.")
 	_, _ = fmt.Fprintln(writer)
 	_, _ = fmt.Fprintln(writer, "Capture inspection")
 	_, _ = fmt.Fprintln(writer, "  view [--live] [--no-open] CAPTURE_DIRECTORY         Open the web viewer")
@@ -1050,6 +1046,7 @@ func printCommandHelp(writer io.Writer, command string) bool {
 		_, _ = fmt.Fprintln(writer, "Usage - bedrock-debug-proxy login [--max-age 7d] [ACCOUNT_NAME]")
 		_, _ = fmt.Fprintln(writer, "Add or reauthenticate a local Microsoft account cache.")
 		_, _ = fmt.Fprintln(writer, "The first interactive login requires a non-empty account name. Enter selects the default only after an account exists.")
+		_, _ = fmt.Fprintln(writer, "--max-age accepts a positive duration in whole seconds, such as 7d or 168h. Use 0 or none for no local limit.")
 	case "accounts":
 		_, _ = fmt.Fprintln(writer, "Usage - bedrock-debug-proxy accounts")
 		_, _ = fmt.Fprintln(writer, "Show local account labels, cache state, token expiry, and the selected default.")

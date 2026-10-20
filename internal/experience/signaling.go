@@ -175,11 +175,11 @@ func (s *legacySignaling) PongData([]byte)   {}
 
 func (s *legacySignaling) Close() (err error) {
 	s.closeOnce.Do(func() {
+		s.cancel(net.ErrClosed)
 		close(s.closed)
 		s.notifierMu.Lock()
 		clear(s.notifiers)
 		s.notifierMu.Unlock()
-		s.cancel(net.ErrClosed)
 		err = s.conn.Close(websocket.StatusNormalClosure, "")
 	})
 	return err
@@ -414,11 +414,11 @@ func (s *jsonRPCSignaling) PongData([]byte)   {}
 
 func (s *jsonRPCSignaling) Close() (err error) {
 	s.closeOnce.Do(func() {
+		s.cancel(net.ErrClosed)
 		close(s.closed)
 		s.notifierMu.Lock()
 		clear(s.notifiers)
 		s.notifierMu.Unlock()
-		s.cancel(net.ErrClosed)
 		err = s.conn.Close(websocket.StatusNormalClosure, "")
 	})
 	return err

@@ -160,6 +160,12 @@ func VerifyWithProgress(root string, progress func(VerificationProgress)) (Verif
 	if manifest.Schema != SchemaVersion {
 		result.Issues = append(result.Issues, fmt.Sprintf("manifest has schema %q", manifest.Schema))
 	}
+	if manifest.EventsPath != eventsName {
+		result.Issues = append(result.Issues, fmt.Sprintf("manifest event stream path is %q, expected %q", manifest.EventsPath, eventsName))
+	}
+	if manifest.BlobRoot != blobRoot {
+		result.Issues = append(result.Issues, fmt.Sprintf("manifest blob root is %q, expected %q", manifest.BlobRoot, blobRoot))
+	}
 	if manifest.Counts.Events != result.Events {
 		result.Issues = append(result.Issues, fmt.Sprintf("manifest counts %d events but stream has %d", manifest.Counts.Events, result.Events))
 	}

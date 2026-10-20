@@ -10,6 +10,7 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"os"
+	"os/exec"
 	"path/filepath"
 	"regexp"
 	"strconv"
@@ -19,6 +20,52 @@ import (
 
 	"github.com/NhanAZ/BedrockDebugProxy/internal/capture"
 )
+
+func TestViewerRendersBlobPreviews(t *testing.T) {
+	if _, err := exec.LookPath("node"); err != nil {
+		t.Skip("Node.js is unavailable; tools/quality.ps1 requires it")
+	}
+	source, err := assets.ReadFile("assets/app.js")
+	if err != nil {
+		t.Fatal(err)
+	}
+	const script = `
+const assert = require("node:assert/strict");
+const fs = require("node:fs");
+const vm = require("node:vm");
+const source = fs.readFileSync(0, "utf8");
+// Execute the shipped rendering function without starting the page or fetch loop.
+const start = source.indexOf("function renderHex(");
+const end = source.indexOf("\nfunction setBytesExpanded(", start);
+assert.ok(start >= 0 && end > start, "renderHex function boundary is missing");
+const elements = {"byte-status": {}, "hex-view": {}};
+const renderHex = vm.runInNewContext(source.slice(start, end) + "\nrenderHex;", {
+  elements, atob, formatCount: String,
+});
+for (const encoded of [undefined, ""]) {
+  renderHex(encoded, false, {size: 0, representation: "packet_payload"});
+  assert.equal(elements["hex-view"].textContent, "Blob is empty.");
+  assert.equal(elements["byte-status"].textContent, "0 bytes · packet_payload");
+}
+renderHex(undefined, false, undefined);
+assert.equal(elements["hex-view"].textContent, "This event has no content-addressed blob.");
+assert.equal(elements["byte-status"].textContent, "No blob selected");
+renderHex("AAFB", true, {size: 10, representation: "packet_payload"});
+assert.equal(elements["byte-status"].textContent, "3 of 10 bytes · packet_payload");
+assert.match(elements["hex-view"].textContent, /00 01 41/);
+assert.match(elements["hex-view"].textContent, /\|\.\.A\|/);
+renderHex("QQ==", false, {size: 1, representation: "packet_payload"});
+assert.equal(elements["byte-status"].textContent, "1 bytes · packet_payload");
+assert.match(elements["hex-view"].textContent, /41.*\|A\|/);
+`
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer cancel()
+	command := exec.CommandContext(ctx, "node", "--input-type=commonjs", "-e", script)
+	command.Stdin = strings.NewReader(string(source))
+	if output, err := command.CombinedOutput(); err != nil {
+		t.Fatalf("blob preview rendering failed: %v\n%s", err, output)
+	}
+}
 
 func TestViewerServesFilteredEventsAndBlobPreview(t *testing.T) {
 	root := filepath.Join(t.TempDir(), "capture")
@@ -408,6 +455,91 @@ func TestLiveViewerPublishesExternalVerificationProgress(t *testing.T) {
 	var completed sessionResponse
 	decodeURL(t, server.URL+"/external-token/api/session", &completed)
 	if completed.Verification != "verified" || completed.VerificationProgress != nil {
+		t.Fatalf("completed session = %+v", completed)
+	}
+}
+
+func TestLiveViewerIndexesFinalEventsBeforeExternalVerificationCompletes(t *testing.T) {
+	root := filepath.Join(t.TempDir(), "capture")
+	recorder, err := capture.New(root, capture.Options{CaptureID: "final-events"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() { _ = recorder.Close("failed", nil) })
+	view, err := OpenLive(root, Options{ExternalVerification: true})
+	if err != nil {
+		t.Fatal(err)
+	}
+	server := httptest.NewServer(view.Handler("final-token"))
+	defer server.Close()
+
+	for range 2 {
+		if _, err := recorder.Record(context.Background(), capture.Record{
+			Event: capture.Event{Kind: "packet.raw", Direction: capture.DirectionServerToClient},
+			Raw:   []byte("final payload"),
+		}); err != nil {
+			t.Fatal(err)
+		}
+	}
+	if err := recorder.Close("closed", nil); err != nil {
+		t.Fatal(err)
+	}
+	view.BeginVerification()
+	verification, err := capture.Verify(root)
+	if err != nil {
+		t.Fatal(err)
+	}
+	// No browser request refreshes the index between recording and completion.
+	view.CompleteVerification(verification, nil)
+
+	var completed sessionResponse
+	decodeURL(t, server.URL+"/final-token/api/session", &completed)
+	if completed.Verification != "verified" || completed.Events != 2 || completed.Blobs != 1 {
+		t.Fatalf("completed session = %+v", completed)
+	}
+	if len(completed.Filters.Kinds) != 1 || completed.Filters.Kinds[0] != "packet.raw" {
+		t.Fatalf("completed filters = %+v", completed.Filters)
+	}
+	var events eventsResponse
+	decodeURL(t, server.URL+"/final-token/api/events", &events)
+	if events.Total != 2 || len(events.Rows) != 2 || events.Rows[1].Sequence != 2 {
+		t.Fatalf("completed events = %+v", events)
+	}
+	var detail eventResponse
+	decodeURL(t, server.URL+"/final-token/api/events/2", &detail)
+	if detail.Event.Sequence != 2 || string(detail.BlobPreview) != "final payload" {
+		t.Fatalf("final event = %+v", detail)
+	}
+}
+
+func TestLiveViewerReportsFinalIndexFailure(t *testing.T) {
+	root := filepath.Join(t.TempDir(), "capture")
+	recorder, err := capture.New(root, capture.Options{CaptureID: "final-index-failure"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() { _ = recorder.Close("failed", nil) })
+	view, err := OpenLive(root, Options{ExternalVerification: true})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := recorder.Close("closed", nil); err != nil {
+		t.Fatal(err)
+	}
+	verification, err := capture.Verify(root)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := os.Remove(filepath.Join(root, eventsFileName)); err != nil {
+		t.Fatal(err)
+	}
+	view.CompleteVerification(verification, nil)
+	server := httptest.NewServer(view.Handler("failure-token"))
+	defer server.Close()
+
+	var completed sessionResponse
+	decodeURL(t, server.URL+"/failure-token/api/session", &completed)
+	if completed.Verification != "failed" || !strings.Contains(strings.Join(completed.VerificationIssues, "\n"), "index completed capture") {
 		t.Fatalf("completed session = %+v", completed)
 	}
 }

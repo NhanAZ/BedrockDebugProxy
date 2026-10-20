@@ -124,7 +124,7 @@ The same profile, seed, trait overrides and sequence of observations produce the
 
 ## Scenarios and assertions
 
-Scenarios are optional. See interactive control below for agents that choose each action after observing the server.
+Scenarios are optional. Use [interactive control](#interactive-agent-control) to choose each action after observing the server.
 
 Save a scenario as `scenario.jsonl` and use `--input scenario.jsonl`. This example runs a plugin's menu command and confirms its observable reply. Adapt the command and expected text to your plugin.
 

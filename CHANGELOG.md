@@ -6,6 +6,18 @@ Detailed rationale remains in [`docs/audits/`](docs/audits/).
 
 ## [Unreleased]
 
+### Fixed
+
+- Reject inconsistent capture manifest paths before verification or export, preventing an archive from omitting the event stream that was verified.
+- Index the final live-viewer events before publishing verification completion. Display an empty blob as zero bytes instead of reporting that no blob exists.
+- Preserve unregistered authentication cache files when renaming an account.
+- Reject fractional-second authentication cache ages instead of silently truncating them, which could turn a subsecond limit into an unlimited cache.
+- Publish the signaling shutdown cause before waking credential requests, so a closing connection cannot return missing credentials without an error.
+
+### Changed
+
+- Shortened the README and corrected stale resource-pack and validation guidance.
+
 ## [0.4.1] - 2026-10-19
 
 Supported Bedrock version: 1.26.52 (protocol 2193).

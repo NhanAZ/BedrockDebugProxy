@@ -200,6 +200,33 @@ func TestLoginCachePolicySupportsNonInteractiveAndFlagForms(t *testing.T) {
 	}
 }
 
+func TestLoginCachePolicyRejectsFractionalSeconds(t *testing.T) {
+	for _, interactive := range []bool{false, true} {
+		flagText := "500ms"
+		if interactive {
+			flagText = ""
+		}
+		var output bytes.Buffer
+		_, _, err := loginCachePolicy(flagText, strings.NewReader("500ms\n"), &output, interactive)
+		if err == nil || !strings.Contains(err.Error(), "whole seconds") {
+			t.Fatalf("loginCachePolicy(interactive=%v) error = %v", interactive, err)
+		}
+		if interactive && !strings.Contains(output.String(), "whole seconds") {
+			t.Fatalf("cache age prompt omits whole seconds: %s", output.String())
+		}
+	}
+}
+
+func TestLoginHelpDocumentsWholeSeconds(t *testing.T) {
+	for _, args := range [][]string{{"help"}, {"help", "login"}, {"login", "--help"}} {
+		var stdout, stderr bytes.Buffer
+		_ = run(args, &stdout, &stderr)
+		if !strings.Contains(stdout.String()+stderr.String(), "whole seconds") {
+			t.Fatalf("%v help omits whole seconds: %s%s", args, stdout.String(), stderr.String())
+		}
+	}
+}
+
 func TestViewRejectsMissingCapture(t *testing.T) {
 	var stdout, stderr bytes.Buffer
 	if code := run([]string{"view"}, &stdout, &stderr); code != 2 {

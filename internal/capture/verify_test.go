@@ -169,6 +169,48 @@ func TestVerifyReportsManifestBlobByteMismatch(t *testing.T) {
 	}
 }
 
+func TestVerifyRejectsNonCanonicalManifestLayout(t *testing.T) {
+	for _, test := range []struct {
+		name       string
+		eventsPath string
+		blobPath   string
+		wantIssue  string
+	}{
+		{"alternate-events", "alternate.jsonl", blobRoot, "event stream path"},
+		{"missing-events", "", blobRoot, "event stream path"},
+		{"alternate-blobs", eventsName, "other-blobs", "blob root"},
+		{"missing-blobs", eventsName, "", "blob root"},
+	} {
+		t.Run(test.name, func(t *testing.T) {
+			root := filepath.Join(t.TempDir(), "capture")
+			recorder, err := New(root, Options{})
+			if err != nil {
+				t.Fatal(err)
+			}
+			if err := recorder.Close("closed", nil); err != nil {
+				t.Fatal(err)
+			}
+			manifest := recorder.Manifest()
+			manifest.EventsPath = test.eventsPath
+			manifest.BlobRoot = test.blobPath
+			data, err := json.Marshal(manifest)
+			if err != nil {
+				t.Fatal(err)
+			}
+			if err := os.WriteFile(filepath.Join(root, manifestName), data, 0o600); err != nil {
+				t.Fatal(err)
+			}
+			verification, err := Verify(root)
+			if err != nil {
+				t.Fatal(err)
+			}
+			if len(verification.Issues) != 1 || !strings.Contains(verification.Issues[0], test.wantIssue) {
+				t.Fatalf("issues = %v, want %s", verification.Issues, test.wantIssue)
+			}
+		})
+	}
+}
+
 func TestVerifyRejectsBlobSymlinkOutsideCapture(t *testing.T) {
 	root := filepath.Join(t.TempDir(), "capture")
 	recorder, err := New(root, Options{})

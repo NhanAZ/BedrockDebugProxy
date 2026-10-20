@@ -4,8 +4,10 @@ import (
 	"archive/zip"
 	"bytes"
 	"context"
+	"encoding/json"
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 
 	"github.com/NhanAZ/BedrockDebugProxy/internal/capture"
@@ -102,6 +104,39 @@ func TestExportReportsDecryptedResourcePackArtifacts(t *testing.T) {
 	}
 	if !result.ContainsDecryptedResourcePacks {
 		t.Fatal("Export() did not report decrypted resource-pack artifacts")
+	}
+}
+
+func TestExportRejectsAlternateManifestEventStream(t *testing.T) {
+	root := filepath.Join(t.TempDir(), "capture")
+	recorder, err := capture.New(root, capture.Options{})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := recorder.Record(context.Background(), capture.Record{Event: capture.Event{Kind: "annotation"}}); err != nil {
+		t.Fatal(err)
+	}
+	if err := recorder.Close("closed", nil); err != nil {
+		t.Fatal(err)
+	}
+	manifest := recorder.Manifest()
+	manifest.EventsPath = "alternate.jsonl"
+	data, err := json.Marshal(manifest)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(root, "manifest.json"), data, 0o600); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(root, "alternate.jsonl"), nil, 0o600); err != nil {
+		t.Fatal(err)
+	}
+	output := filepath.Join(t.TempDir(), "capture.bdpcap")
+	if _, err := Export(root, output); err == nil || !strings.Contains(err.Error(), "capture verification found") {
+		t.Fatalf("Export() error = %v, want failed verification", err)
+	}
+	if _, err := os.Stat(output); !os.IsNotExist(err) {
+		t.Fatalf("archive was created despite mismatched event stream: %v", err)
 	}
 }
 

@@ -134,6 +134,9 @@ func (s *AccountStore) TokenPath(name string) (string, string, error) {
 // Upsert records a successfully authenticated account. The first account
 // automatically becomes the default. Existing defaults are preserved.
 func (s *AccountStore) Upsert(name string, maxAge time.Duration, setMaxAge bool) error {
+	if setMaxAge && (maxAge < 0 || maxAge%time.Second != 0) {
+		return errors.New("local cache age must use whole seconds and cannot be negative")
+	}
 	key, label, err := canonicalAccountName(name)
 	if err != nil {
 		return err
@@ -211,6 +214,11 @@ func (s *AccountStore) Rename(oldName, newName string) error {
 	}
 	oldPath := s.tokenPath(oldKey)
 	newPath := s.tokenPath(newKey)
+	if _, err := os.Lstat(newPath); err == nil {
+		return fmt.Errorf("account cache %q already exists", newName)
+	} else if !errors.Is(err, os.ErrNotExist) {
+		return fmt.Errorf("inspect destination account cache: %w", err)
+	}
 	info, err := os.Stat(oldPath)
 	if errors.Is(err, os.ErrNotExist) {
 		return fmt.Errorf("account %q has no cached Microsoft authentication", oldName)
@@ -453,7 +461,7 @@ func canonicalAccountName(name string) (key, label string, err error) {
 	return strings.ToLower(label), label, nil
 }
 
-// ParseMaxCacheAge parses the optional local cache policy accepted by login.
+// ParseMaxCacheAge parses the optional whole-second local cache policy accepted by login.
 // Empty, zero, and "none" mean that the provider controls token refresh and
 // the local cache has no additional age limit.
 func ParseMaxCacheAge(value string) (time.Duration, error) {
@@ -473,6 +481,9 @@ func ParseMaxCacheAge(value string) (time.Duration, error) {
 	duration, err := time.ParseDuration(value)
 	if err != nil || duration <= 0 {
 		return 0, fmt.Errorf("invalid cache age %q; use a duration such as 7d or 168h", value)
+	}
+	if duration%time.Second != 0 {
+		return 0, errors.New("local cache age must use whole seconds")
 	}
 	return duration, nil
 }

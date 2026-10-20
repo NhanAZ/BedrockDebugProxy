@@ -353,6 +353,57 @@ func TestAccountStoreRenameRejectsExistingDestination(t *testing.T) {
 	}
 }
 
+func TestAccountStoreRenamePreservesUnregisteredDestination(t *testing.T) {
+	root := t.TempDir()
+	store := newAccountStore(root)
+	sourcePath := filepath.Join(root, "auth-token.json")
+	destinationPath := filepath.Join(root, "accounts", "sampleaccount.json")
+	for path, token := range map[string]string{sourcePath: "source", destinationPath: "destination"} {
+		if err := writeToken(path, &oauth2.Token{RefreshToken: token}); err != nil {
+			t.Fatal(err)
+		}
+	}
+	if err := store.Rename("default", "SampleAccount"); err == nil || !strings.Contains(err.Error(), "already exists") {
+		t.Fatalf("Rename() error = %v", err)
+	}
+	for path, want := range map[string]string{sourcePath: "source", destinationPath: "destination"} {
+		token, err := readToken(path)
+		if err != nil || token.RefreshToken != want {
+			t.Fatalf("cache %q was changed: %v", filepath.Base(path), err)
+		}
+	}
+	account, err := store.Default()
+	if err != nil || account.Name != "default" || account.TokenPath != sourcePath {
+		t.Fatalf("default account changed after rejected rename: %#v, %v", account, err)
+	}
+}
+
+func TestAccountStoreRenameRejectsDanglingDestinationSymlink(t *testing.T) {
+	root := t.TempDir()
+	store := newAccountStore(root)
+	sourcePath := filepath.Join(root, "auth-token.json")
+	if err := writeToken(sourcePath, &oauth2.Token{RefreshToken: "source"}); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.MkdirAll(filepath.Join(root, "accounts"), 0o700); err != nil {
+		t.Fatal(err)
+	}
+	destinationPath := filepath.Join(root, "accounts", "sampleaccount.json")
+	targetPath := filepath.Join(root, "missing.json")
+	if err := os.Symlink(targetPath, destinationPath); err != nil {
+		t.Skipf("symbolic links are unavailable: %v", err)
+	}
+	if err := store.Rename("default", "SampleAccount"); err == nil || !strings.Contains(err.Error(), "already exists") {
+		t.Fatalf("Rename() error = %v", err)
+	}
+	if target, err := os.Readlink(destinationPath); err != nil || target != targetPath {
+		t.Fatalf("destination symlink changed: %q, %v", target, err)
+	}
+	if _, err := os.Stat(sourcePath); err != nil {
+		t.Fatalf("source cache after rejected rename: %v", err)
+	}
+}
+
 func TestAccountStoreRejectsUnsafeNames(t *testing.T) {
 	store := newAccountStore(t.TempDir())
 	for _, name := range []string{"", "..", "bad/name", "bad name", strings.Repeat("a", 33)} {
@@ -378,17 +429,35 @@ func TestParseMaxCacheAge(t *testing.T) {
 		value string
 		want  time.Duration
 	}{
-		{"", 0}, {"none", 0}, {"7d", 7 * 24 * time.Hour}, {"168h", 7 * 24 * time.Hour},
+		{"", 0}, {"none", 0}, {"7d", 7 * 24 * time.Hour}, {"168h", 7 * 24 * time.Hour}, {"1000ms", time.Second},
 	} {
 		got, err := ParseMaxCacheAge(test.value)
 		if err != nil || got != test.want {
 			t.Fatalf("ParseMaxCacheAge(%q) = %v, %v; want %v", test.value, got, err, test.want)
 		}
 	}
-	for _, value := range []string{"not-a-duration", "7days", "999999999999999999999d"} {
+	for _, value := range []string{"not-a-duration", "7days", "999999999999999999999d", "500ms", "1500ms"} {
 		if _, err := ParseMaxCacheAge(value); err == nil {
 			t.Fatalf("ParseMaxCacheAge accepted invalid duration %q", value)
 		}
+	}
+}
+
+func TestAccountStoreRejectsUnrepresentableCacheAge(t *testing.T) {
+	for _, maxAge := range []time.Duration{-time.Second, 500 * time.Millisecond, 1500 * time.Millisecond} {
+		t.Run(maxAge.String(), func(t *testing.T) {
+			store := newAccountStore(t.TempDir())
+			if err := store.Upsert("Example", time.Hour, true); err != nil {
+				t.Fatal(err)
+			}
+			if err := store.Upsert("Example", maxAge, true); err == nil {
+				t.Fatal("Upsert accepted an unrepresentable cache age")
+			}
+			account, err := store.Default()
+			if err != nil || account.MaxCacheAge != time.Hour {
+				t.Fatalf("invalid policy changed the stored age: %v, %v", account.MaxCacheAge, err)
+			}
+		})
 	}
 }
 

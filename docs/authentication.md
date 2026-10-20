@@ -46,7 +46,7 @@ Use a local label only when adding or switching accounts:
 
 `login` without a label prompts for a label in an interactive terminal. A non-empty label adds or reauthenticates that profile. Pressing Enter is allowed only after at least one account exists, and reauthenticates the current default. The first successful account becomes the default. `use` changes only the local selection. `logout` removes only the selected account's local token cache. If the default is removed while another account remains, the remaining account with the stable first label becomes the default.
 
-`rename OLD_ACCOUNT NEW_ACCOUNT` moves an existing local cache and preserves its token, local cache-age policy, and selected-default state. It never overwrites an existing destination. This is useful for converting the legacy `default` cache to a meaningful label without signing in again. The label is local metadata and is not verified against the Microsoft or Minecraft identity in the token.
+`rename OLD_ACCOUNT NEW_ACCOUNT` moves an existing local cache and preserves its token, local cache-age policy, and selected-default state. It refuses an existing destination, including a cache file absent from the account registry. This is useful for converting the legacy `default` cache to a meaningful label without signing in again. The label is local metadata and is not verified against the Microsoft or Minecraft identity in the token.
 
 Account labels are local names, not claims about the Minecraft username inside the token. The account registry never stores access or refresh token values.
 
@@ -62,7 +62,7 @@ An optional local maximum cache age can require device authentication again even
 .\bin\bedrock-debug-proxy.exe login NhanAZ --max-age 7d
 ```
 
-The flag is useful for scripts or for skipping the prompt. The accepted forms are a positive Go duration such as `168h` or a day value such as `7d`. `none` and `0` remove the local limit. This setting does not change Microsoft's token lifetime. Microsoft controls the access token and refresh token expiry, rotation, and revocation. The proxy only applies the local policy when choosing whether to reuse the cache.
+The flag skips the prompt. Use a positive duration in whole seconds, such as `168h` or `7d`. Fractional seconds such as `500ms` or `1.5s` are rejected because the registry stores seconds. `none` and `0` remove the local limit. This setting does not change Microsoft's token lifetime. Microsoft controls access token and refresh token expiry, rotation, and revocation. The proxy applies the local policy when deciding whether to reuse the cache.
 
 ## Storage and privacy
 

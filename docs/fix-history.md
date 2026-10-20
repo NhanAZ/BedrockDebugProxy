@@ -14,6 +14,46 @@ Every new entry should state the symptom, root cause, implementation commits, ev
 
 ## Compatibility and bug index
 
+### FIX-0167 - Reject cache ages that cannot be persisted
+
+- Symptom: a positive cache age such as `500ms` became unlimited after the account registry was saved.
+- Classification: a new local-policy persistence defect.
+- Root cause: duration parsing accepted nanosecond precision while the registry stores whole seconds and reserves zero for unlimited.
+- Implementation: reject negative or fractional-second values before updating the registry and document whole-second precision in login help and its prompt. Zero remains unlimited and `1000ms` remains a valid one-second limit.
+- Evidence and validation: parser, registry-preservation, and CLI regressions reproduce the truncation and verify explicit rejection. See [AUDIT-0237](audits/AUDIT-0237-maintenance-review.md).
+
+### FIX-0166 - Validate the manifest's capture layout
+
+- Symptom: verification could accept a manifest naming an alternate event file, then export that file instead of the verified event stream.
+- Classification: a new verifier and exporter consistency defect.
+- Root cause: the verifier read the fixed v1 layout without checking the manifest's `events_path` and `blob_root`, while the exporter used the declared event path.
+- Implementation: reject manifest paths that do not match the existing v1 layout. Valid captures, blob bytes, event order, and the schema remain unchanged.
+- Evidence and validation: synthetic malformed-layout and export regressions reproduce the inconsistency. The paired BedrockPackArchive fixture checks rejection and preserves valid archive, manifest, key-count, and index data. See [AUDIT-0237](audits/AUDIT-0237-maintenance-review.md).
+
+### FIX-0165 - Publish signaling cancellation before closure
+
+- Symptom: a credential request could return neither credentials nor an error during signaling shutdown.
+- Classification: a new shutdown-order race in both signaling implementations.
+- Root cause: `Close` woke credential requests before setting the context cancellation cause.
+- Implementation: publish the cause before closing the notification channel, preserving any earlier cause.
+- Evidence and validation: deterministic tests hold notifier cleanup while a credential request observes closure. Both implementations fail before the fix and return a close error afterward. See [AUDIT-0237](audits/AUDIT-0237-maintenance-review.md).
+
+### FIX-0164 - Preserve unregistered account caches during rename
+
+- Symptom: renaming an account could overwrite a destination token file absent from the registry.
+- Classification: a gap in the no-overwrite contract from FIX-0122.
+- Root cause: rename checked the registry but not the destination filesystem entry. Login writes its cache before saving the registry, so an interrupted registry save can leave such a file.
+- Implementation: inspect the destination with `Lstat` and refuse an existing entry, including a dangling symlink. Preserve the original account and default selection.
+- Evidence and validation: synthetic cache-preservation tests fail before the fix and pass afterward. The symlink regression requires a host that permits symlink creation. See [AUDIT-0237](audits/AUDIT-0237-maintenance-review.md).
+
+### FIX-0163 - Retain the final live-viewer events
+
+- Symptom: the live viewer could report successful verification while omitting events written after its last poll. An empty blob also appeared to be missing.
+- Classification: a completion-indexing defect related to FIX-0130 and a separate empty-preview display defect.
+- Root cause: external verification disabled tailing before indexing the final bytes. The frontend treated an omitted empty preview as an absent blob.
+- Implementation: finish indexing before publishing completion, retain index errors, remove the redundant post-completion refresh, and determine blob presence from its reference.
+- Evidence and validation: a synthetic HTTP regression closes a capture without an intervening poll and checks final events, filters, details, and blobs. JavaScript checks distinguish empty blobs from absent blobs. See [AUDIT-0237](audits/AUDIT-0237-maintenance-review.md).
+
 ### FIX-0162 - Prepare transfer identity before a fast reconnect
 
 - Symptom: an immediate client reconnect could use a different upstream RakNet GUID or UDP source address at the next hop despite the existing identity-preservation path.
@@ -1321,7 +1361,6 @@ This is a compatibility guard, not permission to assume a universal Bedrock sequ
 
 ## Open and pending items
 
-- The stamped maintenance runtime has a passing synthetic The Hive baseline and local plus five-public-target evidence recorded in [AUDIT-0213](audits/AUDIT-0213-stable-maintenance-server-validation.md). Retail gameplay remains unobserved.
-- Re-run the direct Enchanted minigame transfer and child resource-pack flow. The maintenance session reached the hub only.
-- Complete the exact-revision matrix for Galaxite, Lifeboat, Mineville Zeqa, Enchanted, and CubeCraft after the The Hive baseline before release. CubeCraft requires maintainer risk acknowledgement first.
+- Version 0.4.1 completed the six-server CLI matrix, including Enchanted OP SMP and its pack-bearing transfer. [AUDIT-0236](audits/AUDIT-0236-v041-cli-release-candidate.md) records the exact runtime and private evidence. This supersedes the older hub-only pending status, not the historical reports themselves.
+- Each later runtime candidate still needs its own release matrix. Retail rendering and visible gameplay remain unobserved by CLI sessions. CubeCraft requires the session's maintainer risk acknowledgement.
 - If a server fails, record the capture and classify the failure before changing the generic state machine.

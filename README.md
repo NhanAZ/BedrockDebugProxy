@@ -1,16 +1,16 @@
 # BedrockDebugProxy
 
-For plugin development without opening Minecraft, see [Golem CLI automation](docs/golem.md). The optional server companion provides persistent simulated players with individual personalities, interactive control, bounded autonomous behaviour, assertions and event observations for AI agents on a disposable PocketMine-MP or Axolotl-PM development server.
-
 BedrockDebugProxy is a high-fidelity Minecraft Bedrock traffic observation and research proxy. It records one client-to-server session as structured, machine-readable evidence that can be inspected again later.
 
 > Capture once, analyze many times.
+
+For plugin tests without a Minecraft client, [Golem CLI automation](docs/golem.md) provides persistent simulated players, interactive control, assertions, and bounded autonomy on a disposable PocketMine-MP or Axolotl-PM development server.
 
 BedrockDebugProxy is independent software. It is not an official Minecraft product and is not approved by or associated with Mojang or Microsoft.
 
 ## Quick start
 
-Already have `bin\bedrock-debug-proxy.exe` and only want a useful debug capture? Choose an upstream and run the general form below from the repository root.
+Run from the repository root. If the binary is missing, install the Go version declared in `go.mod`, keep the working tree clean, and build it with `.\tools\build.ps1 -Version dev`.
 
 ```powershell
 # General form. Replace <UPSTREAM> before running.
@@ -22,59 +22,24 @@ Already have `bin\bedrock-debug-proxy.exe` and only want a useful debug capture?
     --auth device
 ```
 
-For example, the following command selects The Hive by its current Featured Experience name. The Hive is only an example target and is not required by the proxy.
+For example, `--upstream "experience:The Hive"` selects The Hive. Replace it with the destination you intend to debug.
 
-```powershell
-# Example only. Replace The Hive with the exact Experience name you want to debug.
-.\bin\bedrock-debug-proxy.exe `
-    run `
-    --listen 0.0.0.0:19132 `
-    --upstream "experience:The Hive" `
-    --auth device
-```
-
-Then follow these steps.
-
-1. Complete the Microsoft device login the first time. The terminal first asks for a non-empty Microsoft account username or local label so a new installation does not silently create an unnamed `default` profile. It then prints a direct `login.live.com` URL that can be opened with Ctrl+click in Windows Terminal. If the direct URL is unavailable, use the displayed `https://www.microsoft.com/link` address and code. Later runs use the selected default account and refresh its cached login until Microsoft requires authentication again.
+1. On first login, enter a non-empty local account label and complete Microsoft device authentication using the printed link and code. Later runs refresh the selected account's cached login until Microsoft requires authentication again.
 2. Wait until the terminal prints `Listening on`. The proxy cannot accept Minecraft connections while authentication and Experience resolution are still in progress.
 3. In Minecraft Bedrock, connect to port `19132` on the computer running the proxy. Use that computer's LAN address from another device. Do not enter `0.0.0.0` as the Minecraft server address.
-4. Join the server and reproduce the behavior you want to debug. The terminal prints connection transitions and compact three-second packet summaries while the full evidence is written to the capture. During login, resource-pack exchange is intentionally upstream-first and buffered. The terminal reports when that wait starts and how long it takes before downstream delivery begins.
+4. Join the server and reproduce the behavior. The terminal prints connection transitions and three-second packet summaries while the capture retains the full evidence. Resource packs are buffered upstream before downstream delivery, and the terminal reports that wait.
 5. Press `Ctrl+C` in the proxy terminal when finished.
 6. Wait for the capture verification result. The exact output path is printed when the proxy starts and is normally `captures\session-<UTC timestamp>`.
 
-That capture directory is the debug result. During play, `artifacts/` also fills with named pack ZIPs, skin/cape PNGs, and JSONL grouped by entities, world/chunks, blocks, inventory, and skins. No extra export command is needed. `Ctrl+C` finishes the folders and verifies the original capture. These are observed data, not a complete playable world. Keep them local because they may contain identifiers, chat, server data, resource packs, and other sensitive content. See the [folder guide](docs/session-artifacts.md).
+The capture directory is the debug result. During play, `artifacts/` also fills with pack ZIPs, skin/cape PNGs, and categorized JSONL. No export command is needed to save them. These observations do not form a complete playable world. Keep them local because they may contain identifiers, chat, server data, resource packs, and other sensitive content. See the [folder guide](docs/session-artifacts.md).
 
 `0.0.0.0` exposes the listener to reachable network interfaces. Use it only on a trusted network with an appropriate firewall. Use `127.0.0.1:19132` when only local software needs to connect.
 
-By default, the downstream Minecraft connection must use Xbox authentication. Add the proxy address in Minecraft's Servers tab for this secure path. A LAN World entry uses a self-signed client login instead. To make one proxy run joinable from either Worlds > LAN or the Servers tab on a trusted LAN, add the existing opt-in flag below.
-
-```powershell
-# Trusted LAN only. Replace <UPSTREAM> before running.
-.\bin\bedrock-debug-proxy.exe `
-    run `
-    --listen 0.0.0.0:19132 `
-    --upstream "<UPSTREAM>" `
-    --auth device `
-    --allow-unauthenticated-client
-```
-
-This flag does not disable upstream authentication. The same running listener continues to accept a Servers-tab connection, but it no longer verifies whether the connecting client used Xbox authentication. Any client that can reach the listener may use the proxy's authenticated upstream session, so this is intentionally not the default.
+By default, the downstream connection requires Xbox authentication. Add the proxy address in Minecraft's Servers tab. A LAN World entry uses a self-signed login. On a trusted LAN, `--allow-unauthenticated-client` accepts either path while keeping upstream authentication enabled. Any client that can reach this listener can use the proxy's authenticated upstream session.
 
 When the destination sends a Bedrock `Transfer` packet, add `--follow-transfers` to keep the proxy in the path. The proxy rewrites the transfer destination to its local listener, waits for the client to reconnect, and then opens the next upstream hop in the same capture. Without this opt-in flag, the original transfer is captured and the process ends after the current hop. A concrete, reachable LAN address is required in `--listen` when following transfers; a wildcard such as `0.0.0.0:19132` cannot be sent to the client.
 
-For a trusted-LAN run that accepts a LAN World connection and follows server transfers, use both opt-in flags explicitly.
-
-```powershell
-.\bin\bedrock-debug-proxy.exe `
-    run `
-    --listen "<LAN_IP>:19132" `
-    --upstream "<UPSTREAM>" `
-    --auth device `
-    --allow-unauthenticated-client `
-    --follow-transfers
-```
-
-Add `--web-viewer` when you want to inspect the ordered capture in a local browser while the proxy is running. The browser follows complete events already committed to the canonical capture. It does not receive packets directly from the forwarding path.
+Add `--web-viewer` to inspect the capture in a local browser during the session. It follows complete events already committed to the capture. This example combines the viewer with trusted-LAN login and transfer following:
 
 ```powershell
 .\bin\bedrock-debug-proxy.exe `
@@ -87,22 +52,14 @@ Add `--web-viewer` when you want to inspect the ordered capture in a local brows
     --web-viewer
 ```
 
-Account management is deliberately separate from `run`, so the everyday command does not grow an account matrix. The first interactive login requires a non-empty account username or local label. Use `.\bin\bedrock-debug-proxy.exe login NAME` to add or reauthenticate a named account, or run `login` without a name to answer the label prompt. After at least one account exists, Enter selects the current default. In a terminal, login also asks for an optional local cache age and Enter means no local limit. Use `accounts` to inspect local state, `use NAME` to change the default, `rename OLD_ACCOUNT NEW_ACCOUNT` to rename a cache without reauthenticating, and `logout` to remove the default cache. Existing `%AppData%\BedrockDebugProxy\auth-token.json` files continue as the `default` account until explicitly renamed. See [authentication accounts](docs/authentication.md) for the complete, short workflow. These files contain authentication secrets and must not be shared or committed.
+Use `login NAME`, `accounts`, `use NAME`, `rename OLD_ACCOUNT NEW_ACCOUNT`, and `logout` to manage local accounts. The [authentication guide](docs/authentication.md) covers prompts, cache age, legacy caches, and storage. Authentication caches contain secrets and must not be shared or committed.
 
-The CLI keeps the command list grouped and discoverable:
+Use `help` for the command list and `help COMMAND` for usage:
 
 ```powershell
 .\bin\bedrock-debug-proxy.exe help
 .\bin\bedrock-debug-proxy.exe help run
 .\bin\bedrock-debug-proxy.exe help login
-```
-
-Use `help COMMAND` when you are unsure which command or argument comes next.
-
-If the binary does not exist yet, install the Go version declared in `go.mod`, keep the working tree clean, and build it once.
-
-```powershell
-.\tools\build.ps1 -Version dev
 ```
 
 ## Choosing an upstream
@@ -130,7 +87,7 @@ The canonical capture retains ordered evidence from both directions, including t
 
 Representative packet coverage includes skin and cape data, entities, chunks and subchunk requests, block updates, inventory content and transactions, movement, emotes, and other decoded packets that pass through the proxy. Binary fields are summarized in decoded views while their exact packet payload remains in content-addressed raw blobs.
 
-Resource-pack archives, metadata, checksums, download information, and content keys supplied by the current upstream session are retained. When packs are offered, the downstream client must choose to download them or leave. The current gophertunnel adapter does not expose whether the upstream server made its packs optional, so the proxy cannot mirror that policy exactly. Decryption is opt-in because it creates additional sensitive plaintext artifacts.
+Resource-pack archives, metadata, checksums, download information, and content keys supplied by the current upstream session are retained. The downstream offer preserves the upstream required/optional policy and other offer metadata when available. URL entries are replaced with archives served by the proxy. See [resource-pack behavior](docs/resource-packs.md) for fallback and delivery details. Decryption is opt-in because it creates additional sensitive plaintext artifacts.
 
 ```powershell
 # Replace <UPSTREAM> with an Experience selector or direct HOST:PORT.
@@ -146,11 +103,11 @@ To capture resource packs without opening a local listener or connecting a Minec
 .\bin\bedrock-debug-proxy.exe run --upstream "<UPSTREAM>" --packs-only --web-viewer
 ```
 
-This still performs a real upstream Bedrock login with the selected authentication mode and completes the server's resource-pack exchange. It closes the upstream connection before requesting a world spawn. The server still receives a login and may count, log, or reject that connection. This is not an offline pack fetch. Since no Minecraft client is connected, the dialer uses its default client metadata; a server may therefore offer different packs than it would to a specific PC or mobile client. The capture retains the login and resource-pack packet evidence plus the exact archives. `--decrypt-resource-packs` remains opt-in. Packs and content keys can be sensitive, so keep the capture local.
+This performs a real upstream login and resource-pack exchange, then closes before requesting spawn. The server may count, log, or reject the connection. Default client metadata can produce a different pack offer from a particular PC or mobile client. The capture retains login and pack evidence plus exact archives. `--decrypt-resource-packs` remains opt-in, and captures must stay local.
 
 ## Inspecting a capture
 
-The following commands are optional analysis and packaging tools, not extra steps required to save a debug session.
+These commands analyze or package an existing capture:
 
 ```powershell
 .\bin\bedrock-debug-proxy.exe verify C:\path\to\capture
@@ -162,19 +119,16 @@ The following commands are optional analysis and packaging tools, not extra step
 .\bin\bedrock-debug-proxy.exe export C:\path\to\capture C:\path\to\session.bdpcap
 ```
 
-The canonical capture is an event stream plus content-addressed blobs. Automatic convenience folders are described in the [folder guide](docs/session-artifacts.md). `view` verifies a closed capture and opens a read-only local browser interface with event filters, decoded details, and bounded blob previews. `view --live` follows complete events from an open capture, and `run --web-viewer` starts that live view automatically. `inspect` locates original evidence and `export` packages the canonical capture, not the convenience folders. Packet counts are event counts, not counts of unique players, assets, or chunks. See [capture analysis and viewer behavior](docs/analysis-and-export.md) for details.
+`view` verifies a closed capture and opens a read-only local interface with filters, decoded details, and bounded blob previews. `view --live` follows an open capture. `inspect` locates original events and blobs, and `export` packages them without the convenience folders. Packet counts count events, not unique players, assets, or chunks. See [capture analysis and viewer behavior](docs/analysis-and-export.md).
 
 ```powershell
 # Resource-pack archives and their blob paths.
 .\bin\bedrock-debug-proxy.exe inspect --kind resource_pack.archive --limit 5 C:\path\to\capture
 
-# Representative skin, world, entity, block, and inventory evidence.
+# Filter decoded packets by name, such as PlayerSkin, LevelChunk,
+# AddActor, UpdateBlock, or InventoryContent.
 .\bin\bedrock-debug-proxy.exe inspect --kind packet.decoded --packet PlayerSkin --limit 5 C:\path\to\capture
-.\bin\bedrock-debug-proxy.exe inspect --kind packet.decoded --packet LevelChunk --limit 5 C:\path\to\capture
-.\bin\bedrock-debug-proxy.exe inspect --kind packet.decoded --packet AddActor --limit 5 C:\path\to\capture
-.\bin\bedrock-debug-proxy.exe inspect --kind packet.decoded --packet UpdateBlock --limit 5 C:\path\to\capture
 .\bin\bedrock-debug-proxy.exe inspect --kind bridge.forward_timing --direction server_to_client --limit 50 C:\path\to\capture
-.\bin\bedrock-debug-proxy.exe inspect --kind packet.decoded --packet InventoryContent --limit 5 C:\path\to\capture
 ```
 
 Each event's `blob.path` points to the exact retained bytes under the capture directory. Encrypted resource-pack archives are retained during a normal run, but plaintext derived archives exist only when `--decrypt-resource-packs` was selected before the session.
@@ -213,8 +167,7 @@ Use `tools\format.ps1` for deterministic Go formatting. CI runs the quality gate
 
 Use the document that matches your task.
 
-- New contributors should follow [`CONTRIBUTING.md`](CONTRIBUTING.md).
-- Pull requests use the repository template and the workflow in [`CONTRIBUTING.md`](CONTRIBUTING.md).
+- Contribution and pull request workflow is in [`CONTRIBUTING.md`](CONTRIBUTING.md).
 - Live capture and report details are in [`docs/validation.md`](docs/validation.md).
 - Maintainers preparing a release should follow [`docs/releasing.md`](docs/releasing.md).
 - Protocol updates must follow [`docs/protocol-updates.md`](docs/protocol-updates.md).
@@ -244,11 +197,7 @@ Using a proxy can violate a server's rules or terms even when the session is rea
 
 ## AI-assisted development
 
-BedrockDebugProxy is maintained by NhanAZ with substantial assistance from AI agents. Agents may help with research, implementation, testing, documentation, and release preparation under the maintainer's direction.
-
-AI assistance does not replace human responsibility. The maintainer decides what is accepted and remains responsible for the project's scope and releases. Changes should be reviewed for provenance, tested proportionally, and validated against the documented evidence and policy requirements.
-
-If you prefer projects that do not use AI-assisted development, please skip this project. That choice is welcome. Please keep technical feedback focused on reproducible behavior, evidence, and concrete improvements, and treat the maintainer and contributors with respect.
+NhanAZ maintains BedrockDebugProxy with substantial AI assistance and remains responsible for accepted changes and releases. Contributions require provenance review and validation under the documented workflow. Technical feedback should focus on reproducible behavior, evidence, and concrete improvements.
 
 ## License
 
