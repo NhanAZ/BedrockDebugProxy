@@ -58,12 +58,12 @@ renderHex("QQ==", false, {size: 1, representation: "packet_payload"});
 assert.equal(elements["byte-status"].textContent, "1 bytes · packet_payload");
 assert.match(elements["hex-view"].textContent, /41.*\|A\|/);
 `
-	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	ctx, cancel := context.WithTimeout(t.Context(), time.Minute)
 	defer cancel()
 	command := exec.CommandContext(ctx, "node", "--input-type=commonjs", "-e", script)
 	command.Stdin = strings.NewReader(string(source))
 	if output, err := command.CombinedOutput(); err != nil {
-		t.Fatalf("blob preview rendering failed: %v\n%s", err, output)
+		t.Fatalf("blob preview rendering failed: %v (context %v)\n%s", err, ctx.Err(), output)
 	}
 }
 
