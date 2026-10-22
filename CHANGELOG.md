@@ -17,6 +17,7 @@ Detailed rationale remains in [`docs/audits/`](docs/audits/).
 ### Changed
 
 - Use Go 1.27.3 to reject compromised intermediate certificates (GO-2026-6809).
+- Update klauspost/compress to 1.18.7 for the S2 dictionary security fix.
 
 - Shortened the README and corrected stale resource-pack and validation guidance.
 
