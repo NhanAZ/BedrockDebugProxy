@@ -16,6 +16,8 @@ Detailed rationale remains in [`docs/audits/`](docs/audits/).
 
 ### Changed
 
+- Use Go 1.27.3 to reject compromised intermediate certificates (GO-2026-6809).
+
 - Shortened the README and corrected stale resource-pack and validation guidance.
 
 ## [0.4.1] - 2026-10-19
