@@ -49,6 +49,7 @@ These entries are useful for exploratory research but are not release gates.
 | Experience | Selector | Provider or endpoint reference |
 | --- | --- | --- |
 | MegaSMP | `experience:MegaSMP` | By InPvP, `play.megasmp.gg:19132` |
+| SurvivalOnline Beta | `experience:SurvivalOnline Beta` | Provider and endpoint not recorded |
 
 The `experience:` selector is the common Minecraft services lookup for both Featured Experiences and Creator Experiences. The category column describes the server listing, not which selector form it accepts. CubeCraft is a Featured server and its release selector is `experience:CubeCraft`; its endpoint is listed as a reference only. Provider and endpoint references in this document came from the maintainer's test catalog and must be rechecked if a service changes its routing.
 
