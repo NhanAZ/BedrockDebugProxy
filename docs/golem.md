@@ -1,6 +1,8 @@
 # Golem CLI for plugin development
 
-Golem lets a developer or AI agent drive simulated players on a running PocketMine-MP 5 or compatible development fork without opening Minecraft. The CLI accepts JSON Lines, executes scenarios sequentially, and returns structured results. The optional GolemAgent server plugin uses the reviewed Golem 0.7.0 runtime. No dashboard is required.
+Golem lets a developer or AI agent drive simulated players on a running PocketMine-MP 5 or compatible development fork without opening Minecraft. The CLI accepts JSON Lines, executes scenarios sequentially, and returns structured results. The optional GolemAgent server plugin uses the reviewed Golem 0.7.0 runtime. No dashboard is required. This is the agent-first path for disposable local server and plugin tests.
+
+Golem is a server-side simulation, not a Bedrock network client. It cannot join The Hive, Galaxite, Lifeboat, Mineville Zeqa, Enchanted, or CubeCraft, and its journal cannot become a public-server validation report. Official release sessions use the reviewed agent-controlled protocol client described in [`docs/validation.md`](validation.md), so no maintainer-owned retail client needs to join the test. Keep Golem evidence separate from proxy captures and release reports.
 
 This is an administrative development tool. Use a disposable server and world. The companion can change player permissions, inventories, blocks and plugin state. Anyone who can write its data directory can control these simulated players and run trusted PHP tests with plugin-level authority. Keep that directory private. Normal proxy commands do not enable this facility.
 

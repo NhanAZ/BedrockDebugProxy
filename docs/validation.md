@@ -1,6 +1,6 @@
 # Real-world validation workflow
 
-Automated tests establish that the implementation matches local expectations. They do not establish that those expectations match live Minecraft Bedrock servers. Runtime, networking, protocol, authentication, session, resource-pack, capture, encoding, and decoding changes need the scoped development evidence below. Official releases accept full authenticated CLI sessions or retail Minecraft client sessions. CLI evidence does not establish rendering or visible gameplay.
+Automated tests establish that the implementation matches local expectations. They do not establish that those expectations match live Minecraft Bedrock servers. Runtime, networking, protocol, authentication, session, resource-pack, capture, encoding, and decoding changes need the scoped development evidence below. Official releases use full authenticated sessions driven by an agent-controlled protocol client. A retail Minecraft client is not required, and CLI evidence does not establish rendering or visible gameplay.
 
 Changes that can affect the local web viewer have an additional same-change requirement. The commit must include the viewer asset and HTTP integration tests and the embedded JavaScript syntax check. Presentation or interaction changes must also be smoke-tested in a browser from a clean committed build. Use [`web-validation.md`](web-validation.md) for the exact scope and checklist.
 
@@ -16,7 +16,7 @@ For a routine pull request with one focused runtime commit, `run --packs-only` i
 
 A packs-only report is expected to have `result=incomplete` and `normal_session=not_observed`; it is scoped evidence for development pull requests and is never a release pass. Mark `packs_exchange=pass` only when the capture shows that the offered packs completed the supported exchange. If no pack is offered or the connection stops before exchange completes, record the relevant check as `not_observed` or `fail`. A general successful connection is not proof of a flow that the capture did not observe.
 
-Changes outside the packs-only boundary still need focused automated, fixture, or loopback coverage for the affected flow. For example, a transfer-following change must test the `Transfer` path and next-hop behavior without treating a first-hop packs-only login as coverage. Resource-pack decryption changes require evidence of the supported decryption path. Record remaining live behavior as unobserved and complete the full CLI or retail session at the release gate.
+Changes outside the packs-only boundary still need focused automated, fixture, or loopback coverage for the affected flow. For example, a transfer-following change must test the `Transfer` path and next-hop behavior without treating a first-hop packs-only login as coverage. Resource-pack decryption changes require evidence of the supported decryption path. Agents may use the Golem CLI on a disposable PocketMine-MP or Axolotl-PM server for server-side plugin scenarios, but Golem is not a network client and cannot replace the public-server matrix. Record remaining live behavior as unobserved and complete the full agent-controlled protocol-client session at the release gate.
 
 For transfer-following changes, focused automated or loopback coverage must exercise the `Transfer` rewrite, a successful next-hop transport and upstream connection, and the next hop's resource-pack exchange when offered. When the route probe exposes it, inspect `client_guid_preserved: true` as evidence that the RakNet identity was carried into the next-hop handshake. A first-hop packs-only connection alone is not sufficient evidence for a transfer fix. The full client flow through a later spawn remains part of Enchanted's release validation.
 
@@ -88,7 +88,7 @@ Add `--decrypt-resource-packs` only when the change or release test explicitly n
 
 ## Release gate
 
-Every official release requires a full authenticated CLI session or a retail Minecraft client session and a passing report tied to a validated runtime revision for each baseline server. A retail application is optional. See [the maintainer decision](decisions/0015-cli-release-validation.md).
+Every official release requires a full authenticated session driven by an agent-controlled protocol client and a passing report tied to a validated runtime revision for each baseline server. The release process does not require a retail Minecraft client. Use Golem CLI for local server/plugin validation, but do not label its simulation journal as a public-server report. See [the maintainer decision](decisions/0015-cli-release-validation.md).
 
 - The Hive
 - Galaxite
@@ -121,7 +121,7 @@ Start the stamped proxy with device authentication, a concrete loopback listener
     --decrypt-resource-packs
 ```
 
-The self-signed downstream is confined to loopback. Upstream Microsoft authentication remains required. This is an existing diagnostic opt-in and does not change the default listener authentication. Packs-only and server-side Golem simulations cannot satisfy this workflow. For a retail client, use the normal authenticated downstream path instead.
+The self-signed downstream is confined to loopback. Upstream Microsoft authentication remains required. This is an existing diagnostic opt-in and does not change the default listener authentication. The CLI protocol client is the release test client; the repository's server-side Golem simulation cannot satisfy this workflow by itself. Do not open a retail client unless a separate visual or gameplay claim is explicitly in scope.
 
 Generate a new report after reviewing the closed capture. Keep older incomplete reports unchanged.
 

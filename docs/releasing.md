@@ -8,7 +8,7 @@ When the maintainer says "I want to release", the AI agent should drive this doc
 
 1. The agent audits the commits since the latest release, proposes or confirms the version, checks the working tree, documentation, licenses, provenance, known limitations, CI, and unresolved review findings.
 2. The agent runs the automated quality gate and builds the exact stamped candidate.
-3. The agent runs the live six-server matrix through an authenticated CLI client using the approved cached account. A retail Minecraft client is optional for additional rendering or gameplay observations. Ask the maintainer only for unavailable account or signing interactions, or an explicitly requested visual check.
+3. The agent runs the live six-server matrix through an authenticated protocol client using the approved cached account. The repository's Golem CLI is used for agent-driven checks on disposable PocketMine-MP or Axolotl-PM development servers; it does not connect to public Featured Experiences. A retail Minecraft client is not required for release. Ask the maintainer only for unavailable account or signing interactions, or an explicitly requested visual check.
 4. The agent inspects each closed capture, verifies its exact revision, authentication, pack exchange, spawn, post-spawn traffic, errors, and artifacts, then generates the sanitized report. The maintainer does not need to run report scripts.
 5. After all required sessions, the agent runs the release gate, prepares the checksum and release notes, and reports any exact blocker. A candidate that adds only allowed Markdown documentation after the matrix may use the documented docs-only equivalence with the original validated runtime revision; the reports themselves must not be edited.
 6. If the maintainer explicitly requested a release, the version is settled, every gate passes, and signing or GitHub access is available, the agent creates and pushes the tag, publishes the release assets, and verifies the result. It must not publish from an incomplete or mismatched validation set.
@@ -48,9 +48,9 @@ If the candidate can affect the local web viewer, complete the automated and bro
 
 ## 3. Validate the six-server baseline
 
-Use a reviewed CLI protocol client or an optional retail Minecraft Bedrock client. For each server, start the same stamped binary, complete the required flow, retain at least 30 seconds of bidirectional traffic after spawn, close the client, and wait for automatic capture verification. CLI sessions do not establish retail rendering, UI, input, or gameplay behavior.
+Use a reviewed agent-controlled CLI protocol client for every release session. For each server, start the same stamped binary, complete the required flow, retain at least 30 seconds of bidirectional traffic after spawn, close the client, and wait for automatic capture verification. The release gate does not require a retail Minecraft client and makes no claim about retail rendering, UI, input, or gameplay.
 
-The first successful device login creates the selected default account cache, so later server runs normally do not require another device code. If the machine has multiple profiles, select the intended account with `bedrock-debug-proxy use NAME` before starting the stamped binary. Wait for `Listening on` before connecting the client. A CLI driver may use the existing `--allow-unauthenticated-client` option on a concrete loopback listener while the proxy authenticates upstream with the approved Microsoft account. A retail client uses the default Xbox-authenticated downstream path, normally through the Servers tab. Do not expose the self-signed validation listener beyond loopback.
+The first successful device login creates the selected default account cache, so later server runs normally do not require another device code. If the machine has multiple profiles, select the intended account with `bedrock-debug-proxy use NAME` before starting the stamped binary. Wait for `Listening on` before connecting the client. The agent-controlled CLI driver may use the existing `--allow-unauthenticated-client` option on a concrete loopback listener while the proxy authenticates upstream with the approved Microsoft account. Do not expose the self-signed validation listener beyond loopback.
 
 Include `--follow-transfers` in the release command when the server's flow can send a `Transfer` packet. This keeps subsequent hops in the same capture. Use a concrete loopback address for CLI tests or a reachable LAN address for a retail client. A wildcard listener address cannot be sent back to the client.
 
@@ -63,7 +63,7 @@ Include `--follow-transfers` in the release command when the server's flow can s
 | `Enchanted` | `experience:Enchanted` | Receive the server-sent form, select the known pack-bearing OP SMP child, observe `Transfer`, follow the next hop, complete its resource-pack exchange, and retain child traffic after spawn |
 | `CubeCraft` | `experience:CubeCraft` | Only after the maintainer accepts the connection risk. Connect, spawn, perform normal read-only interaction, observe both traffic directions, and close cleanly |
 
-Use this command with the selector shown in the matrix and connect the reviewed CLI client to its loopback listener. Replace only the value after `--upstream` for each run. For an optional retail test, use a reachable LAN listener and remove the self-signed client option. The `experience:` selector resolves both Featured and Creator Experiences through Minecraft services. For CubeCraft, satisfy the maintainer risk gate in [`server-targets.md`](server-targets.md) before connecting. Do not add bypass, mutation, replay, or anti-cheat evasion behavior to the release command.
+Use this command with the selector shown in the matrix and connect the reviewed CLI client to its loopback listener. Replace only the value after `--upstream` for each run. The `experience:` selector resolves both Featured and Creator Experiences through Minecraft services. For CubeCraft, satisfy the maintainer risk gate in [`server-targets.md`](server-targets.md) before connecting. Do not add bypass, mutation, replay, or anti-cheat evasion behavior to the release command.
 
 ```powershell
 .\bin\bedrock-debug-proxy.exe `
@@ -75,6 +75,8 @@ Use this command with the selector shown in the matrix and connect the reviewed 
     --follow-transfers `
     --decrypt-resource-packs
 ```
+
+Before or alongside the public matrix, the agent may use the Golem CLI against a disposable local development server to exercise plugin commands, forms, inventories, movement, events, and other server-side behavior. Keep the Golem journal separate from proxy captures. Golem simulation results are supplemental development evidence, not public-server release reports.
 
 For every server, confirm all of the following before recording `pass`.
 
