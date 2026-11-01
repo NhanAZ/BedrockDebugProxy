@@ -378,7 +378,7 @@ func (r *Runner) Run(ctx context.Context) error {
 				// A Transfer packet carries a direct RakNet host and port. The
 				// initial Experience route may use NetherNet signaling, but that
 				// transport must not be reused for a transferred child endpoint.
-				if state.transferLocalAddr != nil || state.transferClientGUID != 0 {
+				if state.hop > 1 || state.transferLocalAddr != nil || state.transferClientGUID != 0 {
 					raknetTransport := minecraft.NewRakNet(state.upstreamLogger)
 					raknetTransport.LocalAddr = state.transferLocalAddr
 					raknetTransport.ClientGUID = state.transferClientGUID
@@ -878,8 +878,12 @@ func (r *Runner) probeTransferRoute(ctx context.Context, target string, localAdd
 	probeCtx, cancel := context.WithTimeout(ctx, transferRouteProbeTimeout)
 	defer cancel()
 	transport := minecraft.NewRakNet(logger)
-	transport.LocalAddr = localAddr
-	transport.ClientGUID = clientGUID
+	if localAddr != nil {
+		transport.LocalAddr = localAddr
+	}
+	if clientGUID != 0 {
+		transport.ClientGUID = clientGUID
+	}
 	network := bedrock.Network{
 		Transport:      transport,
 		Recorder:       r.config.Recorder,
@@ -895,9 +899,13 @@ func (r *Runner) probeTransferRoute(ctx context.Context, target string, localAdd
 
 func (r *Runner) probeTransferRouteNetwork(ctx context.Context, target string, localAddr *net.UDPAddr, clientGUID int64, hop int, network bedrock.Network, live *liveReporter) error {
 	_, err := network.PingContext(ctx, target)
+	localAddress := ""
+	if localAddr != nil {
+		localAddress = localAddr.String()
+	}
 	fields := map[string]any{
 		"address":               target,
-		"local_address":         localAddr.String(),
+		"local_address":         localAddress,
 		"timeout":               transferRouteProbeTimeout.String(),
 		"client_guid_preserved": clientGUID != 0,
 	}
