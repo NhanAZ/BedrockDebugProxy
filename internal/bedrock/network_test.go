@@ -411,6 +411,45 @@ func TestObservedConnReportsTransferredBytesWhenCaptureFails(t *testing.T) {
 	}
 }
 
+func TestObservedConnMarksClosedTransportWriteAsBestEffort(t *testing.T) {
+	root := filepath.Join(t.TempDir(), "capture")
+	recorder, err := capture.New(root, capture.Options{})
+	if err != nil {
+		t.Fatal(err)
+	}
+	conn := &observedConn{Conn: &fakePacketConn{closed: true}, network: Network{
+		Recorder:       recorder,
+		Failures:       &FailureSink{},
+		WriteDirection: capture.DirectionClientToServer,
+	}}
+	if _, err := conn.Write([]byte{1, 2, 3}); !errors.Is(err, net.ErrClosed) {
+		t.Fatalf("Write() error = %v, want net.ErrClosed", err)
+	}
+	if err := recorder.Close("closed", nil); err != nil {
+		t.Fatal(err)
+	}
+
+	var event capture.Event
+	if err := capture.ScanEvents(root, func(candidate capture.Event) error {
+		if candidate.Kind == "transport.payload" {
+			event = candidate
+		}
+		return nil
+	}); err != nil {
+		t.Fatal(err)
+	}
+	if event.Severity != capture.SeverityWarn || event.Error == nil {
+		t.Fatalf("closed transport event = %#v", event)
+	}
+	var metadata map[string]any
+	if err := json.Unmarshal(event.Data, &metadata); err != nil {
+		t.Fatal(err)
+	}
+	if metadata["best_effort"] != true {
+		t.Fatalf("closed transport metadata = %#v", metadata)
+	}
+}
+
 func TestObservedConnPreservesTransportErrorWhenCaptureFails(t *testing.T) {
 	recorder, err := capture.New(filepath.Join(t.TempDir(), "capture"), capture.Options{})
 	if err != nil {

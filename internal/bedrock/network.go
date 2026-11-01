@@ -386,6 +386,14 @@ func (c *observedConn) recordPayload(operation string, payload []byte, attempted
 		"attempted_bytes":   attempted,
 		"transferred_bytes": transferred,
 	}
+	// A concurrent peer-loop shutdown can make the transport report
+	// net.ErrClosed after the payload was already handed to the other loop.
+	// Preserve that evidence, but mark it as expected teardown so a clean
+	// diagnostic session is not rejected for a close-side race.
+	expectedShutdown := operationErr != nil && errors.Is(operationErr, net.ErrClosed)
+	if expectedShutdown {
+		dataMap["best_effort"] = true
+	}
 	if c.network.PayloadMetadataFunc != nil {
 		for key, value := range c.network.PayloadMetadataFunc() {
 			dataMap[key] = value
@@ -407,6 +415,9 @@ func (c *observedConn) recordPayload(operation string, payload []byte, attempted
 	}
 	if operationErr != nil {
 		event.Severity = capture.SeverityError
+		if expectedShutdown {
+			event.Severity = capture.SeverityWarn
+		}
 		event.Error = captureError(operation, operationErr)
 	}
 	var raw []byte

@@ -375,7 +375,10 @@ func (r *Runner) Run(ctx context.Context) error {
 				}
 				state.upstreamLogger = slog.New(bedrock.NewCaptureLogHandler(r.config.Recorder, failures, sessionID, state.upstreamID, "upstream", live.LibraryLog))
 				transport := r.config.UpstreamNetwork
-				if transport == nil && (state.transferLocalAddr != nil || state.transferClientGUID != 0) {
+				// A Transfer packet carries a direct RakNet host and port. The
+				// initial Experience route may use NetherNet signaling, but that
+				// transport must not be reused for a transferred child endpoint.
+				if state.transferLocalAddr != nil || state.transferClientGUID != 0 {
 					raknetTransport := minecraft.NewRakNet(state.upstreamLogger)
 					raknetTransport.LocalAddr = state.transferLocalAddr
 					raknetTransport.ClientGUID = state.transferClientGUID
@@ -583,7 +586,9 @@ func (r *Runner) Run(ctx context.Context) error {
 			if state.hop >= maxFollowedHops {
 				return fmt.Errorf("transfer hop limit %d reached at %s", maxFollowedHops, followed.target)
 			}
-			if followed.localAddr != nil && r.config.UpstreamNetwork == nil {
+			// Transfer targets are direct RakNet endpoints even when the first
+			// Experience hop was reached through a NetherNet network.
+			if followed.localAddr != nil {
 				if err := r.probeTransferRoute(runCtx, followed.target, followed.localAddr, followed.clientGUID, state.hop+1, state.upstreamLogger, failures, live); err != nil {
 					live.Info("Transfer route probe failed - %s", err)
 				}

@@ -262,12 +262,12 @@ func Analyze(root string) (Summary, error) {
 		if event.Error != nil || event.Severity == capture.SeverityError {
 			summary.Session.ErrorEvents++
 			bestEffort := false
-			if event.Kind == "transport.ping" && len(event.Data) != 0 {
-				var ping struct {
+			if len(event.Data) != 0 {
+				var metadata struct {
 					BestEffort bool `json:"best_effort"`
 				}
-				if err := json.Unmarshal(event.Data, &ping); err == nil {
-					bestEffort = ping.BestEffort
+				if err := json.Unmarshal(event.Data, &metadata); err == nil {
+					bestEffort = metadata.BestEffort
 				}
 			}
 			key := errorKey{kind: event.Kind, bestEffort: bestEffort}
