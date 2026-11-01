@@ -6,7 +6,13 @@ Detailed rationale remains in [`docs/audits/`](docs/audits/).
 
 ## [Unreleased]
 
+No unreleased changes.
+
+## [0.5.0] - 2026-11-02
+
 Supported Bedrock version: 1.26.61 (protocol 2225).
+
+[Published release](https://github.com/NhanAZ/BedrockDebugProxy/releases/tag/v0.5.0) | [All changes since v0.4.2](https://github.com/NhanAZ/BedrockDebugProxy/compare/v0.4.2...v0.5.0)
 
 ### Changed
 
