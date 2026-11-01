@@ -119,14 +119,18 @@ try {
                     $checks["post_spawn_stability"] -eq "pass"
                 $sessionGate = ($retailSession -xor $cliSession) -and -not ($checks.Values -contains "fail") -and
                     -not ($checks.Values -contains "not_observed")
-                $transferGate = $server -ne "Enchanted" -or
-                    ($checks["transfer_following"] -eq "pass" -and $checks["resource_pack_transfer"] -eq "pass")
+                $conditionalTransferStates = @("pass", "not_applicable")
+                $enchantedFlowGate = $server -ne "Enchanted" -or
+                    ($checks["enchanted_form_review"] -eq "pass" -and
+                        $checks["enchanted_route_matrix"] -eq "pass" -and
+                        $conditionalTransferStates -contains $checks["transfer_following"] -and
+                        $conditionalTransferStates -contains $checks["resource_pack_transfer"])
                 $decryptionGate = $_.EncryptedResourcePackCount -ge 0 -and
                     ($_.EncryptedResourcePackCount -eq 0 -or
                         ($_.DecryptedResourcePackCount -eq $_.EncryptedResourcePackCount -and
                             $_.ResourcePackDecryptErrorCount -eq 0 -and
                             $checks["resource_pack_decryption"] -eq "pass"))
-                $_.Result -eq "pass" -and $_.Automatic -and $_.Manual -and $sessionGate -and $transferGate -and $decryptionGate
+                $_.Result -eq "pass" -and $_.Automatic -and $_.Manual -and $sessionGate -and $enchantedFlowGate -and $decryptionGate
             })
         if ($passing.Count -eq 0) {
             $state = if ($candidates.Count -eq 0) { "missing" } else { "not passing" }

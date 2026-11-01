@@ -110,8 +110,8 @@ try {
 
     $manualChecksByName = @{}
     foreach ($entry in $Check) {
-        if ($entry -notmatch '^(?<name>[a-z][a-z0-9_]*?)=(?<state>pass|fail|not_observed)$') {
-            throw "Invalid check '$entry'. Use lowercase_name=pass, lowercase_name=fail, or lowercase_name=not_observed."
+        if ($entry -notmatch '^(?<name>[a-z][a-z0-9_]*?)=(?<state>pass|fail|not_observed|not_applicable)$') {
+            throw "Invalid check '$entry'. Use lowercase_name=pass, lowercase_name=fail, lowercase_name=not_observed, or lowercase_name=not_applicable."
         }
         $name = $Matches.name
         if ($manualChecksByName.ContainsKey($name)) {
@@ -213,10 +213,18 @@ try {
         $manualChecksByName["authenticated_upstream"] -eq "pass" -and $manualChecksByName["post_spawn_stability"] -eq "pass"
     $resourcePackDecryptionPassed = $encryptedResourcePackCount -eq 0 -or
         $manualChecksByName["resource_pack_decryption"] -eq "pass"
+    $enchantedFlowPassed = $true
+    if ($Server.Trim() -eq "Enchanted") {
+        $conditionalTransferStates = @("pass", "not_applicable")
+        $enchantedFlowPassed = $manualChecksByName["enchanted_form_review"] -eq "pass" -and
+            $manualChecksByName["enchanted_route_matrix"] -eq "pass" -and
+            $conditionalTransferStates -contains $manualChecksByName["transfer_following"] -and
+            $conditionalTransferStates -contains $manualChecksByName["resource_pack_transfer"]
+    }
     $manualChecksPassed = ($retailSessionPassed -xor $cliSessionPassed) -and -not ($manualChecksByName.Values -contains "fail") -and
-        -not ($manualChecksByName.Values -contains "not_observed") -and $resourcePackDecryptionPassed
+        -not ($manualChecksByName.Values -contains "not_observed") -and $resourcePackDecryptionPassed -and $enchantedFlowPassed
     if ($Result -eq "pass" -and (-not $automaticChecksPassed -or -not $manualChecksPassed)) {
-        throw "A passing report requires all automatic evidence and review checks, required resource-pack decryption, plus either normal_session=pass or cli_session=pass with authenticated_upstream=pass and post_spawn_stability=pass."
+        throw "A passing report requires all automatic evidence and review checks, required resource-pack decryption, plus either normal_session=pass or cli_session=pass with authenticated_upstream=pass and post_spawn_stability=pass. Enchanted also requires enchanted_form_review=pass, enchanted_route_matrix=pass, and applicable transfer/resource-pack checks set to pass or not_applicable."
     }
 
     $protocol = Get-ObjectProperty $analysis "protocol"

@@ -22,7 +22,7 @@ func TestValidationReportRequiresCompleteArtifactFolders(t *testing.T) {
 		t.Fatal(err)
 	}
 	commit := strings.Repeat("a", 40)
-	for _, name := range []string{"legacy", "complete", "missing", "open", "errors", "wrong_revision", "wrong_capture", "wrong_sequence", "invalid_json", "cli_complete", "cli_missing_auth", "cli_missing_stability", "cli_packs_only", "cli_blocking_error"} {
+	for _, name := range []string{"legacy", "complete", "missing", "open", "errors", "wrong_revision", "wrong_capture", "wrong_sequence", "invalid_json", "cli_complete", "cli_missing_auth", "cli_missing_stability", "cli_packs_only", "cli_blocking_error", "enchanted_flexible_complete", "enchanted_not_applicable", "enchanted_missing_form_review", "enchanted_missing_route_matrix"} {
 		t.Run(name, func(t *testing.T) {
 			root := t.TempDir()
 			write := func(name string, value any) {
@@ -100,15 +100,30 @@ func TestValidationReportRequiresCompleteArtifactFolders(t *testing.T) {
 					checks = []string{"cli_session=pass", "authenticated_upstream=pass"}
 				}
 			}
+			server := "Synthetic test"
+			if strings.HasPrefix(name, "enchanted_") {
+				server = "Enchanted"
+				checks = []string{"cli_session=pass", "authenticated_upstream=pass", "post_spawn_stability=pass", "enchanted_form_review=pass", "enchanted_route_matrix=pass", "transfer_following=pass", "resource_pack_transfer=pass"}
+				if name == "enchanted_not_applicable" {
+					checks[len(checks)-2] = "transfer_following=not_applicable"
+					checks[len(checks)-1] = "resource_pack_transfer=not_applicable"
+				}
+				if name == "enchanted_missing_form_review" {
+					checks[3] = "enchanted_form_review=not_applicable"
+				}
+				if name == "enchanted_missing_route_matrix" {
+					checks[4] = "enchanted_route_matrix=not_applicable"
+				}
+			}
 			write("checks.json", checks)
 			wrapper := filepath.Join(root, "invoke.ps1")
-			invocation := "param([string]$ReportScript)\n& $ReportScript -Binary (Join-Path $PSScriptRoot 'synthetic-analysis.ps1') -Capture $PSScriptRoot -Server 'Synthetic test' -Result pass -Check @(Get-Content -Raw (Join-Path $PSScriptRoot 'checks.json') | ConvertFrom-Json) -Output (Join-Path $PSScriptRoot 'report.json')\n"
+			invocation := "param([string]$ReportScript)\n& $ReportScript -Binary (Join-Path $PSScriptRoot 'synthetic-analysis.ps1') -Capture $PSScriptRoot -Server '" + server + "' -Result pass -Check @(Get-Content -Raw (Join-Path $PSScriptRoot 'checks.json') | ConvertFrom-Json) -Output (Join-Path $PSScriptRoot 'report.json')\n"
 			if err := os.WriteFile(wrapper, []byte(invocation), 0o600); err != nil {
 				t.Fatal(err)
 			}
 			// #nosec G204 -- Fixed project script and synthetic t.TempDir paths, passed as separate arguments.
 			output, err := exec.CommandContext(ctx, "pwsh", "-NoProfile", "-File", wrapper, "-ReportScript", script).CombinedOutput()
-			wantPass := name == "legacy" || name == "complete" || name == "cli_complete"
+			wantPass := name == "legacy" || name == "complete" || name == "cli_complete" || name == "enchanted_flexible_complete" || name == "enchanted_not_applicable"
 			if (err == nil) != wantPass {
 				t.Fatalf("want pass=%t, error=%v\n%s", wantPass, err, output)
 			}
@@ -134,7 +149,7 @@ func TestReleaseReadinessRequiresFullSessionEvidence(t *testing.T) {
 	}
 	commit := strings.Repeat("a", 40)
 	servers := []string{"The Hive", "Galaxite", "Lifeboat", "Mineville Zeqa", "Enchanted", "CubeCraft"}
-	for _, name := range []string{"cli", "retail", "cube_craft_without_risk", "encrypted_packs", "missing_decryption", "missing_auth", "missing_stability", "missing_transfer", "failed_automatic", "failed_result", "wrong_revision", "packs_only", "ambiguous_session"} {
+	for _, name := range []string{"cli", "retail", "cube_craft_without_risk", "encrypted_packs", "missing_decryption", "missing_auth", "missing_stability", "missing_transfer", "enchanted_not_applicable", "missing_enchanted_form_review", "missing_enchanted_route_matrix", "failed_automatic", "failed_result", "wrong_revision", "packs_only", "ambiguous_session"} {
 		t.Run(name, func(t *testing.T) {
 			root := t.TempDir()
 			for _, server := range servers {
@@ -143,8 +158,14 @@ func TestReleaseReadinessRequiresFullSessionEvidence(t *testing.T) {
 					checks = map[string]string{"normal_session": "pass"}
 				}
 				if server == "Enchanted" {
+					checks["enchanted_form_review"] = "pass"
+					checks["enchanted_route_matrix"] = "pass"
 					checks["transfer_following"] = "pass"
 					checks["resource_pack_transfer"] = "pass"
+					if name == "enchanted_not_applicable" {
+						checks["transfer_following"] = "not_applicable"
+						checks["resource_pack_transfer"] = "not_applicable"
+					}
 				}
 				if name == "encrypted_packs" {
 					checks["resource_pack_decryption"] = "pass"
@@ -170,6 +191,12 @@ func TestReleaseReadinessRequiresFullSessionEvidence(t *testing.T) {
 				}
 				if server == "Enchanted" && name == "missing_transfer" {
 					delete(checks, "transfer_following")
+				}
+				if server == "Enchanted" && name == "missing_enchanted_form_review" {
+					delete(checks, "enchanted_form_review")
+				}
+				if server == "Enchanted" && name == "missing_enchanted_route_matrix" {
+					delete(checks, "enchanted_route_matrix")
 				}
 				var review []map[string]string
 				for key, value := range checks {
@@ -197,7 +224,7 @@ func TestReleaseReadinessRequiresFullSessionEvidence(t *testing.T) {
 			args := []string{"-NoProfile", "-File", script, "-Revision", commit, "-Reports", root}
 			// #nosec G204 -- Fixed project script and synthetic t.TempDir paths, passed as separate arguments.
 			output, err := exec.CommandContext(ctx, "pwsh", args...).CombinedOutput()
-			wantPass := name == "cli" || name == "retail" || name == "cube_craft_without_risk" || name == "encrypted_packs"
+			wantPass := name == "cli" || name == "retail" || name == "cube_craft_without_risk" || name == "encrypted_packs" || name == "enchanted_not_applicable"
 			if (err == nil) != wantPass {
 				t.Fatalf("want pass=%t, error=%v\n%s", wantPass, err, output)
 			}

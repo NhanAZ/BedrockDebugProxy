@@ -17,6 +17,8 @@ Supported Bedrock version: 1.26.61 (protocol 2225).
 - Release validation now always enables resource-pack decryption, requires every encrypted offered pack to produce a decrypted archive without errors, and no longer adds a separate repeated CubeCraft risk-acknowledgement gate.
 - Release stewardship now requires the agent to read the private maintainer handoff after publishing, synchronize the recovery mirror, and remove local captures and derived decrypted pack artifacts afterward.
 - Protocol updates now include a paired protocol-baseline and compatibility update in the private BedrockPackArchive repository before the update is complete.
+- Clarified that `Rob a Mob` is a separate Featured Experience rather than an Enchanted child, and removed the stale `Steal a Mob` child-flow assumption from the validation catalog.
+- Reworked Enchanted release validation to inventory the live Hub form, test actionable child routes from fresh Hub sessions, follow only observed transfers and nested forms, and classify direct or unavailable outcomes without forcing a fixed hop workflow.
 
 ### Fixed
 

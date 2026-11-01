@@ -27,7 +27,13 @@ These six targets are the required release matrix. Use the exact selector with t
 
 For release validation, follow [`validation.md`](validation.md) and [`releasing.md`](releasing.md). Use a concrete loopback address for the agent-controlled protocol client when testing `--follow-transfers`; a retail client is not required. Use Golem CLI only for disposable local server/plugin scenarios, not as a public-server network client. Do not place raw addresses, credentials, or captures in sanitized reports.
 
-Enchanted has a required release flow beyond hub connectivity. The server sends its form automatically when the player joins. Select a known pack-bearing child, such as OP SMP, in that form and observe the resulting `Transfer` and next-hop resource-pack exchange before recording a passing report. A hub-only session is not sufficient.
+Enchanted has a context-aware release flow beyond hub connectivity. The server sends a form automatically when the player joins, and that form is the authority for the current child list and status. Inventory the entries without assuming a fixed order or fixed names. Classify each entry as an available child, a maintenance or unavailable item, a navigation item, or an informational/status item.
+
+For every actionable top-level child, start from a fresh Hub session, select the current form entry, and classify the result. If the server sends `Transfer`, follow the transfer through the next hop, complete every offered pack exchange, reach spawn, and retain at least 30 seconds of bidirectional traffic. If the server sends another form, treat it as a nested menu and select one currently available child from that form; repeat the same classification if another form appears. If the server sends no `Transfer`, inspect whether the selection produced a direct spawn, a status or maintenance response, a navigation action, or an unchanged Hub session. Do not mark the route failed merely because it has no hop 2.
+
+Return to the Hub before testing the next top-level child. The Enchanted pass decision requires a reviewed form inventory, an outcome for every actionable entry, at least one playable route that reaches spawn and the stability interval, and no unexplained failure. Transfer and child-pack checks apply only when the observed route actually uses those flows. A route explicitly classified as direct or unavailable is recorded as `not_applicable` for those conditional checks, not as an artificial transfer failure.
+
+The Enchanted child menu is dynamic. `Steal a Mob` is no longer an Enchanted child; its successor, `Rob a Mob`, is a separate Featured Experience. Do not include either name as an Enchanted child-selection step. The Enchanted release flow requires at least one currently playable route, not one fixed historical child.
 
 ## Additional Experience references
 

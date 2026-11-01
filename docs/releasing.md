@@ -61,7 +61,7 @@ Include `--follow-transfers` in the release command when the server's flow can s
 | `Galaxite` | `experience:Galaxite` | Connect, complete packs, spawn, and retain normal lobby traffic |
 | `Lifeboat` | `experience:Lifeboat` | Connect, complete packs, spawn, and retain normal lobby traffic |
 | `Mineville Zeqa` | `experience:Mineville Zeqa` | Enter the Zeqa flow and observe it directly |
-| `Enchanted` | `experience:Enchanted` | Receive the server-sent form, select the known pack-bearing OP SMP child, observe `Transfer`, follow the next hop, complete its resource-pack exchange, and retain child traffic after spawn |
+| `Enchanted` | `experience:Enchanted` | Inventory the server-sent form, test each actionable top-level child from a fresh Hub session, follow observed transfers and nested forms, and retain every playable route through spawn and stability |
 | `CubeCraft` | `experience:CubeCraft` | Connect, spawn, perform normal read-only interaction, observe both traffic directions, and close cleanly |
 
 Use this command with the selector shown in the matrix and connect the reviewed CLI client to its loopback listener. Replace only the value after `--upstream` for each run. The `experience:` selector resolves both Featured and Creator Experiences through Minecraft services. CubeCraft follows the same owner-controlled, read-only path without a separate repeated risk confirmation. Its public policy boundary still applies. Do not add bypass, mutation, replay, or anti-cheat evasion behavior to the release command.
@@ -94,7 +94,7 @@ If a server cannot be tested, create an `incomplete` report. If an anomaly occur
 
 For every offered encrypted pack, the release capture must contain a successful derived decrypted archive and no decryption error. Add `resource_pack_decryption=pass` to the report checks whenever the server offers encrypted packs. A missing content key, unsupported encryption variant, or partial decryption is a release failure, not a reason to accept the encrypted archive as sufficient evidence. The original encrypted archive remains local evidence until cleanup.
 
-The Enchanted report must include `transfer_following=pass` and `resource_pack_transfer=pass`. The server sends the form automatically when the player joins. A hub-only session, or a session where no minigame is selected from that form, does not satisfy the Enchanted release gate.
+The Enchanted report must include `enchanted_form_review=pass` and `enchanted_route_matrix=pass`. The server sends the form automatically when the player joins. The agent must inventory the current entries, classify maintenance/status and navigation entries, and test each actionable top-level child from a fresh Hub session. If a child sends another form, select one available nested child; if it sends `Transfer`, follow every hop and complete every offered pack exchange before spawn and stability. Return to the Hub before the next top-level child. `transfer_following=pass` and `resource_pack_transfer=pass` apply when those flows occur; use `not_applicable` only when the reviewed route matrix proves that the current flow did not use them. A Hub-only session without form review and route outcomes does not satisfy the Enchanted release gate.
 
 The CubeCraft report uses the normal read-only path. Do not ask for a separate repeated rejection, kick, or ban confirmation and do not require `risk_acknowledged` in the report. The readiness command still requires a complete authenticated session, successful pack decryption, spawn, stable traffic, and verified artifacts. The lack of a separate confirmation is not permission or a policy exception.
 
@@ -120,7 +120,7 @@ Review each JSON file before using it. Then run the matrix gate.
 .\tools\check-release-readiness.ps1 -Revision $revision
 ```
 
-The command must print `pass` for all six servers. This gate verifies report structure, client-mode checks, required transfer checks, encrypted-pack decryption, and revision matching. It does not replace agent review of local captures and anomalies. Retail reports use normal_session=pass instead of the three CLI session checks.
+The command must print `pass` for all six servers. This gate verifies report structure, client-mode checks, Enchanted form/route review, conditional transfer checks, encrypted-pack decryption, and revision matching. It does not replace agent review of local captures and route ledgers. Retail reports use normal_session=pass instead of the three CLI session checks.
 
 ## 5. Create the release
 
