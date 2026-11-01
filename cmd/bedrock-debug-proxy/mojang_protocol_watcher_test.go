@@ -24,13 +24,13 @@ func TestMojangProtocolWatcherReleaseMetadata(t *testing.T) {
 		name, tag, value, protocol string
 		issue                      bool
 	}{
-		{"plain", "v1.26.51", "2193", "2193", false},
-		{"italic release body", "v1.26.51", "*2193*", "2193", false},
-		{"bold", "v1.26.51", "**2193**", "2193", false},
-		{"inline code", "v1.26.51", "`2193`", "2193", false},
-		{"mismatched emphasis", "v1.26.51", "*2193**", "unknown", false},
-		{"new protocol only", "v1.26.51", "*2194*", "2194", true},
-		{"new game version", "v1.26.52", "*2193*", "2193", true},
+		{"plain", "v1.26.61", "2225", "2225", false},
+		{"italic release body", "v1.26.61", "*2225*", "2225", false},
+		{"bold", "v1.26.61", "**2225**", "2225", false},
+		{"inline code", "v1.26.61", "`2225`", "2225", false},
+		{"mismatched emphasis", "v1.26.61", "*2225**", "unknown", false},
+		{"new protocol only", "v1.26.61", "*2226*", "2226", true},
+		{"new game version", "v1.26.62", "*2225*", "2225", true},
 	} {
 		t.Run(test.name, func(t *testing.T) {
 			root := t.TempDir()
@@ -97,8 +97,8 @@ function Invoke-RestMethod {
 				t.Fatalf("issue title = %q", issue.Title)
 			}
 			for _, expected := range []string{
-				"| Game version | `1.26.51` | `" + strings.TrimPrefix(test.tag, "v") + "` |",
-				"| Network protocol | `2193` | `" + test.protocol + "` |",
+				"| Game version | `1.26.61` | `" + strings.TrimPrefix(test.tag, "v") + "` |",
+				"| Network protocol | `2225` | `" + test.protocol + "` |",
 				"| Release tag | n/a | `" + test.tag + "` |",
 				"| Release commit | n/a | `1111111111111111111111111111111111111111` |",
 				"| Published | n/a | `2026-10-05T00:00:00Z` |",

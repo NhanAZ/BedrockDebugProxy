@@ -2,18 +2,20 @@ package bedrock
 
 import (
 	"bytes"
+	"reflect"
 	"testing"
 
 	"github.com/go-gl/mathgl/mgl32"
 	"github.com/sandertv/gophertunnel/minecraft/protocol"
+	"github.com/sandertv/gophertunnel/minecraft/protocol/login"
 	"github.com/sandertv/gophertunnel/minecraft/protocol/packet"
 )
 
-func TestProtocolVersion12652(t *testing.T) {
-	if got, want := protocol.CurrentProtocol, 2193; got != want {
+func TestProtocolVersion12661(t *testing.T) {
+	if got, want := protocol.CurrentProtocol, 2225; got != want {
 		t.Fatalf("protocol ID = %d, want %d", got, want)
 	}
-	if got, want := protocol.CurrentVersion, "1.26.52"; got != want {
+	if got, want := protocol.CurrentVersion, "1.26.61"; got != want {
 		t.Fatalf("game version = %q, want %q", got, want)
 	}
 }
@@ -43,7 +45,7 @@ func TestClientCacheBlobStatusAllowsObservedHashCount(t *testing.T) {
 	}
 }
 
-func TestProtocol12651PacketRegistration(t *testing.T) {
+func TestProtocol2225PacketRegistration(t *testing.T) {
 	if got, want := packet.IDSetPlayerFurnaceOptions, 351; got != want {
 		t.Fatalf("SetPlayerFurnaceOptions packet ID = %d, want %d", got, want)
 	}
@@ -51,7 +53,8 @@ func TestProtocol12651PacketRegistration(t *testing.T) {
 		t.Fatalf("RecordStarted packet ID = %d, want %d", got, want)
 	}
 
-	clientFactory, ok := packet.NewClientPool()[packet.IDSetPlayerFurnaceOptions]
+	clientPool := packet.NewClientPool()
+	clientFactory, ok := clientPool[packet.IDSetPlayerFurnaceOptions]
 	if !ok {
 		t.Fatal("SetPlayerFurnaceOptions is not registered in the client packet pool")
 	}
@@ -78,6 +81,179 @@ func TestProtocol12651PacketRegistration(t *testing.T) {
 				t.Fatalf("server packet factory for ID %d returned %T", id, factory())
 			}
 		}
+	}
+
+	clientTypes := map[uint32]packet.Packet{
+		packet.IDServerboundStonecutterSetRecipe: &packet.ServerboundStonecutterSetRecipe{},
+		packet.IDServerboundMatchmakingCancel:    &packet.ServerboundMatchmakingCancel{},
+		packet.IDServerboundCursorItemDrag:       &packet.ServerboundCursorItemDrag{},
+		packet.IDServerboundRegisterAudioContent: &packet.ServerboundRegisterAudioContent{},
+	}
+	for id, want := range clientTypes {
+		factory, ok := clientPool[id]
+		if !ok {
+			t.Fatalf("client packet pool is missing packet ID %d", id)
+		}
+		if got := factory(); reflect.TypeOf(got) != reflect.TypeOf(want) {
+			t.Fatalf("client packet factory for ID %d returned %T, want %T", id, got, want)
+		}
+	}
+
+	serverTypes := map[uint32]packet.Packet{
+		packet.IDClientboundMatchmakingState:     &packet.ClientboundMatchmakingState{},
+		packet.IDClientboundStonecutterSetRecipe: &packet.ClientboundStonecutterSetRecipe{},
+		packet.IDSetPassengerOfBlock:             &packet.SetPassengerOfBlock{},
+		packet.IDClientboundPlayAudioContent:     &packet.ClientboundPlayAudioContent{},
+	}
+	for id, want := range serverTypes {
+		factory, ok := serverPool[id]
+		if !ok {
+			t.Fatalf("server packet pool is missing packet ID %d", id)
+		}
+		if got := factory(); reflect.TypeOf(got) != reflect.TypeOf(want) {
+			t.Fatalf("server packet factory for ID %d returned %T, want %T", id, got, want)
+		}
+	}
+}
+
+func TestProtocol2225PacketEncodings(t *testing.T) {
+	encode := func(pk packet.Packet) []byte {
+		var encoded bytes.Buffer
+		pk.Marshal(protocol.NewWriter(&encoded, 0))
+		return encoded.Bytes()
+	}
+
+	tests := []struct {
+		name string
+		pk   packet.Packet
+		want []byte
+	}{
+		{
+			name: "serverbound cursor item drag",
+			pk:   &packet.ServerboundCursorItemDrag{State: packet.CursorItemDragStop},
+			want: []byte{0x01},
+		},
+		{
+			name: "serverbound stonecutter recipe",
+			pk: &packet.ServerboundStonecutterSetRecipe{
+				ContainerID: 4,
+				RecipeIndex: -3,
+			},
+			want: []byte{0x04, 0x05},
+		},
+		{
+			name: "clientbound matchmaking state",
+			pk: &packet.ClientboundMatchmakingState{
+				State:           packet.MatchmakingStateTimedOut,
+				DestinationName: "hub",
+			},
+			want: []byte{0x07, 0x03, 'h', 'u', 'b', 0x00},
+		},
+		{
+			name: "clientbound stonecutter recipe",
+			pk: &packet.ClientboundStonecutterSetRecipe{
+				PlayerUniqueID: -2,
+				ContainerID:    4,
+				RecipeIndex:    -3,
+			},
+			want: []byte{0x03, 0x04, 0x05},
+		},
+		{
+			name: "set passenger of block",
+			pk:   &packet.SetPassengerOfBlock{PassengerUniqueID: 123},
+			want: []byte{0xf6, 0x01, 0x00},
+		},
+		{
+			name: "serverbound register audio content",
+			pk: &packet.ServerboundRegisterAudioContent{
+				Registrations: []protocol.AudioContentRegistrationEntry{{
+					AudioContentID:  "id",
+					SharedMetadata:  "a",
+					ServerContent:   "b",
+					PlaybackContent: "c",
+				}},
+			},
+			want: []byte{0x01, 0x02, 'i', 'd', 0x01, 'a', 0x01, 'b', 0x01, 'c'},
+		},
+	}
+
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			if got := encode(test.pk); !bytes.Equal(got, test.want) {
+				t.Fatalf("encoded bytes = %x, want %x", got, test.want)
+			}
+		})
+	}
+}
+
+func TestProtocol2225CorrectedPacketLayouts(t *testing.T) {
+	t.Run("camera spline instruction", func(t *testing.T) {
+		want := protocol.CameraSplineInstruction{
+			TotalTime:         1.5,
+			SplineType:        2,
+			Curve:             []mgl32.Vec3{},
+			ProgressKeyFrames: []protocol.CameraProgressOption{},
+			RotationOptions:   []protocol.CameraRotationOption{},
+			SplineIdentifier:  "spline",
+			LoadFromJson:      true,
+		}
+		var encoded bytes.Buffer
+		want.Marshal(protocol.NewWriter(&encoded, 0))
+
+		var got protocol.CameraSplineInstruction
+		got.Marshal(protocol.NewReader(bytes.NewReader(encoded.Bytes()), 0, true))
+		if !reflect.DeepEqual(got, want) {
+			t.Fatalf("decoded instruction = %#v, want %#v", got, want)
+		}
+	})
+
+	t.Run("player video capture start", func(t *testing.T) {
+		pk := &packet.PlayerVideoCapture{
+			Action:     packet.PlayerVideoCaptureActionStart,
+			FrameRate:  30,
+			FilePrefix: "frame",
+		}
+		var encoded bytes.Buffer
+		pk.Marshal(protocol.NewWriter(&encoded, 0))
+		want := []byte{0x00, 0x1e, 0x00, 0x00, 0x00, 0x05, 'f', 'r', 'a', 'm', 'e'}
+		if got := encoded.Bytes(); !bytes.Equal(got, want) {
+			t.Fatalf("encoded video capture = %x, want %x", got, want)
+		}
+	})
+
+	t.Run("structure block filtered name", func(t *testing.T) {
+		want := packet.StructureBlockUpdate{FilteredStructureName: protocol.Option("filtered")}
+		var encoded bytes.Buffer
+		want.Marshal(protocol.NewWriter(&encoded, 0))
+
+		var got packet.StructureBlockUpdate
+		got.Marshal(protocol.NewReader(bytes.NewReader(encoded.Bytes()), 0, true))
+		filtered, ok := got.FilteredStructureName.Value()
+		if !ok || filtered != "filtered" {
+			t.Fatalf("filtered structure name = %q, set = %t", filtered, ok)
+		}
+	})
+}
+
+func TestNetherNetClientDataAcceptsSinglePortURL(t *testing.T) {
+	base := login.ClientData{
+		DeviceOS:          1,
+		GameVersion:       "1.26.61",
+		LanguageCode:      "en_US",
+		SkinResourcePatch: "e30=",
+		SkinID:            "synthetic",
+	}
+	for _, address := range []string{
+		"https://example.com:443",
+		"https://example.com:443:443",
+	} {
+		t.Run(address, func(t *testing.T) {
+			data := base
+			data.ServerAddress = address
+			if err := data.Validate(); err != nil {
+				t.Fatalf("ClientData.Validate(%q) error = %v", address, err)
+			}
+		})
 	}
 }
 

@@ -16,20 +16,20 @@ The network protocol value may be plain digits or enclosed in balanced Markdown 
 
 ## Current baseline
 
-The current baseline combines the reviewed Bedrock 1.26.50 packet definitions and the stable 1.26.51 protocol schema with client metadata for the 26.52 game hotfix. The latest official stable schema remains 1.26.51, protocol 2193. There is no official 1.26.52 schema to establish an exhaustive absence of wire changes. Retain the reviewed codec and validate the selected 1.26.52 login metadata against the observed flows. See [the maintenance review](research/maintenance-2026-10-15.md).
+The current baseline uses the reviewed Bedrock 1.26.60 packet definitions and the stable 1.26.61 protocol schema with client metadata for Bedrock 1.26.61. Both stable releases use protocol 2225. Mojang reports no packet changes for 1.26.61, so the 1.26.60 codec remains the selected implementation. See [the 1.26.60 and 1.26.61 protocol review](research/protocol-1.26.60-1.26.61.md).
 
-The [stable recheck on 2026-10-19](research/stable-protocol-review-2026-10-19.md) confirmed the same released schema, game hotfix, and upstream stable tag. No protocol, dependency, or client-version change was needed.
+The [stable recheck on 2026-10-19](research/stable-protocol-review-2026-10-19.md) is retained as the previous baseline review. The 2026-11-01 review supersedes its protocol selection with the released 1.26.60/1.26.61 evidence.
 
-The protocol watcher compares the Mojang schema version and protocol rows below. It does not compare the advertised client version, so a future 1.26.52 schema is still reported even though the client metadata already uses that game version.
+The protocol watcher compares the Mojang schema version and protocol rows below. It does not compare the advertised client version, so a future 1.26.62 schema is still reported even though the client metadata already uses 1.26.61.
 
 | Component | Pinned value | Evidence |
 | --- | --- | --- |
 | Go toolchain | `go1.27.3` | `go.mod` toolchain directive and [the security review](audits/AUDIT-0239-v042-maintenance-release.md) |
-| gophertunnel | Declared as `v1.61.0`; in-tree composite includes reviewed merged `v1.62.0` 1.26.50 corrections, 1.26.52 client metadata, focused NBT and empty-pack maintenance backports, and local compatibility patches | `go.mod`, `third_party/gophertunnel/BEDROCKDEBUGPROXY_PATCH.md`, and the maintenance reviews on 2026-10-05 and 2026-10-15 |
-| gophertunnel source | `283a5a97dfe65da94bcc0b401807f6aefa9e72ee`, `481f3bd138766304a73d7a0412a47a87acec15ed`, `b8bd7357c24fcba3e32f940d1afb1d3b4e43b96d`, and merged `v1.62.0` at `7a556a07335b663744b50d38062636ad8283f314` | Stable base, reviewed feature and correction commits, and final upstream merge used to verify 1.26.50 protocol fixes |
-| Bedrock protocol | `2193` | Mojang `bedrock-protocol-docs` release `v1.26.51` and `minecraft/protocol/info.go` |
-| Mojang schema version | `1.26.51` | Latest non-prerelease `bedrock-protocol-docs` release, at `8667debe0adad27de6c692c88942c489a1193206` |
-| Bedrock game version | `1.26.52` | Official 26.52 game hotfix and `minecraft/protocol/info.go`; [scope and uncertainty](research/maintenance-2026-10-15.md) |
+| gophertunnel | Declared as `v1.61.0`; in-tree composite includes reviewed merged `v1.62.0` maintenance code, the selected 1.26.60 protocol codec, 1.26.61 client metadata, focused NBT and empty-pack backports, and local compatibility patches | `go.mod`, `third_party/gophertunnel/BEDROCKDEBUGPROXY_PATCH.md`, and [the 1.26.60/1.26.61 protocol review](research/protocol-1.26.60-1.26.61.md) |
+| gophertunnel source | `283a5a97dfe65da94bcc0b401807f6aefa9e72ee`, `481f3bd138766304a73d7a0412a47a87acec15ed`, `b8bd7357c24fcba3e32f940d1afb1d3b4e43b96d`, merged `v1.62.0` at `7a556a07335b663744b50d38062636ad8283f314`, selected 1.26.60 support at `8c30047d86617a56e1f1871e3a1d47ec4f670d99`, NetherNet login validation at `531fd12d9a67985af5fa9552e88745350da87bfb`, and packet corrections at `d4836105abdc5de0496cf62b69413a591af5f8fb` | Stable base, reviewed feature and correction commits, and focused upstream protocol revisions |
+| Bedrock protocol | `2225` | Mojang `bedrock-protocol-docs` releases `v1.26.60` and `v1.26.61`, and `minecraft/protocol/info.go` |
+| Mojang schema version | `1.26.61` | Latest non-prerelease `bedrock-protocol-docs` release, at `21e84e70fc6385d40d448ca8a2e12d959e9d185e` |
+| Bedrock game version | `1.26.61` | Official `v1.26.61` protocol release and `minecraft/protocol/info.go`; [scope and uncertainty](research/protocol-1.26.60-1.26.61.md) |
 | go-raknet | `v1.15.2-0.20260705184311-0d1fd09e2cf6`, with the reviewed upstream handshake-cache mutex and retained local patches | `go.mod` and `third_party/go-raknet/BEDROCKDEBUGPROXY_PATCH.md` |
 | go-nethernet | `v1.0.24`, with its required Pion versions | Root and replacement-module `go.mod` files and [the maintenance review](research/protocol-maintenance-2026-10-05.md) |
 | Capture schema | `bedrockdebugproxy.capture.v1` | `internal/capture/schema.go` |

@@ -6,6 +6,14 @@ Detailed rationale remains in [`docs/audits/`](docs/audits/).
 
 ## [Unreleased]
 
+Supported Bedrock version: 1.26.61 (protocol 2225).
+
+### Changed
+
+- Updated the selected Bedrock codec to protocol 2225 using the reviewed 1.26.60 packet definitions and 1.26.61 stable metadata. Added the new matchmaking, stonecutter, passenger-of-block, cursor-drag, and signed-audio packet registrations.
+- Accepted both the legacy two-port and 1.26.60 single-port NetherNet URL forms in login metadata validation.
+- Corrected 1.26.60 camera spline, player video capture, and structure block packet layouts, with focused binary and round-trip regression coverage.
+
 ## [0.4.2] - 2026-10-23
 
 Supported Bedrock version: 1.26.52 (protocol 2193).
