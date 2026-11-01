@@ -95,6 +95,10 @@ try {
             Automatic = [bool]$report.evidence.automatic_checks_passed
             Manual = [bool]$report.manual_checks_passed
             ManualChecks = @($report.manual_checks)
+            ResourcePackCount = [int]$report.evidence.resource_pack_count
+            EncryptedResourcePackCount = if ($null -ne $report.evidence.PSObject.Properties["encrypted_resource_pack_count"]) { [int]$report.evidence.encrypted_resource_pack_count } else { -1 }
+            DecryptedResourcePackCount = [int]$report.evidence.decrypted_resource_pack_count
+            ResourcePackDecryptErrorCount = [int]$report.evidence.resource_pack_decrypt_error_count
         }
     }
 
@@ -117,13 +121,12 @@ try {
                     -not ($checks.Values -contains "not_observed")
                 $transferGate = $server -ne "Enchanted" -or
                     ($checks["transfer_following"] -eq "pass" -and $checks["resource_pack_transfer"] -eq "pass")
-                $riskGate = $true
-                if ($server -eq "CubeCraft") {
-                    $riskGate = @($_.ManualChecks | Where-Object {
-                            [string]$_.name -eq "risk_acknowledged" -and [string]$_.result -eq "pass"
-                        }).Count -gt 0
-                }
-                $_.Result -eq "pass" -and $_.Automatic -and $_.Manual -and $sessionGate -and $transferGate -and $riskGate
+                $decryptionGate = $_.EncryptedResourcePackCount -ge 0 -and
+                    ($_.EncryptedResourcePackCount -eq 0 -or
+                        ($_.DecryptedResourcePackCount -eq $_.EncryptedResourcePackCount -and
+                            $_.ResourcePackDecryptErrorCount -eq 0 -and
+                            $checks["resource_pack_decryption"] -eq "pass"))
+                $_.Result -eq "pass" -and $_.Automatic -and $_.Manual -and $sessionGate -and $transferGate -and $decryptionGate
             })
         if ($passing.Count -eq 0) {
             $state = if ($candidates.Count -eq 0) { "missing" } else { "not passing" }

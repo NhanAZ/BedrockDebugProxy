@@ -24,7 +24,7 @@ The pre-reconnect route probe is a best-effort route hint. Its ping response or 
 
 The Enchanted release report has an additional mandatory flow. The server sends its form when the player joins. Select a known pack-bearing child, such as OP SMP, in that server-sent form and wait for the server to send `Transfer`. The report passes only when the proxy follows that transfer, captures the next-hop login and resource-pack exchange when offered, and reaches the minigame spawn. Connecting to the Enchanted hub without selecting a minigame is not sufficient. Record `transfer_following=pass` and `resource_pack_transfer=pass` for this flow.
 
-CubeCraft has an additional maintainer risk gate. Before connecting, the maintainer must explicitly accept the possibility of rejection, kick, or ban for the exact diagnostic session. CubeCraft's public rules prohibit Bedrock proxies, so a risk acknowledgement must not be described as permission or a policy exception. If the acknowledgement is unavailable, do not connect and record `incomplete` with the relevant `risk_acknowledged=not_observed` check. The session must use the normal read-only proxy path and must not add bypass, mutation, replay, or anti-cheat evasion behavior.
+CubeCraft remains subject to its public proxy rules and may reject, kick, or ban a diagnostic connection. The release workflow does not add a separate repeated acknowledgement gate for that risk. This does not grant server permission, change the public rules, or permit bypass, mutation, replay, or anti-cheat evasion. The session must use the normal read-only proxy path.
 
 Do not approve or merge a runtime-affecting pull request without exact-revision automated checks and applicable focused flow evidence. A packs-only report may be incomplete only because it ends before spawn; it does not waive a missing check for the changed flow. Documentation, comments, formatting, and changes proven not to affect runtime may be exempt. When impact is uncertain, require validation.
 
@@ -84,11 +84,11 @@ Generate candidate reports under the ignored `validation/local/<REVISION>/` dire
 
 Do not commit `.bdpcap`, raw captures, authentication state, resource-pack keys, or third-party assets.
 
-Add `--decrypt-resource-packs` only when the change or release test explicitly needs to validate the authorized resource-pack decryption flow. It is not part of the default connection sanity test.
+Release validation always uses `--decrypt-resource-packs`. When an offered pack is encrypted, the capture must contain one successful decrypted archive for that pack, zero decryption errors, and the report must include `resource_pack_decryption=pass`. A missing key, unsupported format, or partial decryption makes the report incomplete or failing. For routine development smoke tests, decryption remains opt-in unless the change specifically covers that path.
 
 ## Release gate
 
-Every official release requires a full authenticated session driven by an agent-controlled protocol client and a passing report tied to a validated runtime revision for each baseline server. The release process does not require a retail Minecraft client. Use Golem CLI for local server/plugin validation, but do not label its simulation journal as a public-server report. See [the maintainer decision](decisions/0015-cli-release-validation.md).
+Every official release requires a full authenticated session driven by an agent-controlled protocol client and a passing report tied to a validated runtime revision for each baseline server. The release process does not require a retail Minecraft client. Use Golem CLI for local server/plugin validation, but do not label its simulation journal as a public-server report. Release sessions must decrypt every encrypted offered pack. CubeCraft has no separate repeated risk-acknowledgement gate. See [the maintainer decision](decisions/0015-cli-release-validation.md).
 
 - The Hive
 - Galaxite
@@ -99,13 +99,12 @@ Every official release requires a full authenticated session driven by an agent-
 
 For each server, check connection, authentication, resource packs when offered, spawn, both traffic directions, packet decoding, stability, and unexplained protocol or decode errors. Do not assume the six servers use the same packet order, timing, optional packets, software, or infrastructure.
 
-For CubeCraft, also require `risk_acknowledged=pass` before accepting `result=pass`. The public policy warning remains in force, and the acknowledgement does not imply that CubeCraft has granted an exception.
+For CubeCraft, use the normal read-only session and do not require `risk_acknowledged=pass`. The public policy warning remains in force and the workflow does not imply that CubeCraft has granted an exception.
 
-A baseline failure starts an investigation. Determine whether the cause is a proxy bug, protocol misunderstanding, valid server behavior, or an external outage before changing code. Do not add a server-specific workaround merely to make the release matrix green. If an external condition prevents testing, retain an `incomplete` report and keep the release not ready until the maintainer explicitly resolves the gate.
+A baseline failure starts an investigation. The agent must determine whether the cause is a proxy bug, protocol misunderstanding, valid server behavior, or an external outage, then fix an in-scope bug, run focused checks, rebuild the stamped binary, and rerun every affected report. Do not add a server-specific workaround merely to make the release matrix green. If an external condition prevents testing after safe fixes and retries, retain an `incomplete` report and ask the maintainer only when a human decision or unavailable authority is required.
 
 After generating all six reports for one runtime revision, run
-`tools/check-release-readiness.ps1 -Revision <40-character-commit>`. It checks that every required label has a
-passing report with automatic and manual gates for that exact revision. It does not replace review of the local captures by the operator or agent.
+`tools/check-release-readiness.ps1 -Revision <40-character-commit>`. It checks that every required label has a passing report with automatic and manual gates for that exact revision, including encrypted-pack decryption. It does not replace review of the local captures by the agent.
 
 ### CLI session workflow
 
@@ -135,7 +134,7 @@ Generate a new report after reviewing the closed capture. Keep older incomplete 
     -Output ".\validation\local\<REVISION>\the-hive.json"
 ```
 
-For Enchanted, also supply transfer_following=pass and resource_pack_transfer=pass after the known child reaches spawn and the stability interval. For CubeCraft, also supply risk_acknowledged=pass after the maintainer risk gate. CLI reports establish the observed protocol flow, not retail rendering, input handling, or gameplay. Release notes must identify this evidence type.
+For Enchanted, also supply transfer_following=pass and resource_pack_transfer=pass after the known child reaches spawn and the stability interval. CLI reports establish the observed protocol flow, not retail rendering, input handling, or gameplay. Release notes must identify this evidence type.
 
 ### Documentation-only release delta
 

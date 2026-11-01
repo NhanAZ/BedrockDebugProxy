@@ -14,6 +14,9 @@ Supported Bedrock version: 1.26.61 (protocol 2225).
 - Accepted both the legacy two-port and 1.26.60 single-port NetherNet URL forms in login metadata validation.
 - Corrected 1.26.60 camera spline, player video capture, and structure block packet layouts, with focused binary and round-trip regression coverage.
 - Updated the release workflow so agents use Golem CLI for applicable disposable local server/plugin checks and an agent-controlled protocol client for the public six-server matrix; opening a retail Minecraft client is not required.
+- Release validation now always enables resource-pack decryption, requires every encrypted offered pack to produce a decrypted archive without errors, and no longer adds a separate repeated CubeCraft risk-acknowledgement gate.
+- Release stewardship now requires the agent to read the private maintainer handoff after publishing, synchronize the recovery mirror, and remove local captures and derived decrypted pack artifacts afterward.
+- Protocol updates now include a paired protocol-baseline and compatibility update in the private BedrockPackArchive repository before the update is complete.
 
 ## [0.4.2] - 2026-10-23
 

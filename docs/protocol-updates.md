@@ -128,7 +128,13 @@ Run the full quality gate and add tests proportional to the changed behavior. Pr
 
 Do not update a fixture from new output without independently proving that the new bytes are correct.
 
-### 6. Validate across real server categories
+### 6. Synchronize BedrockPackArchive
+
+After BedrockDebugProxy passes its focused protocol checks, update the private [NhanAZ-Tools/BedrockPackArchive](https://github.com/NhanAZ-Tools/BedrockPackArchive) checkout before declaring the protocol update complete. Inspect both working trees first and preserve unrelated changes. Update the consumer's protocol baseline, importer compatibility checks, synthetic fixtures, and documentation for the new producer protocol. If the archive contract does not change, still add or extend a compatibility check that imports a synthetic BedrockDebugProxy fixture and records why no importer code change was needed.
+
+Run the relevant BedrockPackArchive formatting, tests, build, importer, and compatibility checks using that repository's documented commands. Keep its commit separate, cross-reference the BedrockPackArchive and BedrockDebugProxy SHAs in the BedrockDebugProxy audit record, and push the paired private change when the related BedrockDebugProxy change is published. Do not copy real captures, content keys, or decrypted third-party packs into the consumer repository.
+
+### 7. Validate across real server categories
 
 Automated tests do not replace interoperability testing. Exercise the categories relevant to the change:
 
@@ -141,13 +147,13 @@ For each target, record the server category and known software or infrastructure
 
 At minimum, verify connection, resource-pack negotiation, spawn, bidirectional packet forwarding, graceful disconnect, final capture verification, and `analyze` output. If a target fails, retain the raw capture and compare the earliest divergent packet or library error before adding a workaround.
 
-### 7. Review regressions before workarounds
+### 8. Review regressions before workarounds
 
 When a bug appears after an update, first re-check packet IDs, field order, optional fields, version gates, decode boundaries, compression negotiation, and assumptions inherited from the old version. Determine whether it affects one server category or all tested implementations.
 
 A compatibility workaround requires evidence of valid behavior that the normal path cannot represent. It must be narrow, documented, tested, and visible in capture metadata when it changes fidelity or interpretation.
 
-### 8. Commit and request human validation
+### 9. Commit and request human validation
 
 Keep the dependency bump, adapter fix, and unrelated cleanup separate when they can be reverted independently. Update the research note and baseline table in the behavior-changing commit.
 
@@ -164,6 +170,7 @@ A protocol update is complete only when:
 - focused fixtures and regression tests pass
 - dependency and source licenses remain compatible and provenance is updated
 - the compiled protocol and game version are visible in CLI and capture metadata
+- the private BedrockPackArchive protocol baseline and compatibility checks are updated and pass, with both repository commits recorded
 - required live test categories have results, or the missing validation is explicitly reported as pending
 
 If the protocol evidence is insufficient, preserve the bytes and uncertainty and stop. Do not guess in order to make the update appear complete.

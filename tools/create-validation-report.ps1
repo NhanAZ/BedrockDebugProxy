@@ -160,6 +160,7 @@ try {
     )
     $resourcePacks = @(Get-ObjectProperty $analysis "resource_packs" @())
     $packDecryptions = @(Get-ObjectProperty $analysis "resource_pack_decryptions" @())
+    $encryptedResourcePackCount = @($resourcePacks | Where-Object { [bool](Get-ObjectProperty $_ "encrypted" $false) }).Count
     $decryptedPackCount = @($packDecryptions | Where-Object { [string](Get-ObjectProperty $_ "status" "") -eq "decrypted" }).Count
     $packDecryptErrorCount = @($packDecryptions | Where-Object { [string](Get-ObjectProperty $_ "status" "") -eq "error" }).Count
     $automaticRequirements = [ordered]@{
@@ -179,6 +180,8 @@ try {
         no_structured_view_errors = [uint64](Get-ObjectProperty $session "structured_view_errors" 0) -eq 0
         no_blocking_error_events = $blockingErrorEvents -eq 0
         no_resource_pack_decrypt_errors = $packDecryptErrorCount -eq 0
+        resource_pack_decryption_complete = $encryptedResourcePackCount -eq 0 -or
+            ($decryptedPackCount -eq $encryptedResourcePackCount -and $packDecryptErrorCount -eq 0)
     }
     $captureManifest = Get-Content -LiteralPath (Join-Path $capturePath "manifest.json") -Raw | ConvertFrom-Json
     $captureOptions = Get-ObjectProperty $captureManifest "options" @{}
@@ -208,10 +211,12 @@ try {
     $retailSessionPassed = $manualChecksByName["normal_session"] -eq "pass"
     $cliSessionPassed = $manualChecksByName["cli_session"] -eq "pass" -and
         $manualChecksByName["authenticated_upstream"] -eq "pass" -and $manualChecksByName["post_spawn_stability"] -eq "pass"
+    $resourcePackDecryptionPassed = $encryptedResourcePackCount -eq 0 -or
+        $manualChecksByName["resource_pack_decryption"] -eq "pass"
     $manualChecksPassed = ($retailSessionPassed -xor $cliSessionPassed) -and -not ($manualChecksByName.Values -contains "fail") -and
-        -not ($manualChecksByName.Values -contains "not_observed")
+        -not ($manualChecksByName.Values -contains "not_observed") -and $resourcePackDecryptionPassed
     if ($Result -eq "pass" -and (-not $automaticChecksPassed -or -not $manualChecksPassed)) {
-        throw "A passing report requires all automatic evidence and review checks, plus either normal_session=pass or cli_session=pass with authenticated_upstream=pass and post_spawn_stability=pass."
+        throw "A passing report requires all automatic evidence and review checks, required resource-pack decryption, plus either normal_session=pass or cli_session=pass with authenticated_upstream=pass and post_spawn_stability=pass."
     }
 
     $protocol = Get-ObjectProperty $analysis "protocol"
@@ -253,6 +258,7 @@ try {
             blocking_error_events = $blockingErrorEvents
             error_kinds = $safeErrors
             resource_pack_count = $resourcePacks.Count
+            encrypted_resource_pack_count = $encryptedResourcePackCount
             decrypted_resource_pack_count = $decryptedPackCount
             resource_pack_decrypt_error_count = $packDecryptErrorCount
         }

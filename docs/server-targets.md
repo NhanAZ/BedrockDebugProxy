@@ -14,7 +14,7 @@ The project must not use a punished account or another account to probe The Hive
 
 ## Active pre-release validation matrix
 
-These six targets are the required release matrix. Use the exact selector with the stamped binary and record the observed endpoint in the local report rather than assuming that the reference remains current. CubeCraft is additionally subject to the maintainer risk gate below.
+These six targets are the required release matrix. Use the exact selector with the stamped binary and record the observed endpoint in the local report rather than assuming that the reference remains current. CubeCraft is included without a separate repeated policy confirmation.
 
 | Report label | Upstream selector | Endpoint reference | Category |
 | --- | --- | --- | --- |
@@ -53,13 +53,13 @@ These entries are useful for exploratory research but are not release gates.
 
 The `experience:` selector is the common Minecraft services lookup for both Featured Experiences and Creator Experiences. The category column describes the server listing, not which selector form it accepts. CubeCraft is a Featured server and its release selector is `experience:CubeCraft`; its endpoint is listed as a reference only. Provider and endpoint references in this document came from the maintainer's test catalog and must be rechecked if a service changes its routing.
 
-## CubeCraft maintainer risk gate
+## CubeCraft policy boundary
 
-CubeCraft is included as a release target only for an owner-controlled test where the maintainer explicitly accepts the risk of connecting through a proxy. Do not record, infer, or publish any private server discussion or claim that CubeCraft permits the connection. A risk acknowledgement is not a policy exception and does not change the server's published rules.
+CubeCraft is included in the owner-controlled release test without a separate repeated risk warning. Do not record, infer, or publish any private server discussion or claim that CubeCraft permits the connection. This workflow choice is not a policy exception and does not change the server's published rules.
 
 CubeCraft's published policies explicitly prohibit proxies in Minecraft Bedrock:
 
 - [CubeCraft Rules](https://help.cubecraft.net/en/article/cubecraft-rules-1403lij/) - reviewed 2026-09-22.
 - [Allowed Mods and Clients](https://www.cubecraft.net/threads/allowed-mods-and-clients.228596/) - reviewed 2026-09-22.
 
-Before a CubeCraft session, the maintainer must explicitly accept the possibility of rejection, kick, or ban. Without that acknowledgement, do not connect and record the CubeCraft report as `incomplete`; the release gate must remain blocked. The validation uses the normal read-only proxy path and adds no bypass, mutation, replay, or anti-cheat evasion behavior. This is an agent workflow requirement, not a product runtime warning.
+The release command uses the normal read-only proxy path and must not add bypass, mutation, replay, or anti-cheat evasion behavior. The connection may still be rejected, kicked, or banned under the published policy. This is an agent workflow boundary, not a product runtime warning.

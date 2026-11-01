@@ -134,7 +134,7 @@ func TestReleaseReadinessRequiresFullSessionEvidence(t *testing.T) {
 	}
 	commit := strings.Repeat("a", 40)
 	servers := []string{"The Hive", "Galaxite", "Lifeboat", "Mineville Zeqa", "Enchanted", "CubeCraft"}
-	for _, name := range []string{"cli", "retail", "missing_auth", "missing_stability", "missing_transfer", "missing_risk", "failed_automatic", "failed_result", "wrong_revision", "packs_only", "ambiguous_session"} {
+	for _, name := range []string{"cli", "retail", "cube_craft_without_risk", "encrypted_packs", "missing_decryption", "missing_auth", "missing_stability", "missing_transfer", "failed_automatic", "failed_result", "wrong_revision", "packs_only", "ambiguous_session"} {
 		t.Run(name, func(t *testing.T) {
 			root := t.TempDir()
 			for _, server := range servers {
@@ -146,8 +146,8 @@ func TestReleaseReadinessRequiresFullSessionEvidence(t *testing.T) {
 					checks["transfer_following"] = "pass"
 					checks["resource_pack_transfer"] = "pass"
 				}
-				if server == "CubeCraft" {
-					checks["risk_acknowledged"] = "pass"
+				if name == "encrypted_packs" {
+					checks["resource_pack_decryption"] = "pass"
 				}
 				revision, result, automatic := commit, "pass", true
 				if server == "The Hive" {
@@ -171,16 +171,19 @@ func TestReleaseReadinessRequiresFullSessionEvidence(t *testing.T) {
 				if server == "Enchanted" && name == "missing_transfer" {
 					delete(checks, "transfer_following")
 				}
-				if server == "CubeCraft" && name == "missing_risk" {
-					delete(checks, "risk_acknowledged")
-				}
 				var review []map[string]string
 				for key, value := range checks {
 					review = append(review, map[string]string{"name": key, "result": value})
 				}
 				// These synthetic reports deliberately retain true summary flags so
 				// missing review evidence cannot pass by trusting those flags alone.
-				report := map[string]any{"schema": "bedrockdebugproxy.validation.v1", "tested_revision": revision, "target_server": server, "result": result, "evidence": map[string]any{"automatic_checks_passed": automatic}, "manual_checks_passed": true, "manual_checks": review}
+				encryptedPacks, decryptedPacks := 0, 0
+				if name == "encrypted_packs" {
+					encryptedPacks, decryptedPacks = 1, 1
+				} else if name == "missing_decryption" {
+					encryptedPacks = 1
+				}
+				report := map[string]any{"schema": "bedrockdebugproxy.validation.v1", "tested_revision": revision, "target_server": server, "result": result, "evidence": map[string]any{"automatic_checks_passed": automatic, "resource_pack_count": encryptedPacks, "encrypted_resource_pack_count": encryptedPacks, "decrypted_resource_pack_count": decryptedPacks, "resource_pack_decrypt_error_count": 0}, "manual_checks_passed": true, "manual_checks": review}
 				data, err := json.Marshal(report)
 				if err != nil {
 					t.Fatal(err)
@@ -191,9 +194,10 @@ func TestReleaseReadinessRequiresFullSessionEvidence(t *testing.T) {
 			}
 			ctx, cancel := context.WithTimeout(t.Context(), time.Minute)
 			defer cancel()
+			args := []string{"-NoProfile", "-File", script, "-Revision", commit, "-Reports", root}
 			// #nosec G204 -- Fixed project script and synthetic t.TempDir paths, passed as separate arguments.
-			output, err := exec.CommandContext(ctx, "pwsh", "-NoProfile", "-File", script, "-Revision", commit, "-Reports", root).CombinedOutput()
-			wantPass := name == "cli" || name == "retail"
+			output, err := exec.CommandContext(ctx, "pwsh", args...).CombinedOutput()
+			wantPass := name == "cli" || name == "retail" || name == "cube_craft_without_risk" || name == "encrypted_packs"
 			if (err == nil) != wantPass {
 				t.Fatalf("want pass=%t, error=%v\n%s", wantPass, err, output)
 			}

@@ -8,11 +8,12 @@ When the maintainer says "I want to release", the AI agent should drive this doc
 
 1. The agent audits the commits since the latest release, proposes or confirms the version, checks the working tree, documentation, licenses, provenance, known limitations, CI, and unresolved review findings.
 2. The agent runs the automated quality gate and builds the exact stamped candidate.
-3. The agent runs the live six-server matrix through an authenticated protocol client using the approved cached account. The repository's Golem CLI is used for agent-driven checks on disposable PocketMine-MP or Axolotl-PM development servers; it does not connect to public Featured Experiences. A retail Minecraft client is not required for release. Ask the maintainer only for unavailable account or signing interactions, or an explicitly requested visual check.
-4. The agent inspects each closed capture, verifies its exact revision, authentication, pack exchange, spawn, post-spawn traffic, errors, and artifacts, then generates the sanitized report. The maintainer does not need to run report scripts.
+3. The agent runs the live six-server matrix through an authenticated protocol client using the approved cached account and passes `--decrypt-resource-packs` on every release session. The repository's Golem CLI is used for agent-driven checks on disposable PocketMine-MP or Axolotl-PM development servers; it does not connect to public Featured Experiences. A retail Minecraft client is not required for release. CubeCraft is included in the matrix without a separate repeated confirmation step; this does not bypass technical gates or allow packet mutation, replay, or anti-cheat evasion.
+4. The agent inspects each closed capture, verifies its exact revision, authentication, pack exchange, decryption of every encrypted offered pack, spawn, post-spawn traffic, errors, and artifacts, then generates the sanitized report. The maintainer does not need to run report scripts.
 5. After all required sessions, the agent runs the release gate, prepares the checksum and release notes, and reports any exact blocker. A candidate that adds only allowed Markdown documentation after the matrix may use the documented docs-only equivalence with the original validated runtime revision; the reports themselves must not be edited.
 6. If the maintainer explicitly requested a release, the version is settled, every gate passes, and signing or GitHub access is available, the agent creates and pushes the tag, publishes the release assets, and verifies the result. It must not publish from an incomplete or mismatched validation set.
-7. After the published release is verified, the agent synchronizes the Git-tracked source history, branches, and tags with the private recovery mirror described in section 7. The release is not reported as fully complete until this synchronization and ref check succeed.
+7. After the published release is verified, the agent reads the private maintainer handoff README at `https://github.com/NhanAZ-Assets/.github-private/blob/main/profile/README.md`, follows its applicable instructions without copying private content into this repository, synchronizes the recovery mirror, and verifies the refs.
+8. Only after the release, private handoff, and recovery synchronization succeed, the agent removes local captures and derived decrypted resource-pack artifacts. Sanitized reports and release assets remain available; raw captures and decrypted third-party content do not.
 
 The remaining sections retain the complete manual procedure so another developer can reproduce and audit what the agent performs.
 
@@ -61,9 +62,9 @@ Include `--follow-transfers` in the release command when the server's flow can s
 | `Lifeboat` | `experience:Lifeboat` | Connect, complete packs, spawn, and retain normal lobby traffic |
 | `Mineville Zeqa` | `experience:Mineville Zeqa` | Enter the Zeqa flow and observe it directly |
 | `Enchanted` | `experience:Enchanted` | Receive the server-sent form, select the known pack-bearing OP SMP child, observe `Transfer`, follow the next hop, complete its resource-pack exchange, and retain child traffic after spawn |
-| `CubeCraft` | `experience:CubeCraft` | Only after the maintainer accepts the connection risk. Connect, spawn, perform normal read-only interaction, observe both traffic directions, and close cleanly |
+| `CubeCraft` | `experience:CubeCraft` | Connect, spawn, perform normal read-only interaction, observe both traffic directions, and close cleanly |
 
-Use this command with the selector shown in the matrix and connect the reviewed CLI client to its loopback listener. Replace only the value after `--upstream` for each run. The `experience:` selector resolves both Featured and Creator Experiences through Minecraft services. For CubeCraft, satisfy the maintainer risk gate in [`server-targets.md`](server-targets.md) before connecting. Do not add bypass, mutation, replay, or anti-cheat evasion behavior to the release command.
+Use this command with the selector shown in the matrix and connect the reviewed CLI client to its loopback listener. Replace only the value after `--upstream` for each run. The `experience:` selector resolves both Featured and Creator Experiences through Minecraft services. CubeCraft follows the same owner-controlled, read-only path without a separate repeated risk confirmation. Its public policy boundary still applies. Do not add bypass, mutation, replay, or anti-cheat evasion behavior to the release command.
 
 ```powershell
 .\bin\bedrock-debug-proxy.exe `
@@ -89,11 +90,13 @@ For every server, confirm all of the following before recording `pass`.
 7. No unexplained decode, protocol, authentication, signaling, or connection error appears.
 8. Client closure lets the proxy finish its capture and artifacts, and the verifier succeeds.
 
-If a server cannot be tested, create an `incomplete` report. If an anomaly occurs, create a `fail` report and investigate. Neither result passes the release gate.
+If a server cannot be tested, create an `incomplete` report. If an anomaly occurs, create a `fail` report and investigate. Neither result passes the release gate. When a release command encounters an error, the agent owns the diagnosis and fix-forward loop: inspect the earliest divergent event, patch the smallest justified cause, run focused tests, rebuild a new stamped binary, and rerun every affected report. Ask the maintainer only when the next action requires unavailable authority, an ambiguous product decision, or a human-only interaction.
+
+For every offered encrypted pack, the release capture must contain a successful derived decrypted archive and no decryption error. Add `resource_pack_decryption=pass` to the report checks whenever the server offers encrypted packs. A missing content key, unsupported encryption variant, or partial decryption is a release failure, not a reason to accept the encrypted archive as sufficient evidence. The original encrypted archive remains local evidence until cleanup.
 
 The Enchanted report must include `transfer_following=pass` and `resource_pack_transfer=pass`. The server sends the form automatically when the player joins. A hub-only session, or a session where no minigame is selected from that form, does not satisfy the Enchanted release gate.
 
-The CubeCraft report must include `risk_acknowledged=pass`. If the maintainer does not accept the risk, use `-Result incomplete` with `-Check @("risk_acknowledged=not_observed")` and keep the release blocked. Do not describe this acknowledgement as permission or a policy exception.
+The CubeCraft report uses the normal read-only path. Do not ask for a separate repeated rejection, kick, or ban confirmation and do not require `risk_acknowledged` in the report. The readiness command still requires a complete authenticated session, successful pack decryption, spawn, stable traffic, and verified artifacts. The lack of a separate confirmation is not permission or a policy exception.
 
 ## 4. Generate one report per server
 
@@ -105,11 +108,11 @@ Use the exact capture directory printed by the matching run. The following examp
     -Capture .\captures\<THE-HIVE-SESSION> `
     -Server "The Hive" `
     -Result pass `
-    -Check @("cli_session=pass", "authenticated_upstream=pass", "post_spawn_stability=pass", "experience_resolution=pass") `
+    -Check @("cli_session=pass", "authenticated_upstream=pass", "post_spawn_stability=pass", "experience_resolution=pass", "resource_pack_decryption=pass") `
     -Output ".\validation\local\$revision\the-hive.json"
 ```
 
-Use these exact `-Server` labels for the other reports: `Galaxite`, `Lifeboat`, `Mineville Zeqa`, `Enchanted`, and `CubeCraft`. Add a focused manual check when a release specifically changes a flow. Never place raw captures, tokens, addresses, resource-pack keys, private discussions, or third-party assets in a report.
+Use these exact `-Server` labels for the other reports: `Galaxite`, `Lifeboat`, `Mineville Zeqa`, `Enchanted`, and `CubeCraft`. Add `resource_pack_decryption=pass` when encrypted packs were offered. Add a focused manual check when a release specifically changes a flow. Never place raw captures, tokens, addresses, resource-pack keys, private discussions, or third-party assets in a report.
 
 Review each JSON file before using it. Then run the matrix gate.
 
@@ -117,7 +120,7 @@ Review each JSON file before using it. Then run the matrix gate.
 .\tools\check-release-readiness.ps1 -Revision $revision
 ```
 
-The command must print `pass` for all six servers. This gate verifies report structure, client-mode checks, required transfer and risk checks, and revision matching. It does not replace operator or agent review of local captures and anomalies. Retail reports use normal_session=pass instead of the three CLI session checks.
+The command must print `pass` for all six servers. This gate verifies report structure, client-mode checks, required transfer checks, encrypted-pack decryption, and revision matching. It does not replace agent review of local captures and anomalies. Retail reports use normal_session=pass instead of the three CLI session checks.
 
 ## 5. Create the release
 
@@ -187,9 +190,36 @@ The release notes file must be reviewed and must not contain credentials, server
 4. Confirm the README quick start matches the released CLI.
 5. Record any external outage, known limitation, or pending compatibility investigation in the release notes instead of silently omitting it.
 
-A release is complete only after the published tag, binary metadata, reports, release notes, and verified recovery mirror identify the candidate revision and, when docs-only equivalence is used, the separately stated validated runtime revision.
+A release is not complete until the published tag, binary metadata, reports, release notes, private handoff, cleanup, and verified recovery mirror identify the candidate revision and, when docs-only equivalence is used, the separately stated validated runtime revision.
 
-## 7. Synchronize the source-history backup
+## 7. Read the private maintainer handoff
+
+After the GitHub release and its assets are verified, read the private maintainer instructions at [`NhanAZ-Assets/.github-private/profile/README.md`](https://github.com/NhanAZ-Assets/.github-private/blob/main/profile/README.md) using an authenticated GitHub client. Do not paste its contents into the public repository, release notes, reports, logs, or chat. Follow only the actions that apply to the released version and record a short public-safe completion note without private details.
+
+If the private repository is unavailable, the agent must not guess the next action. Ask the maintainer to restore access or provide the applicable instruction. The release remains published but post-release completion is incomplete until the handoff has been read.
+
+## 8. Clean local release artifacts
+
+After the published release, private handoff, and recovery synchronization are verified, remove local raw captures and derived decrypted resource-pack artifacts. Keep sanitized reports under `validation/local/<REVISION>/`, the release assets, Git history, and public-safe audit records. Do not remove a capture before any required private archive or release asset has been independently verified.
+
+Use explicit paths and inspect the resolved targets before deletion:
+
+```powershell
+$projectRoot = (Resolve-Path .).Path
+$captureRoot = (Resolve-Path (Join-Path $projectRoot "captures")).Path
+if ([IO.Path]::GetFullPath($captureRoot) -ne [IO.Path]::Combine($projectRoot, "captures")) {
+    throw "Refusing to clean an unexpected capture path: $captureRoot"
+}
+Remove-Item -LiteralPath $captureRoot -Recurse -Force
+
+$tempRoot = [IO.Path]::GetTempPath()
+Get-ChildItem -LiteralPath $tempRoot -File -Filter "bedrock-debug-proxy-decrypted-pack-*.mcpack" |
+    ForEach-Object { Remove-Item -LiteralPath $_.FullName -Force }
+```
+
+The second cleanup removes only stale temporary files created by the documented decryption path. If a process is still running, stop it and rerun cleanup. Never delete the entire temporary directory or the ignored `validation/local/` directory.
+
+## 9. Synchronize the source-history backup
 
 The private repository [`NhanAZ/BedrockDebugProxy-Backup`](https://github.com/NhanAZ/BedrockDebugProxy-Backup) is a recovery mirror for Git-tracked source and history. After the release has been verified, push all local branches and tags to this remote and verify that its default branch points to the candidate revision.
 

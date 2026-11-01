@@ -103,7 +103,7 @@ To capture resource packs without opening a local listener or connecting a Minec
 .\bin\bedrock-debug-proxy.exe run --upstream "<UPSTREAM>" --packs-only --web-viewer
 ```
 
-This performs a real upstream login and resource-pack exchange, then closes before requesting spawn. The server may count, log, or reject the connection. Default client metadata can produce a different pack offer from a particular PC or mobile client. The capture retains login and pack evidence plus exact archives. `--decrypt-resource-packs` remains opt-in, and captures must stay local.
+This performs a real upstream login and resource-pack exchange, then closes before requesting spawn. The server may count, log, or reject the connection. Default client metadata can produce a different pack offer from a particular PC or mobile client. The capture retains login and pack evidence plus exact archives. `--decrypt-resource-packs` remains opt-in for this development command, and captures must stay local. Official release sessions always enable it and require successful decryption of every encrypted offered pack.
 
 ## Inspecting a capture
 
@@ -131,7 +131,7 @@ These commands analyze or package an existing capture:
 .\bin\bedrock-debug-proxy.exe inspect --kind bridge.forward_timing --direction server_to_client --limit 50 C:\path\to\capture
 ```
 
-Each event's `blob.path` points to the exact retained bytes under the capture directory. Encrypted resource-pack archives are retained during a normal run, but plaintext derived archives exist only when `--decrypt-resource-packs` was selected before the session.
+Each event's `blob.path` points to the exact retained bytes under the capture directory. Encrypted resource-pack archives are retained during a normal run, but plaintext derived archives exist only when `--decrypt-resource-packs` was selected before the session. The release workflow selects this flag for every server and removes local raw and decrypted artifacts after the published release and private handoff are complete.
 
 An exported `.bdpcap` is a portable copy, not a redacted copy. It can contain all sensitive evidence present in the source capture.
 
@@ -139,7 +139,7 @@ An exported `.bdpcap` is a portable copy, not a redacted copy. It can contain al
 
 The project currently selects Bedrock 1.26.61 client metadata and protocol 2225, through the reviewed 1.26.60 gophertunnel packet definitions, the official 1.26.61 stable schema, and local featured-experience compatibility patches. Mojang reports no packet changes between 1.26.60 and 1.26.61, but this source review does not establish complete live compatibility across all servers. See [the current protocol review](docs/research/protocol-1.26.60-1.26.61.md) for evidence and validation limits. It supports one downstream client. With `--follow-transfers`, subsequent upstream hops remain in the same process and capture session. Automated tests include a full local RakNet session and focused tests for capture integrity, representative packet preservation, Experience response parsing, transport capability preservation, protocol metadata, and new packet bodies.
 
-Automated success does not prove live Minecraft compatibility. Routine runtime pull requests use the scoped validation workflow in [`docs/validation.md`](docs/validation.md); a packs-only smoke check does not prove spawn or gameplay. Official releases require the six-server full-session validation matrix, driven by an authenticated agent-controlled protocol client. The release process does not require opening a retail Minecraft client. Golem CLI is available for disposable local server/plugin scenarios, but its simulation evidence does not replace the public-server matrix. CLI sessions establish observed protocol flow without claiming retail rendering or gameplay. CubeCraft is included only when the maintainer accepts the connection risk for the exact diagnostic session. Until the current candidate completes that release process, treat it as development software rather than a production-ready proxy.
+Automated success does not prove live Minecraft compatibility. Routine runtime pull requests use the scoped validation workflow in [`docs/validation.md`](docs/validation.md); a packs-only smoke check does not prove spawn or gameplay. Official releases require the six-server full-session validation matrix, driven by an authenticated agent-controlled protocol client with resource-pack decryption enabled. The release process does not require opening a retail Minecraft client. Golem CLI is available for disposable local server/plugin scenarios, but its simulation evidence does not replace the public-server matrix. CLI sessions establish observed protocol flow without claiming retail rendering or gameplay. The release workflow includes CubeCraft without a separate repeated policy warning; it remains read-only and does not imply server permission. Until the current candidate completes that release process, treat it as development software rather than a production-ready proxy.
 
 The Enchanted featured-experience transfer investigation, including the pre-fix failure signature and revision-matched live result, is recorded in the [research note](docs/research/enchanted-transfer-handshake.md).
 
