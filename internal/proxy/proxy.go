@@ -65,6 +65,8 @@ type hopState struct {
 	// source flow, so the next RakNet dial must be able to reuse it.
 	transferLocalAddr   *net.UDPAddr
 	transferClientGUID  int64
+	transferNetwork     minecraft.Network
+	transferAddress     string
 	transferRouteProbed bool
 	// transferReady closes after the preceding socket is released and its
 	// bounded route probe finishes. A fast reconnect must wait before dialing.
@@ -386,15 +388,21 @@ func (r *Runner) Run(ctx context.Context) error {
 				}
 				state.upstreamLogger = slog.New(bedrock.NewCaptureLogHandler(r.config.Recorder, failures, sessionID, state.upstreamID, "upstream", live.LibraryLog))
 				transport := r.config.UpstreamNetwork
-				// A Transfer packet carries a direct RakNet host and port. The
-				// initial Experience route may use NetherNet signaling, but that
-				// transport must not be reused for a transferred child endpoint.
+				connectTarget := state.target
+				// A Transfer packet carries a host and port, but current Bedrock
+				// child endpoints may use HTTPS NetherNet on that same address.
+				// prepareTransferHop classifies the endpoint before reconnecting.
 				if state.hop > 1 || state.transferLocalAddr != nil || state.transferClientGUID != 0 {
-					raknetTransport := minecraft.NewRakNet(state.upstreamLogger)
-					raknetTransport.LocalAddr = state.transferLocalAddr
-					raknetTransport.ClientGUID = state.transferClientGUID
-					raknetTransport.MaxMTU = transferRakNetMaxMTU
-					transport = raknetTransport
+					if state.transferNetwork != nil {
+						transport = state.transferNetwork
+						connectTarget = state.transferAddress
+					} else {
+						raknetTransport := minecraft.NewRakNet(state.upstreamLogger)
+						raknetTransport.LocalAddr = state.transferLocalAddr
+						raknetTransport.ClientGUID = state.transferClientGUID
+						raknetTransport.MaxMTU = transferRakNetMaxMTU
+						transport = raknetTransport
+					}
 				}
 				state.upstreamNetwork = bedrock.Network{
 					Transport: transport, Recorder: r.config.Recorder, Observer: observer, Failures: failures,
@@ -409,7 +417,7 @@ func (r *Runner) Run(ctx context.Context) error {
 				if downstream := state.downstreamConn.Load(); downstream != nil {
 					enableClientCache = downstream.ClientCacheEnabled()
 				}
-				state.slot.conn, state.slot.resourcePacks, state.slot.err = r.connectUpstream(connectCtx, state.target, state.upstreamNetwork, observer, state.upstreamID, state.hop, state.upstreamLogger, live, identityData, clientData, enableClientCache, state.hop > 1 || state.transferLocalAddr != nil || state.transferClientGUID != 0, state.transferRouteProbed, true, false, func(conn *minecraft.Conn) {
+				state.slot.conn, state.slot.resourcePacks, state.slot.err = r.connectUpstream(connectCtx, connectTarget, state.upstreamNetwork, observer, state.upstreamID, state.hop, state.upstreamLogger, live, identityData, clientData, enableClientCache, state.hop > 1 || state.transferLocalAddr != nil || state.transferClientGUID != 0, state.transferRouteProbed, true, false, func(conn *minecraft.Conn) {
 					state.upstreamConn.Store(conn)
 				})
 			})
@@ -597,13 +605,8 @@ func (r *Runner) Run(ctx context.Context) error {
 			if state.hop >= maxFollowedHops {
 				return fmt.Errorf("transfer hop limit %d reached at %s", maxFollowedHops, followed.target)
 			}
-			// Transfer targets are direct RakNet endpoints even when the first
-			// Experience hop was reached through a NetherNet network.
-			if followed.localAddr != nil {
-				if err := r.probeTransferRoute(runCtx, followed.target, followed.localAddr, followed.clientGUID, state.hop+1, state.upstreamLogger, failures, live); err != nil {
-					live.Info("Transfer route probe failed - %s", err)
-				}
-				nextHop.transferRouteProbed = true
+			if err := r.prepareTransferHop(runCtx, nextHop, state.hop+1, state.upstreamLogger, failures, live); err != nil {
+				return err
 			}
 			close(nextHop.transferReady)
 			live.Info("Following transfer to %s; waiting for the client to reconnect", followed.target)

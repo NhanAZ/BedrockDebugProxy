@@ -280,6 +280,14 @@ func newHTTPSNetherNetNetwork(ctx context.Context, client *http.Client, address 
 	return authenticatedNetherNet{NetherNet: minecraft.NetherNet{Signaling: signaling}}, nil
 }
 
+// NewHTTPSNetherNetNetwork checks an HTTPS NetherNet endpoint and returns a
+// network that can attach the authenticated Minecraft identity during dial.
+// It is also used by transfer following, where a server-provided host and
+// port must be classified before the next hop is connected.
+func NewHTTPSNetherNetNetwork(ctx context.Context, client *http.Client, address string) (minecraft.Network, error) {
+	return newHTTPSNetherNetNetwork(ctx, client, address)
+}
+
 func (s *serviceSession) newTarget(selector, name, experienceID string, destination resolvedDestination, configure func(*Target)) *Target {
 	target := &Target{
 		Selector:     selector,

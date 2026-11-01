@@ -118,6 +118,37 @@ func TestTransferForProxyAddressRejectsWildcardListener(t *testing.T) {
 	}
 }
 
+func TestTransferHTTPSAddress(t *testing.T) {
+	tests := []struct {
+		name    string
+		target  string
+		want    string
+		wantErr bool
+	}{
+		{name: "hostname", target: "child.example:19132", want: "https://child.example:19132"},
+		{name: "ipv6", target: "[2001:db8::20]:19132", want: "https://[2001:db8::20]:19132"},
+		{name: "zero port", target: "child.example:0", wantErr: true},
+		{name: "missing port", target: "child.example", wantErr: true},
+	}
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			got, err := transferHTTPSAddress(test.target)
+			if test.wantErr {
+				if err == nil {
+					t.Fatalf("transferHTTPSAddress(%q) returned nil error", test.target)
+				}
+				return
+			}
+			if err != nil {
+				t.Fatalf("transferHTTPSAddress(%q): %v", test.target, err)
+			}
+			if got != test.want {
+				t.Fatalf("transferHTTPSAddress(%q) = %q, want %q", test.target, got, test.want)
+			}
+		})
+	}
+}
+
 func TestUDPAddressParsesNetherNetSourceDescription(t *testing.T) {
 	got := udpAddress(descriptiveAddr("9495845429771839570 (6904723740436760513) (udp4 host 192.168.1.9:51255 (resolved: 192.168.1.9:51255))"))
 	if got == nil || !got.IP.Equal(net.ParseIP("192.168.1.9")) || got.Port != 51255 {
