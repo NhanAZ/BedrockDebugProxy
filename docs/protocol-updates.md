@@ -31,7 +31,7 @@ The protocol watcher compares the Mojang schema version and protocol rows below.
 | Mojang schema version | `1.26.61` | Latest non-prerelease `bedrock-protocol-docs` release, at `21e84e70fc6385d40d448ca8a2e12d959e9d185e` |
 | Bedrock game version | `1.26.61` | Official `v1.26.61` protocol release and `minecraft/protocol/info.go`; [scope and uncertainty](research/protocol-1.26.60-1.26.61.md) |
 | go-raknet | `v1.15.2-0.20260705184311-0d1fd09e2cf6`, with the reviewed upstream handshake-cache mutex and retained local patches | `go.mod` and `third_party/go-raknet/BEDROCKDEBUGPROXY_PATCH.md` |
-| go-nethernet | `v1.0.24`, with its required Pion versions | Root and replacement-module `go.mod` files and [the maintenance review](research/protocol-maintenance-2026-10-05.md) |
+| go-nethernet | `v1.0.27-0.20261027203254-60826b5e5a8f`, with its required Pion versions | Root and replacement-module `go.mod` files, [the 1.26.60/1.26.61 protocol review](research/protocol-1.26.60-1.26.61.md), and the upstream The Hive candidate-prefix fix |
 | Capture schema | `bedrockdebugproxy.capture.v1` | `internal/capture/schema.go` |
 
 Run `bedrock-debug-proxy version` to report the protocol and game version compiled into a binary. Record the binary output, commit, target Minecraft version, and server software with every live capture used as update evidence.

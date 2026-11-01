@@ -18,6 +18,10 @@ Supported Bedrock version: 1.26.61 (protocol 2225).
 - Release stewardship now requires the agent to read the private maintainer handoff after publishing, synchronize the recovery mirror, and remove local captures and derived decrypted pack artifacts afterward.
 - Protocol updates now include a paired protocol-baseline and compatibility update in the private BedrockPackArchive repository before the update is complete.
 
+### Fixed
+
+- Updated go-nethernet to the upstream The Hive SDP candidate-prefix fix. The previous dependency encoded ICE candidates in SDP with a duplicated `candidate:` prefix, causing The Hive to reject the NetherNet offer with HTTP 400 before login.
+
 ## [0.4.2] - 2026-10-23
 
 Supported Bedrock version: 1.26.52 (protocol 2193).

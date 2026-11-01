@@ -14,6 +14,15 @@ Every new entry should state the symptom, root cause, implementation commits, ev
 
 ## Compatibility and bug index
 
+### FIX-0168 - Correct the NetherNet SDP candidate prefix
+
+- Symptom: The Hive rejected the authenticated HTTPS NetherNet offer with `POST /v1/join/<network-id>: 400 Bad Request`, while a retail client could still join the server.
+- Classification: an upstream NetherNet signaling interoperability defect, not a Hive endpoint or protocol-codec mismatch.
+- Root cause: go-nethernet formatted ICE candidates with the literal `candidate:` prefix even when the SDP attribute key already supplied it, producing malformed `a=candidate:candidate:...` values.
+- Implementation: update both module graphs to `v1.0.27-0.20261027203254-60826b5e5a8f`, the immutable upstream snapshot containing `60826b5e5a8f13498de588eacbbabefcc9402883`. No endpoint fallback, identity bypass, server-specific mutation, or anti-cheat behavior was added.
+- Evidence and validation: `TestNetherNetOfferDoesNotDuplicateSDPCandidatePrefix` covers the generated offer. The fixed candidate reached The Hive through `https://nethernet.playhive.com:19132`, completed 25 resource packs, spawned, retained 35 seconds of bidirectional traffic, and passed automatic capture verification. See [AUDIT-0246](audits/AUDIT-0246-nethernet-hive-sdp-prefix.md).
+- Status: focused and live candidate validation pass. A fresh exact-commit six-server matrix remains required before release publication.
+
 ### FIX-0167 - Reject cache ages that cannot be persisted
 
 - Symptom: a positive cache age such as `500ms` became unlimited after the account registry was saved.

@@ -6,7 +6,7 @@ toolchain go1.27.3
 
 require (
 	github.com/coder/websocket v1.8.15
-	github.com/df-mc/go-nethernet v1.0.24
+	github.com/df-mc/go-nethernet v1.0.27-0.20261027203254-60826b5e5a8f
 	github.com/df-mc/go-playfab/v2 v2.0.3
 	github.com/df-mc/go-xsapi/v2 v2.0.3
 	github.com/go-gl/mathgl v1.2.0
