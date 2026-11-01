@@ -124,7 +124,18 @@ func udpAddress(address net.Addr) *net.UDPAddr {
 		copy.IP = append(net.IP(nil), udp.IP...)
 		return &copy
 	}
-	udp, err := net.ResolveUDPAddr("udp", address.String())
+	addressText := address.String()
+	// NetherNet exposes a descriptive address such as
+	// "... (udp4 host 192.168.1.9:51255 (resolved: ...))" rather than a
+	// *net.UDPAddr. Recover the original UDP source so a direct Transfer hop
+	// can preserve the backend's flow affinity.
+	if marker := "udp4 host "; strings.Contains(addressText, marker) {
+		addressText = addressText[strings.Index(addressText, marker)+len(marker):]
+		if end := strings.Index(addressText, " ("); end >= 0 {
+			addressText = addressText[:end]
+		}
+	}
+	udp, err := net.ResolveUDPAddr("udp", addressText)
 	if err != nil {
 		return nil
 	}
@@ -398,7 +409,7 @@ func (r *Runner) Run(ctx context.Context) error {
 				if downstream := state.downstreamConn.Load(); downstream != nil {
 					enableClientCache = downstream.ClientCacheEnabled()
 				}
-				state.slot.conn, state.slot.resourcePacks, state.slot.err = r.connectUpstream(connectCtx, state.target, state.upstreamNetwork, observer, state.upstreamID, state.hop, state.upstreamLogger, live, identityData, clientData, enableClientCache, state.transferLocalAddr != nil, state.transferRouteProbed, true, false, func(conn *minecraft.Conn) {
+				state.slot.conn, state.slot.resourcePacks, state.slot.err = r.connectUpstream(connectCtx, state.target, state.upstreamNetwork, observer, state.upstreamID, state.hop, state.upstreamLogger, live, identityData, clientData, enableClientCache, state.hop > 1 || state.transferLocalAddr != nil || state.transferClientGUID != 0, state.transferRouteProbed, true, false, func(conn *minecraft.Conn) {
 					state.upstreamConn.Store(conn)
 				})
 			})

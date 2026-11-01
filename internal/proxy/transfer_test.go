@@ -118,6 +118,18 @@ func TestTransferForProxyAddressRejectsWildcardListener(t *testing.T) {
 	}
 }
 
+func TestUDPAddressParsesNetherNetSourceDescription(t *testing.T) {
+	got := udpAddress(descriptiveAddr("9495845429771839570 (6904723740436760513) (udp4 host 192.168.1.9:51255 (resolved: 192.168.1.9:51255))"))
+	if got == nil || !got.IP.Equal(net.ParseIP("192.168.1.9")) || got.Port != 51255 {
+		t.Fatalf("udpAddress() = %v, want 192.168.1.9:51255", got)
+	}
+}
+
+type descriptiveAddr string
+
+func (a descriptiveAddr) Network() string { return "nethernet" }
+func (a descriptiveAddr) String() string  { return string(a) }
+
 func TestTransferRakNetHandshakeMTUIsCapped(t *testing.T) {
 	if transferRakNetMaxMTU != 1200 {
 		t.Fatalf("transfer RakNet max MTU = %d, want 1200", transferRakNetMaxMTU)
