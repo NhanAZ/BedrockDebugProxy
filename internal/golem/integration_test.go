@@ -12,23 +12,30 @@ import (
 	"github.com/google/uuid"
 )
 
-// Set BDP_GOLEM_TEST_DATA only for an operator-selected disposable server.
+// Set BDP_GOLEM_TEST_DATA only for an operator-selected disposable server and
+// BDP_GOLEM_TEST_FIXTURES to a checkout of NhanAZ-Plugins/GolemAgent.
 // The fixture resets its simulated players and changes its flat test world.
 func TestDevelopmentServerIntegration(t *testing.T) {
 	directory := os.Getenv("BDP_GOLEM_TEST_DATA")
-	if directory == "" {
-		t.Skip("set BDP_GOLEM_TEST_DATA to a disposable GolemAgent data directory for server integration")
+	fixtureRoot := os.Getenv("BDP_GOLEM_TEST_FIXTURES")
+	if directory == "" || fixtureRoot == "" {
+		t.Skip("set BDP_GOLEM_TEST_DATA and BDP_GOLEM_TEST_FIXTURES for server integration")
 	}
 	root, err := os.OpenRoot(directory)
 	if err != nil {
 		t.Fatal(err)
 	}
 	defer func() { _ = root.Close() }()
+	fixtures, err := os.OpenRoot(fixtureRoot)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer func() { _ = fixtures.Close() }()
 	for _, fixture := range []struct {
 		file   string
 		checks int
 	}{{"smoke.php", 74}, {"behaviour-smoke.php", 25}} {
-		source, err := os.ReadFile(filepath.Join("..", "..", "dev", "golem-agent", "tests", fixture.file))
+		source, err := fixtures.ReadFile(filepath.Join("tests", fixture.file))
 		if err != nil {
 			t.Fatal(err)
 		}

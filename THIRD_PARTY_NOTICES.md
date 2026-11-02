@@ -16,7 +16,7 @@ The resource-pack decryption behavior was cross-checked against MIT, Apache-2.0,
 
 ## Optional Golem development runtime
 
-The optional GolemAgent companion uses `achedon12/golem` 0.7.0 at revision `18c86ea25b1d67fa9ceb6079c46ade2f8f99fc31`, copyright (c) 2026 Achedon12, under MIT. The source context in `dev/golem-agent/golem-0.7.0.patch` is adapted from `src/Runtime/Network/GolemSession.php` at that revision. The patch selects the current Axolotl resource-pack response enum while retaining the legacy API. The complete upstream notice is preserved in `dev/golem-agent/GOLEM-LICENSE.txt` and both built PHAR distributions retain their applicable licenses. The source hash lock identifies the reviewed runtime and local patch. See [the review](docs/research/golem-development-runtime.md).
+The optional GolemAgent companion uses `achedon12/golem` 0.7.0 at revision `18c86ea25b1d67fa9ceb6079c46ade2f8f99fc31`, copyright (c) 2026 Achedon12, under MIT. The source context in the standalone [NhanAZ-Plugins/GolemAgent](https://github.com/NhanAZ-Plugins/GolemAgent) repository's `golem-0.7.0.patch` is adapted from `src/Runtime/Network/GolemSession.php` at that revision. The patch selects the current Axolotl resource-pack response enum while retaining the legacy API. The complete upstream notice and source hash lock remain in that plugin repository and its built PHAR retains the applicable licenses. See [the review](docs/research/golem-development-runtime.md).
 
 FakePlayer and Specter are architectural references only. No source from them is copied into this implementation. GolemAgent itself is project code under GPL-3.0-or-later.
 

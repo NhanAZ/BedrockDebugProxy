@@ -8,17 +8,25 @@ This is an administrative development tool. Use a disposable server and world. T
 
 ## Installation
 
-Use your server's PHP binary with the required PocketMine extensions. Build the two optional plugins from a clean pinned upstream checkout. Run these commands from the BedrockDebugProxy repository in PowerShell. The output paths must not already exist.
+Use the PHP binary required by your server and install the standalone
+[GolemAgent plugin](https://github.com/NhanAZ-Plugins/GolemAgent) alongside the
+pinned Golem runtime. The plugin is maintained outside BedrockDebugProxy so
+the Go protocol client and the optional PocketMine/Axolotl companion have
+independent release lifecycles.
+
+Build the two PHAR files from clean pinned checkouts. The output paths must
+not already exist.
 
 ```powershell
 New-Item -ItemType Directory -Force .local/golem-build | Out-Null
+git clone https://github.com/NhanAZ-Plugins/GolemAgent.git .local/golem-agent
 git clone https://github.com/achedon12/golem.git .local/golem-build/runtime
 git -C .local/golem-build/runtime checkout --detach 18c86ea25b1d67fa9ceb6079c46ade2f8f99fc31
-$patch = (Resolve-Path dev/golem-agent/golem-0.7.0.patch).Path
+$patch = (Resolve-Path .local/golem-agent/golem-0.7.0.patch).Path
 git -C .local/golem-build/runtime apply --check $patch
 git -C .local/golem-build/runtime apply $patch
 php -d phar.readonly=0 .local/golem-build/runtime/.github/scripts/build-phar.php .local/golem-build/Golem.phar
-php -d phar.readonly=0 dev/golem-agent/build.php .local/golem-build/GolemAgent.phar
+php -d phar.readonly=0 .local/golem-agent/build.php .local/golem-build/GolemAgent.phar
 ```
 
 Copy both PHAR files into the disposable server's plugins directory and start it. GolemAgent verifies the runtime source against `runtime-lock.json`. A mismatch disables the companion with an error. The patch supports the current Axolotl resource-pack response enum and the legacy PocketMine constant. It affects only simulation, not network pack negotiation.
@@ -130,7 +138,8 @@ Scenarios are optional. Use [interactive control](#interactive-agent-control) to
 
 Save a scenario as `scenario.jsonl` and use `--input scenario.jsonl`. This example runs a plugin's menu command and confirms its observable reply. Adapt the command and expected text to your plugin.
 
-The repository also includes `dev/golem-agent/examples/basic.jsonl`, which uses only built-in server behavior and cleans up its two simulated players.
+The companion repository includes `examples/basic.jsonl`, which uses only
+built-in server behavior and cleans up its two simulated players.
 
 ```jsonl
 {"id":"join","op":"spawn","args":{"name":"AgentOne"}}
@@ -192,7 +201,8 @@ There is no real Xbox handshake, client rendering, pack transfer, transport capt
 
 The normal `tools/quality.ps1` gate tests the Go mailbox and CLI. When PHP is installed it also checks companion syntax, deterministic personality regressions and packaging. A PHP-less environment skips that optional companion check explicitly. The full server suite requires an isolated server and is separate from the network proxy gate.
 
-Copy `dev/golem-agent/tests/smoke.php` into the companion's scripts directory, then run:
+Copy `tests/smoke.php` from the companion repository into the companion's
+scripts directory, then run:
 
 ```powershell
 bin/bedrock-debug-proxy.exe golem --data $data --timeout 60s --request '{"op":"script","args":{"file":"smoke.php"}}'
@@ -200,14 +210,16 @@ bin/bedrock-debug-proxy.exe golem --data $data --timeout 60s --request '{"op":"s
 
 This fixture changes a small flat-world area and exercises player actions, event delivery, negative inputs, forms, inventory transactions, HUD observations and cleanup. Use it only in a disposable world. See the commit audit for the exact server revision and verified results. Real network login, public-server checks and retail gameplay are not part of this local simulation feature's evidence.
 
-For reproducible Go-to-PHP integration checks, set `BDP_GOLEM_TEST_DATA` to the absolute data directory of that disposable companion. Run these commands sequentially because both tests control the same owned players:
+For reproducible Go-to-PHP integration checks, set `BDP_GOLEM_TEST_DATA` to the absolute data directory of that disposable companion and `BDP_GOLEM_TEST_FIXTURES` to the standalone companion checkout. Run these commands sequentially because both tests control the same owned players:
 
 ```powershell
+$env:BDP_GOLEM_TEST_FIXTURES = (Resolve-Path .local/golem-agent).Path
+$env:BDP_GOLEM_TEST_DATA = (Resolve-Path C:/dev-server/plugin_data/GolemAgent).Path
 go test -count=1 -run TestDevelopmentServerIntegration -v ./internal/golem
 go test -count=1 -run TestGolemInteractiveServerControl -v ./cmd/bedrock-debug-proxy
 ```
 
-The first copies and runs both `smoke.php` and `behaviour-smoke.php`, then checks that an expired request cannot complete a later request. The second keeps stdin open, chooses movement from observed coordinates, reads state during movement, stops it, chats, closes the CLI and controls the same player through another invocation. Without the environment variable these server-dependent tests are skipped explicitly. Unset the variable after testing.
+The first copies and runs both `smoke.php` and `behaviour-smoke.php`, then checks that an expired request cannot complete a later request. The second keeps stdin open, chooses movement from observed coordinates, reads state during movement, stops it, chats, closes the CLI and controls the same player through another invocation. Without both environment variables these server-dependent tests are skipped explicitly. Unset the variables after testing.
 
 ### Development plugin validation
 
