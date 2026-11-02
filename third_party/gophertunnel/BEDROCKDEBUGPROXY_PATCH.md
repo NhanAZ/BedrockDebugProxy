@@ -30,7 +30,7 @@ The dialer exposes an opt-in `ResourcePackExchangeOnly` completion boundary for 
 
 The protocol helper includes one additional project-specific safety-bound override for `ClientCacheBlobStatus`. Its two hash lists use a 16,384-entry bound because a real Galaxite client reported 1,302 hashes in one packet, while ordinary protocol slices retain the upstream 1,024-entry bound. This is a targeted decoder compatibility change, not a global limit relaxation.
 
-The protocol packet helpers additionally use a 16,384-entry bound for `ItemRegistry` and both `CreativeContent` tables. The disposable Axolotl-PM 5.51.1 fixture sent 2,081 item-registry entries and 1,722 creative items during the Bedrock 1.26.61 startup flow. These are finite field-specific compatibility bounds. Ordinary protocol slices retain the upstream 1,024-entry limit.
+The protocol packet helpers additionally use a 16,384-entry bound for `ItemRegistry`, both `CreativeContent` tables, and the `CraftingData` recipe vectors. The disposable Axolotl-PM 5.51.1 fixture sent 2,081 item-registry entries, 1,722 creative items, and 1,425 recipes during the Bedrock 1.26.61 startup flow. These are finite field-specific compatibility bounds. Ordinary protocol slices retain the upstream 1,024-entry limit.
 
 `minecraft.Conn.CloseImmediately` flushes pending packets and propagates an optional immediate-close capability to its transport. The proxy uses this only when following a server `Transfer`, because the next hop must reuse the preceding RakNet UDP source address before the transport's acknowledgement-based close would otherwise release it. Other dial and close paths are unchanged.
 

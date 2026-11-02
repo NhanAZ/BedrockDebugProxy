@@ -9,8 +9,8 @@ Detailed rationale remains in [`docs/audits/`](docs/audits/).
 ### Fixed
 
 - Raised only the field-specific decode bounds for the large `ItemRegistry`
-  and `CreativeContent` startup tables observed from Axolotl-PM. The generic
-  protocol slice limit remains unchanged.
+  `CreativeContent`, and `CraftingData` startup tables observed from
+  Axolotl-PM. The generic protocol slice limit remains unchanged.
 - Kept generic network telemetry out of the bounded Go Golem scenario-event
   queue, rolled its diagnostic history instead of failing at the cap, packed
   validation checks as one PowerShell array argument, and changed the default

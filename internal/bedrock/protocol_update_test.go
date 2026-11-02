@@ -88,6 +88,27 @@ func TestCreativeContentAllowsCurrentServerItemCount(t *testing.T) {
 	}
 }
 
+func TestCraftingDataAllowsCurrentServerRecipeCount(t *testing.T) {
+	want := &packet.CraftingData{MultiRecipes: make([]protocol.MultiRecipe, 1425)}
+	for i := range want.MultiRecipes {
+		want.MultiRecipes[i].RecipeNetworkID = uint32(i + 1)
+	}
+
+	var encoded bytes.Buffer
+	want.Marshal(protocol.NewWriter(&encoded, 0))
+
+	got := &packet.CraftingData{}
+	got.Marshal(protocol.NewReader(bytes.NewReader(encoded.Bytes()), 0, true))
+	if len(got.MultiRecipes) != len(want.MultiRecipes) {
+		t.Fatalf("decoded crafting recipe count = %d, want %d", len(got.MultiRecipes), len(want.MultiRecipes))
+	}
+	for _, index := range []int{0, len(want.MultiRecipes) - 1} {
+		if got.MultiRecipes[index].RecipeNetworkID != want.MultiRecipes[index].RecipeNetworkID {
+			t.Fatalf("decoded crafting recipe at %d = %#v, want %#v", index, got.MultiRecipes[index], want.MultiRecipes[index])
+		}
+	}
+}
+
 func TestProtocol2225PacketRegistration(t *testing.T) {
 	if got, want := packet.IDSetPlayerFurnaceOptions, 351; got != want {
 		t.Fatalf("SetPlayerFurnaceOptions packet ID = %d, want %d", got, want)

@@ -21,8 +21,9 @@ that flow. It does not claim public-server compatibility or full gameplay.
 - The official PocketMine-MP 5.44.3 fixture rejected the Go client with
   protocol 2225 as an incompatible version.
 - Axolotl-PM accepted a valid offline username but sent an `ItemRegistry` with
-  2,081 entries and a `CreativeContent` table with 1,722 items. The generic
-  gophertunnel 1,024-entry safety bound reported decode errors.
+  2,081 entries, a `CreativeContent` table with 1,722 items, and a
+  `CraftingData` vector with 1,425 recipes. The generic gophertunnel
+  1,024-entry safety bound reported decode errors.
 - The Go Golem recorded every generic packet as a scenario notification. The
   startup burst filled the 1,024-entry notification queue before a scenario
   could consume the next actionable event.
@@ -32,8 +33,9 @@ that flow. It does not claim public-server compatibility or full gameplay.
 
 ## Implementation
 
-- Added bounded 16,384-entry readers for `ItemRegistry` and both
-  `CreativeContent` tables. The generic protocol slice bound remains 1,024.
+- Added bounded 16,384-entry readers for `ItemRegistry`, both
+  `CreativeContent` tables, and all `CraftingData` recipe vectors. The generic
+  protocol slice bound remains 1,024.
 - Kept generic packet telemetry in the bounded diagnostic history and sent
   only actionable lifecycle, text, form, transfer, and disconnect events to
   the scenario queue. History rolls at its cap instead of terminating a live
@@ -62,6 +64,6 @@ Focused tests passed for `internal/golemnet`, `internal/bedrock`, and
 Go Golem reached spawn, sent client input for the full 30-second scenario
 window, and closed cleanly after the startup-table and queue fixes. The exact
 stamped binary run, canonical capture manifest, supplemental report, and
-validation report are recorded after the clean commit and build.
+validation report are recorded after the clean follow-up commit and build.
 
 No public server was contacted and no retail Minecraft client was opened.

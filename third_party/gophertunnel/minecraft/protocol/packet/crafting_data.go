@@ -30,22 +30,33 @@ type CraftingData struct {
 	ClearRecipes bool
 }
 
+// Current Bedrock servers can expose more than the generic protocol slice
+// bound in one crafting table. Keep each recipe vector bounded while allowing
+// the observed Axolotl-PM recipe set.
+const maxCraftingDataEntries = 16 * 1024
+
 // ID ...
 func (*CraftingData) ID() uint32 {
 	return IDCraftingData
 }
 
 func (pk *CraftingData) Marshal(io protocol.IO) {
-	protocol.Slice(io, &pk.ShapedRecipes)
-	protocol.Slice(io, &pk.ShapelessRecipes)
-	protocol.Slice(io, &pk.MultiRecipes)
-	protocol.Slice(io, &pk.UserDataShapelessRecipes)
-	protocol.Slice(io, &pk.ShapelessChemistryRecipes)
-	protocol.Slice(io, &pk.ShapedChemistryRecipes)
-	protocol.Slice(io, &pk.SmithingTransformRecipes)
-	protocol.Slice(io, &pk.SmithingTrimRecipes)
-	protocol.Slice(io, &pk.PotionRecipes)
-	protocol.Slice(io, &pk.PotionContainerChangeRecipes)
-	protocol.FuncSlice(io, &pk.MaterialReducers, io.MaterialReducer)
+	marshalCraftingSlice(io, &pk.ShapedRecipes, func(recipe *protocol.ShapedRecipe) { recipe.Marshal(io) })
+	marshalCraftingSlice(io, &pk.ShapelessRecipes, func(recipe *protocol.ShapelessRecipe) { recipe.Marshal(io) })
+	marshalCraftingSlice(io, &pk.MultiRecipes, func(recipe *protocol.MultiRecipe) { recipe.Marshal(io) })
+	marshalCraftingSlice(io, &pk.UserDataShapelessRecipes, func(recipe *protocol.UserDataShapelessRecipe) { recipe.Marshal(io) })
+	marshalCraftingSlice(io, &pk.ShapelessChemistryRecipes, func(recipe *protocol.ShapelessChemistryRecipe) { recipe.Marshal(io) })
+	marshalCraftingSlice(io, &pk.ShapedChemistryRecipes, func(recipe *protocol.ShapedChemistryRecipe) { recipe.Marshal(io) })
+	marshalCraftingSlice(io, &pk.SmithingTransformRecipes, func(recipe *protocol.SmithingTransformRecipe) { recipe.Marshal(io) })
+	marshalCraftingSlice(io, &pk.SmithingTrimRecipes, func(recipe *protocol.SmithingTrimRecipe) { recipe.Marshal(io) })
+	marshalCraftingSlice(io, &pk.PotionRecipes, func(recipe *protocol.PotionRecipe) { recipe.Marshal(io) })
+	marshalCraftingSlice(io, &pk.PotionContainerChangeRecipes, func(recipe *protocol.PotionContainerChangeRecipe) { recipe.Marshal(io) })
+	marshalCraftingSlice(io, &pk.MaterialReducers, io.MaterialReducer)
 	io.Bool(&pk.ClearRecipes)
+}
+
+func marshalCraftingSlice[T any, S ~*[]T](io protocol.IO, values S, marshal func(*T)) {
+	count := uint32(len(*values))
+	io.Varuint32(&count)
+	protocol.FuncSliceOfLenWithMaxLen(io, count, values, marshal, maxCraftingDataEntries)
 }
