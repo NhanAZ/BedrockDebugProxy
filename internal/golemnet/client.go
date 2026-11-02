@@ -611,14 +611,14 @@ func udpAddress(address net.Addr) (*net.UDPAddr, bool) {
 
 func (c *Client) record(event Event) bool {
 	c.stateMu.Lock()
-	if len(c.history) >= maxHistory {
-		c.stateMu.Unlock()
-		c.fail(ErrEventBuffer)
-		return false
-	}
 	c.sequence++
 	event.Sequence = c.sequence
-	c.history = append(c.history, cloneEvent(event))
+	cloned := cloneEvent(event)
+	if len(c.history) >= maxHistory {
+		c.history = append(c.history[1:], cloned)
+	} else {
+		c.history = append(c.history, cloned)
+	}
 	if event.Packet != "" {
 		c.packetCount[event.Packet]++
 	}
@@ -635,6 +635,14 @@ func (c *Client) record(event Event) bool {
 		}
 	}
 	c.stateMu.Unlock()
+	// Generic packet telemetry is retained in history and packet counts, but it
+	// is not a scenario notification. Scenarios only need actionable events such
+	// as forms, text, transfers, disconnects, and lifecycle changes. Keeping the
+	// telemetry out of this bounded queue prevents a normal login burst from
+	// starving the event a scenario is waiting for.
+	if event.Kind == "packet" {
+		return true
+	}
 	select {
 	case c.events <- cloneEvent(event):
 		return true

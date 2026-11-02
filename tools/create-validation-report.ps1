@@ -109,15 +109,18 @@ try {
     }
 
     $manualChecksByName = @{}
-    foreach ($entry in $Check) {
-        if ($entry -notmatch '^(?<name>[a-z][a-z0-9_]*?)=(?<state>pass|fail|not_observed|not_applicable)$') {
-            throw "Invalid check '$entry'. Use lowercase_name=pass, lowercase_name=fail, lowercase_name=not_observed, or lowercase_name=not_applicable."
+	foreach ($rawEntry in $Check) {
+		foreach ($entry in ([string]$rawEntry -split ',')) {
+			$entry = $entry.Trim()
+			if ($entry -notmatch '^(?<name>[a-z][a-z0-9_]*?)=(?<state>pass|fail|not_observed|not_applicable)$') {
+				throw "Invalid check '$entry'. Use lowercase_name=pass, lowercase_name=fail, lowercase_name=not_observed, or lowercase_name=not_applicable."
+			}
+			$name = $Matches.name
+			if ($manualChecksByName.ContainsKey($name)) {
+				throw "Manual check '$name' was supplied more than once."
+			}
+			$manualChecksByName[$name] = $Matches.state
         }
-        $name = $Matches.name
-        if ($manualChecksByName.ContainsKey($name)) {
-            throw "Manual check '$name' was supplied more than once."
-        }
-        $manualChecksByName[$name] = $Matches.state
     }
     $manualChecks = @(
         foreach ($name in @($manualChecksByName.Keys | Sort-Object)) {

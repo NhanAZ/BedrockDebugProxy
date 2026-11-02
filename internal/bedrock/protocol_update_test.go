@@ -2,6 +2,7 @@ package bedrock
 
 import (
 	"bytes"
+	"fmt"
 	"reflect"
 	"testing"
 
@@ -42,6 +43,48 @@ func TestClientCacheBlobStatusAllowsObservedHashCount(t *testing.T) {
 	}
 	if len(got.HitHashes) != 1 || got.HitHashes[0] != want.HitHashes[0] {
 		t.Fatalf("decoded hit hashes = %#v, want %#v", got.HitHashes, want.HitHashes)
+	}
+}
+
+func TestItemRegistryAllowsCurrentServerEntryCount(t *testing.T) {
+	want := &packet.ItemRegistry{Items: make([]protocol.ItemEntry, 2081)}
+	for i := range want.Items {
+		want.Items[i] = protocol.ItemEntry{Name: fmt.Sprintf("test:item_%d", i), RuntimeID: int16(i)}
+	}
+
+	var encoded bytes.Buffer
+	want.Marshal(protocol.NewWriter(&encoded, 0))
+
+	got := &packet.ItemRegistry{}
+	got.Marshal(protocol.NewReader(bytes.NewReader(encoded.Bytes()), 0, true))
+	if len(got.Items) != len(want.Items) {
+		t.Fatalf("decoded item count = %d, want %d", len(got.Items), len(want.Items))
+	}
+	for _, index := range []int{0, len(want.Items) - 1} {
+		if got.Items[index].Name != want.Items[index].Name || got.Items[index].RuntimeID != want.Items[index].RuntimeID || got.Items[index].ComponentBased != want.Items[index].ComponentBased || got.Items[index].Version != want.Items[index].Version {
+			t.Fatalf("decoded item at %d = %#v, want %#v", index, got.Items[index], want.Items[index])
+		}
+	}
+}
+
+func TestCreativeContentAllowsCurrentServerItemCount(t *testing.T) {
+	want := &packet.CreativeContent{Items: make([]protocol.CreativeItem, 1722)}
+	for i := range want.Items {
+		want.Items[i].CreativeItemNetworkID = uint32(i + 1)
+	}
+
+	var encoded bytes.Buffer
+	want.Marshal(protocol.NewWriter(&encoded, 0))
+
+	got := &packet.CreativeContent{}
+	got.Marshal(protocol.NewReader(bytes.NewReader(encoded.Bytes()), 0, true))
+	if len(got.Items) != len(want.Items) {
+		t.Fatalf("decoded creative item count = %d, want %d", len(got.Items), len(want.Items))
+	}
+	for _, index := range []int{0, len(want.Items) - 1} {
+		if got.Items[index].CreativeItemNetworkID != want.Items[index].CreativeItemNetworkID {
+			t.Fatalf("decoded creative item at %d = %#v, want %#v", index, got.Items[index], want.Items[index])
+		}
 	}
 }
 

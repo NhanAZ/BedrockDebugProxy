@@ -81,7 +81,7 @@ func runGolemNetwork(args []string, stdout, stderr io.Writer) int {
 	connectTimeout := flags.Duration("connect-timeout", 15*time.Minute, "deadline for login, packs, and spawn")
 	followTransfers := flags.Bool("follow-transfers", true, "follow server Transfer packets and spawn at the next hop")
 	maxHops := flags.Int("max-hops", 64, "maximum transfer hops in one session")
-	name := flags.String("name", "BDP-Golem", "offline identity name for unauthenticated direct servers")
+	name := flags.String("name", "BDPGolem", "offline identity name for unauthenticated direct servers")
 	captureRoot := flags.String("capture", "", "write a canonical capture directory for analysis and release validation")
 	decryptResourcePacks := flags.Bool("decrypt-resource-packs", false, "derive decrypted resource-pack archives in the canonical capture")
 	validationReport := flags.String("validation-report", "", "write a bedrockdebugproxy.validation.v1 report after the capture closes")
@@ -508,9 +508,7 @@ func createGolemValidationReport(ctx context.Context, captureRoot, output, serve
 		"-Server", server,
 		"-Result", result,
 	}
-	for _, check := range checks {
-		args = append(args, "-Check", check)
-	}
+	args = append(args, "-Check", strings.Join(checks, ","))
 	args = append(args, "-Output", outputPath)
 	// #nosec G204 -- the executable and script path are fixed by the repository; user values are separate validated argv entries.
 	command := exec.CommandContext(ctx, "pwsh", args...)

@@ -137,6 +137,25 @@ func TestClientCapturesFormAndSendsActions(t *testing.T) {
 	}
 }
 
+func TestClientDoesNotQueueGenericPacketTelemetry(t *testing.T) {
+	client, err := New(Config{Address: "127.0.0.1:19132"})
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	for i := 0; i < maxHistory+maxEventBuffer; i++ {
+		if !client.record(Event{Kind: "packet", Packet: "LevelChunk", Hop: 1}) {
+			t.Fatalf("record returned false at packet %d", i)
+		}
+	}
+	if got := len(client.events); got != 0 {
+		t.Fatalf("generic telemetry queue length = %d, want 0", got)
+	}
+	if got := client.Snapshot().EventCount; got != maxHistory {
+		t.Fatalf("bounded history length = %d, want %d", got, maxHistory)
+	}
+}
+
 func TestClientNotifiesNetworkObservers(t *testing.T) {
 	ctx, cancel := context.WithTimeout(t.Context(), 10*time.Second)
 	defer cancel()

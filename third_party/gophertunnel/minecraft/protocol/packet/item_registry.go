@@ -14,11 +14,20 @@ type ItemRegistry struct {
 	Items []protocol.ItemEntry
 }
 
+// Current Bedrock item registries can exceed the generic protocol slice bound
+// when a server exposes its full item table. Keep this field-specific bound
+// finite while allowing the observed Axolotl-PM registry.
+const maxItemRegistryEntries = 16 * 1024
+
 // ID ...
 func (*ItemRegistry) ID() uint32 {
 	return IDItemRegistry
 }
 
 func (pk *ItemRegistry) Marshal(io protocol.IO) {
-	protocol.Slice(io, &pk.Items)
+	count := uint32(len(pk.Items))
+	io.Varuint32(&count)
+	protocol.FuncSliceOfLenWithMaxLen(io, count, &pk.Items, func(item *protocol.ItemEntry) {
+		item.Marshal(io)
+	}, maxItemRegistryEntries)
 }

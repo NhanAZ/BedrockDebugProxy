@@ -38,12 +38,25 @@ type CreativeContent struct {
 	Items []protocol.CreativeItem
 }
 
+// Current Bedrock creative inventories can exceed the generic protocol slice
+// bound. Keep both field-specific bounds finite while allowing the observed
+// Axolotl-PM item list.
+const maxCreativeEntries = 16 * 1024
+
 // ID ...
 func (*CreativeContent) ID() uint32 {
 	return IDCreativeContent
 }
 
 func (pk *CreativeContent) Marshal(io protocol.IO) {
-	protocol.Slice(io, &pk.Groups)
-	protocol.Slice(io, &pk.Items)
+	groupCount := uint32(len(pk.Groups))
+	io.Varuint32(&groupCount)
+	protocol.FuncSliceOfLenWithMaxLen(io, groupCount, &pk.Groups, func(group *protocol.CreativeGroup) {
+		group.Marshal(io)
+	}, maxCreativeEntries)
+	itemCount := uint32(len(pk.Items))
+	io.Varuint32(&itemCount)
+	protocol.FuncSliceOfLenWithMaxLen(io, itemCount, &pk.Items, func(item *protocol.CreativeItem) {
+		item.Marshal(io)
+	}, maxCreativeEntries)
 }

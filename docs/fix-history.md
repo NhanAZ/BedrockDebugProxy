@@ -23,6 +23,14 @@ Every new entry should state the symptom, root cause, implementation commits, ev
 - Evidence and validation: `TestNetherNetOfferDoesNotDuplicateSDPCandidatePrefix` covers the generated offer. The fixed candidate reached The Hive through `https://nethernet.playhive.com:19132`, completed 25 resource packs, spawned, retained 35 seconds of bidirectional traffic, and passed automatic capture verification. See [AUDIT-0246](audits/AUDIT-0246-nethernet-hive-sdp-prefix.md).
 - Status: focused and live candidate validation pass. A fresh exact-commit six-server matrix remains required before release publication.
 
+### FIX-0169 - Keep Go Golem startup and report flows compatible with Axolotl-PM
+
+- Symptom: the disposable Axolotl-PM 5.51.1 fixture sent an `ItemRegistry` with 2,081 entries and a `CreativeContent` table with 1,722 items. The generic 1,024-entry decoder bound produced blocking decode errors. Before that boundary, the Go Golem also filled its scenario queue with ordinary packet telemetry and failed with `golem network event buffer is full`. A completed session could not generate its validation report because PowerShell received repeated `-Check` parameters.
+- Classification: new local compatibility defects exposed by the current Axolotl-PM startup flow and the first real Go Golem disposable-server run. The packet limits are field-specific integration limits, not a global protocol bound relaxation.
+- Implementation: allow up to 16,384 entries for `ItemRegistry`, `CreativeContent.Groups`, and `CreativeContent.Items`; retain generic slices at 1,024. Keep generic packet telemetry in bounded history and reserve the scenario queue for actionable events. Roll history at its cap, use a Bedrock-valid default offline name, and pass all validation checks as one comma-delimited PowerShell array argument that the report script expands.
+- Evidence and validation: focused protocol round-trip tests cover 2,081 item entries and 1,722 creative items. The Golem regression covers more than the combined history and notification limits without failure. The disposable Axolotl-PM 5.51.1 runtime reached spawn and completed a 30-second stationary-input window after the fixes; the exact stamped validation-report run and complete capture inspection are recorded in [AUDIT-0257](audits/AUDIT-0257-golem-axolotl-e2e-compatibility.md).
+- Status: implemented for the observed startup tables and local Go Golem workflow. The disposable server uses `xbox-auth=off`, so its report is supplemental and cannot replace authenticated public-server release validation.
+
 ### FIX-0167 - Reject cache ages that cannot be persisted
 
 - Symptom: a positive cache age such as `500ms` became unlimited after the account registry was saved.
