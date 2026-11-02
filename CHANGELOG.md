@@ -8,6 +8,9 @@ Detailed rationale remains in [`docs/audits/`](docs/audits/).
 
 ### Fixed
 
+- Updated the vendored gophertunnel module manifest and checksums to the
+  security-fixed `github.com/go-jose/go-jose/v4` `v4.1.6`, closing the nested
+  manifest gap left after the root dependency update.
 - Raised only the field-specific decode bounds for the large `ItemRegistry`
   `CreativeContent`, and `CraftingData` startup tables observed from
   Axolotl-PM. The generic protocol slice limit remains unchanged.
