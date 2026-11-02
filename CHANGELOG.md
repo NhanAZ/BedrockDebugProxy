@@ -12,6 +12,11 @@ Detailed rationale remains in [`docs/audits/`](docs/audits/).
   [NhanAZ-Plugins/GolemAgent](https://github.com/NhanAZ-Plugins/GolemAgent)
   repository. The existing mailbox contract remains available while the Go
   network-client Golem replacement is developed.
+- Added the first Go network-client Golem mode at `golem network`. It joins
+  direct Bedrock endpoints or resolved experiences, completes login, resource
+  packs, and spawn, inventories server forms, can submit bounded JSON form
+  responses, follows Transfer hops, and writes a private local session report.
+  This report is supplemental evidence and is not a release validation report.
 - Preserve small text-like resource-pack files when `contents.json` declares a key for bytes that are already plaintext. AES-CFB8 has no authentication, so the derived archive now avoids corrupting misdeclared README and similar text entries while continuing to decrypt entries whose source bytes are not clearly plaintext.
 
 ## [0.5.0] - 2026-11-02

@@ -18,6 +18,16 @@ func TestGolemHelpAndInvalidInput(t *testing.T) {
 			t.Errorf("help lacks %q", text)
 		}
 	}
+	out.Reset()
+	diagnostic.Reset()
+	if code := run([]string{"help", "golem-network"}, &out, &diagnostic); code != 0 {
+		t.Fatal(code)
+	}
+	for _, text := range []string{"--server", "--follow-transfers", "wait_form", "select_form", "supplemental"} {
+		if !strings.Contains(out.String(), text) {
+			t.Errorf("network Golem help lacks %q", text)
+		}
+	}
 	for _, input := range []string{"", "null", `{}`, `{"op":"reset","typo":true}`, `{"op":"reset"} {"op":"spawn"}`} {
 		out.Reset()
 		diagnostic.Reset()

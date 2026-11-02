@@ -18,6 +18,9 @@ import (
 )
 
 func runGolem(args []string, stdout, stderr io.Writer) int {
+	if len(args) > 0 && (args[0] == "network" || args[0] == "join") {
+		return runGolemNetwork(args[1:], stdout, stderr)
+	}
 	flags := flag.NewFlagSet("golem", flag.ContinueOnError)
 	flags.SetOutput(stderr)
 	directory := flags.String("data", "", "GolemAgent plugin data directory on the development server")

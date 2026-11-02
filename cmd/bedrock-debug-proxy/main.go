@@ -1001,7 +1001,8 @@ func printUsage(writer io.Writer) {
 	_, _ = fmt.Fprintln(writer)
 	_, _ = fmt.Fprintln(writer, "Proxy")
 	_, _ = fmt.Fprintln(writer, "  run --upstream HOST:PORT|experience:NAME [options]  Start the observation proxy or capture packs only")
-	_, _ = fmt.Fprintln(writer, "  golem --data DIRECTORY [--request JSON | --input FILE]  Interactively control simulated players and personalities")
+	_, _ = fmt.Fprintln(writer, "  golem --data DIRECTORY [--request JSON | --input FILE]  Control optional server-side simulated players")
+	_, _ = fmt.Fprintln(writer, "  golem network --server HOST:PORT|experience:NAME [options]  Join a Bedrock server with the Go network bot")
 	_, _ = fmt.Fprintln(writer)
 	_, _ = fmt.Fprintln(writer, "Authentication accounts")
 	_, _ = fmt.Fprintln(writer, "  login [--max-age 7d] [ACCOUNT_NAME]                 Add or reauthenticate an account")
@@ -1035,6 +1036,12 @@ func printCommandHelp(writer io.Writer, command string) bool {
 		_, _ = fmt.Fprintln(writer, "Send {\"op\":\"capabilities\"} to discover actions. The timeout applies to each request and must be positive and at most 10m.")
 		_, _ = fmt.Fprintln(writer, "Keep stdin open to choose each next request after reading a response. move returns immediately, state observes progress, and stop cancels movement. Direct actions pause autonomy. personality and autonomy configure seeded behaviour.")
 		_, _ = fmt.Fprintln(writer, "Players persist until reset or server shutdown. These are server-side simulations, not network captures or retail-client validation. See docs/golem.md for installation, actions, events, assertions, and trusted PHP scripts.")
+	case "golem network", "golem-network":
+		_, _ = fmt.Fprintln(writer, "Usage - bedrock-debug-proxy golem network --server HOST:PORT|experience:NAME [options]")
+		_, _ = fmt.Fprintln(writer, "Join a Bedrock server through the Go protocol client, complete resource packs and spawn, then execute a bounded JSON Lines scenario.")
+		_, _ = fmt.Fprintln(writer, "The network client records forms, text, transfers, packet counts, and bounded errors. --follow-transfers is enabled by default and preserves RakNet source identity when possible.")
+		_, _ = fmt.Fprintln(writer, "This report is supplemental local Golem evidence. It is not a release validation report until a verified capture and the existing validation gate are produced.")
+		_, _ = fmt.Fprintln(writer, "Scenario operations are wait_form, current_form, select_form, submit_form, chat, wait, observe, report, and quit. See docs/golem-network.md.")
 	case "run":
 		_, _ = fmt.Fprintln(writer, "Usage - bedrock-debug-proxy run --upstream HOST:PORT|experience:NAME [options]")
 		_, _ = fmt.Fprintln(writer, "Run the observation proxy or capture upstream resource packs into a canonical capture.")
