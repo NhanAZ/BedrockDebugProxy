@@ -9,18 +9,27 @@ import (
 	"flag"
 	"fmt"
 	"io"
+	"net"
 	"os"
+	"os/exec"
 	"os/signal"
 	"path/filepath"
+	"strconv"
 	"strings"
 	"syscall"
 	"time"
 
+	"github.com/NhanAZ/BedrockDebugProxy/internal/artifacts"
 	"github.com/NhanAZ/BedrockDebugProxy/internal/authcache"
+	"github.com/NhanAZ/BedrockDebugProxy/internal/buildinfo"
+	"github.com/NhanAZ/BedrockDebugProxy/internal/capture"
 	"github.com/NhanAZ/BedrockDebugProxy/internal/experience"
 	"github.com/NhanAZ/BedrockDebugProxy/internal/golemnet"
 	"github.com/google/uuid"
+	"github.com/sandertv/gophertunnel/minecraft"
+	"github.com/sandertv/gophertunnel/minecraft/protocol"
 	"github.com/sandertv/gophertunnel/minecraft/protocol/login"
+	"github.com/sandertv/gophertunnel/minecraft/protocol/packet"
 	"golang.org/x/oauth2"
 )
 
@@ -43,6 +52,22 @@ type networkScenarioResponse struct {
 	Error  string `json:"error,omitempty"`
 }
 
+type networkScenarioState struct {
+	stabilityDuration time.Duration
+}
+
+type stringListFlag []string
+
+func (value *stringListFlag) String() string { return strings.Join(*value, ",") }
+
+func (value *stringListFlag) Set(item string) error {
+	if strings.TrimSpace(item) == "" {
+		return errors.New("value must not be empty")
+	}
+	*value = append(*value, item)
+	return nil
+}
+
 func runGolemNetwork(args []string, stdout, stderr io.Writer) int {
 	flags := flag.NewFlagSet("golem network", flag.ContinueOnError)
 	flags.SetOutput(stderr)
@@ -57,6 +82,13 @@ func runGolemNetwork(args []string, stdout, stderr io.Writer) int {
 	followTransfers := flags.Bool("follow-transfers", true, "follow server Transfer packets and spawn at the next hop")
 	maxHops := flags.Int("max-hops", 64, "maximum transfer hops in one session")
 	name := flags.String("name", "BDP-Golem", "offline identity name for unauthenticated direct servers")
+	captureRoot := flags.String("capture", "", "write a canonical capture directory for analysis and release validation")
+	decryptResourcePacks := flags.Bool("decrypt-resource-packs", false, "derive decrypted resource-pack archives in the canonical capture")
+	validationReport := flags.String("validation-report", "", "write a bedrockdebugproxy.validation.v1 report after the capture closes")
+	validationResult := flags.String("validation-result", "incomplete", "validation result: pass, fail, or incomplete")
+	serverLabel := flags.String("server-label", "", "public release-report label, such as The Hive or Enchanted")
+	var validationChecks stringListFlag
+	flags.Var(&validationChecks, "validation-check", "additional release-report check in name=pass|fail|not_observed|not_applicable form")
 	flags.Usage = func() {
 		_, _ = fmt.Fprintln(stderr, "Usage - bedrock-debug-proxy golem network --server HOST:PORT|experience:NAME [options]")
 		flags.PrintDefaults()
@@ -70,6 +102,18 @@ func runGolemNetwork(args []string, stdout, stderr io.Writer) int {
 	}
 	if flags.NArg() != 0 || strings.TrimSpace(server) == "" || *requestTimeout <= 0 || *requestTimeout > 10*time.Minute || *connectTimeout <= 0 || *connectTimeout > 30*time.Minute || *maxHops < 1 || *maxHops > 64 {
 		flags.Usage()
+		return 2
+	}
+	if *validationResult != "pass" && *validationResult != "fail" && *validationResult != "incomplete" {
+		_, _ = fmt.Fprintln(stderr, "Unsupported --validation-result. Use pass, fail, or incomplete.")
+		return 2
+	}
+	if strings.TrimSpace(*validationReport) != "" && (strings.TrimSpace(*captureRoot) == "" || strings.TrimSpace(*serverLabel) == "") {
+		_, _ = fmt.Fprintln(stderr, "--validation-report requires both --capture and --server-label.")
+		return 2
+	}
+	if *decryptResourcePacks && strings.TrimSpace(*captureRoot) == "" {
+		_, _ = fmt.Fprintln(stderr, "--decrypt-resource-packs requires --capture.")
 		return 2
 	}
 	if *authMode != "device" && *authMode != "none" {
@@ -89,7 +133,6 @@ func runGolemNetwork(args []string, stdout, stderr io.Writer) int {
 		_, _ = fmt.Fprintf(stderr, "Resolve server - %v\n", err)
 		return 1
 	}
-	defer func() { _ = target.Close() }()
 	if accountName != "" {
 		_, _ = fmt.Fprintf(stderr, "Using Microsoft account %q.\n", accountName)
 	}
@@ -97,6 +140,76 @@ func runGolemNetwork(args []string, stdout, stderr io.Writer) int {
 	if *authMode == "none" {
 		identity = login.IdentityData{Identity: uuid.NewString(), DisplayName: *name}
 	}
+	var recorder *capture.Recorder
+	var evidence *golemCapture
+	var liveArtifacts *artifacts.Live
+	if strings.TrimSpace(*captureRoot) != "" {
+		capturePath, pathErr := filepath.Abs(*captureRoot)
+		if pathErr != nil {
+			_ = target.Close()
+			_, _ = fmt.Fprintf(stderr, "Resolve capture path - %v\n", pathErr)
+			return 2
+		}
+		recorder, err = capture.New(capturePath, capture.Options{
+			GeneratorName: "bedrock-debug-proxy-golem",
+			Version:       buildinfo.Version,
+			Commit:        buildinfo.Commit,
+			RawLayers:     []string{"bedrock_packet_payload"},
+			Values: map[string]string{
+				"operation_mode":         "golem_network",
+				"upstream_selector":      target.Selector,
+				"upstream_name":          target.Name,
+				"upstream_address":       target.Address,
+				"upstream_transport":     target.Transport,
+				"protocol_id":            strconv.FormatInt(int64(protocol.CurrentProtocol), 10),
+				"game_version":           protocol.CurrentVersion,
+				"decrypt_resource_packs": strconv.FormatBool(*decryptResourcePacks),
+				"automatic_artifacts":    artifacts.Schema,
+				"follow_transfers":       strconv.FormatBool(*followTransfers),
+				"direct_client":          "true",
+			},
+			Limitations: []string{
+				"This capture proves direct protocol-client behavior and does not claim retail-client rendering or full gameplay coverage",
+			},
+		})
+		if err != nil {
+			_ = target.Close()
+			_, _ = fmt.Fprintf(stderr, "Create canonical Golem capture - %v\n", err)
+			return 1
+		}
+		evidence = newGolemCapture(recorder, "golem-"+uuid.NewString(), *decryptResourcePacks)
+		if err := evidence.onStart(); err != nil {
+			_ = recorder.Close("failed", err)
+			_ = target.Close()
+			_, _ = fmt.Fprintf(stderr, "Start canonical Golem capture - %v\n", err)
+			return 1
+		}
+		liveArtifacts, err = artifacts.Start(capturePath, int32(protocol.CurrentProtocol), nil)
+		if err != nil {
+			_ = recorder.Close("failed", err)
+			_ = target.Close()
+			_, _ = fmt.Fprintf(stderr, "Start automatic capture artifacts - %v\n", err)
+			return 1
+		}
+	}
+	finishCapture := func(cause error, snapshot golemnet.Report) error {
+		if evidence == nil || recorder == nil {
+			return nil
+		}
+		evidence.onClose(cause, snapshot, snapshot.Hops)
+		status := "closed"
+		if cause != nil || evidence.error() != nil {
+			status = "failed"
+			cause = errors.Join(cause, evidence.error())
+		}
+		closeErr := recorder.Close(status, cause)
+		if liveArtifacts != nil {
+			_, artifactErr := liveArtifacts.Finish()
+			closeErr = errors.Join(closeErr, artifactErr)
+		}
+		return closeErr
+	}
+	defer func() { _ = target.Close() }()
 	client, err := golemnet.New(golemnet.Config{
 		Address:         target.Address,
 		Transport:       target.Transport,
@@ -106,15 +219,43 @@ func runGolemNetwork(args []string, stdout, stderr io.Writer) int {
 		ConnectTimeout:  *connectTimeout,
 		FollowTransfers: *followTransfers,
 		MaxHops:         *maxHops,
+		ConnectionObserver: func(conn *minecraft.Conn, hop int) {
+			if evidence != nil {
+				evidence.onConnection(conn, hop)
+			}
+		},
+		PacketObserver: func(conn *minecraft.Conn, hop int, header packet.Header, payload []byte, source, destination net.Addr) {
+			if evidence != nil {
+				evidence.onPacket(conn, hop, header, payload, source, destination)
+			}
+		},
+		ResourcePackObserver: func(observerCtx context.Context, conn *minecraft.Conn, hop int) error {
+			if evidence == nil {
+				return nil
+			}
+			return evidence.onResourcePacks(observerCtx, conn, hop)
+		},
+		SpawnObserver: func(observerCtx context.Context, conn *minecraft.Conn, hop int) error {
+			if evidence == nil {
+				return nil
+			}
+			return evidence.onSpawn(observerCtx, conn, hop)
+		},
 	})
 	if err != nil {
 		_, _ = fmt.Fprintf(stderr, "Configure network client - %v\n", err)
+		if recorder != nil {
+			_ = finishCapture(err, golemnet.Report{})
+		}
 		return 2
 	}
 	err = client.Start(ctx)
 	if err != nil {
 		_, _ = fmt.Fprintf(stderr, "Start network Golem - %v\n", err)
 		_ = client.Close()
+		if finishErr := finishCapture(err, client.Snapshot()); finishErr != nil {
+			_, _ = fmt.Fprintf(stderr, "Close canonical Golem capture - %v\n", finishErr)
+		}
 		return 1
 	}
 	defer func() { _ = client.Close() }()
@@ -125,26 +266,49 @@ func runGolemNetwork(args []string, stdout, stderr io.Writer) int {
 		Result: map[string]any{"transport": target.Transport, "name": target.Name, "authenticated": client.Snapshot().Authenticated},
 	}); err != nil {
 		_, _ = fmt.Fprintf(stderr, "Write connection response - %v\n", err)
+		_ = client.Close()
+		_ = finishCapture(err, client.Snapshot())
 		return 1
 	}
 
 	reader, closeReader, err := openScenarioInput(*input)
 	if err != nil {
 		_, _ = fmt.Fprintf(stderr, "Open scenario input - %v\n", err)
+		_ = client.Close()
+		if finishErr := finishCapture(err, client.Snapshot()); finishErr != nil {
+			_, _ = fmt.Fprintf(stderr, "Close canonical Golem capture - %v\n", finishErr)
+		}
 		return 2
 	}
 	if closeReader != nil {
 		defer func() { _ = closeReader.Close() }()
 	}
-	status := runNetworkScenario(ctx, client, reader, stdout, stderr, *requestTimeout)
+	scenarioState := &networkScenarioState{}
+	status := runNetworkScenario(ctx, client, reader, stdout, stderr, *requestTimeout, scenarioState)
 	closeErr := client.Close()
 	if status == 0 && closeErr != nil {
 		_, _ = fmt.Fprintf(stderr, "Close network Golem - %v\n", closeErr)
 		status = 1
 	}
+	if captureErr := finishCapture(closeErr, client.Snapshot()); captureErr != nil {
+		_, _ = fmt.Fprintf(stderr, "Close canonical Golem capture - %v\n", captureErr)
+		status = 1
+	}
 	if *report != "" {
 		if err := writeNetworkReport(*report, client.Snapshot()); err != nil {
 			_, _ = fmt.Fprintf(stderr, "Write network Golem report - %v\n", err)
+			status = 1
+		}
+	}
+	if strings.TrimSpace(*validationReport) != "" {
+		checks := golemValidationChecks(client.Snapshot(), scenarioState, evidence, status)
+		checks, err = appendValidationChecks(checks, validationChecks)
+		if err != nil {
+			_, _ = fmt.Fprintf(stderr, "Prepare validation checks - %v\n", err)
+			return 2
+		}
+		if err := createGolemValidationReport(ctx, *captureRoot, *validationReport, *serverLabel, *validationResult, checks, stderr); err != nil {
+			_, _ = fmt.Fprintf(stderr, "Create Golem validation report - %v\n", err)
 			status = 1
 		}
 	}
@@ -212,7 +376,7 @@ func openScenarioInput(path string) (io.Reader, io.Closer, error) {
 	return file, file, nil
 }
 
-func runNetworkScenario(ctx context.Context, client *golemnet.Client, input io.Reader, stdout, stderr io.Writer, timeout time.Duration) int {
+func runNetworkScenario(ctx context.Context, client *golemnet.Client, input io.Reader, stdout, stderr io.Writer, timeout time.Duration, state *networkScenarioState) int {
 	scanner := bufio.NewScanner(input)
 	scanner.Buffer(make([]byte, 4096), maxNetworkScenarioLine)
 	decoderOutput := json.NewEncoder(stdout)
@@ -251,6 +415,11 @@ func runNetworkScenario(ctx context.Context, client *golemnet.Client, input io.R
 		if err != nil {
 			return 1
 		}
+		if state != nil && request.Op == "stability" {
+			if duration, parseErr := parseScenarioDuration(request.Duration); parseErr == nil {
+				state.stabilityDuration += duration
+			}
+		}
 		if quit {
 			return 0
 		}
@@ -260,6 +429,97 @@ func runNetworkScenario(ctx context.Context, client *golemnet.Client, input io.R
 		return 1
 	}
 	return 0
+}
+
+func golemValidationChecks(snapshot golemnet.Report, state *networkScenarioState, evidence *golemCapture, scenarioStatus int) []string {
+	checks := []string{
+		"cli_session=not_observed",
+		"authenticated_upstream=not_observed",
+		"post_spawn_stability=not_observed",
+	}
+	if scenarioStatus == 0 && snapshot.Spawned && snapshot.Closed && len(snapshot.Errors) == 0 && (evidence == nil || evidence.error() == nil) {
+		checks[0] = "cli_session=pass"
+	}
+	if snapshot.Authenticated {
+		checks[1] = "authenticated_upstream=pass"
+	}
+	if state != nil && state.stabilityDuration >= 30*time.Second && snapshot.ClientInputPackets > 0 && len(snapshot.Errors) == 0 {
+		checks[2] = "post_spawn_stability=pass"
+	}
+	if evidence != nil && evidence.encryptedPackCount() > 0 {
+		if evidence.decryptionErrorCount() == 0 && evidence.decrypt {
+			checks = append(checks, "resource_pack_decryption=pass")
+		} else {
+			checks = append(checks, "resource_pack_decryption=not_observed")
+		}
+	}
+	return checks
+}
+
+func appendValidationChecks(existing []string, additional []string) ([]string, error) {
+	seen := make(map[string]struct{}, len(existing)+len(additional))
+	for _, check := range existing {
+		name, _, ok := strings.Cut(check, "=")
+		if !ok || strings.TrimSpace(name) == "" {
+			return nil, fmt.Errorf("invalid automatic check %q", check)
+		}
+		seen[name] = struct{}{}
+	}
+	result := append([]string(nil), existing...)
+	for _, check := range additional {
+		name, _, ok := strings.Cut(check, "=")
+		if !ok || strings.TrimSpace(name) == "" {
+			return nil, fmt.Errorf("invalid validation check %q", check)
+		}
+		if _, exists := seen[name]; exists {
+			return nil, fmt.Errorf("validation check %q was supplied more than once", name)
+		}
+		seen[name] = struct{}{}
+		result = append(result, check)
+	}
+	return result, nil
+}
+
+func createGolemValidationReport(ctx context.Context, captureRoot, output, server, result string, checks []string, stderr io.Writer) error {
+	workingDirectory, err := os.Getwd()
+	if err != nil {
+		return fmt.Errorf("locate project directory: %w", err)
+	}
+	script := filepath.Join(workingDirectory, "tools", "create-validation-report.ps1")
+	if _, err := os.Stat(script); err != nil {
+		return fmt.Errorf("locate validation report script: %w", err)
+	}
+	binary, err := os.Executable()
+	if err != nil {
+		return fmt.Errorf("locate running binary: %w", err)
+	}
+	capturePath, err := filepath.Abs(captureRoot)
+	if err != nil {
+		return fmt.Errorf("resolve capture path: %w", err)
+	}
+	outputPath, err := filepath.Abs(output)
+	if err != nil {
+		return fmt.Errorf("resolve report path: %w", err)
+	}
+	args := []string{
+		"-NoProfile", "-File", script,
+		"-Binary", binary,
+		"-Capture", capturePath,
+		"-Server", server,
+		"-Result", result,
+	}
+	for _, check := range checks {
+		args = append(args, "-Check", check)
+	}
+	args = append(args, "-Output", outputPath)
+	// #nosec G204 -- the executable and script path are fixed by the repository; user values are separate validated argv entries.
+	command := exec.CommandContext(ctx, "pwsh", args...)
+	command.Stdout = stderr
+	command.Stderr = stderr
+	if err := command.Run(); err != nil {
+		return err
+	}
+	return nil
 }
 
 func validateNetworkScenarioRequest(request networkScenarioRequest) error {

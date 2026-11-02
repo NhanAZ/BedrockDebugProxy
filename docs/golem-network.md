@@ -21,6 +21,11 @@ RakNet when the endpoint does not advertise that transport.
     --server experience:Enchanted `
     --auth device `
     --report .local\golem-network\enchanted.json `
+    --capture .local\golem-network\enchanted-capture `
+    --decrypt-resource-packs `
+    --validation-report validation\Enchanted.golem.json `
+    --server-label Enchanted `
+    --validation-result incomplete `
     --input .local\golem-network\enchanted.jsonl
 ```
 
@@ -71,6 +76,25 @@ Supported operations are:
 - `report` returns the current report snapshot immediately.
 - `quit` closes the session and stops the scenario.
 
+When `--capture` is provided, the command writes the canonical
+`bedrockdebugproxy.capture.v1` directory. It retains post-transport Bedrock
+packet payloads and decoded packet views in both directions, connection and
+spawn lifecycle evidence, bounded GameData, and resource-pack archives. Add
+`--decrypt-resource-packs` for release work so encrypted offers also produce
+the derived plaintext archive and `contents.json` evidence. The original
+encrypted archive remains the authoritative local evidence.
+
+`--validation-report` runs the repository's existing
+`tools/create-validation-report.ps1` after the capture closes. The command
+automatically supplies `cli_session`, `authenticated_upstream`, and
+`post_spawn_stability` from observed evidence. Use repeated `--validation-check`
+options for review facts that only an agent can establish, such as
+`enchanted_form_review=pass` and `enchanted_route_matrix=pass`. The default
+result is `incomplete`; `--validation-result pass` is rejected by the existing
+report generator unless every automatic and manual gate passes. The binary
+must be built with `tools/build.ps1` so the capture contains the exact Git
+revision required by the report generator.
+
 ## Enchanted workflow
 
 The network client does not assume that Enchanted has a fixed child count or a
@@ -88,22 +112,20 @@ are valid observed outcomes and must be classified from the returned events.
 
 ## Report boundary
 
-The report schema is `bedrockdebugproxy.golem.network.v1`. It contains bounded
-event counts, packet type counts, forms, transfers, text messages, resource-pack
-count, hop count, spawn state, stationary client-input count and rate, and
-errors. It intentionally does not contain raw packet bytes, authentication
-tokens, or decrypted pack contents.
+The supplemental report schema is `bedrockdebugproxy.golem.network.v1`. It
+contains bounded event counts, packet type counts, forms, transfers, text
+messages, resource-pack count, hop count, spawn state, stationary
+client-input count and rate, and errors. It intentionally does not contain
+raw packet bytes, authentication tokens, or decrypted pack contents.
 
-This report is not a release validation report. The network bot now emits a
-bounded stationary `PlayerAuthInput` heartbeat after spawn, but it does not
-yet implement the full post-spawn movement/gameplay stream, write canonical
-BedrockDebugProxy captures, or derive decrypted resource-pack archives. It is
-therefore useful for login, form, transfer, pack-count, spawn, and basic
-post-spawn stability investigations, but it cannot by itself satisfy
-`cli_session=pass`, the complete `post_spawn_stability` check, or the
-six-server release gate. The existing proxy capture workflow and its reviewed
-CLI protocol driver remain the release evidence path until those boundaries
-are implemented and verified.
+The canonical capture and validation-report options now make the Go network
+client usable as a release-report producer. The release gate still reviews
+the report and its capture: a normal `stability` operation must cover at least
+30 seconds, encrypted packs must be decrypted successfully, and server-specific
+workflow checks remain agent responsibilities. The client currently provides
+a stationary `PlayerAuthInput` heartbeat and scenario-driven forms, chat, and
+transfer following. It does not yet claim full retail-client movement,
+inventory, combat, block interaction, or rendering gameplay.
 
 ## Security and limits
 

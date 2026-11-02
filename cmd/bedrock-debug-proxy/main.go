@@ -1040,7 +1040,8 @@ func printCommandHelp(writer io.Writer, command string) bool {
 		_, _ = fmt.Fprintln(writer, "Usage - bedrock-debug-proxy golem network --server HOST:PORT|experience:NAME [options]")
 		_, _ = fmt.Fprintln(writer, "Join a Bedrock server through the Go protocol client, complete resource packs and spawn, then execute a bounded JSON Lines scenario.")
 		_, _ = fmt.Fprintln(writer, "The network client records forms, text, transfers, packet counts, and bounded errors. --follow-transfers is enabled by default and preserves RakNet source identity when possible.")
-		_, _ = fmt.Fprintln(writer, "This report is supplemental local Golem evidence. It is not a release validation report until a verified capture and the existing validation gate are produced.")
+		_, _ = fmt.Fprintln(writer, "Use --capture with --decrypt-resource-packs to write canonical raw and decoded evidence. Add --validation-report and --server-label to generate a bedrockdebugproxy.validation.v1 report after the session.")
+		_, _ = fmt.Fprintln(writer, "The network report remains supplemental. A passing release report still requires the existing automatic evidence, a 30-second stability scenario, and the required review checks.")
 		_, _ = fmt.Fprintln(writer, "Scenario operations are wait_form, current_form, select_form, submit_form, chat, wait, stability, observe, report, and quit. See docs/golem-network.md.")
 	case "run":
 		_, _ = fmt.Fprintln(writer, "Usage - bedrock-debug-proxy run --upstream HOST:PORT|experience:NAME [options]")

@@ -71,6 +71,20 @@ type Config struct {
 	// ClientInputInterval controls the stationary PlayerAuthInput heartbeat
 	// after spawn. The default is one packet per Bedrock tick.
 	ClientInputInterval time.Duration
+
+	// ConnectionObserver is called after a connection has completed its login
+	// setup. It is intended for evidence collection and must not mutate the
+	// connection protocol state.
+	ConnectionObserver func(*minecraft.Conn, int)
+	// PacketObserver receives the post-transport packet payload for every packet
+	// read from or written to a connection, including login and resource-pack
+	// negotiation packets. Implementations must copy data they retain.
+	PacketObserver func(*minecraft.Conn, int, packet.Header, []byte, net.Addr, net.Addr)
+	// ResourcePackObserver runs after the connection's resource-pack exchange
+	// has completed and before world spawn is published.
+	ResourcePackObserver func(context.Context, *minecraft.Conn, int) error
+	// SpawnObserver runs after DoSpawnContext has completed for a hop.
+	SpawnObserver func(context.Context, *minecraft.Conn, int) error
 }
 
 // FormButton is a bounded projection of a server-sent menu form button.
@@ -237,7 +251,7 @@ func (c *Client) Start(parent context.Context) error {
 	connectCtx, cancelConnect := context.WithTimeout(c.ctx, c.config.ConnectTimeout)
 	defer cancelConnect()
 	c.started = time.Now().UTC()
-	conn, err := c.dial(connectCtx, c.config.Address, c.config.Network, c.config.Identity, c.config.Client, nil, 0)
+	conn, err := c.dial(connectCtx, c.config.Address, c.config.Network, c.config.Identity, c.config.Client, nil, 0, 1)
 	if err != nil {
 		c.fail(err)
 		return fmt.Errorf("dial server: %w", err)
@@ -247,6 +261,13 @@ func (c *Client) Start(parent context.Context) error {
 		c.fail(err)
 		return fmt.Errorf("spawn in server: %w", err)
 	}
+	if c.config.ResourcePackObserver != nil {
+		if err := c.config.ResourcePackObserver(connectCtx, conn, 1); err != nil {
+			_ = conn.CloseImmediately()
+			c.fail(err)
+			return fmt.Errorf("observe resource packs: %w", err)
+		}
+	}
 	c.setConnection(conn, 1)
 	c.stateMu.Lock()
 	c.spawned = true
@@ -255,12 +276,19 @@ func (c *Client) Start(parent context.Context) error {
 	c.readerStarted = true
 	c.stateMu.Unlock()
 	c.record(Event{Kind: "session.spawned", Hop: 1, At: time.Now().UTC()})
+	if c.config.SpawnObserver != nil {
+		if err := c.config.SpawnObserver(connectCtx, conn, 1); err != nil {
+			c.fail(err)
+			return fmt.Errorf("observe spawn: %w", err)
+		}
+	}
 	go c.readLoop()
 	go c.inputLoop()
 	return nil
 }
 
-func (c *Client) dial(ctx context.Context, address string, network minecraft.Network, identity login.IdentityData, client login.ClientData, localAddr *net.UDPAddr, clientGUID int64) (*minecraft.Conn, error) {
+func (c *Client) dial(ctx context.Context, address string, network minecraft.Network, identity login.IdentityData, client login.ClientData, localAddr *net.UDPAddr, clientGUID int64, hop int) (*minecraft.Conn, error) {
+	var callbackConn *minecraft.Conn
 	dialer := minecraft.Dialer{
 		ErrorLog:                   c.config.Logger,
 		HTTPClient:                 c.config.HTTPClient,
@@ -273,11 +301,34 @@ func (c *Client) dial(ctx context.Context, address string, network minecraft.Net
 		DisconnectOnUnknownPackets: false,
 		DisconnectOnInvalidPackets: false,
 		DownloadResourcePack:       func(uuid.UUID, string, int, int) bool { return true },
+		ConnectionFunc: func(conn *minecraft.Conn) {
+			// The dialer invokes this before login starts. Keep the callback
+			// non-blocking because it runs on the login path.
+			callbackConn = conn
+		},
+		PacketFunc: func(header packet.Header, payload []byte, src, dst net.Addr) {
+			if callbackConn != nil && c.config.PacketObserver != nil {
+				c.config.PacketObserver(callbackConn, hop, header, payload, src, dst)
+			}
+		},
 	}
+	var conn *minecraft.Conn
+	var err error
 	if network == nil {
-		return dialer.DialContext(ctx, "raknet", address)
+		conn, err = dialer.DialContext(ctx, "raknet", address)
+	} else {
+		conn, err = dialer.DialContextNetwork(ctx, network, address)
 	}
-	return dialer.DialContextNetwork(ctx, network, address)
+	if err != nil {
+		return nil, err
+	}
+	if callbackConn == nil {
+		callbackConn = conn
+	}
+	if c.config.ConnectionObserver != nil {
+		c.config.ConnectionObserver(callbackConn, hop)
+	}
+	return conn, nil
 }
 
 func (c *Client) setConnection(conn *minecraft.Conn, hop int) {
@@ -386,18 +437,26 @@ func (c *Client) followTransfer(transfer *Transfer, previous *minecraft.Conn, ho
 		raknet.ClientGUID = clientGUID
 		network = raknet
 	}
-	conn, err := c.dial(c.ctx, address, network, identity, client, localAddr, clientGUID)
+	nextHop := hop + 1
+	conn, err := c.dial(c.ctx, address, network, identity, client, localAddr, clientGUID, nextHop)
 	if err != nil {
 		transfer.FollowError = err.Error()
 		c.updateTransfer(transfer)
 		return fmt.Errorf("dial transfer target %s: %w", transfer.Target, err)
 	}
-	nextHop := hop + 1
 	if err := conn.DoSpawnContext(c.ctx); err != nil {
 		_ = conn.CloseImmediately()
 		transfer.FollowError = err.Error()
 		c.updateTransfer(transfer)
 		return fmt.Errorf("spawn transfer target %s: %w", transfer.Target, err)
+	}
+	if c.config.ResourcePackObserver != nil {
+		if err := c.config.ResourcePackObserver(c.ctx, conn, nextHop); err != nil {
+			_ = conn.CloseImmediately()
+			transfer.FollowError = err.Error()
+			c.updateTransfer(transfer)
+			return fmt.Errorf("observe resource packs for transfer target %s: %w", transfer.Target, err)
+		}
 	}
 	transfer.Followed = true
 	c.setConnection(conn, nextHop)
@@ -414,6 +473,11 @@ func (c *Client) followTransfer(transfer *Transfer, previous *minecraft.Conn, ho
 	c.stateMu.Unlock()
 	c.inputPaused = false
 	c.record(Event{Kind: "session.spawned", Hop: nextHop, At: time.Now().UTC()})
+	if c.config.SpawnObserver != nil {
+		if err := c.config.SpawnObserver(c.ctx, conn, nextHop); err != nil {
+			return fmt.Errorf("observe spawn for transfer target %s: %w", transfer.Target, err)
+		}
+	}
 	return nil
 }
 

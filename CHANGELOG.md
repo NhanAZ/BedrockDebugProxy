@@ -20,6 +20,11 @@ Detailed rationale remains in [`docs/audits/`](docs/audits/).
 - Added a bounded stationary `PlayerAuthInput` heartbeat after spawn and a
   `stability` scenario operation. The network Golem report now exposes the
   input packet count and interval while remaining supplemental evidence.
+- Added canonical capture and release-report output to `golem network`. The
+  Go client now records raw and decoded packet evidence, spawn lifecycle,
+  resource-pack archives, optional ContentKey-scoped decryption, automatic
+  artifact views, and validation reports without opening Minecraft for Windows.
+  The current scenario client remains below full retail gameplay coverage.
 - Preserve small text-like resource-pack files when `contents.json` declares a key for bytes that are already plaintext. AES-CFB8 has no authentication, so the derived archive now avoids corrupting misdeclared README and similar text entries while continuing to decrypt entries whose source bytes are not clearly plaintext.
 
 ## [0.5.0] - 2026-11-02

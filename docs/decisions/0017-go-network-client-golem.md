@@ -16,8 +16,10 @@ The first boundary is login, resource-pack exchange, spawn, server form
 inspection, bounded form responses, chat, Transfer following, and a private
 structured session report. The next increment adds a bounded stationary
 `PlayerAuthInput` heartbeat after each spawn and a `stability` scenario
-operation. The client stores no credentials in the report and does not claim
-that its report is a canonical capture or a release report.
+operation. The following increment connects that client to the canonical
+capture writer, the existing resource-pack decryption path, automatic artifact
+views, and the repository's validation-report generator. The client stores no
+credentials in reports and does not claim full retail gameplay.
 
 ## Rationale
 
@@ -42,12 +44,12 @@ printing token values, and creates reports as private files. Packet mutation,
 replay, injection, anti-cheat evasion, and authentication bypass remain out of
 scope.
 
-The network report is supplemental evidence. It does not replace a verified
-BedrockDebugProxy capture, resource-pack decryption artifacts, or the existing
-release report checks. The stationary input loop is deliberately smaller than
-a complete game client. Canonical capture integration, full gameplay input,
-complete pack decryption evidence, and the release-grade stability check still
-remain before the network bot can become the release driver.
+The network report remains supplemental evidence, while `--capture` and
+`--validation-report` now produce the same canonical capture and validation
+report contracts used by the release workflow. The stationary input loop is
+deliberately smaller than a complete game client. Full gameplay input and
+server-specific route review remain before the network bot can become the
+release driver for every server.
 
 No BedrockPackArchive change is required for this first step. The implementation
 does not change the proxy's capture or pack archive producer contract and does

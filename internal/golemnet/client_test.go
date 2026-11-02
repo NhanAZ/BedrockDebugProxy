@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"net"
+	"sync/atomic"
 	"testing"
 	"time"
 
@@ -127,6 +128,91 @@ func TestClientCapturesFormAndSendsActions(t *testing.T) {
 	report := client.Snapshot()
 	if len(report.Forms) != 1 || report.PacketCounts["ModalFormRequest"] != 1 || report.PacketCounts["Text"] < 1 {
 		t.Fatalf("report = %+v", report)
+	}
+	if err := client.Close(); err != nil {
+		t.Fatal(err)
+	}
+	if err := <-serverErrors; err != nil {
+		t.Fatal(err)
+	}
+}
+
+func TestClientNotifiesNetworkObservers(t *testing.T) {
+	ctx, cancel := context.WithTimeout(t.Context(), 10*time.Second)
+	defer cancel()
+	listener, err := (minecraft.ListenConfig{AuthenticationDisabled: true, AllowUnknownPackets: true, AllowInvalidPackets: true}).Listen("raknet", "127.0.0.1:0")
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer func() { _ = listener.Close() }()
+	serverErrors := make(chan error, 1)
+	go func() {
+		accepted, acceptErr := listener.Accept()
+		if acceptErr != nil {
+			serverErrors <- acceptErr
+			return
+		}
+		conn, ok := accepted.(*minecraft.Conn)
+		if !ok {
+			serverErrors <- fmt.Errorf("unexpected server connection %T", accepted)
+			_ = accepted.Close()
+			return
+		}
+		defer func() { _ = conn.Close() }()
+		if err := conn.StartGame(minecraft.GameData{WorldName: "Observer test", EntityUniqueID: 1, EntityRuntimeID: 1}); err != nil {
+			serverErrors <- err
+			return
+		}
+		if err := conn.WritePacket(&packet.Text{TextType: packet.TextTypeRaw, Message: "observer-ready"}); err != nil {
+			serverErrors <- err
+			return
+		}
+		if err := conn.Flush(); err != nil {
+			serverErrors <- err
+			return
+		}
+		for {
+			if _, err := conn.ReadPacket(); err != nil {
+				serverErrors <- nil
+				return
+			}
+		}
+	}()
+
+	var connections atomic.Int32
+	var packets atomic.Int32
+	client, err := New(Config{
+		Address: listener.Addr().String(),
+		ConnectionObserver: func(conn *minecraft.Conn, hop int) {
+			if conn == nil || hop != 1 {
+				t.Errorf("connection observer received conn=%v hop=%d", conn, hop)
+			}
+			connections.Add(1)
+		},
+		PacketObserver: func(conn *minecraft.Conn, hop int, header packet.Header, payload []byte, source, destination net.Addr) {
+			if conn == nil || hop != 1 || source == nil || destination == nil {
+				t.Errorf("packet observer received nil_or_invalid metadata hop=%d id=%d payload=%d source=%v destination=%v", hop, header.PacketID, len(payload), source, destination)
+			}
+			packets.Add(1)
+		},
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := client.Start(ctx); err != nil {
+		t.Fatal(err)
+	}
+	for {
+		event, eventErr := client.NextEvent(ctx)
+		if eventErr != nil {
+			t.Fatal(eventErr)
+		}
+		if event.Kind == "text" && event.Message == "observer-ready" {
+			break
+		}
+	}
+	if connections.Load() != 1 || packets.Load() == 0 {
+		t.Fatalf("observer counts connections=%d packets=%d", connections.Load(), packets.Load())
 	}
 	if err := client.Close(); err != nil {
 		t.Fatal(err)
