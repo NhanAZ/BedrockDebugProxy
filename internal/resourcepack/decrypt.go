@@ -16,6 +16,7 @@ import (
 	"sort"
 	"strings"
 	"time"
+	"unicode"
 	"unicode/utf8"
 )
 
@@ -26,6 +27,7 @@ const (
 	maxContentsManifestSize = 16 << 20
 	maxContentsPlaintext    = 64 << 20
 	maxDecryptedPayloadSize = 1 << 30
+	maxKeyedTextProbeSize   = maxContentsManifestSize
 )
 
 var (
@@ -274,12 +276,6 @@ func DecryptArchive(ctx context.Context, source io.ReaderAt, archiveSize int64, 
 			_ = writer.Close()
 			return Result{}, fmt.Errorf("resource pack entry %s exceeds the %d-byte decrypted payload limit", name, maxDecryptedPayloadSize)
 		}
-		sourceEntry, err := file.Open()
-		if err != nil {
-			_ = writer.Close()
-			return Result{}, fmt.Errorf("open resource pack entry %s: %w", name, err)
-		}
-		input := io.Reader(sourceEntry)
 		entryKey := declarations[name]
 		// Root pack metadata is read before decryption. A contents declaration
 		// may still carry a key for these plaintext files. Preserve their bytes.
@@ -287,20 +283,59 @@ func DecryptArchive(ctx context.Context, source io.ReaderAt, archiveSize int64, 
 		case rootManifest, joinArchivePath(root, "pack_icon.png"), joinArchivePath(root, "bug_pack_icon.png"):
 			entryKey = ""
 		}
-		if entryKey != "" {
-			stream, streamErr := newCFB8Decrypter([]byte(entryKey), []byte(entryKey)[:aes.BlockSize])
-			if streamErr != nil {
-				_ = sourceEntry.Close()
+		var input io.Reader
+		var sourceEntry io.ReadCloser
+		if entryKey != "" && isTextLikeResourcePath(name) && file.UncompressedSize64 <= maxKeyedTextProbeSize {
+			// Some servers put a per-file key in contents.json for text that is
+			// already plaintext. AES-CFB8 is unauthenticated, so blindly applying
+			// that declaration would turn valid text into unrelated bytes. Probe
+			// bounded text-like entries and preserve the original only when the
+			// source is clearly text and the decrypted candidate is clearly not.
+			data, readErr := readLimitedEntry(ctx, file)
+			if readErr != nil {
 				_ = writer.Close()
-				return Result{}, fmt.Errorf("create decryptor for %s: %w", name, streamErr)
+				return Result{}, fmt.Errorf("read resource pack entry %s: %w", name, readErr)
 			}
-			input = &cipher.StreamReader{S: stream, R: input}
-			result.Report.DecryptedFiles++
+			decrypted, decryptErr := decryptBytes([]byte(entryKey), data)
+			if decryptErr != nil {
+				_ = writer.Close()
+				return Result{}, fmt.Errorf("decrypt resource pack entry %s: %w", name, decryptErr)
+			}
+			if looksLikePlaintext(data) && !looksLikePlaintext(decrypted) {
+				input = bytes.NewReader(data)
+				result.Report.CopiedFiles++
+			} else {
+				input = bytes.NewReader(decrypted)
+				result.Report.DecryptedFiles++
+			}
 		} else {
+			var openErr error
+			sourceEntry, openErr = file.Open()
+			if openErr != nil {
+				_ = writer.Close()
+				return Result{}, fmt.Errorf("open resource pack entry %s: %w", name, openErr)
+			}
+			input = sourceEntry
+		}
+		if entryKey != "" {
+			if sourceEntry != nil {
+				stream, streamErr := newCFB8Decrypter([]byte(entryKey), []byte(entryKey)[:aes.BlockSize])
+				if streamErr != nil {
+					_ = sourceEntry.Close()
+					_ = writer.Close()
+					return Result{}, fmt.Errorf("create decryptor for %s: %w", name, streamErr)
+				}
+				input = &cipher.StreamReader{S: stream, R: input}
+				result.Report.DecryptedFiles++
+			}
+		} else if sourceEntry != nil {
 			result.Report.CopiedFiles++
 		}
 		written, copyErr := copyWithBudget(ctx, destinationEntry, input, &remaining)
-		closeErr := sourceEntry.Close()
+		var closeErr error
+		if sourceEntry != nil {
+			closeErr = sourceEntry.Close()
+		}
 		if copyErr != nil || closeErr != nil {
 			_ = writer.Close()
 			return Result{}, fmt.Errorf("write decrypted archive entry %s: %w", name, errors.Join(copyErr, closeErr))
@@ -392,6 +427,56 @@ func newCFB8Decrypter(key, iv []byte) (*cfb8Decrypter, error) {
 	stream := &cfb8Decrypter{block: block}
 	copy(stream.register[:], iv)
 	return stream, nil
+}
+
+func decryptBytes(key, ciphertext []byte) ([]byte, error) {
+	stream, err := newCFB8Decrypter(key, key[:aes.BlockSize])
+	if err != nil {
+		return nil, err
+	}
+	plaintext := make([]byte, len(ciphertext))
+	stream.XORKeyStream(plaintext, ciphertext)
+	return plaintext, nil
+}
+
+func isTextLikeResourcePath(name string) bool {
+	lower := strings.ToLower(name)
+	for _, suffix := range []string{
+		".cfg",
+		".csv",
+		".fsh",
+		".glsl",
+		".hlsl",
+		".ini",
+		".json",
+		".lang",
+		".material",
+		".mcmeta",
+		".md",
+		".properties",
+		".txt",
+		".vsh",
+		".xml",
+		".yaml",
+		".yml",
+	} {
+		if strings.HasSuffix(lower, suffix) {
+			return true
+		}
+	}
+	return false
+}
+
+func looksLikePlaintext(data []byte) bool {
+	if !utf8.Valid(data) {
+		return false
+	}
+	for _, value := range string(data) {
+		if value == 0 || (unicode.IsControl(value) && value != '\t' && value != '\n' && value != '\r') {
+			return false
+		}
+	}
+	return true
 }
 
 func (s *cfb8Decrypter) XORKeyStream(destination, source []byte) {

@@ -120,6 +120,33 @@ func TestDecryptArchiveRootAndSubpack(t *testing.T) {
 	}
 }
 
+func TestDecryptArchivePreservesKeyedPlaintextTextFile(t *testing.T) {
+	t.Parallel()
+
+	fileKey := "ZYXWVUTSRQPONMLKJIHGFEDCBA654321"
+	readme := []byte("Galaxite UI README\r\nThis source entry is already plaintext.\r\n")
+	input := buildEncryptedArchive(t, []testArchiveEntry{
+		{name: "manifest.json", data: []byte(`{"format_version":2}`)},
+		{name: "README.txt", data: readme},
+		{name: "contents.json", data: encryptedContents(t, testContentKey, testContentID, []contentsEntry{
+			{Path: "README.txt", Key: fileKey},
+		})},
+	})
+
+	var output bytes.Buffer
+	result, err := DecryptArchive(context.Background(), bytes.NewReader(input), int64(len(input)), testContentKey, &output)
+	if err != nil {
+		t.Fatal(err)
+	}
+	files := readArchiveFiles(t, output.Bytes())
+	if !bytes.Equal(files["README.txt"], readme) {
+		t.Fatalf("keyed plaintext README was changed: got %q, want %q", files["README.txt"], readme)
+	}
+	if result.Report.DecryptedFiles != 0 || result.Report.CopiedFiles != 2 {
+		t.Fatalf("unexpected copy/decrypt counts: %#v", result.Report)
+	}
+}
+
 func TestDecryptArchivePreservesKeyedRootMetadata(t *testing.T) {
 	t.Parallel()
 

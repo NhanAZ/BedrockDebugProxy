@@ -160,6 +160,13 @@ Every new entry should state the symptom, root cause, implementation commits, ev
 - Evidence and validation: the synthetic regression failed before the fix and passes under the race detector for flat and nested pack roots. The [research note](research/plaintext-resource-pack-metadata.md) records the reviewed primary implementation and scope. BedrockPackArchive's matched fixture retains plaintext metadata, archive hashes, contents.json, three declared keys, and event provenance.
 - Status: focused checks pass. The [commit audit](audits/AUDIT-0204-plaintext-pack-metadata.md) records the canonical gate and paired verification. Retail-client and release-matrix validation remain separate.
 
+### FIX-0153 - Preserve keyed plaintext text entries
+
+- Symptom: a GALAXITE `Galaxite UI` `README.txt` was listed in `contents.json` with a per-file key, but the source archive was already plaintext. The derived archive therefore contained corrupted bytes, which BedrockPackArchive faithfully stored.
+- Root cause: the resource-pack decoder applied unauthenticated AES-CFB8 to every non-empty per-file key. The existing exception covered only the selected root manifest and icons.
+- Implementation: probe bounded text-like entries and preserve the source bytes only when they are clearly plaintext while the decrypted candidate is clearly not. Continue streaming decryption for normal keyed entries and preserve the raw archive as before.
+- Evidence and validation: the deterministic regression fails before the change and passes afterward. It covers the misdeclared plaintext README and the existing genuinely encrypted text entry. The paired BedrockPackArchive fixture verifies byte-preserving import, contents.json retention, and the declared key count without storing key values. Live GALAXITE backfill remains a separate exact-revision validation step.
+
 ### FIX-0001 - Experience destination resolution
 
 - Symptom: default or named experience destinations could resolve to the wrong address or fail to select the intended featured experience.

@@ -6,7 +6,9 @@ Detailed rationale remains in [`docs/audits/`](docs/audits/).
 
 ## [Unreleased]
 
-No unreleased changes.
+### Fixed
+
+- Preserve small text-like resource-pack files when `contents.json` declares a key for bytes that are already plaintext. AES-CFB8 has no authentication, so the derived archive now avoids corrupting misdeclared README and similar text entries while continuing to decrypt entries whose source bytes are not clearly plaintext.
 
 ## [0.5.0] - 2026-11-02
 
