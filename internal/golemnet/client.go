@@ -12,6 +12,7 @@ import (
 	"fmt"
 	"io"
 	"log/slog"
+	"math"
 	"net"
 	"net/http"
 	"strconv"
@@ -20,6 +21,7 @@ import (
 	"time"
 
 	"github.com/NhanAZ/BedrockDebugProxy/internal/experience"
+	"github.com/go-gl/mathgl/mgl32"
 	"github.com/google/uuid"
 	"github.com/sandertv/gophertunnel/minecraft"
 	"github.com/sandertv/gophertunnel/minecraft/protocol"
@@ -36,6 +38,10 @@ const (
 	maxChatBytes    = 64 << 10
 	maxFormButtons  = 1024
 	maxTransferHops = 64
+
+	defaultClientInputInterval = 50 * time.Millisecond
+	minClientInputInterval     = 20 * time.Millisecond
+	maxClientInputInterval     = time.Second
 )
 
 var (
@@ -61,6 +67,10 @@ type Config struct {
 	// selected transport supports those properties.
 	FollowTransfers bool
 	MaxHops         int
+
+	// ClientInputInterval controls the stationary PlayerAuthInput heartbeat
+	// after spawn. The default is one packet per Bedrock tick.
+	ClientInputInterval time.Duration
 }
 
 // FormButton is a bounded projection of a server-sent menu form button.
@@ -112,21 +122,25 @@ type Event struct {
 // Public-server release tooling still requires a verified capture and the
 // existing validation report schema.
 type Report struct {
-	Schema          string         `json:"schema"`
-	StartedAt       time.Time      `json:"started_at"`
-	EndedAt         time.Time      `json:"ended_at,omitempty"`
-	Hops            int            `json:"hops"`
-	Spawned         bool           `json:"spawned"`
-	Closed          bool           `json:"closed"`
-	Authenticated   bool           `json:"authenticated"`
-	ResourcePacks   int            `json:"resource_pack_count"`
-	Forms           []Form         `json:"forms,omitempty"`
-	Transfers       []Transfer     `json:"transfers,omitempty"`
-	PacketCounts    map[string]int `json:"packet_counts,omitempty"`
-	Messages        []string       `json:"messages,omitempty"`
-	Errors          []string       `json:"errors,omitempty"`
-	EventCount      int            `json:"event_count"`
-	FollowTransfers bool           `json:"follow_transfers"`
+	Schema             string         `json:"schema"`
+	StartedAt          time.Time      `json:"started_at"`
+	EndedAt            time.Time      `json:"ended_at,omitempty"`
+	Hops               int            `json:"hops"`
+	Spawned            bool           `json:"spawned"`
+	Closed             bool           `json:"closed"`
+	Authenticated      bool           `json:"authenticated"`
+	ResourcePacks      int            `json:"resource_pack_count"`
+	Forms              []Form         `json:"forms,omitempty"`
+	Transfers          []Transfer     `json:"transfers,omitempty"`
+	PacketCounts       map[string]int `json:"packet_counts,omitempty"`
+	Messages           []string       `json:"messages,omitempty"`
+	Errors             []string       `json:"errors,omitempty"`
+	EventCount         int            `json:"event_count"`
+	FollowTransfers    bool           `json:"follow_transfers"`
+	ClientInput        bool           `json:"client_input_enabled"`
+	ClientInputRate    string         `json:"client_input_interval,omitempty"`
+	ClientInputPackets int            `json:"client_input_packet_count"`
+	LastClientInputAt  time.Time      `json:"last_client_input_at,omitempty"`
 }
 
 // Client is a single network bot session.
@@ -140,28 +154,34 @@ type Client struct {
 	conn   *minecraft.Conn
 	hop    int
 
+	inputMu     sync.Mutex
+	inputPaused bool
+
 	events   chan Event
 	done     chan struct{}
 	doneOnce sync.Once
 
-	stateMu       sync.Mutex
-	history       []Event
-	sequence      uint64
-	currentForm   *Form
-	started       time.Time
-	ended         time.Time
-	spawned       bool
-	closed        bool
-	readerStarted bool
-	terminalErr   error
-	closeOnce     sync.Once
-	packetCount   map[string]int
-	resourcePacks int
-	forms         []Form
-	transfers     []Transfer
-	messages      []string
-	errors        []string
-	hops          int
+	stateMu            sync.Mutex
+	history            []Event
+	sequence           uint64
+	currentForm        *Form
+	started            time.Time
+	ended              time.Time
+	spawned            bool
+	closed             bool
+	readerStarted      bool
+	terminalErr        error
+	closeOnce          sync.Once
+	packetCount        map[string]int
+	resourcePacks      int
+	inputTick          uint64
+	clientInputPackets int
+	lastClientInputAt  time.Time
+	forms              []Form
+	transfers          []Transfer
+	messages           []string
+	errors             []string
+	hops               int
 }
 
 // New validates a network bot configuration without opening a connection.
@@ -191,6 +211,12 @@ func New(config Config) (*Client, error) {
 	}
 	if config.ConnectTimeout <= 0 || config.ConnectTimeout > 30*time.Minute {
 		return nil, errors.New("golem network connect timeout must be positive and at most 30m")
+	}
+	if config.ClientInputInterval == 0 {
+		config.ClientInputInterval = defaultClientInputInterval
+	}
+	if config.ClientInputInterval < minClientInputInterval || config.ClientInputInterval > maxClientInputInterval {
+		return nil, fmt.Errorf("golem network client input interval must be between %s and %s", minClientInputInterval, maxClientInputInterval)
 	}
 	if config.HTTPClient == nil {
 		config.HTTPClient = http.DefaultClient
@@ -230,6 +256,7 @@ func (c *Client) Start(parent context.Context) error {
 	c.stateMu.Unlock()
 	c.record(Event{Kind: "session.spawned", Hop: 1, At: time.Now().UTC()})
 	go c.readLoop()
+	go c.inputLoop()
 	return nil
 }
 
@@ -323,6 +350,9 @@ func (c *Client) eventForPacket(value packet.Packet, hop int) Event {
 }
 
 func (c *Client) followTransfer(transfer *Transfer, previous *minecraft.Conn, hop int) error {
+	c.inputMu.Lock()
+	defer c.inputMu.Unlock()
+	c.inputPaused = true
 	if transfer == nil {
 		return errors.New("transfer event has no target")
 	}
@@ -382,8 +412,97 @@ func (c *Client) followTransfer(transfer *Transfer, previous *minecraft.Conn, ho
 		}
 	}
 	c.stateMu.Unlock()
+	c.inputPaused = false
 	c.record(Event{Kind: "session.spawned", Hop: nextHop, At: time.Now().UTC()})
 	return nil
+}
+
+func (c *Client) inputLoop() {
+	ticker := time.NewTicker(c.config.ClientInputInterval)
+	defer ticker.Stop()
+	for {
+		select {
+		case <-ticker.C:
+			if err := c.sendClientInput(); err != nil {
+				if c.ctx != nil && c.ctx.Err() != nil {
+					return
+				}
+				c.fail(err)
+				return
+			}
+		case <-c.ctx.Done():
+			return
+		case <-c.done:
+			return
+		}
+	}
+}
+
+func (c *Client) sendClientInput() error {
+	c.inputMu.Lock()
+	defer c.inputMu.Unlock()
+	if c.inputPaused {
+		return nil
+	}
+	conn, _ := c.connection()
+	if conn == nil {
+		return nil
+	}
+	data := conn.GameData()
+	clientData := conn.ClientData()
+	inputMode := clientData.CurrentInputMode
+	if inputMode <= packet.InputModeUndefined || inputMode >= packet.InputModeCount {
+		inputMode = packet.InputModeTouch
+	}
+	interactionModel := packet.InteractionModelTouch
+	if inputMode == packet.InputModeMouse || inputMode == packet.InputModeGamePad {
+		interactionModel = packet.InteractionModelCrosshair
+	}
+	tick := c.nextInputTick()
+	input := &packet.PlayerAuthInput{
+		Pitch:             data.Pitch,
+		Yaw:               data.Yaw,
+		Position:          data.PlayerPosition,
+		HeadYaw:           data.Yaw,
+		InputData:         protocol.NewInputFlags(packet.InputFlagCount),
+		InputMode:         uint32(inputMode),
+		PlayMode:          packet.PlayModeNormal,
+		InteractionModel:  int32(interactionModel),
+		InteractPitch:     data.Pitch,
+		InteractYaw:       data.Yaw,
+		Tick:              tick,
+		CameraOrientation: cameraOrientation(data.Pitch, data.Yaw),
+	}
+	if err := conn.WritePacket(input); err != nil {
+		return fmt.Errorf("write client input: %w", err)
+	}
+	if err := conn.Flush(); err != nil {
+		return fmt.Errorf("flush client input: %w", err)
+	}
+	c.stateMu.Lock()
+	c.clientInputPackets++
+	c.lastClientInputAt = time.Now().UTC()
+	c.stateMu.Unlock()
+	return nil
+}
+
+func (c *Client) nextInputTick() uint64 {
+	c.stateMu.Lock()
+	c.inputTick++
+	tick := c.inputTick
+	c.stateMu.Unlock()
+	return tick
+}
+
+func cameraOrientation(pitch, yaw float32) (orientation mgl32.Vec3) {
+	pitchRadians := float64(pitch) * math.Pi / 180
+	yawRadians := float64(yaw) * math.Pi / 180
+	cosPitch := float32(math.Cos(pitchRadians))
+	return mgl32.Vec3{
+		float32(-math.Sin(yawRadians)) * cosPitch,
+		float32(-math.Sin(pitchRadians)),
+		float32(math.Cos(yawRadians)) * cosPitch,
+	}
 }
 
 func (c *Client) updateTransfer(transfer *Transfer) {
@@ -644,21 +763,25 @@ func (c *Client) Snapshot() Report {
 		ended = time.Now().UTC()
 	}
 	return Report{
-		Schema:          Schema,
-		StartedAt:       c.started,
-		EndedAt:         ended,
-		Hops:            c.hops,
-		Spawned:         c.spawned,
-		Closed:          c.closed,
-		Authenticated:   c.currentAuthenticated(),
-		ResourcePacks:   c.resourcePacks,
-		Forms:           cloneForms(c.forms),
-		Transfers:       append([]Transfer(nil), c.transfers...),
-		PacketCounts:    copyCounts(c.packetCount),
-		Messages:        append([]string(nil), c.messages...),
-		Errors:          append([]string(nil), c.errors...),
-		EventCount:      len(c.history),
-		FollowTransfers: c.config.FollowTransfers,
+		Schema:             Schema,
+		StartedAt:          c.started,
+		EndedAt:            ended,
+		Hops:               c.hops,
+		Spawned:            c.spawned,
+		Closed:             c.closed,
+		Authenticated:      c.currentAuthenticated(),
+		ResourcePacks:      c.resourcePacks,
+		Forms:              cloneForms(c.forms),
+		Transfers:          append([]Transfer(nil), c.transfers...),
+		PacketCounts:       copyCounts(c.packetCount),
+		Messages:           append([]string(nil), c.messages...),
+		Errors:             append([]string(nil), c.errors...),
+		EventCount:         len(c.history),
+		FollowTransfers:    c.config.FollowTransfers,
+		ClientInput:        c.config.ClientInputInterval > 0,
+		ClientInputRate:    c.config.ClientInputInterval.String(),
+		ClientInputPackets: c.clientInputPackets,
+		LastClientInputAt:  c.lastClientInputAt,
 	}
 }
 

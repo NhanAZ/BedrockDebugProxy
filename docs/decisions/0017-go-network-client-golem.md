@@ -14,8 +14,10 @@ copy protocol code from another client implementation.
 
 The first boundary is login, resource-pack exchange, spawn, server form
 inspection, bounded form responses, chat, Transfer following, and a private
-structured session report. The client stores no credentials in the report and
-does not claim that its report is a canonical capture or a release report.
+structured session report. The next increment adds a bounded stationary
+`PlayerAuthInput` heartbeat after each spawn and a `stability` scenario
+operation. The client stores no credentials in the report and does not claim
+that its report is a canonical capture or a release report.
 
 ## Rationale
 
@@ -42,9 +44,10 @@ scope.
 
 The network report is supplemental evidence. It does not replace a verified
 BedrockDebugProxy capture, resource-pack decryption artifacts, or the existing
-release report checks. A later implementation step must add canonical capture
-integration, client tick and input behavior, complete pack decryption evidence,
-and a stability check before the network bot can become the release driver.
+release report checks. The stationary input loop is deliberately smaller than
+a complete game client. Canonical capture integration, full gameplay input,
+complete pack decryption evidence, and the release-grade stability check still
+remain before the network bot can become the release driver.
 
 No BedrockPackArchive change is required for this first step. The implementation
 does not change the proxy's capture or pack archive producer contract and does

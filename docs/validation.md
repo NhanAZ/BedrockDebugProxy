@@ -120,7 +120,7 @@ Start the stamped proxy with device authentication, a concrete loopback listener
     --decrypt-resource-packs
 ```
 
-The self-signed downstream is confined to loopback. Upstream Microsoft authentication remains required. This is an existing diagnostic opt-in and does not change the default listener authentication. The reviewed CLI protocol client remains the release test client. The Go `golem network` client is useful for direct server scenarios, but its current report cannot satisfy this workflow because it does not yet produce the canonical capture and full post-spawn input evidence. Do not open a retail client unless a separate visual or gameplay claim is explicitly in scope.
+The self-signed downstream is confined to loopback. Upstream Microsoft authentication remains required. This is an existing diagnostic opt-in and does not change the default listener authentication. The reviewed CLI protocol client remains the release test client. The Go `golem network` client is useful for direct server scenarios and now emits a bounded stationary post-spawn input heartbeat, but its supplemental report cannot satisfy this workflow because it does not yet produce the canonical capture or the complete post-spawn gameplay evidence. Do not open a retail client unless a separate visual or gameplay claim is explicitly in scope.
 
 Generate a new report after reviewing the closed capture. Keep older incomplete reports unchanged.
 

@@ -17,6 +17,9 @@ Detailed rationale remains in [`docs/audits/`](docs/audits/).
   packs, and spawn, inventories server forms, can submit bounded JSON form
   responses, follows Transfer hops, and writes a private local session report.
   This report is supplemental evidence and is not a release validation report.
+- Added a bounded stationary `PlayerAuthInput` heartbeat after spawn and a
+  `stability` scenario operation. The network Golem report now exposes the
+  input packet count and interval while remaining supplemental evidence.
 - Preserve small text-like resource-pack files when `contents.json` declares a key for bytes that are already plaintext. AES-CFB8 has no authentication, so the derived archive now avoids corrupting misdeclared README and similar text entries while continuing to decrypt entries whose source bytes are not clearly plaintext.
 
 ## [0.5.0] - 2026-11-02

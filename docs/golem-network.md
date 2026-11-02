@@ -46,7 +46,7 @@ operation is executed.
 {"op":"wait_form","id":"nested"}
 {"op":"select_form","id":"choose-hop","index":0}
 {"op":"wait","duration":"5s"}
-{"op":"observe","duration":"30s"}
+{"op":"stability","duration":"30s"}
 {"op":"report"}
 {"op":"quit"}
 ```
@@ -64,6 +64,9 @@ Supported operations are:
 - `chat` sends one client chat message. Server replies appear as later text
   events.
 - `wait` lets the reader continue collecting events for a bounded duration.
+- `stability` waits for a bounded post-spawn window while the client sends a
+  stationary `PlayerAuthInput` heartbeat, then returns the report and fails if
+  no client input packet was emitted.
 - `observe` waits and returns the current report snapshot.
 - `report` returns the current report snapshot immediately.
 - `quit` closes the session and stops the scenario.
@@ -87,17 +90,20 @@ are valid observed outcomes and must be classified from the returned events.
 
 The report schema is `bedrockdebugproxy.golem.network.v1`. It contains bounded
 event counts, packet type counts, forms, transfers, text messages, resource-pack
-count, hop count, spawn state, and errors. It intentionally does not contain
-raw packet bytes, authentication tokens, or decrypted pack contents.
+count, hop count, spawn state, stationary client-input count and rate, and
+errors. It intentionally does not contain raw packet bytes, authentication
+tokens, or decrypted pack contents.
 
-This report is not a release validation report. The current network bot does
-not yet send the full stream of post-spawn client input and gameplay packets,
-does not write canonical BedrockDebugProxy captures, and does not derive
-decrypted resource-pack archives. It is therefore useful for login, form,
-transfer, pack-count, and spawn investigations, but it cannot by itself satisfy
-`cli_session=pass`, post-spawn stability, or the six-server release gate.
-The existing proxy capture workflow and its reviewed CLI protocol driver remain
-the release evidence path until those boundaries are implemented and verified.
+This report is not a release validation report. The network bot now emits a
+bounded stationary `PlayerAuthInput` heartbeat after spawn, but it does not
+yet implement the full post-spawn movement/gameplay stream, write canonical
+BedrockDebugProxy captures, or derive decrypted resource-pack archives. It is
+therefore useful for login, form, transfer, pack-count, spawn, and basic
+post-spawn stability investigations, but it cannot by itself satisfy
+`cli_session=pass`, the complete `post_spawn_stability` check, or the
+six-server release gate. The existing proxy capture workflow and its reviewed
+CLI protocol driver remain the release evidence path until those boundaries
+are implemented and verified.
 
 ## Security and limits
 

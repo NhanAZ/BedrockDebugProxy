@@ -23,7 +23,7 @@ func TestGolemHelpAndInvalidInput(t *testing.T) {
 	if code := run([]string{"help", "golem-network"}, &out, &diagnostic); code != 0 {
 		t.Fatal(code)
 	}
-	for _, text := range []string{"--server", "--follow-transfers", "wait_form", "select_form", "supplemental"} {
+	for _, text := range []string{"--server", "--follow-transfers", "wait_form", "select_form", "stability", "supplemental"} {
 		if !strings.Contains(out.String(), text) {
 			t.Errorf("network Golem help lacks %q", text)
 		}

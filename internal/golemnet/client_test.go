@@ -8,6 +8,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/go-gl/mathgl/mgl32"
 	"github.com/sandertv/gophertunnel/minecraft"
 	"github.com/sandertv/gophertunnel/minecraft/protocol/login"
 	"github.com/sandertv/gophertunnel/minecraft/protocol/packet"
@@ -126,6 +127,92 @@ func TestClientCapturesFormAndSendsActions(t *testing.T) {
 	report := client.Snapshot()
 	if len(report.Forms) != 1 || report.PacketCounts["ModalFormRequest"] != 1 || report.PacketCounts["Text"] < 1 {
 		t.Fatalf("report = %+v", report)
+	}
+	if err := client.Close(); err != nil {
+		t.Fatal(err)
+	}
+	if err := <-serverErrors; err != nil {
+		t.Fatal(err)
+	}
+}
+
+func TestClientSendsStationaryPlayerAuthInput(t *testing.T) {
+	ctx, cancel := context.WithTimeout(t.Context(), 10*time.Second)
+	defer cancel()
+	listener, err := (minecraft.ListenConfig{AuthenticationDisabled: true, AllowUnknownPackets: true, AllowInvalidPackets: true}).Listen("raknet", "127.0.0.1:0")
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer func() { _ = listener.Close() }()
+	serverErrors := make(chan error, 1)
+	inputPackets := make(chan *packet.PlayerAuthInput, 3)
+	go func() {
+		accepted, acceptErr := listener.Accept()
+		if acceptErr != nil {
+			serverErrors <- acceptErr
+			return
+		}
+		conn, ok := accepted.(*minecraft.Conn)
+		if !ok {
+			serverErrors <- fmt.Errorf("unexpected server connection %T", accepted)
+			_ = accepted.Close()
+			return
+		}
+		defer func() { _ = conn.Close() }()
+		if err := conn.StartGame(minecraft.GameData{
+			WorldName:       "Input test",
+			EntityUniqueID:  1,
+			EntityRuntimeID: 1,
+			PlayerPosition:  mgl32.Vec3{12, 64, -8},
+			Pitch:           10,
+			Yaw:             90,
+		}); err != nil {
+			serverErrors <- err
+			return
+		}
+		for {
+			value, readErr := conn.ReadPacket()
+			if readErr != nil {
+				serverErrors <- nil
+				return
+			}
+			if input, ok := value.(*packet.PlayerAuthInput); ok {
+				select {
+				case inputPackets <- input:
+				default:
+				}
+			}
+		}
+	}()
+
+	client, err := New(Config{Address: listener.Addr().String()})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := client.Start(ctx); err != nil {
+		t.Fatal(err)
+	}
+	var received []*packet.PlayerAuthInput
+	for len(received) < 3 {
+		select {
+		case input := <-inputPackets:
+			received = append(received, input)
+		case <-ctx.Done():
+			t.Fatal(ctx.Err())
+		}
+	}
+	if received[0].Position != (mgl32.Vec3{12, 64, -8}) || received[0].Yaw != 90 || received[0].Pitch != 10 {
+		t.Fatalf("input position and rotation = %+v", received[0])
+	}
+	if received[0].InputMode != packet.InputModeTouch || received[0].PlayMode != packet.PlayModeNormal {
+		t.Fatalf("input modes = %+v", received[0])
+	}
+	if received[0].Tick == 0 || received[1].Tick <= received[0].Tick || received[2].Tick <= received[1].Tick {
+		t.Fatalf("input ticks = %d, %d, %d", received[0].Tick, received[1].Tick, received[2].Tick)
+	}
+	report := client.Snapshot()
+	if report.ClientInputPackets < 3 || !report.ClientInput || report.ClientInputRate != defaultClientInputInterval.String() {
+		t.Fatalf("input report = %+v", report)
 	}
 	if err := client.Close(); err != nil {
 		t.Fatal(err)

@@ -60,7 +60,7 @@ func runGolemNetwork(args []string, stdout, stderr io.Writer) int {
 	flags.Usage = func() {
 		_, _ = fmt.Fprintln(stderr, "Usage - bedrock-debug-proxy golem network --server HOST:PORT|experience:NAME [options]")
 		flags.PrintDefaults()
-		_, _ = fmt.Fprintln(stderr, "Scenario operations - wait_form, current_form, select_form, submit_form, chat, wait, observe, report, quit")
+		_, _ = fmt.Fprintln(stderr, "Scenario operations - wait_form, current_form, select_form, submit_form, chat, wait, stability, observe, report, quit")
 	}
 	if err := flags.Parse(args); err != nil {
 		if errors.Is(err, flag.ErrHelp) {
@@ -270,7 +270,7 @@ func validateNetworkScenarioRequest(request networkScenarioRequest) error {
 		return errors.New("request field exceeds size limit")
 	}
 	switch request.Op {
-	case "wait_form", "current_form", "select_form", "submit_form", "chat", "wait", "observe", "report", "quit":
+	case "wait_form", "current_form", "select_form", "submit_form", "chat", "wait", "stability", "observe", "report", "quit":
 		return nil
 	default:
 		return fmt.Errorf("unsupported op %q", request.Op)
@@ -303,6 +303,23 @@ func executeNetworkScenario(ctx context.Context, client *golemnet.Client, reques
 			return nil, false, err
 		}
 		return map[string]any{"waited": duration.String()}, false, client.Wait(ctx, duration)
+	case "stability":
+		duration, err := parseScenarioDuration(request.Duration)
+		if err != nil {
+			return nil, false, err
+		}
+		if err := client.Wait(ctx, duration); err != nil {
+			return nil, false, err
+		}
+		report := client.Snapshot()
+		if report.ClientInputPackets == 0 {
+			return nil, false, errors.New("stability window completed without a client input packet")
+		}
+		return map[string]any{
+			"observed":             duration.String(),
+			"client_input_packets": report.ClientInputPackets,
+			"report":               report,
+		}, false, nil
 	case "observe":
 		duration, err := parseScenarioDuration(request.Duration)
 		if err != nil {
