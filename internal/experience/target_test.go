@@ -168,7 +168,7 @@ func TestHTTPSNetherNetNetworkChecksEndpoint(t *testing.T) {
 			t.Fatalf("request = %s %s", request.Method, request.URL.Path)
 		}
 		w.Header().Set("Content-Type", "application/json")
-		_, _ = w.Write([]byte(`{"name":"Test server","protocol":2225,"version":"1.26.61"}`))
+		_, _ = w.Write([]byte(`{"name":"Test server","protocol":2225,"version":"1.26.62"}`))
 	})
 	network, err := newHTTPSNetherNetNetwork(context.Background(), server.Client(), server.URL)
 	if err != nil {

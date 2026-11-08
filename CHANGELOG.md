@@ -8,6 +8,7 @@ Detailed rationale remains in [`docs/audits/`](docs/audits/).
 
 ### Fixed
 
+- Updated the selected Bedrock client metadata to 1.26.62 while retaining protocol 2225 and the reviewed 1.26.60 packet codec. The official stable schema was cross-checked against the local codec; preview-only packet additions remain excluded.
 - Updated the vendored gophertunnel module manifest and checksums to the
   security-fixed `github.com/go-jose/go-jose/v4` `v4.1.6`, closing the nested
   manifest gap left after the root dependency update.

@@ -12,11 +12,11 @@ import (
 	"github.com/sandertv/gophertunnel/minecraft/protocol/packet"
 )
 
-func TestProtocolVersion12661(t *testing.T) {
+func TestProtocolVersion12662(t *testing.T) {
 	if got, want := protocol.CurrentProtocol, 2225; got != want {
 		t.Fatalf("protocol ID = %d, want %d", got, want)
 	}
-	if got, want := protocol.CurrentVersion, "1.26.61"; got != want {
+	if got, want := protocol.CurrentVersion, "1.26.62"; got != want {
 		t.Fatalf("game version = %q, want %q", got, want)
 	}
 }
@@ -302,7 +302,7 @@ func TestProtocol2225CorrectedPacketLayouts(t *testing.T) {
 func TestNetherNetClientDataAcceptsSinglePortURL(t *testing.T) {
 	base := login.ClientData{
 		DeviceOS:          1,
-		GameVersion:       "1.26.61",
+		GameVersion:       "1.26.62",
 		LanguageCode:      "en_US",
 		SkinResourcePatch: "e30=",
 		SkinID:            "synthetic",
