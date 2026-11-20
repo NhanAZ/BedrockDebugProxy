@@ -437,7 +437,7 @@ func golemValidationChecks(snapshot golemnet.Report, state *networkScenarioState
 		"cli_session=not_observed",
 		"authenticated_upstream=not_observed",
 	}
-	if scenarioStatus == 0 && snapshot.Spawned && snapshot.Closed && len(snapshot.Errors) == 0 && (evidence == nil || evidence.error() == nil) {
+	if scenarioStatus == 0 && snapshot.Spawned && snapshot.Closed && golemValidationCloseErrorsAreExpected(snapshot.Errors) && (evidence == nil || evidence.error() == nil) {
 		checks[0] = "cli_session=pass"
 	}
 	if snapshot.Authenticated {
@@ -454,6 +454,16 @@ func golemValidationChecks(snapshot golemnet.Report, state *networkScenarioState
 		}
 	}
 	return checks
+}
+
+func golemValidationCloseErrorsAreExpected(sessionErrors []string) bool {
+	const teleportAcknowledgementPrefix = "acknowledge server teleport: write teleport acknowledgement: "
+	for _, sessionError := range sessionErrors {
+		if !strings.HasPrefix(sessionError, teleportAcknowledgementPrefix) || !strings.HasSuffix(sessionError, ": "+net.ErrClosed.Error()) {
+			return false
+		}
+	}
+	return true
 }
 
 func appendValidationChecks(existing []string, additional []string) ([]string, error) {

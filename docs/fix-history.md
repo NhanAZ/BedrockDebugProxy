@@ -14,6 +14,16 @@ Every new entry should state the symptom, root cause, implementation commits, ev
 
 ## Compatibility and bug index
 
+### FIX-0176 - Accept the expected Golem close race after spawn
+
+- Symptom: after an authenticated Hive session completed its packs, spawned, and processed the immediate `quit`, the Golem report failed because a server teleport acknowledgement raced with the intentional socket close.
+- Classification: local release-report gating defect. Capture analysis showed all automatic requirements passed, and the only Golem client error was `net.ErrClosed` while acknowledging the server teleport after shutdown.
+- Root cause: the release check required an empty client error list even when the known acknowledgement write returned the closed-socket error caused by the required immediate shutdown.
+- Implementation: allow only the `net.ErrClosed` result from `acknowledge server teleport: write teleport acknowledgement`. Other Golem errors still prevent `cli_session=pass`. No packet flow, capture schema, recorded event, or importer behavior changes.
+- Evidence and validation: reproduced in an authenticated Hive Golem session. The client completed all offered encrypted packs, reached spawn, and closed. The sanitized capture analysis passed its automatic requirements. A focused regression permits the observed close race and rejects an unrelated session error.
+- Status: focused regression and the canonical quality gate pass in the working tree. The exact committed build still needs the six-server live matrix before release.
+- Related history: [FIX-0172](#fix-0172-acknowledge-server-teleports-in-go-golem) covers the earlier missing teleport acknowledgement. [AUDIT-0268](audits/AUDIT-0268-golem-immediate-close-report.md) records this shutdown-report correction.
+
 ### FIX-0175 - Prefetch URL resource packs in direct Go Golem sessions
 
 - Symptom: the direct Go Golem sent `ResourcePackClientResponse(SendPacks)` for an offer containing URL-delivered packs, then waited for RakNet chunks that the server did not provide. The session stalled before pack completion and spawn.

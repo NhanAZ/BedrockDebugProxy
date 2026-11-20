@@ -29,6 +29,27 @@ func TestGolemValidationChecksAcceptImmediateSpawnAndClose(t *testing.T) {
 	}
 }
 
+func TestGolemValidationChecksAllowOnlyExpectedCloseRace(t *testing.T) {
+	snapshot := golemnet.Report{
+		Spawned:       true,
+		Closed:        true,
+		Authenticated: true,
+		Errors: []string{
+			"acknowledge server teleport: write teleport acknowledgement: write packet synthetic: use of closed network connection",
+		},
+	}
+	checks := golemValidationChecks(snapshot, &networkScenarioState{}, nil, 0)
+	if got, want := strings.Join(checks, ","), "cli_session=pass,authenticated_upstream=pass"; got != want {
+		t.Fatalf("expected close-race checks = %q, want %q", got, want)
+	}
+
+	snapshot.Errors = []string{"unexpected protocol read failure"}
+	checks = golemValidationChecks(snapshot, &networkScenarioState{}, nil, 0)
+	if got, want := strings.Join(checks, ","), "cli_session=not_observed,authenticated_upstream=pass"; got != want {
+		t.Fatalf("unexpected session error checks = %q, want %q", got, want)
+	}
+}
+
 func TestValidationReportRequiresCompleteArtifactFolders(t *testing.T) {
 	if _, err := exec.LookPath("pwsh"); err != nil {
 		t.Skip("PowerShell is unavailable")

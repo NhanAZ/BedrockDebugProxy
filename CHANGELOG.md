@@ -18,6 +18,7 @@ Supported Bedrock version: 1.26.62 (protocol 2225).
 
 ### Fixed
 
+- Allow the known closed-socket race from a teleport acknowledgement after the requested immediate Golem shutdown. Other client errors still prevent a passing report.
 - Record failed best-effort HTTPS NetherNet transfer-route probes before the existing RakNet fallback. The fallback decision and capture schema are unchanged.
 - Updated the Go toolchain to 1.27.4 to remediate GO-2026-6859 in `net/http`.
 - Updated the selected Bedrock client metadata to 1.26.62 while retaining protocol 2225 and the reviewed 1.26.60 packet codec. The official stable schema was cross-checked against the local codec; preview-only packet additions remain excluded.
