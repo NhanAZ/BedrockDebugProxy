@@ -1,20 +1,178 @@
 package golemnet
 
 import (
+	"archive/zip"
+	"bytes"
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"net"
+	"net/http"
+	"net/http/httptest"
+	"strconv"
+	"strings"
 	"sync/atomic"
 	"testing"
 	"time"
 
 	"github.com/go-gl/mathgl/mgl32"
+	"github.com/google/uuid"
 	"github.com/sandertv/gophertunnel/minecraft"
 	"github.com/sandertv/gophertunnel/minecraft/protocol"
 	"github.com/sandertv/gophertunnel/minecraft/protocol/login"
 	"github.com/sandertv/gophertunnel/minecraft/protocol/packet"
+	"github.com/sandertv/gophertunnel/minecraft/resource"
 )
+
+func TestClientLoadsServerAdvertisedURLResourcePack(t *testing.T) {
+	ctx, cancel := context.WithTimeout(t.Context(), 10*time.Second)
+	defer cancel()
+	packUUID := uuid.MustParse("aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa")
+	archive := golemURLResourcePackArchive(t, packUUID, "1.0.0")
+	var downloads atomic.Int32
+	var offerPacketsObserved atomic.Int32
+	var checkingClientLoad atomic.Bool
+	packServer := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		if checkingClientLoad.Load() && offerPacketsObserved.Load() != 1 {
+			t.Errorf("ResourcePacksInfo observer count before URL fetch = %d, want 1", offerPacketsObserved.Load())
+		}
+		downloads.Add(1)
+		_, _ = w.Write(archive)
+	}))
+	defer packServer.Close()
+	pack, err := resource.ReadURL(packServer.URL)
+	if err != nil {
+		t.Fatal(err)
+	}
+	downloads.Store(0)
+	checkingClientLoad.Store(true)
+	responses := make(chan uint32, 4)
+	listener, err := (minecraft.ListenConfig{
+		AuthenticationDisabled: true,
+		ResourcePacks:          []*resource.Pack{pack},
+		PacketFunc: func(header packet.Header, payload []byte, _, _ net.Addr) {
+			if header.PacketID != packet.IDResourcePackClientResponse {
+				return
+			}
+			response := &packet.ResourcePackClientResponse{}
+			response.Marshal(protocol.NewReader(bytes.NewReader(payload), 0, true))
+			select {
+			case responses <- response.Response:
+			default:
+			}
+		},
+		FetchResourcePacksInfo: func(login.IdentityData, login.ClientData) *packet.ResourcePacksInfo {
+			return &packet.ResourcePacksInfo{TexturePacks: []protocol.TexturePackInfo{{
+				UUID: packUUID, Version: "1.0.0", Size: uint64(len(archive)), DownloadURL: packServer.URL,
+			}}}
+		},
+		FetchResourcePackStack: func(login.IdentityData, login.ClientData) *packet.ResourcePackStack {
+			return &packet.ResourcePackStack{TexturePacks: []protocol.StackResourcePack{{UUID: packUUID.String(), Version: "1.0.0"}}}
+		},
+	}).Listen("raknet", "127.0.0.1:0")
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer func() { _ = listener.Close() }()
+	serverErrors := make(chan error, 1)
+	go func() {
+		accepted, acceptErr := listener.Accept()
+		if acceptErr != nil {
+			serverErrors <- acceptErr
+			return
+		}
+		conn, ok := accepted.(*minecraft.Conn)
+		if !ok {
+			serverErrors <- fmt.Errorf("unexpected server connection %T", accepted)
+			_ = accepted.Close()
+			return
+		}
+		defer func() { _ = conn.Close() }()
+		serverErrors <- conn.StartGame(minecraft.GameData{WorldName: "URL pack Golem test", EntityUniqueID: 1, EntityRuntimeID: 1})
+	}()
+
+	client, err := New(Config{
+		Address:  listener.Addr().String(),
+		Identity: login.IdentityData{Identity: uuid.NewString(), DisplayName: "URLPackTest"},
+		PacketObserver: func(_ *minecraft.Conn, _ int, header packet.Header, _ []byte, _, _ net.Addr) {
+			if header.PacketID == packet.IDResourcePacksInfo {
+				offerPacketsObserved.Add(1)
+			}
+		},
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := client.Start(ctx); err != nil {
+		t.Fatal(err)
+	}
+	defer func() { _ = client.Close() }()
+	report := client.Snapshot()
+	if !report.Spawned || report.ResourcePacks != 1 {
+		t.Fatalf("Golem report = %+v, want one URL pack and spawn", report)
+	}
+	if got := downloads.Load(); got != 1 {
+		t.Fatalf("HTTP pack downloads = %d, want 1", got)
+	}
+	select {
+	case response := <-responses:
+		if response != packet.PackResponseAllPacksDownloaded {
+			t.Fatalf("first pack response = %v, want AllPacksDownloaded without chunk requests", response)
+		}
+	case <-ctx.Done():
+		t.Fatal("server did not receive the completed pack response")
+	}
+	if err := client.Close(); err != nil {
+		t.Fatal(err)
+	}
+	if err := <-serverErrors; err != nil && !errors.Is(err, context.Canceled) {
+		t.Fatal(err)
+	}
+}
+
+func golemURLResourcePackArchive(t *testing.T, packUUID uuid.UUID, version string) []byte {
+	t.Helper()
+	versionParts := make([]int, 3)
+	for index, part := range strings.Split(version, ".") {
+		if index == len(versionParts) {
+			break
+		}
+		versionParts[index], _ = strconv.Atoi(part)
+	}
+	manifest, err := json.Marshal(map[string]any{
+		"format_version": 2,
+		"header": map[string]any{
+			"description":        "Synthetic Golem URL pack",
+			"name":               "Synthetic Golem URL pack",
+			"uuid":               packUUID.String(),
+			"version":            versionParts,
+			"min_engine_version": []int{1, 20, 0},
+		},
+		"modules": []any{map[string]any{
+			"description": "Synthetic Golem URL pack module",
+			"type":        "resources",
+			"uuid":        "bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb",
+			"version":     versionParts,
+		}},
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	var archive bytes.Buffer
+	writer := zip.NewWriter(&archive)
+	file, err := writer.Create("manifest.json")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := file.Write(manifest); err != nil {
+		t.Fatal(err)
+	}
+	if err := writer.Close(); err != nil {
+		t.Fatal(err)
+	}
+	return archive.Bytes()
+}
 
 func TestClientCapturesFormAndSendsActions(t *testing.T) {
 	ctx, cancel := context.WithTimeout(t.Context(), 10*time.Second)

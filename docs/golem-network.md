@@ -9,6 +9,8 @@ The client resolves a literal `HOST:PORT` or an `experience:NAME` selector,
 authenticates when requested, completes the upstream login and resource-pack
 exchange, calls `DoSpawn`, and then reads server packets into a bounded event
 stream. It recognizes server text, forms, disconnects, and Transfer packets.
+Its direct dial uses the same per-connection bounded URL-pack cache as proxy
+sessions, so offers that provide HTTPS pack URLs can complete before spawn.
 Transfer following is enabled by default. RakNet hops preserve the previous
 source address and client GUID when the transport exposes them. A NetherNet
 transfer to a UUID with port zero reuses the signaling network from an

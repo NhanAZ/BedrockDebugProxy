@@ -16,9 +16,9 @@ For a routine pull request with one focused runtime commit, `run --packs-only` i
 
 A packs-only report is expected to have `result=incomplete` and `normal_session=not_observed`; it is scoped evidence for development pull requests and is never a release pass. Mark `packs_exchange=pass` only when the capture shows that the offered packs completed the supported exchange. If no pack is offered or the connection stops before exchange completes, record the relevant check as `not_observed` or `fail`. A general successful connection is not proof of a flow that the capture did not observe.
 
-Changes outside the packs-only boundary still need focused automated, fixture, or loopback coverage for the affected flow. For example, a transfer-following change must test the `Transfer` path and next-hop behavior without treating a first-hop packs-only login as coverage. Resource-pack decryption changes require evidence of the supported decryption path. Agents may use the Golem CLI on a disposable PocketMine-MP or Axolotl-PM server for server-side plugin scenarios, but Golem is not a network client and cannot replace the public-server matrix. Record remaining live behavior as unobserved and complete the full agent-controlled protocol-client session at the release gate.
+Changes outside the packs-only boundary still need focused automated, fixture, or loopback coverage for the affected flow. For example, a transfer-following change must test the `Transfer` path and next-hop behavior without treating a first-hop packs-only login as coverage. Resource-pack decryption changes require evidence of the supported decryption path. Use `golem network` as the agent-controlled Bedrock client for public protocol sessions and the PHP Golem CLI only for disposable local PocketMine-MP or Axolotl-PM plugin scenarios. The Go client writes the canonical capture and can generate the validation report from that capture. It does not establish retail rendering or gameplay. Record remaining live behavior as unobserved and complete the required full protocol-client session at the release gate.
 
-For transfer-following changes, focused automated or loopback coverage must exercise the `Transfer` rewrite, a successful next-hop transport and upstream connection, and the next hop's resource-pack exchange when offered. When the route probe exposes it, inspect `client_guid_preserved: true` as evidence that the RakNet identity was carried into the next-hop handshake. A first-hop packs-only connection alone is not sufficient evidence for a transfer fix. The Go `golem network` mode can provide supplemental direct-client Transfer and form evidence, but its current report is not a canonical capture or a release report. Enchanted's release traversal is context-aware: the current form determines the available routes, and only routes that actually emit `Transfer` require transfer-following evidence. The full client flow through a later spawn remains part of Enchanted's release validation when a playable child route exists.
+For transfer-following changes, focused automated or loopback coverage must exercise the `Transfer` rewrite, a successful next-hop transport and upstream connection, and the next hop's resource-pack exchange when offered. When the route probe exposes it, inspect `client_guid_preserved: true` as evidence that the RakNet identity was carried into the next-hop handshake. A first-hop packs-only connection alone is not sufficient evidence for a transfer fix. The authenticated Go `golem network` session provides the direct-client capture and report for the live route. Enchanted's release traversal is context-aware: the current form determines the available routes, and only routes that actually emit `Transfer` require transfer-following evidence. The full client flow through a later spawn remains part of Enchanted's release validation when a playable child route exists.
 
 The pre-reconnect route probe is a best-effort route hint. Its ping response or failure remains in the raw capture and analysis, and a failure marked `best_effort=true` is non-blocking only when the normal next-hop session still connects and reaches the required flow. The optional upstream address-discovery ping is bounded to five seconds for an initial dial and 750 ms for a transfer hop so a lost UDP ping cannot consume the full login and resource-pack deadline. Status-ping errors without the `best_effort` marker remain blocking.
 
@@ -88,7 +88,7 @@ Release validation always uses `--decrypt-resource-packs`. When an offered pack 
 
 ## Release gate
 
-Every official release requires a full authenticated session driven by an agent-controlled protocol client and a passing report tied to a validated runtime revision for each baseline server. The release process does not require a retail Minecraft client. Use Golem CLI for local server/plugin validation, but do not label its simulation journal as a public-server report. Release sessions must decrypt every encrypted offered pack. CubeCraft has no separate repeated risk-acknowledgement gate. See [the maintainer decision](decisions/0015-cli-release-validation.md).
+Every official release requires a full authenticated session driven by the Go `golem network` protocol client and a passing report tied to a validated runtime revision for each baseline server. The release process does not require a retail Minecraft client. Use the PHP Golem CLI for local server/plugin validation, but do not label its simulation journal as a public-server report. Release sessions must decrypt every encrypted offered pack. CubeCraft has no separate repeated risk-acknowledgement gate. See [the maintainer decision](decisions/0015-cli-release-validation.md).
 
 - The Hive
 - Galaxite
@@ -108,19 +108,21 @@ After generating all six reports for one runtime revision, run
 
 ### CLI session workflow
 
-Start the stamped proxy with device authentication, a concrete loopback listener, and the existing self-signed downstream opt-in. Connect a reviewed CLI protocol client to that listener, accept offered resource packs, complete spawn, consume packets, and perform ordinary required protocol responses for at least 30 seconds after spawn. Retain the driver revision or exact local source with the private evidence. Close the client and let the proxy finalize artifacts and verification. Use a single approved account session at a time.
+Use the stamped Go network client with device authentication and `--decrypt-resource-packs`. Inspect the current forms and packet flow, complete the offered packs, follow observed Transfers, reach the required spawn, and run the stationary post-spawn stability interval. The client writes the canonical capture and validation report. Use a single approved account session at a time.
 
 ```powershell
-.\bin\bedrock-debug-proxy.exe run `
-    --listen "127.0.0.1:19134" `
-    --upstream "experience:The Hive" `
+.\bin\bedrock-debug-proxy.exe golem network `
+    --server "experience:The Hive" `
     --auth device `
-    --allow-unauthenticated-client `
-    --follow-transfers `
-    --decrypt-resource-packs
+    --capture .local\validation\the-hive `
+    --decrypt-resource-packs `
+    --validation-report validation\local\<REVISION>\the-hive.json `
+    --server-label "The Hive" `
+    --validation-result incomplete `
+    --input .local\validation\the-hive.jsonl
 ```
 
-The self-signed downstream is confined to loopback. Upstream Microsoft authentication remains required. This is an existing diagnostic opt-in and does not change the default listener authentication. The reviewed CLI protocol client remains the release test client. The Go `golem network` client is useful for direct server scenarios and now emits a bounded stationary post-spawn input heartbeat, but its supplemental report cannot satisfy this workflow because it does not yet produce the canonical capture or the complete post-spawn gameplay evidence. Do not open a retail client unless a separate visual or gameplay claim is explicitly in scope.
+The Go network client authenticates directly upstream and sends a stationary `PlayerAuthInput` heartbeat during the stability interval. A passing report remains scoped to the packets and routes observed in that capture. Do not open a retail client unless a separate visual or gameplay claim is explicitly in scope.
 
 Generate a new report after reviewing the closed capture. Keep older incomplete reports unchanged.
 

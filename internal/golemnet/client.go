@@ -21,6 +21,7 @@ import (
 	"time"
 
 	"github.com/NhanAZ/BedrockDebugProxy/internal/experience"
+	"github.com/NhanAZ/BedrockDebugProxy/internal/urlpackcache"
 	"github.com/go-gl/mathgl/mgl32"
 	"github.com/google/uuid"
 	"github.com/sandertv/gophertunnel/minecraft"
@@ -290,6 +291,7 @@ func (c *Client) Start(parent context.Context) error {
 
 func (c *Client) dial(ctx context.Context, address string, network minecraft.Network, identity login.IdentityData, client login.ClientData, localAddr *net.UDPAddr, clientGUID int64, hop int) (*minecraft.Conn, error) {
 	var callbackConn *minecraft.Conn
+	urlResourcePacks := urlpackcache.New(ctx)
 	dialer := minecraft.Dialer{
 		ErrorLog:                   c.config.Logger,
 		HTTPClient:                 c.config.HTTPClient,
@@ -298,6 +300,7 @@ func (c *Client) dial(ctx context.Context, address string, network minecraft.Net
 		ClientData:                 client,
 		RakNetLocalAddr:            localAddr,
 		RakNetClientGUID:           clientGUID,
+		ResourcePackCache:          urlResourcePacks,
 		PingTimeout:                5 * time.Second,
 		DisconnectOnUnknownPackets: false,
 		DisconnectOnInvalidPackets: false,
@@ -311,6 +314,7 @@ func (c *Client) dial(ctx context.Context, address string, network minecraft.Net
 			if callbackConn != nil && c.config.PacketObserver != nil {
 				c.config.PacketObserver(callbackConn, hop, header, payload, src, dst)
 			}
+			urlResourcePacks.Observe(header, payload)
 		},
 	}
 	var conn *minecraft.Conn

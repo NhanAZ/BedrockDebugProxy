@@ -22,6 +22,7 @@ import (
 	"github.com/NhanAZ/BedrockDebugProxy/internal/artifacts"
 	"github.com/NhanAZ/BedrockDebugProxy/internal/bedrock"
 	"github.com/NhanAZ/BedrockDebugProxy/internal/capture"
+	"github.com/NhanAZ/BedrockDebugProxy/internal/urlpackcache"
 	"github.com/go-gl/mathgl/mgl32"
 	"github.com/google/uuid"
 	"github.com/sandertv/gophertunnel/minecraft"
@@ -1374,7 +1375,7 @@ func TestRunnerForwardsBidirectionalPacketsAndCapturesSession(t *testing.T) {
 					if err != nil {
 						return err
 					}
-					info, err := decodeResourcePacksInfo(payload)
+					info, err := urlpackcache.DecodeResourcePacksInfo(payload)
 					if err != nil {
 						return err
 					}

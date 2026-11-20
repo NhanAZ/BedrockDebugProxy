@@ -1,4 +1,4 @@
-package proxy
+package urlpackcache
 
 import (
 	"bytes"
@@ -30,11 +30,11 @@ const urlResourcePackDownloadWait = 60 * time.Second
 // and HTTP pressure without limit.
 const urlResourcePackDownloadConcurrency = 3
 
-// urlResourcePackCache adapts the URL form of ResourcePacksInfo to
+// Cache adapts the URL form of ResourcePacksInfo to
 // gophertunnel's ResourcePackCache interface. gophertunnel invokes PacketFunc
 // before decoding a packet, which lets this cache observe the advertised URL
 // and populate a cache entry before handleResourcePacksInfo asks for it.
-type urlResourcePackCache struct {
+type Cache struct {
 	ctx context.Context
 
 	mu         sync.Mutex
@@ -50,11 +50,12 @@ type urlResourcePackCache struct {
 	urlCount   int
 }
 
-func newURLResourcePackCache(ctx context.Context) *urlResourcePackCache {
+// New creates a per-connection cache using ctx to bound and cancel URL reads.
+func New(ctx context.Context) *Cache {
 	if ctx == nil {
 		ctx = context.Background()
 	}
-	return &urlResourcePackCache{
+	return &Cache{
 		ctx:        ctx,
 		packs:      make(map[minecraft.ResourcePackCacheKey]*resource.Pack),
 		packOrder:  make([]minecraft.ResourcePackCacheKey, 0),
@@ -69,11 +70,11 @@ func newURLResourcePackCache(ctx context.Context) *urlResourcePackCache {
 // Observe looks for ResourcePacksInfo packets and downloads only packs that
 // carry a URL. The original packet is still passed to the normal observer and
 // remains the canonical evidence for the advertised URL.
-func (cache *urlResourcePackCache) Observe(header packet.Header, payload []byte) {
+func (cache *Cache) Observe(header packet.Header, payload []byte) {
 	if header.PacketID != packet.IDResourcePacksInfo {
 		return
 	}
-	info, err := decodeResourcePacksInfo(payload)
+	info, err := DecodeResourcePacksInfo(payload)
 	if err != nil {
 		// The normal gophertunnel decoder will retain the malformed packet as an
 		// observable failure. There is no cache key to attach this error to.
@@ -177,7 +178,7 @@ func (cache *urlResourcePackCache) Observe(header packet.Header, payload []byte)
 // ResourcePacksInfo. Cached entries are preferred over any same-key entry
 // returned by gophertunnel. Entries not present in the complete offer order
 // are retained at the end so this method does not discard observed data.
-func (cache *urlResourcePackCache) Merge(existing []*resource.Pack) []*resource.Pack {
+func (cache *Cache) Merge(existing []*resource.Pack) []*resource.Pack {
 	cache.mu.Lock()
 	offerOrder := append([]minecraft.ResourcePackCacheKey(nil), cache.offerOrder...)
 	packOrder := append([]minecraft.ResourcePackCacheKey(nil), cache.packOrder...)
@@ -239,7 +240,7 @@ func resourcePackKey(pack *resource.Pack) minecraft.ResourcePackCacheKey {
 	return minecraft.ResourcePackCacheKey{UUID: pack.UUID(), Version: pack.Version(), Size: uint64(size)}
 }
 
-func (cache *urlResourcePackCache) download(advertised protocol.TexturePackInfo) (*resource.Pack, error) {
+func (cache *Cache) download(advertised protocol.TexturePackInfo) (*resource.Pack, error) {
 	parsed, err := url.Parse(advertised.DownloadURL)
 	if err != nil {
 		return nil, fmt.Errorf("parse resource pack URL %q: %w", advertised.DownloadURL, err)
@@ -274,7 +275,7 @@ func (cache *urlResourcePackCache) download(advertised protocol.TexturePackInfo)
 // Load implements minecraft.ResourcePackCache. URL failures are returned to
 // gophertunnel, which records the warning and falls back to its normal chunk
 // request path. This keeps failures visible without hiding the raw packet.
-func (cache *urlResourcePackCache) Load(ctx context.Context, key minecraft.ResourcePackCacheKey) (*resource.Pack, error) {
+func (cache *Cache) Load(ctx context.Context, key minecraft.ResourcePackCacheKey) (*resource.Pack, error) {
 	if ctx == nil {
 		ctx = context.Background()
 	}
@@ -294,7 +295,7 @@ func (cache *urlResourcePackCache) Load(ctx context.Context, key minecraft.Resou
 // Store implements minecraft.ResourcePackCache for non-URL packs. It allows
 // the same per-connection cache to retain normal RakNet downloads if a server
 // mixes URL and chunk-delivered packs.
-func (cache *urlResourcePackCache) Store(ctx context.Context, key minecraft.ResourcePackCacheKey, pack *resource.Pack) error {
+func (cache *Cache) Store(ctx context.Context, key minecraft.ResourcePackCacheKey, pack *resource.Pack) error {
 	if ctx == nil {
 		ctx = context.Background()
 	}
@@ -329,7 +330,7 @@ func (cache *urlResourcePackCache) Store(ctx context.Context, key minecraft.Reso
 // the proxy tolerant of implementations that omit that optional phase. The
 // longer download timeout prevents a slow pack from being exposed downstream
 // before the cache is ready.
-func (cache *urlResourcePackCache) WaitForOffer(ctx context.Context) bool {
+func (cache *Cache) WaitForOffer(ctx context.Context) bool {
 	if ctx == nil {
 		ctx = context.Background()
 	}
@@ -363,7 +364,7 @@ func (cache *urlResourcePackCache) WaitForOffer(ctx context.Context) bool {
 // Packs returns cached packs in cache completion order. It is retained for
 // diagnostics and tests. The connection path uses Merge instead because
 // completion order is not the complete ResourcePacksInfo offer order.
-func (cache *urlResourcePackCache) Packs() []*resource.Pack {
+func (cache *Cache) Packs() []*resource.Pack {
 	cache.mu.Lock()
 	defer cache.mu.Unlock()
 	packs := make([]*resource.Pack, 0, len(cache.packOrder))
@@ -375,7 +376,10 @@ func (cache *urlResourcePackCache) Packs() []*resource.Pack {
 	return packs
 }
 
-func decodeResourcePacksInfo(payload []byte) (info *packet.ResourcePacksInfo, err error) {
+// DecodeResourcePacksInfo decodes a raw ResourcePacksInfo payload without
+// changing the caller-owned bytes. It accepts the protocol's final empty URL
+// string when it ends exactly at the end of the packet payload.
+func DecodeResourcePacksInfo(payload []byte) (info *packet.ResourcePacksInfo, err error) {
 	defer func() {
 		if recovered := recover(); recovered != nil {
 			err = fmt.Errorf("decode ResourcePacksInfo: %v", recovered)
@@ -393,4 +397,4 @@ func decodeResourcePacksInfo(payload []byte) (info *packet.ResourcePacksInfo, er
 	return info, nil
 }
 
-var _ minecraft.ResourcePackCache = (*urlResourcePackCache)(nil)
+var _ minecraft.ResourcePackCache = (*Cache)(nil)

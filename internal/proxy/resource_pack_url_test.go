@@ -16,6 +16,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/NhanAZ/BedrockDebugProxy/internal/urlpackcache"
 	"github.com/google/uuid"
 	"github.com/sandertv/gophertunnel/minecraft"
 	"github.com/sandertv/gophertunnel/minecraft/protocol"
@@ -45,7 +46,7 @@ func TestURLResourcePackCacheLoadsAdvertisedPack(t *testing.T) {
 		DownloadURL: server.URL,
 	}}}
 	payload := encodeResourcePacksInfo(t, info)
-	cache := newURLResourcePackCache(context.Background())
+	cache := urlpackcache.New(context.Background())
 	cache.Observe(packet.Header{PacketID: packet.IDResourcePacksInfo}, payload)
 	if !cache.WaitForOffer(context.Background()) {
 		t.Fatal("resource-pack offer was not observed")
@@ -92,7 +93,7 @@ func TestURLResourcePackCacheReportsAdvertisedPackMismatch(t *testing.T) {
 		Size:        uint64(len(archive)),
 		DownloadURL: server.URL,
 	}}}
-	cache := newURLResourcePackCache(context.Background())
+	cache := urlpackcache.New(context.Background())
 	cache.Observe(packet.Header{PacketID: packet.IDResourcePacksInfo}, encodeResourcePacksInfo(t, info))
 
 	key := minecraft.ResourcePackCacheKey{UUID: info.TexturePacks[0].UUID, Version: "1.0.0", Size: uint64(len(archive))}
@@ -135,7 +136,7 @@ func TestURLResourcePackCacheRejectsIncompleteHTTPBody(t *testing.T) {
 		Size:        uint64(len(archive)),
 		DownloadURL: server.URL,
 	}}}
-	cache := newURLResourcePackCache(context.Background())
+	cache := urlpackcache.New(context.Background())
 	cache.Observe(packet.Header{PacketID: packet.IDResourcePacksInfo}, encodeResourcePacksInfo(t, info))
 	pack, err := cache.Load(context.Background(), minecraft.ResourcePackCacheKey{
 		UUID: info.TexturePacks[0].UUID, Version: "1.0.0", Size: uint64(len(archive)),
@@ -171,7 +172,7 @@ func TestURLResourcePackCacheBoundsResponseBodyToAdvertisedSize(t *testing.T) {
 		Size:        uint64(len(archive)),
 		DownloadURL: server.URL,
 	}}}
-	cache := newURLResourcePackCache(context.Background())
+	cache := urlpackcache.New(context.Background())
 	cache.Observe(packet.Header{PacketID: packet.IDResourcePacksInfo}, encodeResourcePacksInfo(t, info))
 	key := minecraft.ResourcePackCacheKey{UUID: info.TexturePacks[0].UUID, Version: "1.0.0", Size: uint64(len(archive))}
 	pack, err := cache.Load(context.Background(), key)
@@ -199,7 +200,7 @@ func TestURLResourcePackCacheCancelsInFlightDownload(t *testing.T) {
 	}}}
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
-	cache := newURLResourcePackCache(ctx)
+	cache := urlpackcache.New(ctx)
 	done := make(chan struct{})
 	go func() {
 		cache.Observe(packet.Header{PacketID: packet.IDResourcePacksInfo}, encodeResourcePacksInfo(t, info))
@@ -251,7 +252,7 @@ func TestURLResourcePackCacheDownloadsPacksConcurrentlyInOfferOrder(t *testing.T
 		{UUID: firstUUID, Version: "1.0.0", Size: uint64(len(archives["/first.zip"])), DownloadURL: server.URL + "/first.zip"},
 		{UUID: secondUUID, Version: "2.0.0", Size: uint64(len(archives["/second.zip"])), DownloadURL: server.URL + "/second.zip"},
 	}}
-	cache := newURLResourcePackCache(context.Background())
+	cache := urlpackcache.New(context.Background())
 	done := make(chan struct{})
 	go func() {
 		cache.Observe(packet.Header{PacketID: packet.IDResourcePacksInfo}, encodeResourcePacksInfo(t, info))
@@ -305,7 +306,7 @@ func TestURLResourcePackCacheMergePreservesMixedOfferOrder(t *testing.T) {
 		{UUID: middleUUID, Version: "2.0.0", Size: uint64(len(archives["/middle.zip"]))},
 		{UUID: lastUUID, Version: "3.0.0", Size: uint64(len(archives["/last.zip"])), DownloadURL: server.URL + "/last.zip"},
 	}}
-	cache := newURLResourcePackCache(context.Background())
+	cache := urlpackcache.New(context.Background())
 	cache.Observe(packet.Header{PacketID: packet.IDResourcePacksInfo}, encodeResourcePacksInfo(t, info))
 	if !cache.WaitForOffer(context.Background()) {
 		t.Fatal("resource-pack offer was not observed")
@@ -342,10 +343,12 @@ func TestURLResourcePackCacheMergePreservesChunkOnlyOfferOrder(t *testing.T) {
 		{UUID: firstUUID, Version: "1.0.0", Size: uint64(len(firstArchive))},
 		{UUID: secondUUID, Version: "2.0.0", Size: uint64(len(secondArchive))},
 	}}
-	cache := newURLResourcePackCache(context.Background())
+	cache := urlpackcache.New(context.Background())
 	cache.Observe(packet.Header{PacketID: packet.IDResourcePacksInfo}, encodeResourcePacksInfo(t, info))
+	packSizes := map[uuid.UUID]uint64{firstUUID: uint64(len(firstArchive)), secondUUID: uint64(len(secondArchive))}
 	for _, pack := range []*resource.Pack{second, first} {
-		if err := cache.Store(context.Background(), resourcePackKey(pack), pack); err != nil {
+		key := minecraft.ResourcePackCacheKey{UUID: pack.UUID(), Version: pack.Version(), Size: packSizes[pack.UUID()]}
+		if err := cache.Store(context.Background(), key, pack); err != nil {
 			t.Fatal(err)
 		}
 	}
@@ -361,7 +364,7 @@ func TestDecodeResourcePacksInfoAcceptsFinalEmptyDownloadURL(t *testing.T) {
 	}}}
 	payload := encodeResourcePacksInfo(t, info)
 	original := bytes.Clone(payload)
-	decoded, err := decodeResourcePacksInfo(payload)
+	decoded, err := urlpackcache.DecodeResourcePacksInfo(payload)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -385,10 +388,21 @@ func TestURLResourcePackCacheStoreClearsPreviousPrefetchError(t *testing.T) {
 		t.Fatalf("test pack does not match key: %#v", key)
 	}
 
-	cache := newURLResourcePackCache(context.Background())
-	cache.mu.Lock()
-	cache.errors[key] = errors.New("synthetic URL prefetch failure")
-	cache.mu.Unlock()
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		http.Error(w, "synthetic prefetch failure", http.StatusBadGateway)
+	}))
+	defer server.Close()
+	info := &packet.ResourcePacksInfo{TexturePacks: []protocol.TexturePackInfo{{
+		UUID: packUUID, Version: "1.0.0", Size: uint64(len(archive)), DownloadURL: server.URL,
+	}}}
+	cache := urlpackcache.New(context.Background())
+	cache.Observe(packet.Header{PacketID: packet.IDResourcePacksInfo}, encodeResourcePacksInfo(t, info))
+	if !cache.WaitForOffer(context.Background()) {
+		t.Fatal("resource-pack offer was not observed")
+	}
+	if _, err := cache.Load(context.Background(), key); err == nil {
+		t.Fatal("failed URL prefetch returned no error")
+	}
 
 	if err := cache.Store(context.Background(), key, pack); err != nil {
 		t.Fatalf("store fallback pack: %v", err)
@@ -417,7 +431,7 @@ func TestResourcePacksForDownstreamClearsURL(t *testing.T) {
 		ContentKey:  "synthetic-content-key",
 	}}}
 
-	cache := newURLResourcePackCache(context.Background())
+	cache := urlpackcache.New(context.Background())
 	cache.Observe(packet.Header{PacketID: packet.IDResourcePacksInfo}, encodeResourcePacksInfo(t, info))
 	packs, err := resourcePacksForDownstream(cache.Packs())
 	if err != nil {
@@ -439,14 +453,14 @@ func TestResourcePacksForDownstreamClearsURL(t *testing.T) {
 }
 
 func TestDecodeResourcePacksInfoMalformedPayloadDoesNotPanic(t *testing.T) {
-	if info, err := decodeResourcePacksInfo([]byte{0xff}); err == nil || info != nil {
+	if info, err := urlpackcache.DecodeResourcePacksInfo([]byte{0xff}); err == nil || info != nil {
 		t.Fatalf("decode result = %#v, err = %v", info, err)
 	}
 }
 
 func TestDecodeResourcePacksInfoRejectsTrailingBytes(t *testing.T) {
 	payload := append(encodeResourcePacksInfo(t, &packet.ResourcePacksInfo{}), 0x00)
-	if info, err := decodeResourcePacksInfo(payload); err == nil || info != nil {
+	if info, err := urlpackcache.DecodeResourcePacksInfo(payload); err == nil || info != nil {
 		t.Fatalf("decode result = %#v, err = %v", info, err)
 	}
 }

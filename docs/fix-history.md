@@ -14,6 +14,15 @@ Every new entry should state the symptom, root cause, implementation commits, ev
 
 ## Compatibility and bug index
 
+### FIX-0175 - Prefetch URL resource packs in direct Go Golem sessions
+
+- Symptom: the direct Go Golem sent `ResourcePackClientResponse(SendPacks)` for an offer containing URL-delivered packs, then waited for RakNet chunks that the server did not provide. The session stalled before pack completion and spawn.
+- Classification: a missing reuse of existing BedrockDebugProxy resource-pack handling in the direct protocol client. The working proxy `--packs-only` path completed the same URL-pack offer, so the live behavior did not establish a server outage.
+- Root cause: proxy dials installed the bounded URL-pack cache through `ResourcePackCache` and observed `ResourcePacksInfo` before gophertunnel decoded it. The Go Golem dial did neither.
+- Implementation: extract the existing URL cache into a shared internal package and install it in both proxy and Go Golem dialers. Keep the original packet observation, URL validation, advertised UUID/version/size checks, bounded download, cache fallback, and archive capture behavior.
+- Evidence and validation: a synthetic loopback server advertises an HTTPS URL pack and omits its chunk archive. The Go Golem downloads exactly one pack, returns `AllPacksDownloaded`, and reaches spawn. The paired BedrockPackArchive fixture imports the canonical archive event from a URL offer without changing importer behavior.
+- Status: focused Golem/proxy checks pass. Full quality gates and exact stamped live validation are recorded in [AUDIT-0262](audits/AUDIT-0262-golem-url-resource-pack-cache.md). A fresh full 14-experience acquisition remains pending.
+
 ### FIX-0174 - Decode structured text in Go Golem forms
 
 - Symptom: a server-sent form using a structured `rawtext` title or content was retained but could not be inspected or selected through the Go Golem report.

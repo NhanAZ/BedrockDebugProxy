@@ -18,6 +18,7 @@ import (
 	"github.com/NhanAZ/BedrockDebugProxy/internal/bedrock"
 	"github.com/NhanAZ/BedrockDebugProxy/internal/capture"
 	"github.com/NhanAZ/BedrockDebugProxy/internal/packetview"
+	"github.com/NhanAZ/BedrockDebugProxy/internal/urlpackcache"
 	"github.com/google/uuid"
 	"github.com/sandertv/gophertunnel/minecraft"
 	"github.com/sandertv/gophertunnel/minecraft/protocol/login"
@@ -946,7 +947,7 @@ func (r *Runner) connectUpstream(ctx context.Context, target string, network bed
 	live.Info("Connecting upstream - %s (hop %d) - waiting for upstream login and resource-pack exchange (buffered by design)", target, hop)
 	dialCtx, cancelDial := context.WithTimeout(ctx, upstreamDialTimeout)
 	defer cancelDial()
-	urlResourcePacks := newURLResourcePackCache(dialCtx)
+	urlResourcePacks := urlpackcache.New(dialCtx)
 	recordPacket := observer.PacketFunc("upstream", connectionID)
 	pingTimeout := upstreamDialPingTimeout
 	if transferRoute {

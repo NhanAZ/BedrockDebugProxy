@@ -21,6 +21,8 @@ Detailed rationale remains in [`docs/audits/`](docs/audits/).
   generic 1,024-item limit.
 - Updated the Go Golem form view to read structured `rawtext` values and
   `content` forms while preserving the original server JSON.
+- Reused the bounded per-connection URL resource-pack cache in direct Go Golem
+  sessions so URL-advertised offers complete without relying on RakNet chunks.
 - Kept generic network telemetry out of the bounded Go Golem scenario-event
   queue, rolled its diagnostic history instead of failing at the cap, packed
   validation checks as one PowerShell array argument, and changed the default

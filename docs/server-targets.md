@@ -25,7 +25,7 @@ These six targets are the required release matrix. Use the exact selector with t
 | Enchanted | `experience:Enchanted` | `play.enchanted.gg:19132` | Creator Experience |
 | CubeCraft | `experience:CubeCraft` | `play.cubecraft.net:19132` | Featured server |
 
-For release validation, follow [`validation.md`](validation.md) and [`releasing.md`](releasing.md). Use a concrete loopback address for the agent-controlled protocol client when testing `--follow-transfers`; a retail client is not required. Use Golem CLI only for disposable local server/plugin scenarios, not as a public-server network client. Do not place raw addresses, credentials, or captures in sanitized reports.
+For release validation, follow [`validation.md`](validation.md) and [`releasing.md`](releasing.md). Use Go `golem network` for the authenticated public-server protocol client, and use a concrete loopback address when testing the proxy listener's `--follow-transfers` behavior. A retail client is not required. Use the PHP Golem simulation only for disposable local server/plugin scenarios. Do not place raw addresses, credentials, or captures in sanitized reports.
 
 Enchanted has a context-aware release flow beyond hub connectivity. The server sends a form automatically when the player joins, and that form is the authority for the current child list and status. Inventory the entries without assuming a fixed order or fixed names. Classify each entry as an available child, a maintenance or unavailable item, a navigation item, or an informational/status item.
 
@@ -69,3 +69,5 @@ CubeCraft's published policies explicitly prohibit proxies in Minecraft Bedrock:
 - [Allowed Mods and Clients](https://www.cubecraft.net/threads/allowed-mods-and-clients.228596/) - reviewed 2026-09-22.
 
 The release command uses the normal read-only proxy path and must not add bypass, mutation, replay, or anti-cheat evasion behavior. The connection may still be rejected, kicked, or banned under the published policy. This is an agent workflow boundary, not a product runtime warning.
+
+For pack acquisition, use the authenticated Go `golem network` client, complete the offered packs, verify lobby spawn, then close the CubeCraft connection. Do not select or join a minigame.
