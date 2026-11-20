@@ -2,7 +2,7 @@ module github.com/NhanAZ/BedrockDebugProxy
 
 go 1.26.0
 
-toolchain go1.27.3
+toolchain go1.27.4
 
 require (
 	github.com/coder/websocket v1.8.15
@@ -13,7 +13,7 @@ require (
 	github.com/google/uuid v1.6.0
 	github.com/sandertv/go-raknet v1.15.2-0.20260705184311-0d1fd09e2cf6
 	github.com/sandertv/gophertunnel v1.61.0
-	golang.org/x/oauth2 v0.37.0
+	golang.org/x/oauth2 v0.38.0
 )
 
 // Enchanted and some other featured experiences omit ChunkRadiusUpdated during
