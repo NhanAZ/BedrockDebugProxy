@@ -32,7 +32,7 @@ region changes without adding movement or transfer behavior.
 
 ```powershell
 .\bin\bedrock-debug-proxy.exe golem network `
-    --server experience:Enchanted `
+    --server "experience:Enchanted [Skyblock]" `
     --auth device `
     --report .local\golem-network\enchanted.json `
     --capture .local\golem-network\enchanted-capture `

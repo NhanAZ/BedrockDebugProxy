@@ -61,7 +61,7 @@ Transfer following is enabled by default in `golem network` so server-directed h
 | `Galaxite` | `experience:Galaxite` | Connect, complete packs, reach lobby spawn, and close immediately |
 | `Lifeboat` | `experience:Lifeboat` | Connect, complete packs, reach lobby spawn, and close immediately |
 | `Mineville Zeqa` | `experience:Mineville Zeqa` | Connect, complete packs, reach the joined lobby spawn, and close immediately |
-| `Enchanted` | `experience:Enchanted` | Complete Hub packs, reach Hub spawn, capture the automatic form, and close without selecting a child |
+| `Enchanted` | `experience:Enchanted [Skyblock]` | Complete Hub packs, reach Hub spawn, capture the automatic form, and close without selecting a child |
 | `CubeCraft` | `experience:CubeCraft` | Complete lobby packs, reach lobby spawn, and close without entering a minigame |
 
 Create a one-line scenario file containing `{"op":"quit"}`. Use the selector shown in the matrix and replace only the value after `--server` for each run. The `experience:` selector resolves both Featured and Creator Experiences through Minecraft services. CubeCraft follows the same owner-controlled, read-only path without a separate repeated risk confirmation. Its public policy boundary still applies. Do not add bypass, mutation, replay, or anti-cheat evasion behavior to the release command.

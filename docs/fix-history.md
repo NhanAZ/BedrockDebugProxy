@@ -20,8 +20,8 @@ Every new entry should state the symptom, root cause, implementation commits, ev
 - Classification: test synchronization race, not a network client behavior failure.
 - Root cause: the test observed a packet in the server reader before the sending goroutine returned from `Flush` and updated the client's report counter.
 - Implementation: wait for the report counter to reflect the already received packets before asserting the retained snapshot.
-- Evidence and validation: hosted run [44798722087](https://github.com/NhanAZ/BedrockDebugProxy/actions/runs/44798722087) failed at this assertion, while the Windows compatibility job passed. Focused race-enabled regression and the canonical quality gate must pass on the corrected commit.
-- Status: pending corrected-revision checks.
+- Evidence and validation: hosted run [44798722087](https://github.com/NhanAZ/BedrockDebugProxy/actions/runs/44798722087) failed at this assertion, while the Windows compatibility job passed. The focused race-enabled regression passed 50 repetitions. Local `tools/quality.ps1 -Race` passed, and hosted run [44799947359](https://github.com/NhanAZ/BedrockDebugProxy/actions/runs/44799947359) passed both jobs.
+- Status: fixed and verified in commit `84ab313`.
 
 ### FIX-0177 - Use finalized capture state for Golem release reports
 
@@ -29,8 +29,8 @@ Every new entry should state the symptom, root cause, implementation commits, ev
 - Classification: local release-report race after capture finalization. The sessions did not fail authentication, pack exchange, spawn, or capture verification.
 - Root cause: `golemValidationChecks` read mutable capture-observer error state after `finishCapture` had closed the canonical capture. A late observer callback could therefore change the CLI check after the report's evidence was already frozen.
 - Implementation: evaluate the session snapshot and expected immediate-close error in the Go Golem check. Let the validation report generator decide capture integrity and observer errors from the finalized capture. Capture failures still leave the report incomplete or failing.
-- Evidence and validation: the stamped Golem-generated Galaxite report recorded authenticated upstream, spawn, close, and 20/20 encrypted pack decryptions. All automatic requirements passed, but `cli_session` was `not_observed`. The final six-server matrix must verify the correction.
-- Status: focused regression and the canonical quality gate pass in the working tree. The exact committed build still needs the six-server live matrix before release.
+- Evidence and validation: the stamped Golem-generated Galaxite report recorded authenticated upstream, spawn, close, and 20/20 encrypted pack decryptions. All automatic requirements passed, but `cli_session` was `not_observed`. The corrected commit `48d33fd` was included in the validated descendant `84ab313`, whose six-server release matrix passed.
+- Status: fixed and verified by the exact-revision release matrix on `84ab313`.
 - Related history: [FIX-0176](#fix-0176-accept-the-expected-golem-close-race-after-spawn) classifies the expected teleport acknowledgement error during immediate shutdown. [AUDIT-0269](audits/AUDIT-0269-finalized-golem-release-report.md) records this follow-up.
 
 ### FIX-0176 - Accept the expected Golem close race after spawn

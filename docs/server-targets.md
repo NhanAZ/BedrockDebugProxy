@@ -22,7 +22,7 @@ These six targets are the required release matrix. Use the exact selector with t
 | Galaxite | `experience:Galaxite` | `play.galaxite.net:19132` | Creator Experience |
 | Lifeboat | `experience:Lifeboat` | `mco.lbsg.net:19132` | Creator Experience |
 | Mineville Zeqa | `experience:Mineville Zeqa` | `play.inpvp.net:19132` | Creator Experience |
-| Enchanted | `experience:Enchanted` | `play.enchanted.gg:19132` | Creator Experience |
+| Enchanted | `experience:Enchanted [Skyblock]` | `play.enchanted.gg:19132` | Creator Experience |
 | CubeCraft | `experience:CubeCraft` | `play.cubecraft.net:19132` | Featured server |
 
 For release validation, follow [`validation.md`](validation.md) and [`releasing.md`](releasing.md). Use Go `golem network` for the authenticated public-server protocol client, and use a concrete loopback address when testing the proxy listener's `--follow-transfers` behavior. A retail client is not required. Use the PHP Golem simulation only for disposable local server/plugin scenarios. Do not place raw addresses, credentials, or captures in sanitized reports.

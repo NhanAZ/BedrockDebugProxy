@@ -94,7 +94,7 @@ Every official release requires one authenticated Go `golem network` session and
 - Galaxite
 - Lifeboat
 - Mineville Zeqa (`experience:Mineville Zeqa`)
-- Enchanted (`experience:Enchanted`)
+- Enchanted (`experience:Enchanted [Skyblock]`)
 - CubeCraft (`experience:CubeCraft`)
 
 For each server, check connection, authentication, offered resource packs, spawn, both traffic directions, packet decoding, clean closure, and unexplained protocol or decode errors. Do not assume the six servers use the same packet order, timing, optional packets, software, or infrastructure.

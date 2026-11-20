@@ -18,10 +18,10 @@ An authenticated Galaxite Golem session spawned, closed, and decrypted all 20 en
 
 ## Validation
 
-- Automated checks: focused `golemValidationChecks` regression and `tools/quality.ps1` pass in the working tree. The quality gate includes tests, build, static analysis with 0 issues, vulnerability scan, tracked-capture checks, and whitespace checks.
-- Live validation: earlier Hive and Galaxite attempts reached spawn and completed pack decryption. The complete six-server matrix must be rerun against the final stamped revision.
-- Capture or report: local diagnostic reports remain in ignored validation storage. Final sanitized release reports will be generated from the final stamped revision.
+- Automated checks: `tools/quality.ps1 -Race` passed locally. Hosted run [44799947359](https://github.com/NhanAZ/BedrockDebugProxy/actions/runs/44799947359) passed both the race-enabled quality gate and Windows compatibility job. The preceding hosted failure [44798722087](https://github.com/NhanAZ/BedrockDebugProxy/actions/runs/44798722087) exposed a test-only snapshot timing race, corrected in commit `84ab313`.
+- Live validation: the stamped `0.6.0` binary from revision `84ab31396cc2b80aa094c47d924489a69581ed43` passed The Hive, Galaxite, Lifeboat, Mineville Zeqa, Enchanted, and CubeCraft. Each report records authenticated upstream, spawn, immediate close, bidirectional decoded traffic, and passing capture evidence. The 61 encrypted packs offered by The Hive, Galaxite, Lifeboat, and CubeCraft were all decrypted. Enchanted and Mineville offered no encrypted packs during these sessions.
+- Capture or report: each of the six closed captures passed the CLI verifier, and `tools/check-release-readiness.ps1 -Revision 84ab31396cc2b80aa094c47d924489a69581ed43` passed all six sanitized reports. The reports remain in ignored local validation storage.
 
 ## Limitations and follow-up
 
-Only the expected `net.ErrClosed` teleport acknowledgement error after immediate close is allowed by the session check. The finalized capture must still pass every automatic requirement. Release remains pending until CI and all six exact-revision reports pass.
+Only the expected `net.ErrClosed` teleport acknowledgement error after immediate close is allowed by the session check. The finalized capture must still pass every automatic requirement. The reports prove the observed Go Golem protocol sessions only. They do not claim retail rendering or gameplay. The official tag and release publication remain to be completed.

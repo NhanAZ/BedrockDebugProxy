@@ -15,6 +15,7 @@ Supported Bedrock version: 1.26.62 (protocol 2225).
 ### Changed
 
 - Simplified the official release baseline to authenticated Golem sessions that complete offered packs, reach lobby spawn, and close immediately. Post-spawn stability and Enchanted child-route traversal are no longer release requirements; encrypted pack decryption and capture integrity remain required.
+- Use the current exact `Enchanted [Skyblock]` Experience selector for release and Golem examples while retaining `Enchanted` as the report label.
 
 ### Fixed
 
