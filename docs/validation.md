@@ -1,6 +1,6 @@
 # Real-world validation workflow
 
-Automated tests establish that the implementation matches local expectations. They do not establish that those expectations match live Minecraft Bedrock servers. Runtime, networking, protocol, authentication, session, resource-pack, capture, encoding, and decoding changes need the scoped development evidence below. Official releases use authenticated sessions driven by the Go Golem network client. A release session completes offered packs, reaches lobby spawn, and closes immediately. A retail Minecraft client is not required, and CLI evidence does not establish rendering or visible gameplay.
+Automated tests establish that the implementation matches local expectations. They do not establish that those expectations match live Minecraft Bedrock servers. Runtime, networking, protocol, authentication, session, resource-pack, capture, encoding, and decoding changes need the scoped development evidence below. Official releases use authenticated sessions driven by the Go Golem network client. A release session completes offered packs, reaches lobby spawn, retains bidirectional decoded traffic for at least 30 seconds, and closes with verified capture integrity. A retail Minecraft client is not required, and CLI evidence does not establish rendering or visible gameplay.
 
 Changes that can affect the local web viewer have an additional same-change requirement. The commit must include the viewer asset and HTTP integration tests and the embedded JavaScript syntax check. Presentation or interaction changes must also be smoke-tested in a browser from a clean committed build. Use [`web-validation.md`](web-validation.md) for the exact scope and checklist.
 
@@ -22,7 +22,7 @@ For transfer-following changes, focused automated or loopback coverage must exer
 
 The pre-reconnect route probe is a best-effort route hint. Its ping response or failure remains in the raw capture and analysis, and a failure marked `best_effort=true` is non-blocking only when the normal next-hop session still connects and reaches the required flow. The optional upstream address-discovery ping is bounded to five seconds for an initial dial and 750 ms for a transfer hop so a lost UDP ping cannot consume the full login and resource-pack deadline. Status-ping errors without the `best_effort` marker remain blocking.
 
-For Enchanted release validation, capture the automatically sent Hub form as part of the session, complete the offered packs, reach Hub spawn, and close immediately. Do not submit the form or enter a child. When collecting packs, inspect the current form and follow the separate route-acquisition workflow. Historical route reports remain unchanged and are not release requirements.
+For Enchanted release validation, capture the automatically sent Hub form as part of the session, complete the offered packs, reach Hub spawn, observe the 30-second stationary post-spawn window, and close. Do not submit the form or enter a child. When collecting packs, inspect the current form and follow the separate route-acquisition workflow. Historical route reports remain unchanged and are not release requirements.
 
 CubeCraft remains subject to its public proxy rules and may reject, kick, or ban a diagnostic connection. The release workflow does not add a separate repeated acknowledgement gate for that risk. This does not grant server permission, change the public rules, or permit bypass, mutation, replay, or anti-cheat evasion. The session must use the normal read-only proxy path.
 
@@ -88,7 +88,7 @@ Release validation always uses `--decrypt-resource-packs`. When an offered pack 
 
 ## Release gate
 
-Every official release requires one authenticated Go `golem network` session and a passing report tied to the validated runtime revision for each baseline server. Complete the offered packs, reach spawn, and quit immediately. Do not wait for post-spawn stability, move, interact with lobby entities or forms, or enter minigames. The release process does not require a retail Minecraft client. Use the PHP Golem CLI for local server/plugin validation, but do not label its simulation journal as a public-server report. Decrypt every encrypted offered pack. CubeCraft has no separate repeated risk-acknowledgement gate. See [the current maintainer decision](decisions/0018-minimal-spawn-release-validation.md).
+Every official release requires one authenticated Go `golem network` session and a passing report tied to the validated runtime revision for each baseline server. Complete the offered packs, reach spawn, retain bidirectional decoded traffic for at least 30 seconds, and then quit. Do not move, interact with lobby entities or forms, or enter minigames. The release process does not require a retail Minecraft client. Use the PHP Golem CLI for local server/plugin validation, but do not label its simulation journal as a public-server report. Decrypt every encrypted offered pack. CubeCraft has no separate repeated risk-acknowledgement gate. See [the current maintainer decision](decisions/0019-full-session-release-validation.md).
 
 - The Hive
 - Galaxite
@@ -108,7 +108,7 @@ After generating all six reports for one runtime revision, run
 
 ### CLI session workflow
 
-Use the stamped Go network client with device authentication and `--decrypt-resource-packs`. It completes the initial login, offered packs, and spawn before reading the scenario. Give it a one-line `quit` scenario so it closes immediately after spawn. Follow server-initiated Transfers needed to finish joining the selected Experience. Do not select lobby forms or items. Use a single approved account session at a time.
+Use the stamped Go network client with device authentication and `--decrypt-resource-packs`. It completes the initial login, offered packs, and spawn before reading the scenario. For release validation, provide a `stability` operation for at least 30 seconds followed by `quit`. The stability operation keeps the client stationary. Follow server-initiated Transfers needed to finish joining the selected Experience. Do not select lobby forms or items. Use a single approved account session at a time.
 
 ```powershell
 .\bin\bedrock-debug-proxy.exe golem network `
@@ -125,12 +125,13 @@ Use the stamped Go network client with device authentication and `--decrypt-reso
 Create `.local\validation\the-hive.jsonl` with this content:
 
 ```jsonl
+{"op":"stability","duration":"30s"}
 {"op":"quit"}
 ```
 
 The client reaches lobby spawn before reading the `quit` line. Its passing report is still limited to the packets observed in that capture. Do not open a retail client unless a separate visual or gameplay claim is explicitly in scope.
 
-The client automatically supplies `cli_session=pass` and `authenticated_upstream=pass` only when the session spawned and closed cleanly. The report generator also requires capture integrity, both traffic directions, decoded packets, completed artifact output when enabled, and successful decryption of every encrypted offered pack. A `stability` operation remains available for focused development investigations but is not a release requirement. Enchanted form review and child-route coverage are not required for the release report. CLI reports establish the observed protocol flow, not retail rendering, input handling, or gameplay. Release notes must identify this evidence type.
+The client automatically supplies `cli_session=pass` and `authenticated_upstream=pass` only when the session spawned and closed cleanly. The report generator supplies `post_spawn_stability=pass` only after the 30-second stationary window includes client input packets and the session has no blocking errors. It also requires capture integrity, both traffic directions, decoded packets, completed artifact output when enabled, and successful decryption of every encrypted offered pack. Enchanted form review and child-route coverage remain part of pack acquisition, not the six-server release report. CLI reports establish the observed protocol flow, not retail rendering, input handling, or gameplay. Release notes must identify this evidence type.
 
 ### Documentation-only release delta
 

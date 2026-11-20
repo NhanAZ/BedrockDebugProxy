@@ -6,6 +6,12 @@ Detailed rationale remains in [`docs/audits/`](docs/audits/).
 
 ## [Unreleased]
 
+## [0.6.1] - 2026-11-21
+
+Supported Bedrock version: 1.26.62 (protocol 2225).
+
+[Published release](https://github.com/NhanAZ/BedrockDebugProxy/releases/tag/v0.6.1) | [All changes since v0.6.0](https://github.com/NhanAZ/BedrockDebugProxy/compare/v0.6.0...v0.6.1)
+
 ### Fixed
 
 - Skip unsupported RakNet status pings on authenticated NetherNet transports. Keep best-effort status-ping evidence for RakNet transfer routes.

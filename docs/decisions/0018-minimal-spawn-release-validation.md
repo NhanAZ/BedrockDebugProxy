@@ -1,5 +1,7 @@
 # Require lobby spawn, then close release sessions
 
+> Superseded by [decision 0019](0019-full-session-release-validation.md). This decision remains historical evidence for reports accepted under the minimal-spawn policy.
+
 ## Decision
 
 Official release validation uses the authenticated Go `golem network` client for The Hive, Galaxite, Lifeboat, Mineville Zeqa, Enchanted, and CubeCraft. Each session must authenticate, complete every offered resource-pack exchange, successfully decrypt each encrypted offered pack, reach spawn, and close immediately. The capture and generated artifacts must pass integrity, bidirectional traffic, packet decoding, and blocking-error checks.

@@ -8,7 +8,7 @@ When the maintainer says "I want to release", the AI agent should drive this doc
 
 1. The agent audits the commits since the latest release, proposes or confirms the version, checks the working tree, documentation, licenses, provenance, known limitations, CI, and unresolved review findings.
 2. The agent runs the automated quality gate and builds the exact stamped candidate.
-3. The agent runs the live six-server matrix with the authenticated Go `golem network` client, the approved cached account, and `--decrypt-resource-packs` on every release session. The client completes the offered packs, reaches lobby spawn, then closes immediately. It does not wait, move, select lobby forms or items, or enter minigames. The PHP Golem CLI remains available for disposable PocketMine-MP or Axolotl-PM plugin scenarios. A retail Minecraft client is not required for release. CubeCraft is included in the matrix without a separate repeated confirmation step; this does not bypass technical gates or allow packet mutation, replay, or anti-cheat evasion.
+3. The agent runs the live six-server matrix with the authenticated Go `golem network` client, the approved cached account, and `--decrypt-resource-packs` on every release session. The client completes the offered packs, reaches lobby spawn, retains bidirectional decoded traffic for 30 seconds, then closes. It does not move, select lobby forms or items, or enter minigames. The PHP Golem CLI remains available for disposable PocketMine-MP or Axolotl-PM plugin scenarios. A retail Minecraft client is not required for release. CubeCraft is included in the matrix without a separate repeated confirmation step; this does not bypass technical gates or allow packet mutation, replay, or anti-cheat evasion.
 4. The agent inspects each closed capture, verifies its exact revision, authentication, pack exchange, decryption of every encrypted offered pack, spawn, bidirectional decoded traffic, errors, and artifacts, then generates the sanitized report. The maintainer does not need to run report scripts.
 5. After all required sessions, the agent runs the release gate, prepares the checksum and release notes, and reports any exact blocker. A candidate that adds only allowed Markdown documentation after the matrix may use the documented docs-only equivalence with the original validated runtime revision; the reports themselves must not be edited.
 6. If the maintainer explicitly requested a release, the version is settled, every gate passes, and signing or GitHub access is available, the agent creates and pushes the tag, publishes the release assets, and verifies the result. It must not publish from an incomplete or mismatched validation set.
@@ -49,22 +49,22 @@ If the candidate can affect the local web viewer, complete the automated and bro
 
 ## 3. Validate the six-server baseline
 
-Use the stamped Go network client for every release session. It authenticates directly to the selected Experience, completes the offered packs, reaches lobby spawn, and then executes a one-line `quit` scenario. The release gate does not require a retail Minecraft client and makes no claim about retail rendering, UI, input, or gameplay.
+Use the stamped Go network client for every release session. It authenticates directly to the selected Experience, completes the offered packs, reaches lobby spawn, runs a stationary 30-second `stability` scenario, and then executes `quit`. The release gate does not require a retail Minecraft client and makes no claim about retail rendering, UI, input, or gameplay.
 
 The first successful device login creates the selected default account cache, so later server runs normally do not require another device code. If the machine has multiple profiles, select the intended account with `bedrock-debug-proxy use NAME` before starting the stamped binary. The Go network client uses that approved cached Microsoft account and does not start a local proxy listener.
 
-Transfer following is enabled by default in `golem network` so server-directed hops needed to finish joining the selected Experience are captured in the same session. For CubeCraft, do not select any minigame. For Enchanted, leave its automatically sent Hub form unanswered and close after spawn.
+Transfer following is enabled by default in `golem network` so server-directed hops needed to finish joining the selected Experience are captured in the same session. For CubeCraft, do not select any minigame. For Enchanted, leave its automatically sent Hub form unanswered and close after the post-spawn stability window.
 
 | Report label | Upstream target | Required live flow |
 | --- | --- | --- |
-| `The Hive` | `experience:The Hive` | Connect, complete packs, reach lobby spawn, and close immediately |
-| `Galaxite` | `experience:Galaxite` | Connect, complete packs, reach lobby spawn, and close immediately |
-| `Lifeboat` | `experience:Lifeboat` | Connect, complete packs, reach lobby spawn, and close immediately |
-| `Mineville Zeqa` | `experience:Mineville Zeqa` | Connect, complete packs, reach the joined lobby spawn, and close immediately |
-| `Enchanted` | `experience:Enchanted [Skyblock]` | Complete Hub packs, reach Hub spawn, capture the automatic form, and close without selecting a child |
-| `CubeCraft` | `experience:CubeCraft` | Complete lobby packs, reach lobby spawn, and close without entering a minigame |
+| `The Hive` | `experience:The Hive` | Connect, complete packs, reach lobby spawn, observe 30 seconds of bidirectional decoded traffic, then close |
+| `Galaxite` | `experience:Galaxite` | Connect, complete packs, reach lobby spawn, observe 30 seconds of bidirectional decoded traffic, then close |
+| `Lifeboat` | `experience:Lifeboat` | Connect, complete packs, reach lobby spawn, observe 30 seconds of bidirectional decoded traffic, then close |
+| `Mineville Zeqa` | `experience:Mineville Zeqa` | Connect, complete packs, reach the joined lobby spawn, observe 30 seconds of bidirectional decoded traffic, then close |
+| `Enchanted` | `experience:Enchanted [Skyblock]` | Complete Hub packs, reach Hub spawn, capture the automatic form, observe 30 seconds without selecting a child, then close |
+| `CubeCraft` | `experience:CubeCraft` | Complete lobby packs, reach spawn, observe 30 seconds without entering a minigame, then close |
 
-Create a one-line scenario file containing `{"op":"quit"}`. Use the selector shown in the matrix and replace only the value after `--server` for each run. The `experience:` selector resolves both Featured and Creator Experiences through Minecraft services. CubeCraft follows the same owner-controlled, read-only path without a separate repeated risk confirmation. Its public policy boundary still applies. Do not add bypass, mutation, replay, or anti-cheat evasion behavior to the release command.
+Create a two-line scenario file containing `{"op":"stability","duration":"30s"}` followed by `{"op":"quit"}`. Set the per-request `--timeout` above 30 seconds. Use the selector shown in the matrix and replace only the value after `--server` for each run. The `experience:` selector resolves both Featured and Creator Experiences through Minecraft services. CubeCraft follows the same owner-controlled, read-only path without a separate repeated risk confirmation. Its public policy boundary still applies. Do not add bypass, mutation, replay, or anti-cheat evasion behavior to the release command.
 
 ```powershell
 .\bin\bedrock-debug-proxy.exe `
@@ -76,17 +76,25 @@ Create a one-line scenario file containing `{"op":"quit"}`. Use the selector sho
     --validation-report validation\local\<REVISION>\the-hive.json `
     --server-label "The Hive" `
     --validation-result pass `
+    --timeout 90s `
     --input .local\validation\quit.jsonl
 ```
 
-Create `.local\validation\quit.jsonl` with the single line `{"op":"quit"}`. `golem network` reaches spawn before it reads the scenario input. Do not add waits or interactions.
+Create `.local\validation\quit.jsonl` with these two lines:
+
+```jsonl
+{"op":"stability","duration":"30s"}
+{"op":"quit"}
+```
+
+`golem network` reaches spawn before it reads the scenario input. The stability operation keeps the client stationary while it observes the post-spawn session. It does not select forms or items or enter minigames.
 
 Before or alongside the public matrix, the agent may use the PHP Golem CLI against a disposable local development server to exercise plugin commands, forms, inventories, movement, events, and other server-side behavior. Keep that simulation journal separate from Go network-client captures. The authenticated Go `golem network` sessions are the public-server protocol reports used by the release matrix.
 
 For every server, confirm all of the following before recording `pass`.
 
 1. Device authentication and Experience resolution succeed when applicable.
-2. The Golem client completes the join flow and reaches spawn, then closes immediately.
+2. The Golem client completes the join flow, reaches spawn, and retains bidirectional decoded traffic for at least 30 seconds before closing.
 3. No movement, lobby item or form selection, or minigame entry occurs.
 4. Client-to-server and server-to-client traffic are present.
 5. Decoded packets are present.
