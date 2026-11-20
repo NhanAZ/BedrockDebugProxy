@@ -14,6 +14,16 @@ Every new entry should state the symptom, root cause, implementation commits, ev
 
 ## Compatibility and bug index
 
+### FIX-0177 - Use finalized capture state for Golem release reports
+
+- Symptom: authenticated Galaxite and Hive sessions completed packs, spawned, and closed, but the Golem-generated report marked `cli_session=not_observed` while every capture-derived requirement passed.
+- Classification: local release-report race after capture finalization. The sessions did not fail authentication, pack exchange, spawn, or capture verification.
+- Root cause: `golemValidationChecks` read mutable capture-observer error state after `finishCapture` had closed the canonical capture. A late observer callback could therefore change the CLI check after the report's evidence was already frozen.
+- Implementation: evaluate the session snapshot and expected immediate-close error in the Go Golem check. Let the validation report generator decide capture integrity and observer errors from the finalized capture. Capture failures still leave the report incomplete or failing.
+- Evidence and validation: the stamped Golem-generated Galaxite report recorded authenticated upstream, spawn, close, and 20/20 encrypted pack decryptions. All automatic requirements passed, but `cli_session` was `not_observed`. The final six-server matrix must verify the correction.
+- Status: focused regression and the canonical quality gate pass in the working tree. The exact committed build still needs the six-server live matrix before release.
+- Related history: [FIX-0176](#fix-0176-accept-the-expected-golem-close-race-after-spawn) classifies the expected teleport acknowledgement error during immediate shutdown. [AUDIT-0269](audits/AUDIT-0269-finalized-golem-release-report.md) records this follow-up.
+
 ### FIX-0176 - Accept the expected Golem close race after spawn
 
 - Symptom: after an authenticated Hive session completed its packs, spawned, and processed the immediate `quit`, the Golem report failed because a server teleport acknowledgement raced with the intentional socket close.

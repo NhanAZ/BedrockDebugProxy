@@ -437,7 +437,10 @@ func golemValidationChecks(snapshot golemnet.Report, state *networkScenarioState
 		"cli_session=not_observed",
 		"authenticated_upstream=not_observed",
 	}
-	if scenarioStatus == 0 && snapshot.Spawned && snapshot.Closed && golemValidationCloseErrorsAreExpected(snapshot.Errors) && (evidence == nil || evidence.error() == nil) {
+	// Capture finalization has already frozen observer errors into the canonical
+	// capture before this check runs. The report generator validates that closed
+	// evidence, so do not re-read observer state that a late callback can mutate.
+	if scenarioStatus == 0 && snapshot.Spawned && snapshot.Closed && golemValidationCloseErrorsAreExpected(snapshot.Errors) {
 		checks[0] = "cli_session=pass"
 	}
 	if snapshot.Authenticated {
