@@ -406,10 +406,15 @@ func TestClientUsesObservedHotbarItemInPlayerInput(t *testing.T) {
 	if err := client.UseItem(ctx, 2); err != nil {
 		t.Fatal(err)
 	}
-	if err := client.Close(); err != nil {
-		t.Fatal(err)
+	select {
+	case err := <-serverErrors:
+		if err != nil {
+			t.Fatalf("local server did not observe the item interaction: %v", err)
+		}
+	case <-ctx.Done():
+		t.Fatal(ctx.Err())
 	}
-	if err := <-serverErrors; err != nil {
+	if err := client.Close(); err != nil {
 		t.Fatal(err)
 	}
 }
