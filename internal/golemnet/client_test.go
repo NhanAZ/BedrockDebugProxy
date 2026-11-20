@@ -726,7 +726,20 @@ func TestClientSendsStationaryPlayerAuthInput(t *testing.T) {
 	if received[0].Tick == 0 || received[1].Tick <= received[0].Tick || received[2].Tick <= received[1].Tick {
 		t.Fatalf("input ticks = %d, %d, %d", received[0].Tick, received[1].Tick, received[2].Tick)
 	}
-	report := client.Snapshot()
+	var report Report
+	metricTicker := time.NewTicker(time.Millisecond)
+	defer metricTicker.Stop()
+	for {
+		report = client.Snapshot()
+		if report.ClientInputPackets >= len(received) {
+			break
+		}
+		select {
+		case <-ctx.Done():
+			t.Fatalf("input report did not catch up with received packets: got %d, received %d: %v", report.ClientInputPackets, len(received), ctx.Err())
+		case <-metricTicker.C:
+		}
+	}
 	if report.ClientInputPackets < 3 || !report.ClientInput || report.ClientInputRate != defaultClientInputInterval.String() {
 		t.Fatalf("input report = %+v", report)
 	}

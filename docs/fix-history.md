@@ -14,6 +14,15 @@ Every new entry should state the symptom, root cause, implementation commits, ev
 
 ## Compatibility and bug index
 
+### FIX-0178 - Synchronize stationary input test metrics
+
+- Symptom: the hosted race-enabled quality gate intermittently reported two client input packets after the loopback server had received the third packet.
+- Classification: test synchronization race, not a network client behavior failure.
+- Root cause: the test observed a packet in the server reader before the sending goroutine returned from `Flush` and updated the client's report counter.
+- Implementation: wait for the report counter to reflect the already received packets before asserting the retained snapshot.
+- Evidence and validation: hosted run [44798722087](https://github.com/NhanAZ/BedrockDebugProxy/actions/runs/44798722087) failed at this assertion, while the Windows compatibility job passed. Focused race-enabled regression and the canonical quality gate must pass on the corrected commit.
+- Status: pending corrected-revision checks.
+
 ### FIX-0177 - Use finalized capture state for Golem release reports
 
 - Symptom: authenticated Galaxite and Hive sessions completed packs, spawned, and closed, but the Golem-generated report marked `cli_session=not_observed` while every capture-derived requirement passed.
