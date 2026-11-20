@@ -7,6 +7,8 @@ import (
 	"fmt"
 	"io"
 	"net"
+	"net/http"
+	"net/http/httptest"
 	"path/filepath"
 	"reflect"
 	"strconv"
@@ -199,6 +201,65 @@ func TestPrepareTransferHopReusesServiceNetherNetSignaling(t *testing.T) {
 	}
 	if !selected {
 		t.Fatal("transfer route selection evidence was not recorded")
+	}
+}
+
+func TestPrepareTransferHopRecordsHTTPSProbeFailureBeforeRakNetFallback(t *testing.T) {
+	server := httptest.NewTLSServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		http.Error(w, "synthetic endpoint unavailable", http.StatusServiceUnavailable)
+	}))
+	defer server.Close()
+	originalClient := http.DefaultClient
+	http.DefaultClient = server.Client()
+	defer func() { http.DefaultClient = originalClient }()
+
+	root := filepath.Join(t.TempDir(), "capture")
+	recorder, err := capture.New(root, capture.Options{})
+	if err != nil {
+		t.Fatal(err)
+	}
+	runner := &Runner{config: Config{Recorder: recorder}}
+	state := &hopState{target: strings.TrimPrefix(server.URL, "https://")}
+	failures := bedrock.NewFailureSink(nil)
+	if err := runner.prepareTransferHop(context.Background(), state, 2, nil, failures, newLiveReporter(io.Discard)); err != nil {
+		t.Fatalf("prepareTransferHop() = %v, want best-effort fallback", err)
+	}
+	if state.transferNetwork != nil || state.transferAddress != "" {
+		t.Fatalf("transfer route = network %T, address %q, want default RakNet fallback", state.transferNetwork, state.transferAddress)
+	}
+	if failures.Err() != nil {
+		t.Fatalf("best-effort HTTPS probe recorded a capture failure: %v", failures.Err())
+	}
+	if err := recorder.Close("closed", nil); err != nil {
+		t.Fatal(err)
+	}
+
+	var found bool
+	if err := capture.ScanEvents(root, func(event capture.Event) error {
+		if event.Kind != "transfer.route_probe" || event.Hop != 2 {
+			return nil
+		}
+		var fields struct {
+			Address           string `json:"address"`
+			Transport         string `json:"transport"`
+			FallbackTransport string `json:"fallback_transport"`
+			Timeout           string `json:"timeout"`
+			BestEffort        bool   `json:"best_effort"`
+			Error             string `json:"error"`
+		}
+		if err := json.Unmarshal(event.Data, &fields); err != nil {
+			return err
+		}
+		if fields.Address != state.target || fields.Transport != "nethernet-https" || fields.FallbackTransport != "raknet" || fields.Timeout != transferNetherNetProbeTimeout.String() || !fields.BestEffort || !strings.Contains(fields.Error, "503") || event.Severity != capture.SeverityWarn {
+			t.Errorf("HTTPS transfer route event = %+v severity %s", fields, event.Severity)
+		}
+		found = true
+		return nil
+	}); err != nil {
+		t.Fatal(err)
+	}
+	if !found {
+		t.Fatal("failed HTTPS NetherNet probe was not recorded before RakNet fallback")
 	}
 }
 

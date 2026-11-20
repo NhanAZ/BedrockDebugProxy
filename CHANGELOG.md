@@ -8,6 +8,7 @@ Detailed rationale remains in [`docs/audits/`](docs/audits/).
 
 ### Fixed
 
+- Record failed best-effort HTTPS NetherNet transfer-route probes before the existing RakNet fallback. The fallback decision and capture schema are unchanged.
 - Updated the Go toolchain to 1.27.4 to remediate GO-2026-6859 in `net/http`.
 - Updated the selected Bedrock client metadata to 1.26.62 while retaining protocol 2225 and the reviewed 1.26.60 packet codec. The official stable schema was cross-checked against the local codec; preview-only packet additions remain excluded.
 - Updated the vendored gophertunnel module manifest and checksums to the

@@ -1430,6 +1430,14 @@ The transfer dial refreshes its route hint independently of the earlier probe. I
 - Evidence and validation: the seven mocked script cases pass, including malformed markup, unchanged-release silence, new protocol-only detection, and new-version issue contents. Every API request and issue post is mocked. A read-only real release check reports protocol 2193 and no newer stable release. The canonical quality gate passed. See [AUDIT-0202](audits/AUDIT-0202-mojang-watcher-metadata.md).
 - Status: implemented. No public issue or runtime packet behavior changed during validation.
 
+### FIX-0152 - Record HTTPS NetherNet probe failures before fallback
+
+- Symptom: when the optional HTTPS NetherNet transfer-route probe failed, the proxy silently continued to the existing RakNet fallback and the capture did not retain why HTTPS was not selected.
+- Root cause: `prepareTransferHop` discarded the probe error because the probe is best effort.
+- Implementation: record a `transfer.route_probe` warning with the attempted target, HTTPS transport, RakNet fallback, timeout, and error details before continuing through the unchanged fallback path.
+- Evidence and validation: a synthetic TLS endpoint returning HTTP 503 verifies that the warning precedes fallback, retains the error and timeout, and does not fail the capture. The canonical quality gate and paired BedrockPackArchive compatibility check are recorded in [AUDIT-0265](audits/AUDIT-0265-transfer-probe-fallback-diagnostics.md).
+- Status: behavior change is intentionally limited to capture and operator visibility. The reason for any live HTTPS probe failure remains undetermined and no retry or transport preference change is implied.
+
 ## Ordering safety contract
 
 The deferred-packet change is deliberately narrow. `expectedIDs` remains the only authority for what the current login state accepts. The queue scan selects the earliest packet that is currently expected, leaves packets for later states queued, and never mutates or reorders bytes on the wire. The regression tests cover canonical resource-pack order, featured early `ResourcePacksInfo`, a later-phase packet queued ahead of the current phase, and all six permutations of the three login packets.

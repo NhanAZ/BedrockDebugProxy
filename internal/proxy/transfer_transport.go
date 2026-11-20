@@ -103,6 +103,21 @@ func (r *Runner) prepareTransferHop(ctx context.Context, state *hopState, hop in
 		}
 		live.Info("Transfer route selected HTTPS NetherNet - %s", address)
 		return nil
+	} else {
+		captureErr := r.recordAtHop("transfer.route_probe", capture.SeverityWarn, map[string]any{
+			"address":            state.target,
+			"transport":          "nethernet-https",
+			"fallback_transport": "raknet",
+			"timeout":            transferNetherNetProbeTimeout.String(),
+			"best_effort":        true,
+			"error":              err.Error(),
+			"error_type":         fmt.Sprintf("%T", err),
+		}, hop)
+		setCaptureFailure(failures, captureErr)
+		if captureErr != nil {
+			return captureErr
+		}
+		live.Info("Transfer HTTPS NetherNet probe failed - %s, falling back to RakNet", err)
 	}
 
 	if state.transferLocalAddr != nil {
