@@ -46,6 +46,48 @@ func TestClientCacheBlobStatusAllowsObservedHashCount(t *testing.T) {
 	}
 }
 
+func TestAvailableCommandsAllowsLargeEnumValueCount(t *testing.T) {
+	want := &packet.AvailableCommands{EnumValues: make([]string, 5999)}
+	want.EnumValues[0] = "first"
+	want.EnumValues[len(want.EnumValues)-1] = "last"
+
+	var encoded bytes.Buffer
+	want.Marshal(protocol.NewWriter(&encoded, 0))
+
+	got := &packet.AvailableCommands{}
+	got.Marshal(protocol.NewReader(bytes.NewReader(encoded.Bytes()), 0, true))
+	if len(got.EnumValues) != len(want.EnumValues) {
+		t.Fatalf("decoded enum value count = %d, want %d", len(got.EnumValues), len(want.EnumValues))
+	}
+	if got.EnumValues[0] != "first" || got.EnumValues[len(got.EnumValues)-1] != "last" {
+		t.Fatalf("decoded enum value boundaries = %q, %q", got.EnumValues[0], got.EnumValues[len(got.EnumValues)-1])
+	}
+}
+
+func TestUpdateSubChunkBlocksAllowsLargeChangeLists(t *testing.T) {
+	want := &packet.UpdateSubChunkBlocks{
+		Blocks: make([]protocol.BlockChangeEntry, 3623),
+		Extra:  make([]protocol.BlockChangeEntry, 1667),
+	}
+	want.Blocks[0].BlockRuntimeID = 1
+	want.Blocks[len(want.Blocks)-1].BlockRuntimeID = 2
+	want.Extra[0].BlockRuntimeID = 3
+	want.Extra[len(want.Extra)-1].BlockRuntimeID = 4
+
+	var encoded bytes.Buffer
+	want.Marshal(protocol.NewWriter(&encoded, 0))
+
+	got := &packet.UpdateSubChunkBlocks{}
+	got.Marshal(protocol.NewReader(bytes.NewReader(encoded.Bytes()), 0, true))
+	if len(got.Blocks) != len(want.Blocks) || len(got.Extra) != len(want.Extra) {
+		t.Fatalf("decoded block change counts = %d and %d, want %d and %d", len(got.Blocks), len(got.Extra), len(want.Blocks), len(want.Extra))
+	}
+	if got.Blocks[0].BlockRuntimeID != 1 || got.Blocks[len(got.Blocks)-1].BlockRuntimeID != 2 ||
+		got.Extra[0].BlockRuntimeID != 3 || got.Extra[len(got.Extra)-1].BlockRuntimeID != 4 {
+		t.Fatal("decoded block change boundaries do not match the input")
+	}
+}
+
 func TestItemRegistryAllowsCurrentServerEntryCount(t *testing.T) {
 	want := &packet.ItemRegistry{Items: make([]protocol.ItemEntry, 2081)}
 	for i := range want.Items {

@@ -40,6 +40,7 @@ type networkScenarioRequest struct {
 	ID       string          `json:"id,omitempty"`
 	Message  string          `json:"message,omitempty"`
 	Index    *int            `json:"index,omitempty"`
+	Slot     *int            `json:"slot,omitempty"`
 	Response json.RawMessage `json:"response,omitempty"`
 	Duration string          `json:"duration,omitempty"`
 }
@@ -92,7 +93,7 @@ func runGolemNetwork(args []string, stdout, stderr io.Writer) int {
 	flags.Usage = func() {
 		_, _ = fmt.Fprintln(stderr, "Usage - bedrock-debug-proxy golem network --server HOST:PORT|experience:NAME [options]")
 		flags.PrintDefaults()
-		_, _ = fmt.Fprintln(stderr, "Scenario operations - wait_form, current_form, select_form, submit_form, chat, wait, stability, observe, report, quit")
+		_, _ = fmt.Fprintln(stderr, "Scenario operations - wait_form, current_form, select_form, submit_form, use_item, chat, wait, stability, observe, report, quit")
 	}
 	if err := flags.Parse(args); err != nil {
 		if errors.Is(err, flag.ErrHelp) {
@@ -528,7 +529,7 @@ func validateNetworkScenarioRequest(request networkScenarioRequest) error {
 		return errors.New("request field exceeds size limit")
 	}
 	switch request.Op {
-	case "wait_form", "current_form", "select_form", "submit_form", "chat", "wait", "stability", "observe", "report", "quit":
+	case "wait_form", "current_form", "select_form", "submit_form", "use_item", "chat", "wait", "stability", "observe", "report", "quit":
 		return nil
 	default:
 		return fmt.Errorf("unsupported op %q", request.Op)
@@ -553,6 +554,11 @@ func executeNetworkScenario(ctx context.Context, client *golemnet.Client, reques
 		return map[string]any{"selected": *request.Index}, false, client.SelectForm(ctx, *request.Index)
 	case "submit_form":
 		return map[string]any{"submitted": true}, false, client.SubmitForm(ctx, request.Response)
+	case "use_item":
+		if request.Slot == nil {
+			return nil, false, errors.New("use_item requires slot")
+		}
+		return map[string]any{"used": true, "slot": *request.Slot}, false, client.UseItem(ctx, *request.Slot)
 	case "chat":
 		return map[string]any{"sent": true}, false, client.Chat(request.Message)
 	case "wait":

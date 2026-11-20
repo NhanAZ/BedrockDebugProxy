@@ -32,6 +32,8 @@ The protocol helper includes one additional project-specific safety-bound overri
 
 The protocol packet helpers additionally use a 16,384-entry bound for `ItemRegistry`, both `CreativeContent` tables, and the `CraftingData` recipe vectors. The disposable Axolotl-PM 5.51.1 fixture sent 2,081 item-registry entries, 1,722 creative items, and 1,425 recipes during the Bedrock 1.26.61 startup flow that established these bounds. These are finite field-specific compatibility bounds. Ordinary protocol slices retain the upstream 1,024-entry limit.
 
+`AvailableCommands` and both `UpdateSubChunkBlocks` change lists use a finite 65,536-entry bound because the protocol 2225 schema defines these collections without a `maxItems` limit. Nested command collections use the same bound. All other slices retain the generic 1,024-entry limit, and the strict reader still checks declared counts against the remaining packet payload. See the parent project's [large command and sub-chunk packet slice review](../../docs/research/large-command-and-subchunk-slices.md) and its synthetic strict-reader regressions.
+
 `minecraft.Conn.CloseImmediately` flushes pending packets and propagates an optional immediate-close capability to its transport. The proxy uses this only when following a server `Transfer`, because the next hop must reuse the preceding RakNet UDP source address before the transport's acknowledgement-based close would otherwise release it. Other dial and close paths are unchanged.
 
 Negotiated `NetworkSettings` are published under a read-write lock, and the getter returns a synchronized value copy. This keeps login-time capture metadata reads safe while the packet reader processes the settings response.

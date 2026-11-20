@@ -4,6 +4,8 @@ import (
 	"github.com/google/uuid"
 )
 
+const maxCommandCollectionLength = 1 << 16
+
 const (
 	CommandPermissionLevelAny = iota
 	CommandPermissionLevelGameDirectors
@@ -47,8 +49,8 @@ func (c *Command) Marshal(r IO) {
 	r.String(&permissionStr)
 	commandPermissionFromString(r, &c.PermissionLevel, permissionStr)
 	r.Uint32(&c.AliasesOffset)
-	FuncSlice(r, &c.ChainedSubcommandOffsets, r.Uint32)
-	Slice(r, &c.Overloads)
+	FuncSliceWithMaxLen(r, &c.ChainedSubcommandOffsets, r.Uint32, maxCommandCollectionLength)
+	SliceWithMaxLen(r, &c.Overloads, maxCommandCollectionLength)
 }
 
 // CommandOverload represents an overload of a command. This overload can be compared to function overloading
@@ -64,7 +66,7 @@ type CommandOverload struct {
 
 func (c *CommandOverload) Marshal(r IO) {
 	r.Bool(&c.Chaining)
-	Slice(r, &c.Parameters)
+	SliceWithMaxLen(r, &c.Parameters, maxCommandCollectionLength)
 }
 
 const (
@@ -231,7 +233,7 @@ type CommandEnumContext struct {
 // Marshal encodes/decodes a CommandEnum.
 func (ctx CommandEnumContext) Marshal(r IO, x *CommandEnum) {
 	r.String(&x.Type)
-	FuncSlice(r, &x.ValueIndices, r.Uint32)
+	FuncSliceWithMaxLen(r, &x.ValueIndices, r.Uint32, maxCommandCollectionLength)
 }
 
 // ChainedSubcommand represents a subcommand that can have chained commands, such as /execute which allows you to run
@@ -245,7 +247,7 @@ type ChainedSubcommand struct {
 
 func (x *ChainedSubcommand) Marshal(r IO) {
 	r.String(&x.Name)
-	Slice(r, &x.Values)
+	SliceWithMaxLen(r, &x.Values, maxCommandCollectionLength)
 }
 
 // ChainedSubcommandValue represents the value for a chained subcommand argument.
@@ -277,7 +279,7 @@ type DynamicEnum struct {
 // Marshal encodes/decodes a DynamicEnum.
 func (x *DynamicEnum) Marshal(r IO) {
 	r.String(&x.Type)
-	FuncSlice(r, &x.Values, r.String)
+	FuncSliceWithMaxLen(r, &x.Values, r.String, maxCommandCollectionLength)
 }
 
 const (

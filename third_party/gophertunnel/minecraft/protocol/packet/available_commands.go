@@ -4,6 +4,8 @@ import (
 	"github.com/sandertv/gophertunnel/minecraft/protocol"
 )
 
+const maxAvailableCommandEntries = 1 << 16
+
 // AvailableCommands is sent by the server to send a list of all commands that
 // the player is able to use on the server. This packet holds all the arguments
 // of each commands as well, making it possible for the client to provide
@@ -46,12 +48,14 @@ func (*AvailableCommands) ID() uint32 {
 }
 
 func (pk *AvailableCommands) Marshal(io protocol.IO) {
-	protocol.FuncSlice(io, &pk.EnumValues, io.String)
-	protocol.FuncSlice(io, &pk.ChainedSubcommandValues, io.String)
-	protocol.FuncSlice(io, &pk.Suffixes, io.String)
-	protocol.FuncIOSlice(io, &pk.Enums, protocol.CommandEnumContext{EnumValues: pk.EnumValues}.Marshal)
-	protocol.Slice(io, &pk.ChainedSubcommands)
-	protocol.Slice(io, &pk.Commands)
-	protocol.Slice(io, &pk.DynamicEnums)
-	protocol.Slice(io, &pk.Constraints)
+	protocol.FuncSliceWithMaxLen(io, &pk.EnumValues, io.String, maxAvailableCommandEntries)
+	protocol.FuncSliceWithMaxLen(io, &pk.ChainedSubcommandValues, io.String, maxAvailableCommandEntries)
+	protocol.FuncSliceWithMaxLen(io, &pk.Suffixes, io.String, maxAvailableCommandEntries)
+	protocol.FuncSliceWithMaxLen(io, &pk.Enums, func(value *protocol.CommandEnum) {
+		protocol.CommandEnumContext{EnumValues: pk.EnumValues}.Marshal(io, value)
+	}, maxAvailableCommandEntries)
+	protocol.SliceWithMaxLen(io, &pk.ChainedSubcommands, maxAvailableCommandEntries)
+	protocol.SliceWithMaxLen(io, &pk.Commands, maxAvailableCommandEntries)
+	protocol.SliceWithMaxLen(io, &pk.DynamicEnums, maxAvailableCommandEntries)
+	protocol.SliceWithMaxLen(io, &pk.Constraints, maxAvailableCommandEntries)
 }

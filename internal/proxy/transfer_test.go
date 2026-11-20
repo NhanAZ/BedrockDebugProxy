@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"io"
 	"net"
 	"path/filepath"
 	"reflect"
@@ -13,7 +14,9 @@ import (
 	"testing"
 	"time"
 
+	"github.com/NhanAZ/BedrockDebugProxy/internal/bedrock"
 	"github.com/NhanAZ/BedrockDebugProxy/internal/capture"
+	"github.com/google/uuid"
 	"github.com/sandertv/gophertunnel/minecraft"
 	"github.com/sandertv/gophertunnel/minecraft/protocol/login"
 	"github.com/sandertv/gophertunnel/minecraft/protocol/packet"
@@ -115,6 +118,87 @@ func TestTransferForProxyAddressRejectsWildcardListener(t *testing.T) {
 	_, _, err := transferForProxyAddress(&packet.Transfer{Address: "next.example", Port: 19132}, "0.0.0.0:19132")
 	if err == nil {
 		t.Fatal("transferForProxyAddress() accepted wildcard listener")
+	}
+}
+
+func TestServiceNetherNetTransferIDClassification(t *testing.T) {
+	const (
+		initialID = "11111111-1111-4111-8111-111111111111"
+		childID   = "22222222-2222-4222-8222-222222222222"
+	)
+	network := &pingDeadlineRecordingNetwork{}
+	for _, test := range []struct {
+		name            string
+		network         minecraft.Network
+		upstreamAddress string
+		target          string
+		want            bool
+	}{
+		{name: "service ID transfer", network: network, upstreamAddress: initialID, target: net.JoinHostPort(childID, "0"), want: true},
+		{name: "no network", upstreamAddress: initialID, target: net.JoinHostPort(childID, "0")},
+		{name: "HTTPS upstream address", network: network, upstreamAddress: "https://service.example:19132", target: net.JoinHostPort(childID, "0")},
+		{name: "nonzero port", network: network, upstreamAddress: initialID, target: net.JoinHostPort(childID, "19132")},
+		{name: "invalid destination ID", network: network, upstreamAddress: initialID, target: net.JoinHostPort("not-an-id", "0")},
+	} {
+		t.Run(test.name, func(t *testing.T) {
+			gotID, got := serviceNetherNetTransferID(test.network, test.upstreamAddress, test.target)
+			if got != test.want || (got && gotID != childID) {
+				t.Fatalf("serviceNetherNetTransferID() = %q, %t, want %q, %t", gotID, got, childID, test.want)
+			}
+		})
+	}
+}
+
+func TestPrepareTransferHopReusesServiceNetherNetSignaling(t *testing.T) {
+	const (
+		initialID = "11111111-1111-4111-8111-111111111111"
+		childID   = "22222222-2222-4222-8222-222222222222"
+	)
+	root := filepath.Join(t.TempDir(), "capture")
+	recorder, err := capture.New(root, capture.Options{})
+	if err != nil {
+		t.Fatal(err)
+	}
+	network := &pingDeadlineRecordingNetwork{}
+	runner := &Runner{config: Config{Recorder: recorder, UpstreamAddress: initialID, UpstreamNetwork: network}}
+	state := &hopState{target: net.JoinHostPort(childID, "0")}
+	failures := bedrock.NewFailureSink(nil)
+	if err := runner.prepareTransferHop(context.Background(), state, 2, nil, failures, newLiveReporter(io.Discard)); err != nil {
+		t.Fatal(err)
+	}
+	if state.transferNetwork != network || state.transferAddress != uuid.MustParse(childID).String() || !state.transferRouteProbed {
+		t.Fatalf("transfer route state = network %T, address %q, selected %t", state.transferNetwork, state.transferAddress, state.transferRouteProbed)
+	}
+	if failures.Err() != nil {
+		t.Fatalf("route selection recorded a capture failure: %v", failures.Err())
+	}
+	if err := recorder.Close("closed", nil); err != nil {
+		t.Fatal(err)
+	}
+	var selected bool
+	if err := capture.ScanEvents(root, func(event capture.Event) error {
+		if event.Kind != "transfer.route_selection" {
+			return nil
+		}
+		selected = true
+		var fields struct {
+			Transport         string `json:"transport"`
+			AddressType       string `json:"address_type"`
+			ReusedSignaling   bool   `json:"reused_signaling"`
+			SelectionEvidence string `json:"selection_evidence"`
+		}
+		if err := json.Unmarshal(event.Data, &fields); err != nil {
+			return err
+		}
+		if fields.Transport != "nethernet-signaling" || fields.AddressType != "network_id" || !fields.ReusedSignaling || fields.SelectionEvidence != "upstream_network_id_and_zero_port_transfer" {
+			t.Errorf("route selection data = %+v", fields)
+		}
+		return nil
+	}); err != nil {
+		t.Fatal(err)
+	}
+	if !selected {
+		t.Fatal("transfer route selection evidence was not recorded")
 	}
 }
 

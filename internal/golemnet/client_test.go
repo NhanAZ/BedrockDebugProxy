@@ -11,6 +11,7 @@ import (
 
 	"github.com/go-gl/mathgl/mgl32"
 	"github.com/sandertv/gophertunnel/minecraft"
+	"github.com/sandertv/gophertunnel/minecraft/protocol"
 	"github.com/sandertv/gophertunnel/minecraft/protocol/login"
 	"github.com/sandertv/gophertunnel/minecraft/protocol/packet"
 )
@@ -43,7 +44,7 @@ func TestClientCapturesFormAndSendsActions(t *testing.T) {
 			serverErrors <- err
 			return
 		}
-		form := map[string]any{"type": "form", "title": "Hub", "text": "Choose", "buttons": []map[string]string{{"text": "Mines"}, {"text": "BedWars"}}}
+		form := map[string]any{"type": "form", "title": "Hub", "text": "Choose", "elements": []map[string]string{{"type": "label", "text": "Choose"}, {"type": "button", "text": "Mines"}, {"type": "button", "text": "BedWars"}}}
 		formData, _ := json.Marshal(form)
 		if err := conn.WritePacket(&packet.ModalFormRequest{FormID: 7, FormData: formData}); err != nil {
 			serverErrors <- err
@@ -93,10 +94,10 @@ func TestClientCapturesFormAndSendsActions(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if form.ID != 7 || form.Title != "Hub" || len(form.Buttons) != 2 || form.Buttons[1].Text != "BedWars" {
+	if form.ID != 7 || form.Title != "Hub" || len(form.Buttons) != 2 || form.Buttons[0].Index != 1 || form.Buttons[1].Index != 2 || form.Buttons[1].Text != "BedWars" {
 		t.Fatalf("form = %+v", form)
 	}
-	if err := client.SelectForm(ctx, 1); err != nil {
+	if err := client.SelectForm(ctx, 2); err != nil {
 		t.Fatal(err)
 	}
 	if err := client.Chat("/help"); err != nil {
@@ -105,7 +106,7 @@ func TestClientCapturesFormAndSendsActions(t *testing.T) {
 	for range 2 {
 		select {
 		case response := <-responses:
-			if response != "1" {
+			if response != "2" {
 				t.Fatalf("form response = %q", response)
 			}
 		case message := <-chats:
@@ -134,6 +135,253 @@ func TestClientCapturesFormAndSendsActions(t *testing.T) {
 	}
 	if err := <-serverErrors; err != nil {
 		t.Fatal(err)
+	}
+}
+
+func TestClientUsesObservedHotbarItemInPlayerInput(t *testing.T) {
+	ctx, cancel := context.WithTimeout(t.Context(), 10*time.Second)
+	defer cancel()
+	listener, err := (minecraft.ListenConfig{AuthenticationDisabled: true, AllowUnknownPackets: true, AllowInvalidPackets: true}).Listen("raknet", "127.0.0.1:0")
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer func() { _ = listener.Close() }()
+	serverErrors := make(chan error, 1)
+	item := protocol.ItemInstance{StackNetworkID: 1, Stack: protocol.ItemStack{ItemType: protocol.ItemType{NetworkID: 400}, Count: 1}}
+	go func() {
+		accepted, acceptErr := listener.Accept()
+		if acceptErr != nil {
+			serverErrors <- acceptErr
+			return
+		}
+		conn, ok := accepted.(*minecraft.Conn)
+		if !ok {
+			serverErrors <- fmt.Errorf("unexpected server connection %T", accepted)
+			_ = accepted.Close()
+			return
+		}
+		defer func() { _ = conn.Close() }()
+		if err := conn.StartGame(minecraft.GameData{WorldName: "Golem item test", EntityUniqueID: 1, EntityRuntimeID: 1}); err != nil {
+			serverErrors <- err
+			return
+		}
+		for {
+			value, readErr := conn.ReadPacket()
+			if readErr != nil {
+				serverErrors <- readErr
+				return
+			}
+			if _, ok := value.(*packet.PlayerAuthInput); ok {
+				break
+			}
+		}
+		content := make([]protocol.ItemInstance, 9)
+		content[2] = item
+		if err := conn.WritePacket(&packet.InventoryContent{WindowID: 0, Content: content}); err != nil {
+			serverErrors <- err
+			return
+		}
+		if err := conn.WritePacket(&packet.PlayerHotBar{SelectedHotBarSlot: 0, WindowID: 0, SelectHotBarSlot: true}); err != nil {
+			serverErrors <- err
+			return
+		}
+		if err := conn.Flush(); err != nil {
+			serverErrors <- err
+			return
+		}
+		equipmentSeen, interactionSeen := false, false
+		for !interactionSeen {
+			value, readErr := conn.ReadPacket()
+			if readErr != nil {
+				serverErrors <- readErr
+				return
+			}
+			switch value := value.(type) {
+			case *packet.MobEquipment:
+				if value.EntityRuntimeID != 1 || value.InventorySlot != 2 || value.HotBarSlot != 2 || value.NewItem.Stack.ItemType.NetworkID != 400 {
+					serverErrors <- fmt.Errorf("unexpected equipment selection: %+v", value)
+					return
+				}
+				equipmentSeen = true
+			case *packet.PlayerAuthInput:
+				transaction, ok := value.ItemInteractionData.Value()
+				if !ok {
+					continue
+				}
+				if !value.InputData.Load(packet.InputFlagPerformItemInteraction) || transaction.ActionType != protocol.UseItemActionClickAir || transaction.TriggerType != protocol.TriggerTypePlayerInput || transaction.HotBarSlot != 2 || transaction.HeldItem.Stack.ItemType.NetworkID != 400 {
+					serverErrors <- fmt.Errorf("unexpected item interaction: flags=%v transaction=%+v", value.InputData, transaction)
+					return
+				}
+				interactionSeen = true
+			}
+		}
+		if !equipmentSeen || !interactionSeen {
+			serverErrors <- fmt.Errorf("equipment=%v interaction=%v", equipmentSeen, interactionSeen)
+			return
+		}
+		serverErrors <- nil
+	}()
+
+	client, err := New(Config{
+		Address:  listener.Addr().String(),
+		Identity: login.IdentityData{Identity: "11111111-1111-1111-1111-111111111111", DisplayName: "GolemItemTest"},
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := client.Start(ctx); err != nil {
+		t.Fatal(err)
+	}
+	for {
+		client.stateMu.Lock()
+		_, observed := client.inventory[2]
+		client.stateMu.Unlock()
+		if observed {
+			break
+		}
+		select {
+		case <-ctx.Done():
+			t.Fatal(ctx.Err())
+		case <-time.After(10 * time.Millisecond):
+		}
+	}
+	if err := client.UseItem(ctx, 2); err != nil {
+		t.Fatal(err)
+	}
+	if err := client.Close(); err != nil {
+		t.Fatal(err)
+	}
+	if err := <-serverErrors; err != nil {
+		t.Fatal(err)
+	}
+}
+
+func TestClientAcknowledgesServerTeleport(t *testing.T) {
+	ctx, cancel := context.WithTimeout(t.Context(), 10*time.Second)
+	defer cancel()
+	listener, err := (minecraft.ListenConfig{AuthenticationDisabled: true, AllowUnknownPackets: true, AllowInvalidPackets: true}).Listen("raknet", "127.0.0.1:0")
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer func() { _ = listener.Close() }()
+	serverErrors := make(chan error, 1)
+	go func() {
+		accepted, acceptErr := listener.Accept()
+		if acceptErr != nil {
+			serverErrors <- acceptErr
+			return
+		}
+		conn, ok := accepted.(*minecraft.Conn)
+		if !ok {
+			serverErrors <- fmt.Errorf("unexpected server connection %T", accepted)
+			_ = accepted.Close()
+			return
+		}
+		defer func() { _ = conn.Close() }()
+		if err := conn.StartGame(minecraft.GameData{WorldName: "Golem teleport test", EntityUniqueID: 1, EntityRuntimeID: 1}); err != nil {
+			serverErrors <- err
+			return
+		}
+		if err := conn.WritePacket(&packet.MovePlayer{EntityRuntimeID: 2, Position: mgl32.Vec3{90, 91, 92}, Mode: packet.MoveModeTeleport}); err != nil {
+			serverErrors <- err
+			return
+		}
+		if err := conn.Flush(); err != nil {
+			serverErrors <- err
+			return
+		}
+		teleport := &packet.MovePlayer{EntityRuntimeID: 1, Position: mgl32.Vec3{12.5, 64, -7.25}, Yaw: 90, HeadYaw: 90, Pitch: -15, OnGround: true, Mode: packet.MoveModeTeleport}
+		if err := conn.WritePacket(teleport); err != nil {
+			serverErrors <- err
+			return
+		}
+		if err := conn.Flush(); err != nil {
+			serverErrors <- err
+			return
+		}
+		previousTick := uint64(0)
+		for _, move := range []*packet.MovePlayer{
+			teleport,
+			{EntityRuntimeID: 1, Position: mgl32.Vec3{-40, 72, 18}, Yaw: -30, HeadYaw: -30, Pitch: 5, Mode: packet.MoveModeReset},
+		} {
+			if move != teleport {
+				if err := conn.WritePacket(move); err != nil {
+					serverErrors <- err
+					return
+				}
+				if err := conn.Flush(); err != nil {
+					serverErrors <- err
+					return
+				}
+			}
+			for {
+				value, readErr := conn.ReadPacket()
+				if readErr != nil {
+					serverErrors <- readErr
+					return
+				}
+				input, ok := value.(*packet.PlayerAuthInput)
+				if !ok || !input.InputData.Load(packet.InputFlagHandledTeleport) {
+					continue
+				}
+				if input.Position != move.Position || input.Yaw != move.Yaw || input.HeadYaw != move.HeadYaw || input.Pitch != move.Pitch {
+					serverErrors <- fmt.Errorf("teleport acknowledgement position/rotation = %v/%v/%v/%v, want %v/%v/%v/%v", input.Position, input.Yaw, input.HeadYaw, input.Pitch, move.Position, move.Yaw, move.HeadYaw, move.Pitch)
+					return
+				}
+				if input.InputData.Load(packet.InputFlagVerticalCollision) != move.OnGround || !input.InputData.Load(packet.InputFlagPersistSneak) || input.Tick <= previousTick {
+					serverErrors <- fmt.Errorf("teleport acknowledgement flags=%v tick=%d, want ground=%v, persist sneak, and tick after %d", input.InputData, input.Tick, move.OnGround, previousTick)
+					return
+				}
+				previousTick = input.Tick
+				break
+			}
+		}
+		serverErrors <- nil
+	}()
+
+	client, err := New(Config{
+		Address:  listener.Addr().String(),
+		Identity: login.IdentityData{Identity: "11111111-1111-1111-1111-111111111111", DisplayName: "GolemTPTest"},
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := client.Start(ctx); err != nil {
+		t.Fatal(err)
+	}
+	select {
+	case err := <-serverErrors:
+		if err != nil {
+			t.Fatal(err)
+		}
+	case <-ctx.Done():
+		t.Fatal(ctx.Err())
+	}
+	if err := client.Close(); err != nil {
+		t.Fatal(err)
+	}
+}
+
+func TestParseFormButtonArraysUseZeroBasedIndexes(t *testing.T) {
+	form := parseForm(9, []byte(`{"type":"form","buttons":[{"text":"One"},{"text":"Two"}]}`), 1, time.Time{})
+	if form.DecodeStatus != "decoded" || len(form.Buttons) != 2 || form.Buttons[0].Index != 0 || form.Buttons[1].Index != 1 {
+		t.Fatalf("parsed button form = %+v", form)
+	}
+}
+
+func TestParseFormFlattensRawTextComponents(t *testing.T) {
+	form := parseForm(12, []byte(`{"type":"form","title":{"rawtext":[{"text":"§6§lWEEKEND EVENT!!"},{"text":"|ACRE|"}]},"content":{"rawtext":[{"text":"Sale details"}]},"elements":[{"type":"button","text":{"rawtext":[{"text":"Let's go!"}]}}]}`), 1, time.Time{})
+	if form.DecodeStatus != "decoded" {
+		t.Fatalf("form decode status = %q, error %q", form.DecodeStatus, form.DecodeError)
+	}
+	if form.Title != "§6§lWEEKEND EVENT!!|ACRE|" || form.Text != "Sale details" {
+		t.Fatalf("form title/text = %q / %q", form.Title, form.Text)
+	}
+	if len(form.Buttons) != 1 || form.Buttons[0].Index != 0 || form.Buttons[0].Text != "Let's go!" {
+		t.Fatalf("form buttons = %+v", form.Buttons)
+	}
+	if !json.Valid(form.Raw) {
+		t.Fatal("raw form was not preserved")
 	}
 }
 
@@ -371,6 +619,52 @@ func TestClientFollowsTransferAndPreservesScenarioEvents(t *testing.T) {
 		if err := <-serverErrors; err != nil {
 			t.Fatal(err)
 		}
+	}
+}
+
+func TestServiceNetherNetTransferIDClassification(t *testing.T) {
+	const target = "22222222-2222-4222-8222-222222222222"
+	for _, test := range []struct {
+		name      string
+		transport string
+		address   string
+		port      uint16
+		want      bool
+	}{
+		{name: "NetherNet", transport: "nethernet", address: target, want: true},
+		{name: "JSON RPC NetherNet", transport: "nethernet-jsonrpc", address: target, want: true},
+		{name: "RakNet", transport: "raknet", address: target},
+		{name: "nonzero port", transport: "nethernet", address: target, port: 19132},
+		{name: "invalid ID", transport: "nethernet", address: "not-an-id"},
+	} {
+		t.Run(test.name, func(t *testing.T) {
+			gotID, got := serviceNetherNetTransferID(test.transport, test.address, test.port)
+			if got != test.want || (got && gotID != target) {
+				t.Fatalf("serviceNetherNetTransferID() = %q, %t, want %q, %t", gotID, got, target, test.want)
+			}
+		})
+	}
+}
+
+func TestServiceNetherNetTransferTargetReusesNetworkAndStripsZeroPort(t *testing.T) {
+	const address = "22222222-2222-4222-8222-222222222222"
+	network := minecraft.NewRakNet(nil)
+	selectedNetwork, target, selected, err := serviceNetherNetTransferTarget("nethernet", network, &Transfer{Address: address, Port: 0})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if selectedNetwork != network || target != address || !selected {
+		t.Fatalf("selected route = network %T, target %q, selected %t", selectedNetwork, target, selected)
+	}
+}
+
+func TestServiceNetherNetTransferTargetRequiresExistingNetwork(t *testing.T) {
+	_, _, selected, err := serviceNetherNetTransferTarget("nethernet", nil, &Transfer{
+		Address: "22222222-2222-4222-8222-222222222222",
+		Port:    0,
+	})
+	if !selected || err == nil || err.Error() != "service NetherNet transfer has no signaling network" {
+		t.Fatalf("service route selected=%t error=%v", selected, err)
 	}
 }
 

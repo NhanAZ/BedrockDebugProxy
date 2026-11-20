@@ -11,8 +11,20 @@ exchange, calls `DoSpawn`, and then reads server packets into a bounded event
 stream. It recognizes server text, forms, disconnects, and Transfer packets.
 Transfer following is enabled by default. RakNet hops preserve the previous
 source address and client GUID when the transport exposes them. A NetherNet
-transfer first probes the HTTPS endpoint used by the proxy and falls back to
-RakNet when the endpoint does not advertise that transport.
+transfer to a UUID with port zero reuses the signaling network from an
+initial service NetherNet or NetherNet JSON-RPC target and dials the destination
+ID directly. HTTPS NetherNet endpoint transfers still probe the advertised
+endpoint and fall back to RakNet when that endpoint does not support the
+transport.
+
+After spawn, the client acknowledges a server `MovePlayer` packet when it
+targets the current player's runtime ID and uses gophertunnel's `Teleport` or
+`Reset` mode. The `PlayerAuthInput` response carries the server-provided
+position and rotation, a new input tick, `HandledTeleport`, and `PersistSneak`.
+It sets `VerticalCollision` when the packet reports `OnGround`. Other entity
+IDs, ordinary movement, paused input, and a connection that is no longer
+current do not trigger an acknowledgement. This supports server-directed
+region changes without adding movement or transfer behavior.
 
 ## Command
 
@@ -59,13 +71,20 @@ operation is executed.
 Supported operations are:
 
 - `wait_form` waits for the next server-sent form and returns its bounded
-  metadata, buttons, and raw JSON.
+  metadata, selectable buttons, and raw JSON. It reads both `buttons` forms
+  and `elements` forms while retaining the server's original element indexes.
 - `current_form` returns the latest form without consuming an event.
-- `select_form` submits a button index from the latest form. It is intended
-  for menu forms and rejects indexes outside the observed button list.
+- `select_form` submits an original button index from the latest form. It is
+  intended for menu forms and rejects indexes that do not identify an observed
+  selectable button.
 - `submit_form` submits a caller-supplied JSON response for the latest form.
   This is needed for custom and modal forms. The response is validated as JSON
   and capped at 1 MiB.
+- `use_item` selects a nonempty hotbar slot from inventory packets already
+  observed by this connection and sends a click-in-air item interaction. Slots
+  are limited to 0 through 8. The operation does not move the player or click an
+  entity. Inspect the current capture to identify the slot and item before
+  using it.
 - `chat` sends one client chat message. Server replies appear as later text
   events.
 - `wait` lets the reader continue collecting events for a bounded duration.
@@ -123,18 +142,20 @@ client usable as a release-report producer. The release gate still reviews
 the report and its capture: a normal `stability` operation must cover at least
 30 seconds, encrypted packs must be decrypted successfully, and server-specific
 workflow checks remain agent responsibilities. The client currently provides
-a stationary `PlayerAuthInput` heartbeat and scenario-driven forms, chat, and
-transfer following. It does not yet claim full retail-client movement,
-inventory, combat, block interaction, or rendering gameplay.
+a stationary `PlayerAuthInput` heartbeat and scenario-driven forms, observed
+hotbar item use, chat, and transfer following. It does not yet claim full
+retail-client movement, inventory management, combat, block interaction, or
+rendering gameplay.
 
 ## Security and limits
 
 The client treats server form data, text, packet types, transfer targets, and
-scenario JSON as untrusted input. It validates transfer host and port, limits
-forms and messages, bounds retained events, refuses an event-buffer overflow,
-limits transfer hops to 64, and never constructs a shell command from scenario
-data. A transfer is followed only after the target has passed the address
-validator. The client does not mutate, replay, inject, or drop packets.
+scenario JSON as untrusted input. It validates transfer host and port, except
+for the narrowly scoped UUID plus zero-port destination on an already resolved
+service NetherNet transport. It limits forms and messages, bounds retained
+events, refuses an event-buffer overflow, limits transfer hops to 64, and never
+constructs a shell command from scenario data. The client does not mutate,
+replay, inject, or drop packets.
 
 Use a disposable account and keep reports and local captures separate from
 public source. `--auth none` is for local development only. Public-server

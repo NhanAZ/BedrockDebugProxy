@@ -14,6 +14,50 @@ Every new entry should state the symptom, root cause, implementation commits, ev
 
 ## Compatibility and bug index
 
+### FIX-0174 - Decode structured text in Go Golem forms
+
+- Symptom: a server-sent form using a structured `rawtext` title or content was retained but could not be inspected or selected through the Go Golem report.
+- Classification: form projection limitation in BedrockDebugProxy. The original form JSON remains available for inspection.
+- Root cause: the bounded form view decoded title, content, and button text only as JSON strings, and did not accept the `content` key.
+- Implementation: accept string and structured text components, flatten `rawtext` segments while retaining translation keys and arguments, and treat `content` as the form text when `text` is absent. Keep the original JSON unchanged in `Form.Raw`.
+- Evidence and validation: a synthetic rawtext form fixture verifies the title, content, button index and label, and preserved raw JSON. No server message or capture is used as permanent documentation evidence.
+- Status: focused tests and `tools/quality.ps1` pass. Exact-revision live validation remains pending.
+
+### FIX-0173 - Bound large command and sub-chunk collections per field
+
+- Symptom: strict latest-protocol decoding rejected large `AvailableCommands` and `UpdateSubChunkBlocks` arrays at the generic 1,024-item ceiling even when the packet payload contained the declared items.
+- Classification: a decoder safety-limit mismatch in BedrockDebugProxy's vendored gophertunnel packet codecs. This is not evidence of a server protocol violation.
+- Root cause: the generic gophertunnel slice guard was applied to packet collections for which Mojang's protocol 2225 schema declares no `maxItems` limit.
+- Implementation: add a finite 65,536-item override for the command packet collections, nested command collections, and both sub-chunk block-change collections. Keep the generic 1,024-item limit and remaining-payload validation for other slices.
+- Evidence and provenance: Mojang's pinned protocol 2225 schemas list these fields as arrays without `maxItems`, while explicitly giving chained-subcommand data a maximum of 16. See [large command and sub-chunk packet slices](research/large-command-and-subchunk-slices.md).
+- Status: focused tests and `tools/quality.ps1` pass. Exact-revision live validation remains pending.
+
+### FIX-0172 - Acknowledge server teleports in Go Golem
+
+- Symptom: Go Golem could spawn and send its stationary input heartbeat but did not acknowledge a later server-directed `MovePlayer` teleport or reset for its own entity. A public-server route that changes region in the same connection could therefore be mistaken for a server failure when the client omitted a protocol response.
+- Classification: missing behavior in BedrockDebugProxy's Go network client. The evidence did not establish a public-server defect or a new protocol version requirement.
+- Root cause: the Go Golem reader observed `MovePlayer` packets but never sent the corresponding `PlayerAuthInput` flag for its own player. The existing BedrockPackArchive Mineville navigator already builds this response for the current server reset.
+- Implementation: respond only to gophertunnel `Teleport` and `Reset` modes addressed to the current entity on the active connection. Reuse the server position and rotation, advance the shared input tick, set `HandledTeleport` and `PersistSneak`, and map `OnGround` to `VerticalCollision`. Ignore other entities and modes, paused input, and a connection that has already changed.
+- Evidence and provenance: the official Mojang schema at `f8d1496b5efc95105bd9ae1f2f2f076a43f71d82` lists `HandledTeleport`, `PersistSneak`, and `VerticalCollision` in `PlayerAuthInputData`, and defines the `MovePlayer` target entity, mode, position, rotation, and ground fields. It names wire mode 1 `Respawn`, while gophertunnel exposes that value as `MoveModeReset`. See [the protocol research note](research/golem-server-teleport-ack.md). The loopback regression verifies Teleport and Reset acknowledgements, rejects a foreign entity response, and checks server position, rotation, ground flag, sneak flag, and increasing ticks. No capture schema or resource-pack importer contract changed.
+- Status: focused tests and the canonical quality gate pass. The working-tree live smoke is excluded from permanent evidence because it was not a stamped exact-revision run. Public-server release validation remains pending.
+
+### FIX-0171 - Use observed hotbar items in Go Golem
+
+- Symptom: the Go Golem could read a server form but could not activate a server selector offered as a hotbar item.
+- Classification: a missing, bounded headless-client action. The existing capture path already retains the inventory packets needed to identify an item.
+- Root cause: Golem did not retain the current main-inventory slots or provide an item-use action tied to an observed stack.
+- Implementation: track the current main inventory from `InventoryContent` and `InventorySlot`. `use_item` accepts only slots 0 through 8 that contain a currently observed nonempty item, selects that same stack with `MobEquipment`, and sends a click-in-air transaction in `PlayerAuthInput` under `PerformItemInteraction`. The action does not move the player or click an entity.
+- Evidence and validation: the loopback regression supplies a synthetic inventory slot, invokes the action, and verifies the selected stack, slot, item-use transaction, and input flag. See [Golem observed item-use research](research/golem-observed-item-use.md) for the official protocol schema references and scope. No capture, pack content, account data, or server messages are used as documentation evidence.
+- Status: focused Golem and proxy tests pass. The action still needs validation from a stamped producer build before it can be treated as exact-revision evidence.
+
+### FIX-0170 - Follow service NetherNet Transfer IDs
+
+- Symptom: the exploratory Dimension Clash route could not continue after the server sent a Transfer with a UUID address and zero port. The Go Golem treated it as an invalid host and port, while the proxy selected a fresh RakNet transport instead of the existing service signaling network.
+- Classification: a transport-routing gap in BedrockDebugProxy. Microsoft documents `netherNetId` as the destination server ID. The pinned `go-nethernet` dialer accepts that ID through the existing signaling connection. The zero-port interpretation remains an inference scoped to the observed packet shape and the previously resolved service transport.
+- Implementation: for a UUID initial service NetherNet target and a UUID Transfer address with port zero, reuse the authenticated signaling network and dial the destination ID alone. Go Golem applies the same rule only to resolved `nethernet` and `nethernet-jsonrpc` transports. Other Transfer shapes retain existing route selection. Server-sent `elements` forms are also exposed with original button indexes so Golem can select the current form entries without assuming a fixed menu.
+- Evidence and provenance: see [NetherNet Transfer ID routing research](research/nethernet-transfer-id-routing.md). Synthetic tests cover the transport classifier, reuse of the existing signaling network, zero-port handling, and `elements` form selection. An exploratory server session triggered this investigation, but its raw data is not used as a citation because it contains decrypted third-party pack content and was not archived. No packet schema or capture format changed.
+- Status: focused proxy and Go Golem tests pass. Exact-revision server traversal and the refreshed full 14-experience acquisition batch remain pending.
+
 ### FIX-0168 - Correct the NetherNet SDP candidate prefix
 
 - Symptom: The Hive rejected the authenticated HTTPS NetherNet offer with `POST /v1/join/<network-id>: 400 Bad Request`, while a retail client could still join the server.

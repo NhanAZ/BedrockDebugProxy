@@ -187,6 +187,7 @@ type Client struct {
 	terminalErr        error
 	closeOnce          sync.Once
 	packetCount        map[string]int
+	inventory          map[uint32]protocol.ItemInstance
 	resourcePacks      int
 	inputTick          uint64
 	clientInputPackets int
@@ -238,7 +239,7 @@ func New(config Config) (*Client, error) {
 	if config.Logger == nil {
 		config.Logger = slog.New(slog.NewTextHandler(io.Discard, nil))
 	}
-	return &Client{config: config, events: make(chan Event, maxEventBuffer), done: make(chan struct{}), packetCount: make(map[string]int)}, nil
+	return &Client{config: config, events: make(chan Event, maxEventBuffer), done: make(chan struct{}), packetCount: make(map[string]int), inventory: make(map[uint32]protocol.ItemInstance)}, nil
 }
 
 // Start dials, completes resource-pack negotiation, spawns into the world,
@@ -362,6 +363,13 @@ func (c *Client) readLoop() {
 			}
 			return
 		}
+		if move, ok := value.(*packet.MovePlayer); ok {
+			if err := c.acknowledgeServerTeleport(conn, move); err != nil {
+				c.fail(fmt.Errorf("acknowledge server teleport: %w", err))
+				return
+			}
+		}
+		c.observeInventory(value)
 		event := c.eventForPacket(value, hop)
 		if event.Kind == "" {
 			continue
@@ -412,10 +420,18 @@ func (c *Client) followTransfer(transfer *Transfer, previous *minecraft.Conn, ho
 		c.updateTransfer(transfer)
 		return fmt.Errorf("transfer hop limit %d reached", c.config.MaxHops)
 	}
-	if err := validateAddress(transfer.Target); err != nil {
-		transfer.FollowError = err.Error()
+	transferNetwork, transferAddress, serviceNetherNetTransfer, routeErr := serviceNetherNetTransferTarget(c.config.Transport, c.config.Network, transfer)
+	if routeErr != nil {
+		transfer.FollowError = routeErr.Error()
 		c.updateTransfer(transfer)
-		return fmt.Errorf("validate transfer target: %w", err)
+		return routeErr
+	}
+	if !serviceNetherNetTransfer {
+		if err := validateAddress(transfer.Target); err != nil {
+			transfer.FollowError = err.Error()
+			c.updateTransfer(transfer)
+			return fmt.Errorf("validate transfer target: %w", err)
+		}
 	}
 	identity := previous.IdentityData()
 	client := previous.ClientData()
@@ -425,13 +441,16 @@ func (c *Client) followTransfer(transfer *Transfer, previous *minecraft.Conn, ho
 
 	network := c.config.Network
 	address := transfer.Target
-	if strings.Contains(c.config.Transport, "nethernet") {
+	if serviceNetherNetTransfer {
+		network = transferNetwork
+		address = transferAddress
+	} else if strings.Contains(strings.ToLower(c.config.Transport), "nethernet") {
 		if netherNetwork, httpsAddress, err := transferHTTPSNetherNet(c.ctx, c.config.HTTPClient, transfer.Target); err == nil {
 			network = netherNetwork
 			address = httpsAddress
 		}
 	}
-	if network == nil || address == transfer.Target {
+	if network == nil || (!serviceNetherNetTransfer && address == transfer.Target) {
 		raknet := minecraft.NewRakNet(c.config.Logger)
 		raknet.LocalAddr = localAddr
 		raknet.ClientGUID = clientGUID
@@ -464,6 +483,7 @@ func (c *Client) followTransfer(transfer *Transfer, previous *minecraft.Conn, ho
 	c.spawned = true
 	c.hops = nextHop
 	c.resourcePacks += len(conn.ResourcePacks())
+	clear(c.inventory)
 	for index := len(c.transfers) - 1; index >= 0; index-- {
 		if c.transfers[index].Target == transfer.Target && c.transfers[index].Hop == transfer.Hop && !c.transfers[index].Followed {
 			c.transfers[index] = *transfer
@@ -479,6 +499,32 @@ func (c *Client) followTransfer(transfer *Transfer, previous *minecraft.Conn, ho
 		}
 	}
 	return nil
+}
+
+func serviceNetherNetTransferID(transport, address string, port uint16) (string, bool) {
+	if port != 0 || (!strings.EqualFold(transport, "nethernet") && !strings.EqualFold(transport, "nethernet-jsonrpc")) {
+		return "", false
+	}
+	address = strings.TrimSpace(address)
+	id, err := uuid.Parse(address)
+	if err != nil {
+		return "", false
+	}
+	return id.String(), true
+}
+
+func serviceNetherNetTransferTarget(transport string, network minecraft.Network, transfer *Transfer) (minecraft.Network, string, bool, error) {
+	if transfer == nil {
+		return nil, "", false, nil
+	}
+	address, ok := serviceNetherNetTransferID(transport, transfer.Address, transfer.Port)
+	if !ok {
+		return nil, "", false, nil
+	}
+	if network == nil {
+		return nil, "", true, errors.New("service NetherNet transfer has no signaling network")
+	}
+	return network, address, true, nil
 }
 
 func (c *Client) inputLoop() {
@@ -505,6 +551,66 @@ func (c *Client) inputLoop() {
 func (c *Client) sendClientInput() error {
 	c.inputMu.Lock()
 	defer c.inputMu.Unlock()
+	return c.sendClientInputLocked(nil)
+}
+
+func (c *Client) acknowledgeServerTeleport(conn *minecraft.Conn, move *packet.MovePlayer) error {
+	if move == nil || (move.Mode != packet.MoveModeTeleport && move.Mode != packet.MoveModeReset) || move.EntityRuntimeID != conn.GameData().EntityRuntimeID {
+		return nil
+	}
+	c.inputMu.Lock()
+	defer c.inputMu.Unlock()
+	if c.inputPaused {
+		return nil
+	}
+	current, _ := c.connection()
+	if current != conn {
+		return nil
+	}
+	clientData := conn.ClientData()
+	inputMode := clientData.CurrentInputMode
+	if inputMode <= packet.InputModeUndefined || inputMode >= packet.InputModeCount {
+		inputMode = packet.InputModeTouch
+	}
+	interactionModel := packet.InteractionModelTouch
+	if inputMode == packet.InputModeMouse || inputMode == packet.InputModeGamePad {
+		interactionModel = packet.InteractionModelCrosshair
+	}
+	flags := protocol.NewInputFlags(packet.InputFlagCount)
+	flags.Set(packet.InputFlagHandledTeleport)
+	flags.Set(packet.InputFlagPersistSneak)
+	if move.OnGround {
+		flags.Set(packet.InputFlagVerticalCollision)
+	}
+	tick := c.nextInputTick()
+	input := &packet.PlayerAuthInput{
+		Position:          move.Position,
+		Pitch:             move.Pitch,
+		Yaw:               move.Yaw,
+		HeadYaw:           move.HeadYaw,
+		InputData:         flags,
+		InputMode:         uint32(inputMode),
+		PlayMode:          packet.PlayModeNormal,
+		InteractionModel:  int32(interactionModel),
+		InteractPitch:     move.Pitch,
+		InteractYaw:       move.Yaw,
+		Tick:              tick,
+		CameraOrientation: cameraOrientation(move.Pitch, move.Yaw),
+	}
+	if err := conn.WritePacket(input); err != nil {
+		return fmt.Errorf("write teleport acknowledgement: %w", err)
+	}
+	if err := conn.Flush(); err != nil {
+		return fmt.Errorf("flush teleport acknowledgement: %w", err)
+	}
+	c.stateMu.Lock()
+	c.clientInputPackets++
+	c.lastClientInputAt = time.Now().UTC()
+	c.stateMu.Unlock()
+	return nil
+}
+
+func (c *Client) sendClientInputLocked(itemInteraction *protocol.UseItemTransactionData) error {
 	if c.inputPaused {
 		return nil
 	}
@@ -523,12 +629,16 @@ func (c *Client) sendClientInput() error {
 		interactionModel = packet.InteractionModelCrosshair
 	}
 	tick := c.nextInputTick()
+	inputFlags := protocol.NewInputFlags(packet.InputFlagCount)
+	if itemInteraction != nil {
+		inputFlags.Set(packet.InputFlagPerformItemInteraction)
+	}
 	input := &packet.PlayerAuthInput{
 		Pitch:             data.Pitch,
 		Yaw:               data.Yaw,
 		Position:          data.PlayerPosition,
 		HeadYaw:           data.Yaw,
-		InputData:         protocol.NewInputFlags(packet.InputFlagCount),
+		InputData:         inputFlags,
 		InputMode:         uint32(inputMode),
 		PlayMode:          packet.PlayModeNormal,
 		InteractionModel:  int32(interactionModel),
@@ -536,6 +646,9 @@ func (c *Client) sendClientInput() error {
 		InteractYaw:       data.Yaw,
 		Tick:              tick,
 		CameraOrientation: cameraOrientation(data.Pitch, data.Yaw),
+	}
+	if itemInteraction != nil {
+		input.ItemInteractionData = protocol.Option(*itemInteraction)
 	}
 	if err := conn.WritePacket(input); err != nil {
 		return fmt.Errorf("write client input: %w", err)
@@ -548,6 +661,76 @@ func (c *Client) sendClientInput() error {
 	c.lastClientInputAt = time.Now().UTC()
 	c.stateMu.Unlock()
 	return nil
+}
+
+func (c *Client) observeInventory(value packet.Packet) {
+	c.stateMu.Lock()
+	defer c.stateMu.Unlock()
+	switch value := value.(type) {
+	case *packet.InventoryContent:
+		if value.WindowID != 0 {
+			return
+		}
+		clear(c.inventory)
+		for slot, item := range value.Content {
+			c.inventory[uint32(slot)] = item
+		}
+	case *packet.InventorySlot:
+		if value.WindowID == 0 {
+			c.inventory[value.Slot] = value.NewItem
+		}
+	}
+}
+
+// UseItem selects an observed hotbar item and sends a normal item-use input.
+// It does not click entities, move the player, or choose a server-sent form.
+func (c *Client) UseItem(ctx context.Context, slot int) error {
+	if err := ctx.Err(); err != nil {
+		return err
+	}
+	if slot < 0 || slot > 8 {
+		return errors.New("item slot must be between 0 and 8")
+	}
+	c.stateMu.Lock()
+	item, observed := c.inventory[uint32(slot)]
+	c.stateMu.Unlock()
+	if !observed || item.Stack.Count == 0 || item.Stack.ItemType.NetworkID == 0 {
+		return fmt.Errorf("hotbar item slot %d has not been observed or is empty", slot)
+	}
+
+	c.inputMu.Lock()
+	defer c.inputMu.Unlock()
+	if c.inputPaused {
+		return errors.New("cannot use an item while following a server transfer")
+	}
+	conn, _ := c.connection()
+	if conn == nil {
+		return ErrClosed
+	}
+	if err := conn.WritePacket(&packet.MobEquipment{
+		EntityRuntimeID: conn.GameData().EntityRuntimeID,
+		NewItem:         item,
+		InventorySlot:   byte(slot),
+		HotBarSlot:      byte(slot),
+		WindowID:        0,
+	}); err != nil {
+		return fmt.Errorf("select observed hotbar item: %w", err)
+	}
+	if err := conn.Flush(); err != nil {
+		return fmt.Errorf("flush selected hotbar item: %w", err)
+	}
+	data := conn.GameData()
+	interaction := &protocol.UseItemTransactionData{
+		ActionType:          protocol.UseItemActionClickAir,
+		TriggerType:         protocol.TriggerTypePlayerInput,
+		HotBarSlot:          int32(slot),
+		Hand:                protocol.HandSlotMainHand,
+		HeldItem:            item,
+		Position:            data.PlayerPosition,
+		ClientPrediction:    protocol.ClientPredictionSuccess,
+		ClientCooldownState: protocol.ClientCooldownStateOff,
+	}
+	return c.sendClientInputLocked(interaction)
 }
 
 func (c *Client) nextInputTick() uint64 {
@@ -779,8 +962,15 @@ func (c *Client) SelectForm(ctx context.Context, index int) error {
 	if !ok {
 		return ErrNoCurrentForm
 	}
-	if index < 0 || index >= len(form.Buttons) {
-		return fmt.Errorf("form button index %d is outside 0..%d", index, len(form.Buttons)-1)
+	selectable := false
+	for _, button := range form.Buttons {
+		if button.Index == index {
+			selectable = true
+			break
+		}
+	}
+	if !selectable {
+		return fmt.Errorf("form button index %d is not selectable", index)
 	}
 	return c.SubmitForm(ctx, json.RawMessage(strconv.Itoa(index)))
 }
@@ -895,28 +1085,101 @@ func parseForm(id uint32, raw []byte, hop int, at time.Time) Form {
 		return form
 	}
 	var data struct {
-		Type    string `json:"type"`
-		Title   string `json:"title"`
-		Text    string `json:"text"`
+		Type    string          `json:"type"`
+		Title   json.RawMessage `json:"title"`
+		Text    json.RawMessage `json:"text"`
+		Content json.RawMessage `json:"content"`
 		Buttons []struct {
-			Text string `json:"text"`
+			Text json.RawMessage `json:"text"`
 		} `json:"buttons"`
+		Elements []struct {
+			Type string          `json:"type"`
+			Text json.RawMessage `json:"text"`
+		} `json:"elements"`
 	}
 	if err := json.Unmarshal(raw, &data); err != nil {
 		form.DecodeError = err.Error()
 		return form
 	}
-	if len(data.Buttons) > maxFormButtons {
+	if len(data.Buttons) > maxFormButtons || len(data.Elements) > maxFormButtons {
 		form.DecodeError = fmt.Sprintf("form contains more than %d buttons", maxFormButtons)
 		return form
 	}
-	form.Type, form.Title, form.Text = data.Type, data.Title, data.Text
-	form.Buttons = make([]FormButton, len(data.Buttons))
-	for index, button := range data.Buttons {
-		form.Buttons[index] = FormButton{Index: index, Text: button.Text}
+	form.Type = data.Type
+	form.Title = formText(data.Title)
+	text := data.Text
+	if len(text) == 0 {
+		text = data.Content
+	}
+	form.Text = formText(text)
+	if len(data.Buttons) != 0 {
+		form.Buttons = make([]FormButton, len(data.Buttons))
+		for index, button := range data.Buttons {
+			form.Buttons[index] = FormButton{Index: index, Text: formText(button.Text)}
+		}
+	} else {
+		for index, element := range data.Elements {
+			if strings.EqualFold(element.Type, "button") {
+				form.Buttons = append(form.Buttons, FormButton{Index: index, Text: formText(element.Text)})
+			}
+		}
 	}
 	form.DecodeStatus = "decoded"
 	return form
+}
+
+func formText(raw json.RawMessage) string {
+	if len(raw) == 0 || string(raw) == "null" {
+		return ""
+	}
+	var value any
+	if err := json.Unmarshal(raw, &value); err != nil {
+		return ""
+	}
+	return flattenFormText(value)
+}
+
+func flattenFormText(value any) string {
+	switch value := value.(type) {
+	case string:
+		return value
+	case []any:
+		var text strings.Builder
+		for _, part := range value {
+			text.WriteString(flattenFormText(part))
+		}
+		return text.String()
+	case map[string]any:
+		if rawText, ok := value["rawtext"]; ok {
+			return flattenFormText(rawText)
+		}
+		if text, ok := value["text"]; ok {
+			return flattenFormText(text)
+		}
+		if translated, ok := value["translate"]; ok {
+			text := flattenFormText(translated)
+			if with, exists := value["with"]; exists {
+				arguments := flattenFormText(with)
+				if arguments != "" {
+					text += " " + arguments
+				}
+			}
+			return text
+		}
+		if selector, ok := value["selector"]; ok {
+			return flattenFormText(selector)
+		}
+		if keybind, ok := value["keybind"]; ok {
+			return flattenFormText(keybind)
+		}
+		encoded, err := json.Marshal(value)
+		if err != nil {
+			return ""
+		}
+		return string(encoded)
+	default:
+		return ""
+	}
 }
 
 func cloneForm(value Form) Form {

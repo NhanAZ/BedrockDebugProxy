@@ -16,6 +16,11 @@ Detailed rationale remains in [`docs/audits/`](docs/audits/).
 - Raised only the field-specific decode bounds for the large `ItemRegistry`
   `CreativeContent`, and `CraftingData` startup tables observed from
   Axolotl-PM. The generic protocol slice limit remains unchanged.
+- Added finite per-field decode bounds for large `AvailableCommands` and
+  `UpdateSubChunkBlocks` collections. Ordinary protocol slices retain the
+  generic 1,024-item limit.
+- Updated the Go Golem form view to read structured `rawtext` values and
+  `content` forms while preserving the original server JSON.
 - Kept generic network telemetry out of the bounded Go Golem scenario-event
   queue, rolled its diagnostic history instead of failing at the cap, packed
   validation checks as one PowerShell array argument, and changed the default
@@ -37,7 +42,14 @@ Detailed rationale remains in [`docs/audits/`](docs/audits/).
   resource-pack archives, optional ContentKey-scoped decryption, automatic
   artifact views, and validation reports without opening Minecraft for Windows.
   The current scenario client remains below full retail gameplay coverage.
+- Improved server-driven Golem exploration with observed hotbar item use,
+  server teleport acknowledgements, service NetherNet Transfer routing, and
+  structured `rawtext` form decoding. The current form remains available for
+  review in the report and canonical capture.
 - Preserve small text-like resource-pack files when `contents.json` declares a key for bytes that are already plaintext. AES-CFB8 has no authentication, so the derived archive now avoids corrupting misdeclared README and similar text entries while continuing to decrypt entries whose source bytes are not clearly plaintext.
+- Read server-sent `elements` forms in Go Golem while preserving their original button indexes, and follow UUID plus zero-port transfers through the resolved NetherNet signaling network. The generic transfer route is selected only when the initial upstream is a service NetherNet ID.
+- Added a bounded Go Golem `use_item` scenario operation. It selects a nonempty hotbar item already observed on the current connection and sends its item-use transaction through `PlayerAuthInput`.
+- Acknowledge server-directed `MovePlayer` teleports and resets for the current Go Golem player through `PlayerAuthInput`. The implementation uses the server's position and rotation, preserves ordered client input ticks, and ignores unrelated entities and ordinary movement. See [the teleport acknowledgement research](docs/research/golem-server-teleport-ack.md).
 
 ## [0.5.0] - 2026-11-02
 

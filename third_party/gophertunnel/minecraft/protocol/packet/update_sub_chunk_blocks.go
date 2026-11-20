@@ -2,6 +2,8 @@ package packet
 
 import "github.com/sandertv/gophertunnel/minecraft/protocol"
 
+const maxSubChunkBlockChanges = 1 << 16
+
 // UpdateSubChunkBlocks is essentially just UpdateBlock packet, however for a set of blocks in a sub-chunk.
 type UpdateSubChunkBlocks struct {
 	// Position is the block position of the sub-chunk being referred to.
@@ -19,6 +21,6 @@ func (*UpdateSubChunkBlocks) ID() uint32 {
 
 func (pk *UpdateSubChunkBlocks) Marshal(io protocol.IO) {
 	io.BlockPos(&pk.Position)
-	protocol.Slice(io, &pk.Blocks)
-	protocol.Slice(io, &pk.Extra)
+	protocol.SliceWithMaxLen(io, &pk.Blocks, maxSubChunkBlockChanges)
+	protocol.SliceWithMaxLen(io, &pk.Extra, maxSubChunkBlockChanges)
 }

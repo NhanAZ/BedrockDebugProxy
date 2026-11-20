@@ -88,6 +88,14 @@ func Slice[T any, S ~*[]T, A PtrMarshaler[T]](r IO, x S) {
 	SliceOfLen[T, S, A](r, count, x)
 }
 
+// SliceWithMaxLen reads or writes a varuint32-prefixed slice with an explicit
+// safety limit for packet fields whose valid cardinality exceeds maxSliceLength.
+func SliceWithMaxLen[T any, S ~*[]T, A PtrMarshaler[T]](r IO, x S, max uint32) {
+	count := uint32(len(*x))
+	r.Varuint32(&count)
+	SliceOfLenWithMaxLen[T, S, A](r, count, x, max)
+}
+
 // SliceUint8Length reads/writes a slice of T with a uint8 prefix.
 func SliceUint8Length[T any, S *[]T, A PtrMarshaler[T]](r IO, x S) {
 	count := uint8(len(*x))
@@ -116,6 +124,15 @@ func FuncSlice[T any, S ~*[]T](r IO, x S, f func(*T)) {
 	FuncSliceOfLen(r, count, x, f)
 }
 
+// FuncSliceWithMaxLen reads or writes a varuint32-prefixed slice with an
+// explicit safety limit for packet fields whose valid cardinality exceeds
+// maxSliceLength.
+func FuncSliceWithMaxLen[T any, S ~*[]T](r IO, x S, f func(*T), max uint32) {
+	count := uint32(len(*x))
+	r.Varuint32(&count)
+	FuncSliceOfLenWithMaxLen(r, count, x, f, max)
+}
+
 // FuncIOSlice reads/writes a slice of T using a function f with a varuint32 length prefix.
 func FuncIOSlice[T any, S ~*[]T](r IO, x S, f func(IO, *T)) {
 	FuncSlice(r, x, func(v *T) {
@@ -127,9 +144,14 @@ const maxSliceLength = 1024
 
 // SliceOfLen reads/writes the elements of a slice of type T with length l.
 func SliceOfLen[T any, S ~*[]T, A PtrMarshaler[T]](r IO, l uint32, x S) {
+	SliceOfLenWithMaxLen[T, S, A](r, l, x, maxSliceLength)
+}
+
+// SliceOfLenWithMaxLen reads or writes a slice with an explicit safety limit.
+func SliceOfLenWithMaxLen[T any, S ~*[]T, A PtrMarshaler[T]](r IO, l uint32, x S, max uint32) {
 	limit, ok := r.(sliceReader)
 	if ok {
-		limit.SliceLength(l, maxSliceLength)
+		limit.SliceLength(l, max)
 		*x = make([]T, l)
 	}
 

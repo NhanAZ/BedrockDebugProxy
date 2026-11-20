@@ -13,6 +13,7 @@ import (
 	"github.com/NhanAZ/BedrockDebugProxy/internal/bedrock"
 	"github.com/NhanAZ/BedrockDebugProxy/internal/capture"
 	"github.com/NhanAZ/BedrockDebugProxy/internal/experience"
+	"github.com/google/uuid"
 	"github.com/sandertv/gophertunnel/minecraft"
 )
 
@@ -47,7 +48,46 @@ func transferHTTPSNetherNet(ctx context.Context, target string) (minecraft.Netwo
 	return network, address, nil
 }
 
+func serviceNetherNetTransferID(network minecraft.Network, upstreamAddress, target string) (string, bool) {
+	if network == nil {
+		return "", false
+	}
+	if _, err := uuid.Parse(strings.TrimSpace(upstreamAddress)); err != nil {
+		return "", false
+	}
+	host, port, err := net.SplitHostPort(strings.TrimSpace(target))
+	if err != nil {
+		return "", false
+	}
+	portNumber, err := strconv.ParseUint(port, 10, 16)
+	if err != nil || portNumber != 0 {
+		return "", false
+	}
+	id, err := uuid.Parse(strings.TrimSpace(host))
+	if err != nil {
+		return "", false
+	}
+	return id.String(), true
+}
+
 func (r *Runner) prepareTransferHop(ctx context.Context, state *hopState, hop int, logger *slog.Logger, failures *bedrock.FailureSink, live *liveReporter) error {
+	if id, ok := serviceNetherNetTransferID(r.config.UpstreamNetwork, r.config.UpstreamAddress, state.target); ok {
+		state.transferNetwork = r.config.UpstreamNetwork
+		state.transferAddress = id
+		state.transferRouteProbed = true
+		captureErr := r.recordAtHop("transfer.route_selection", capture.SeverityInfo, map[string]any{
+			"transport":          "nethernet-signaling",
+			"address_type":       "network_id",
+			"reused_signaling":   true,
+			"selection_evidence": "upstream_network_id_and_zero_port_transfer",
+		}, hop)
+		setCaptureFailure(failures, captureErr)
+		if captureErr != nil {
+			return captureErr
+		}
+		live.Info("Transfer route selected the existing NetherNet signaling connection for a server-sent network ID")
+		return nil
+	}
 	if network, address, err := transferHTTPSNetherNet(ctx, state.target); err == nil {
 		state.transferNetwork = network
 		state.transferAddress = address
