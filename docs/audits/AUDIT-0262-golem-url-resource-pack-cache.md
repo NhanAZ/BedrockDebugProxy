@@ -24,7 +24,7 @@ BedrockPackArchive commit [`1ea804d`](https://github.com/NhanAZ-Tools/BedrockPac
 
 - Focused checks: `go test -count=1 ./internal/urlpackcache ./internal/proxy ./internal/golemnet` passes, including a loopback server that advertises an HTTPS pack URL without a chunk archive. Go Golem fetches one pack, responds `AllPacksDownloaded`, and reaches spawn.
 - Full producer quality gate: pass with `tools/quality.ps1`, including the complete test suite, build, static analysis, vulnerability scan, tracked artifact checks, and whitespace check.
-- BedrockPackArchive commit `1ea804dc671dc54b286569a8cd918623c747056e`: full tests, focused URL fixture, vet, build, and `git diff --check` pass. Its exact stamped producer verifier is pending the clean committed producer build.
+- BedrockPackArchive commit `1ea804dc671dc54b286569a8cd918623c747056e`: full tests, focused URL fixture, vet, build, and `git diff --check` pass. Its exact stamped producer verifier also passes against the clean producer build for commit `00845025d143752f032c675d46f898e2ebadadc3`.
 - Exact stamped public-server validation: pending. No fresh acquisition result is inferred from earlier captures.
 
 ## Limitations and follow-up
