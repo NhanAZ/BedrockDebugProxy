@@ -316,6 +316,9 @@ type authenticatedNetherNet struct {
 	minecraft.NetherNet
 }
 
+// StatusPingSupported reports whether the NetherNet transport supports RakNet status pings.
+func (authenticatedNetherNet) StatusPingSupported() bool { return false }
+
 func (n authenticatedNetherNet) DialContextIdentity(ctx context.Context, address, token string, key *ecdsa.PrivateKey) (net.Conn, error) {
 	n.Dialer.Identity = &nethernet.Identity{PrivateKey: key, Token: token, Domain: identityDomain}
 	return n.DialContext(ctx, address)

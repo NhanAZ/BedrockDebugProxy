@@ -14,6 +14,15 @@ Every new entry should state the symptom, root cause, implementation commits, ev
 
 ## Compatibility and bug index
 
+### FIX-0179 - Skip unsupported NetherNet status pings
+
+- Symptom: a completed OneBlockOnline packs-only session recorded `transport.ping` with `minecraft: NetherNet.PingContext: not supported` and surfaced it as a blocking transport diagnostic.
+- Classification: local transport capability mismatch. The resource-pack exchange completed, so the ping error did not establish an upstream login failure.
+- Root cause: upstream dialing skipped status pings for HTTPS targets but still invoked RakNet's optional status ping through an authenticated NetherNet transport.
+- Implementation: skip `minecraft.Dialer` status pings when the selected transport reports that it does not support them. Preserve best-effort status-ping probes on RakNet transfer routes.
+- Evidence and validation: the verified OneBlockOnline capture [session-20261120T195739Z](https://github.com/BedrockDebugProxy-Captures/session-20261120T195739Z/releases/tag/capture-archive) records three offered packs and the unsupported ping diagnostic at BedrockDebugProxy `0.6.0`. The regression test verifies that dialing continues without a ping or captured `transport.ping` event. Full quality checks pass. Fresh `0.6.1` OneBlockOnline and six-server release reports remain required.
+- Status: fixed in the implementation recorded by [AUDIT-0271](audits/AUDIT-0271-nethernet-status-ping.md). Paired BedrockPackArchive commit and exact stamped producer fixture remain pending.
+
 ### FIX-0178 - Synchronize stationary input test metrics
 
 - Symptom: the hosted race-enabled quality gate intermittently reported two client input packets after the loopback server had received the third packet.

@@ -940,6 +940,14 @@ func (r *Runner) probeTransferRouteNetwork(ctx context.Context, target string, l
 	return nil
 }
 
+func skipUnsupportedStatusPing(target string, network bedrock.Network) bool {
+	if strings.HasPrefix(target, "https://") {
+		return true
+	}
+	statusPingNetwork, ok := network.Transport.(interface{ StatusPingSupported() bool })
+	return ok && !statusPingNetwork.StatusPingSupported()
+}
+
 func (r *Runner) connectUpstream(ctx context.Context, target string, network bedrock.Network, observer *bedrock.Observer, connectionID string, hop int, logger *slog.Logger, live *liveReporter, identityData login.IdentityData, clientData login.ClientData, enableClientCache, transferRoute, routeProbed, prepareDownstream, resourcePackExchangeOnly bool, onConnection func(*minecraft.Conn)) (*minecraft.Conn, []*resource.Pack, error) {
 	if err := r.recordAtHop("upstream.dial_start", capture.SeverityInfo, map[string]any{"address": target}, hop); err != nil {
 		return nil, nil, err
@@ -961,9 +969,9 @@ func (r *Runner) connectUpstream(ctx context.Context, target string, network bed
 		ClientData:        clientData,
 		EnableClientCache: enableClientCache,
 		ErrorLog:          logger,
-		// HTTPS NetherNet endpoints do not support RakNet status pings. Their
-		// endpoint status was checked when the Experience was resolved.
-		SkipPing: strings.HasPrefix(target, "https://"),
+		// NetherNet transports do not support RakNet status pings. HTTPS
+		// endpoints were checked when the Experience was resolved.
+		SkipPing: skipUnsupportedStatusPing(target, network),
 		// The optional address-discovery ping must not inherit the 15-minute
 		// resource-pack dial deadline. RakNet documents that PingContext can
 		// otherwise wait indefinitely after a lost UDP packet.

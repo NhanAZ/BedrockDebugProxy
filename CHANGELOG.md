@@ -6,6 +6,10 @@ Detailed rationale remains in [`docs/audits/`](docs/audits/).
 
 ## [Unreleased]
 
+### Fixed
+
+- Skip unsupported RakNet status pings on authenticated NetherNet transports. Keep best-effort status-ping evidence for RakNet transfer routes.
+
 ## [0.6.0] - 2026-11-21
 
 Supported Bedrock version: 1.26.62 (protocol 2225).

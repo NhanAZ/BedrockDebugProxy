@@ -177,6 +177,10 @@ func TestHTTPSNetherNetNetworkChecksEndpoint(t *testing.T) {
 	if _, ok := network.(authenticatedNetherNet); !ok {
 		t.Fatalf("network type = %T", network)
 	}
+	statusPing, ok := network.(interface{ StatusPingSupported() bool })
+	if !ok || statusPing.StatusPingSupported() {
+		t.Fatal("HTTPS NetherNet network did not report unsupported status pings")
+	}
 	if _, err := newHTTPSNetherNetNetwork(context.Background(), server.Client(), strings.Replace(server.URL, "https://", "http://", 1)); err == nil || !strings.Contains(err.Error(), "must use HTTPS") {
 		t.Fatalf("HTTP endpoint error = %v", err)
 	}

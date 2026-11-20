@@ -122,11 +122,64 @@ func TestConnectUpstreamBoundsAddressDiscoveryPing(t *testing.T) {
 	}
 }
 
+func TestConnectUpstreamSkipsUnsupportedNetherNetStatusPing(t *testing.T) {
+	root := filepath.Join(t.TempDir(), "capture")
+	recorder, err := capture.New(root, capture.Options{})
+	if err != nil {
+		t.Fatal(err)
+	}
+	failures := bedrock.NewFailureSink(nil)
+	transport := &unsupportedStatusPingNetwork{pingDeadlineRecordingNetwork: &pingDeadlineRecordingNetwork{}}
+	network := bedrock.Network{
+		Transport:    transport,
+		Recorder:     recorder,
+		Failures:     failures,
+		SessionID:    sessionID,
+		ConnectionID: "upstream-1",
+		Channel:      "upstream",
+		Hop:          1,
+	}
+	observer := bedrock.NewObserver(recorder, failures, sessionID, 1, nil)
+	runner := &Runner{config: Config{Recorder: recorder}}
+	_, _, err = runner.connectUpstream(
+		context.Background(), "experience:OneBlockOnline", network, observer,
+		"upstream-1", 1, nil, newLiveReporter(io.Discard), login.IdentityData{}, login.ClientData{},
+		false, false, false, false, false, nil,
+	)
+	if closeErr := recorder.Close("closed", nil); closeErr != nil {
+		t.Fatal(closeErr)
+	}
+	if err == nil {
+		t.Fatal("connectUpstream() returned nil after the test transport rejected the dial")
+	}
+	if transport.pingCalled {
+		t.Fatal("connectUpstream() called an unsupported NetherNet status ping")
+	}
+	if !transport.dialCalled {
+		t.Fatal("connectUpstream() did not continue with the upstream dial")
+	}
+	if err := capture.ScanEvents(root, func(event capture.Event) error {
+		if event.Kind == "transport.ping" {
+			t.Fatal("capture recorded an unsupported NetherNet status ping")
+		}
+		return nil
+	}); err != nil {
+		t.Fatal(err)
+	}
+}
+
 type pingDeadlineRecordingNetwork struct {
 	dialCalled      bool
+	pingCalled      bool
 	pingDeadline    time.Time
 	pingHasDeadline bool
 }
+
+type unsupportedStatusPingNetwork struct {
+	*pingDeadlineRecordingNetwork
+}
+
+func (*unsupportedStatusPingNetwork) StatusPingSupported() bool { return false }
 
 func (n *pingDeadlineRecordingNetwork) DialContext(context.Context, string) (net.Conn, error) {
 	n.dialCalled = true
@@ -134,6 +187,7 @@ func (n *pingDeadlineRecordingNetwork) DialContext(context.Context, string) (net
 }
 
 func (n *pingDeadlineRecordingNetwork) PingContext(ctx context.Context, _ string) ([]byte, error) {
+	n.pingCalled = true
 	n.pingDeadline, n.pingHasDeadline = ctx.Deadline()
 	return nil, context.DeadlineExceeded
 }
