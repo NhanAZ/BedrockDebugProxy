@@ -1,5 +1,7 @@
 # Context-aware Enchanted validation
 
+> Superseded as a release requirement by [decision 0018](0018-minimal-spawn-release-validation.md). Its dynamic-form analysis remains applicable to pack acquisition and route research.
+
 ## Decision
 
 Enchanted release validation treats the server-sent Hub form as runtime data instead of hard-coding one child name or one hop count. The agent records the current form entries, classifies available children, maintenance or status entries, navigation entries, and informational entries, then tests every actionable top-level child from a fresh Hub session.

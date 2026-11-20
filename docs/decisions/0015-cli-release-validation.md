@@ -1,5 +1,7 @@
 # Accept authenticated CLI sessions for release validation
 
+> Superseded by [decision 0018](0018-minimal-spawn-release-validation.md). This record describes the earlier 30-second post-spawn gate and remains historical evidence for reports accepted under that policy.
+
 ## Decision
 
 On 2026-10-19 the maintainer explicitly requested agent-controlled CLI validation without opening a retail Minecraft client and release of BedrockDebugProxy 0.4.1. A full live session driven by a reviewed protocol client satisfies each required server baseline. The upstream must authenticate with the approved account, resolve the Experience, complete offered packs, reach spawn, retain bidirectional decoded traffic for at least 30 seconds after spawn, and close with verified capture integrity and complete artifacts.

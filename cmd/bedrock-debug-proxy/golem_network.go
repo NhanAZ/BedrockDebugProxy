@@ -436,7 +436,6 @@ func golemValidationChecks(snapshot golemnet.Report, state *networkScenarioState
 	checks := []string{
 		"cli_session=not_observed",
 		"authenticated_upstream=not_observed",
-		"post_spawn_stability=not_observed",
 	}
 	if scenarioStatus == 0 && snapshot.Spawned && snapshot.Closed && len(snapshot.Errors) == 0 && (evidence == nil || evidence.error() == nil) {
 		checks[0] = "cli_session=pass"
@@ -445,7 +444,7 @@ func golemValidationChecks(snapshot golemnet.Report, state *networkScenarioState
 		checks[1] = "authenticated_upstream=pass"
 	}
 	if state != nil && state.stabilityDuration >= 30*time.Second && snapshot.ClientInputPackets > 0 && len(snapshot.Errors) == 0 {
-		checks[2] = "post_spawn_stability=pass"
+		checks = append(checks, "post_spawn_stability=pass")
 	}
 	if evidence != nil && evidence.encryptedPackCount() > 0 {
 		if evidence.decryptionErrorCount() == 0 && evidence.decrypt {

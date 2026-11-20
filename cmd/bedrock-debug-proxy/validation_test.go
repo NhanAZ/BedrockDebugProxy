@@ -11,7 +11,23 @@ import (
 	"time"
 
 	"github.com/NhanAZ/BedrockDebugProxy/internal/artifacts"
+	"github.com/NhanAZ/BedrockDebugProxy/internal/golemnet"
 )
+
+func TestGolemValidationChecksAcceptImmediateSpawnAndClose(t *testing.T) {
+	snapshot := golemnet.Report{Spawned: true, Closed: true, Authenticated: true}
+	checks := golemValidationChecks(snapshot, &networkScenarioState{}, nil, 0)
+	if got, want := strings.Join(checks, ","), "cli_session=pass,authenticated_upstream=pass"; got != want {
+		t.Fatalf("immediate release checks = %q, want %q", got, want)
+	}
+
+	state := &networkScenarioState{stabilityDuration: 30 * time.Second}
+	snapshot.ClientInputPackets = 1
+	checks = golemValidationChecks(snapshot, state, nil, 0)
+	if got, want := strings.Join(checks, ","), "cli_session=pass,authenticated_upstream=pass,post_spawn_stability=pass"; got != want {
+		t.Fatalf("optional stability checks = %q, want %q", got, want)
+	}
+}
 
 func TestValidationReportRequiresCompleteArtifactFolders(t *testing.T) {
 	if _, err := exec.LookPath("pwsh"); err != nil {
@@ -22,7 +38,7 @@ func TestValidationReportRequiresCompleteArtifactFolders(t *testing.T) {
 		t.Fatal(err)
 	}
 	commit := strings.Repeat("a", 40)
-	for _, name := range []string{"legacy", "complete", "missing", "open", "errors", "wrong_revision", "wrong_capture", "wrong_sequence", "invalid_json", "cli_complete", "cli_missing_auth", "cli_missing_stability", "cli_packs_only", "cli_blocking_error", "enchanted_flexible_complete", "enchanted_not_applicable", "enchanted_missing_form_review", "enchanted_missing_route_matrix"} {
+	for _, name := range []string{"legacy", "complete", "missing", "open", "errors", "wrong_revision", "wrong_capture", "wrong_sequence", "invalid_json", "cli_complete", "cli_minimal", "cli_missing_auth", "cli_packs_only", "cli_blocking_error", "enchanted_flexible_complete", "enchanted_minimal", "enchanted_not_applicable", "enchanted_missing_form_review", "enchanted_missing_route_matrix"} {
 		t.Run(name, func(t *testing.T) {
 			root := t.TempDir()
 			write := func(name string, value any) {
@@ -93,17 +109,20 @@ func TestValidationReportRequiresCompleteArtifactFolders(t *testing.T) {
 			checks := []string{"normal_session=pass"}
 			if strings.HasPrefix(name, "cli_") {
 				checks = []string{"cli_session=pass", "authenticated_upstream=pass", "post_spawn_stability=pass"}
-				if name == "cli_missing_auth" {
-					checks = []string{"cli_session=pass", "post_spawn_stability=pass"}
-				}
-				if name == "cli_missing_stability" {
+				if name == "cli_minimal" {
 					checks = []string{"cli_session=pass", "authenticated_upstream=pass"}
+				}
+				if name == "cli_missing_auth" {
+					checks = []string{"cli_session=pass"}
 				}
 			}
 			server := "Synthetic test"
 			if strings.HasPrefix(name, "enchanted_") {
 				server = "Enchanted"
 				checks = []string{"cli_session=pass", "authenticated_upstream=pass", "post_spawn_stability=pass", "enchanted_form_review=pass", "enchanted_route_matrix=pass", "transfer_following=pass", "resource_pack_transfer=pass"}
+				if name == "enchanted_minimal" {
+					checks = []string{"cli_session=pass", "authenticated_upstream=pass"}
+				}
 				if name == "enchanted_not_applicable" {
 					checks[len(checks)-2] = "transfer_following=not_applicable"
 					checks[len(checks)-1] = "resource_pack_transfer=not_applicable"
@@ -123,7 +142,7 @@ func TestValidationReportRequiresCompleteArtifactFolders(t *testing.T) {
 			}
 			// #nosec G204 -- Fixed project script and synthetic t.TempDir paths, passed as separate arguments.
 			output, err := exec.CommandContext(ctx, "pwsh", "-NoProfile", "-File", wrapper, "-ReportScript", script).CombinedOutput()
-			wantPass := name == "legacy" || name == "complete" || name == "cli_complete" || name == "enchanted_flexible_complete" || name == "enchanted_not_applicable"
+			wantPass := name == "legacy" || name == "complete" || name == "cli_complete" || name == "cli_minimal" || name == "enchanted_flexible_complete" || name == "enchanted_minimal" || name == "enchanted_not_applicable" || name == "enchanted_missing_form_review" || name == "enchanted_missing_route_matrix"
 			if (err == nil) != wantPass {
 				t.Fatalf("want pass=%t, error=%v\n%s", wantPass, err, output)
 			}
@@ -149,11 +168,14 @@ func TestReleaseReadinessRequiresFullSessionEvidence(t *testing.T) {
 	}
 	commit := strings.Repeat("a", 40)
 	servers := []string{"The Hive", "Galaxite", "Lifeboat", "Mineville Zeqa", "Enchanted", "CubeCraft"}
-	for _, name := range []string{"cli", "retail", "cube_craft_without_risk", "encrypted_packs", "missing_decryption", "missing_auth", "missing_stability", "missing_transfer", "enchanted_not_applicable", "missing_enchanted_form_review", "missing_enchanted_route_matrix", "failed_automatic", "failed_result", "wrong_revision", "packs_only", "ambiguous_session"} {
+	for _, name := range []string{"cli", "minimal_cli", "retail", "cube_craft_without_risk", "encrypted_packs", "missing_decryption", "missing_auth", "missing_stability", "missing_transfer", "enchanted_not_applicable", "missing_enchanted_form_review", "missing_enchanted_route_matrix", "failed_automatic", "failed_result", "wrong_revision", "packs_only", "ambiguous_session"} {
 		t.Run(name, func(t *testing.T) {
 			root := t.TempDir()
 			for _, server := range servers {
 				checks := map[string]string{"cli_session": "pass", "authenticated_upstream": "pass", "post_spawn_stability": "pass"}
+				if name == "minimal_cli" {
+					checks = map[string]string{"cli_session": "pass", "authenticated_upstream": "pass"}
+				}
 				if name == "retail" {
 					checks = map[string]string{"normal_session": "pass"}
 				}
@@ -224,7 +246,7 @@ func TestReleaseReadinessRequiresFullSessionEvidence(t *testing.T) {
 			args := []string{"-NoProfile", "-File", script, "-Revision", commit, "-Reports", root}
 			// #nosec G204 -- Fixed project script and synthetic t.TempDir paths, passed as separate arguments.
 			output, err := exec.CommandContext(ctx, "pwsh", args...).CombinedOutput()
-			wantPass := name == "cli" || name == "retail" || name == "cube_craft_without_risk" || name == "encrypted_packs" || name == "enchanted_not_applicable"
+			wantPass := name == "cli" || name == "minimal_cli" || name == "retail" || name == "cube_craft_without_risk" || name == "encrypted_packs" || name == "missing_stability" || name == "missing_transfer" || name == "enchanted_not_applicable" || name == "missing_enchanted_form_review" || name == "missing_enchanted_route_matrix"
 			if (err == nil) != wantPass {
 				t.Fatalf("want pass=%t, error=%v\n%s", wantPass, err, output)
 			}

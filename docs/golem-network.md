@@ -107,14 +107,15 @@ encrypted archive remains the authoritative local evidence.
 
 `--validation-report` runs the repository's existing
 `tools/create-validation-report.ps1` after the capture closes. The command
-automatically supplies `cli_session`, `authenticated_upstream`, and
-`post_spawn_stability` from observed evidence. Use repeated `--validation-check`
-options for review facts that only an agent can establish, such as
-`enchanted_form_review=pass` and `enchanted_route_matrix=pass`. The default
-result is `incomplete`; `--validation-result pass` is rejected by the existing
-report generator unless every automatic and manual gate passes. The binary
-must be built with `tools/build.ps1` so the capture contains the exact Git
-revision required by the report generator.
+automatically supplies `cli_session` and `authenticated_upstream` from
+observed evidence. It adds `post_spawn_stability=pass` only when the scenario
+explicitly completes the stability operation. Use repeated
+`--validation-check` options for other review facts. The default result is
+`incomplete`; `--validation-result pass` is rejected unless every required
+automatic and manual gate passes. The release scenario can contain only
+`{"op":"quit"}` because login, packs, and spawn finish before scenario input
+is read. The binary must be built with `tools/build.ps1` so the capture
+contains the exact Git revision required by the report generator.
 
 ## Enchanted workflow
 
@@ -139,15 +140,15 @@ messages, resource-pack count, hop count, spawn state, stationary
 client-input count and rate, and errors. It intentionally does not contain
 raw packet bytes, authentication tokens, or decrypted pack contents.
 
-The canonical capture and validation-report options now make the Go network
-client usable as a release-report producer. The release gate still reviews
-the report and its capture: a normal `stability` operation must cover at least
-30 seconds, encrypted packs must be decrypted successfully, and server-specific
-workflow checks remain agent responsibilities. The client currently provides
-a stationary `PlayerAuthInput` heartbeat and scenario-driven forms, observed
-hotbar item use, chat, and transfer following. It does not yet claim full
-retail-client movement, inventory management, combat, block interaction, or
-rendering gameplay.
+The canonical capture and validation-report options make the Go network
+client a release-report producer. The release gate reviews the report and its
+capture for authentication, completed pack exchange and decryption, spawn,
+bidirectional decoded traffic, clean closure, integrity, and errors. It does
+not require a post-spawn wait or lobby interaction. The client also provides a
+stationary `PlayerAuthInput` heartbeat and scenario-driven forms, observed
+hotbar item use, chat, and transfer following for separate investigations. It
+does not claim full retail-client movement, inventory management, combat,
+block interaction, or rendering gameplay.
 
 ## Security and limits
 

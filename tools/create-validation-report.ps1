@@ -213,21 +213,13 @@ try {
     $automaticChecksPassed = -not ($automaticRequirements.Values -contains $false)
     $retailSessionPassed = $manualChecksByName["normal_session"] -eq "pass"
     $cliSessionPassed = $manualChecksByName["cli_session"] -eq "pass" -and
-        $manualChecksByName["authenticated_upstream"] -eq "pass" -and $manualChecksByName["post_spawn_stability"] -eq "pass"
+        $manualChecksByName["authenticated_upstream"] -eq "pass"
     $resourcePackDecryptionPassed = $encryptedResourcePackCount -eq 0 -or
         $manualChecksByName["resource_pack_decryption"] -eq "pass"
-    $enchantedFlowPassed = $true
-    if ($Server.Trim() -eq "Enchanted") {
-        $conditionalTransferStates = @("pass", "not_applicable")
-        $enchantedFlowPassed = $manualChecksByName["enchanted_form_review"] -eq "pass" -and
-            $manualChecksByName["enchanted_route_matrix"] -eq "pass" -and
-            $conditionalTransferStates -contains $manualChecksByName["transfer_following"] -and
-            $conditionalTransferStates -contains $manualChecksByName["resource_pack_transfer"]
-    }
     $manualChecksPassed = ($retailSessionPassed -xor $cliSessionPassed) -and -not ($manualChecksByName.Values -contains "fail") -and
-        -not ($manualChecksByName.Values -contains "not_observed") -and $resourcePackDecryptionPassed -and $enchantedFlowPassed
+        -not ($manualChecksByName.Values -contains "not_observed") -and $resourcePackDecryptionPassed
     if ($Result -eq "pass" -and (-not $automaticChecksPassed -or -not $manualChecksPassed)) {
-        throw "A passing report requires all automatic evidence and review checks, required resource-pack decryption, plus either normal_session=pass or cli_session=pass with authenticated_upstream=pass and post_spawn_stability=pass. Enchanted also requires enchanted_form_review=pass, enchanted_route_matrix=pass, and applicable transfer/resource-pack checks set to pass or not_applicable."
+        throw "A passing report requires all automatic evidence and review checks, required resource-pack decryption, plus either normal_session=pass or cli_session=pass with authenticated_upstream=pass."
     }
 
     $protocol = Get-ObjectProperty $analysis "protocol"

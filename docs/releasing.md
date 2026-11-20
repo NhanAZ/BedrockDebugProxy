@@ -8,8 +8,8 @@ When the maintainer says "I want to release", the AI agent should drive this doc
 
 1. The agent audits the commits since the latest release, proposes or confirms the version, checks the working tree, documentation, licenses, provenance, known limitations, CI, and unresolved review findings.
 2. The agent runs the automated quality gate and builds the exact stamped candidate.
-3. The agent runs the live six-server matrix with the authenticated Go `golem network` client, the approved cached account, and `--decrypt-resource-packs` on every release session. The PHP Golem CLI remains available for disposable PocketMine-MP or Axolotl-PM plugin scenarios. The Go client creates the canonical capture and validation report for each public session. A retail Minecraft client is not required for release. CubeCraft is included in the matrix without a separate repeated confirmation step; this does not bypass technical gates or allow packet mutation, replay, or anti-cheat evasion.
-4. The agent inspects each closed capture, verifies its exact revision, authentication, pack exchange, decryption of every encrypted offered pack, spawn, post-spawn traffic, errors, and artifacts, then generates the sanitized report. The maintainer does not need to run report scripts.
+3. The agent runs the live six-server matrix with the authenticated Go `golem network` client, the approved cached account, and `--decrypt-resource-packs` on every release session. The client completes the offered packs, reaches lobby spawn, then closes immediately. It does not wait, move, select lobby forms or items, or enter minigames. The PHP Golem CLI remains available for disposable PocketMine-MP or Axolotl-PM plugin scenarios. A retail Minecraft client is not required for release. CubeCraft is included in the matrix without a separate repeated confirmation step; this does not bypass technical gates or allow packet mutation, replay, or anti-cheat evasion.
+4. The agent inspects each closed capture, verifies its exact revision, authentication, pack exchange, decryption of every encrypted offered pack, spawn, bidirectional decoded traffic, errors, and artifacts, then generates the sanitized report. The maintainer does not need to run report scripts.
 5. After all required sessions, the agent runs the release gate, prepares the checksum and release notes, and reports any exact blocker. A candidate that adds only allowed Markdown documentation after the matrix may use the documented docs-only equivalence with the original validated runtime revision; the reports themselves must not be edited.
 6. If the maintainer explicitly requested a release, the version is settled, every gate passes, and signing or GitHub access is available, the agent creates and pushes the tag, publishes the release assets, and verifies the result. It must not publish from an incomplete or mismatched validation set.
 7. After the published release is verified, the agent reads the private maintainer handoff README at `https://github.com/NhanAZ-Assets/.github-private/blob/main/profile/README.md`, follows its applicable instructions without copying private content into this repository, synchronizes the recovery mirror, and verifies the refs.
@@ -49,41 +49,45 @@ If the candidate can affect the local web viewer, complete the automated and bro
 
 ## 3. Validate the six-server baseline
 
-Use a reviewed agent-controlled CLI protocol client for every release session. For each server, start the same stamped binary, complete the required flow, retain at least 30 seconds of bidirectional traffic after spawn, close the client, and wait for automatic capture verification. The release gate does not require a retail Minecraft client and makes no claim about retail rendering, UI, input, or gameplay.
+Use the stamped Go network client for every release session. It authenticates directly to the selected Experience, completes the offered packs, reaches lobby spawn, and then executes a one-line `quit` scenario. The release gate does not require a retail Minecraft client and makes no claim about retail rendering, UI, input, or gameplay.
 
-The first successful device login creates the selected default account cache, so later server runs normally do not require another device code. If the machine has multiple profiles, select the intended account with `bedrock-debug-proxy use NAME` before starting the stamped binary. Wait for `Listening on` before connecting the client. The agent-controlled CLI driver may use the existing `--allow-unauthenticated-client` option on a concrete loopback listener while the proxy authenticates upstream with the approved Microsoft account. Do not expose the self-signed validation listener beyond loopback.
+The first successful device login creates the selected default account cache, so later server runs normally do not require another device code. If the machine has multiple profiles, select the intended account with `bedrock-debug-proxy use NAME` before starting the stamped binary. The Go network client uses that approved cached Microsoft account and does not start a local proxy listener.
 
-Include `--follow-transfers` in the release command when the server's flow can send a `Transfer` packet. This keeps subsequent hops in the same capture. Use a concrete loopback address for CLI tests or a reachable LAN address for a retail client. A wildcard listener address cannot be sent back to the client.
+Transfer following is enabled by default in `golem network` so server-directed hops needed to finish joining the selected Experience are captured in the same session. For CubeCraft, do not select any minigame. For Enchanted, leave its automatically sent Hub form unanswered and close after spawn.
 
 | Report label | Upstream target | Required live flow |
 | --- | --- | --- |
-| `The Hive` | `experience:The Hive` | Connect, complete packs, spawn, and retain normal lobby traffic |
-| `Galaxite` | `experience:Galaxite` | Connect, complete packs, spawn, and retain normal lobby traffic |
-| `Lifeboat` | `experience:Lifeboat` | Connect, complete packs, spawn, and retain normal lobby traffic |
-| `Mineville Zeqa` | `experience:Mineville Zeqa` | Enter the Zeqa flow and observe it directly |
-| `Enchanted` | `experience:Enchanted` | Inventory the server-sent form, test each actionable top-level child from a fresh Hub session, follow observed transfers and nested forms, and retain every playable route through spawn and stability |
-| `CubeCraft` | `experience:CubeCraft` | Connect, spawn, perform normal read-only interaction, observe both traffic directions, and close cleanly |
+| `The Hive` | `experience:The Hive` | Connect, complete packs, reach lobby spawn, and close immediately |
+| `Galaxite` | `experience:Galaxite` | Connect, complete packs, reach lobby spawn, and close immediately |
+| `Lifeboat` | `experience:Lifeboat` | Connect, complete packs, reach lobby spawn, and close immediately |
+| `Mineville Zeqa` | `experience:Mineville Zeqa` | Connect, complete packs, reach the joined lobby spawn, and close immediately |
+| `Enchanted` | `experience:Enchanted` | Complete Hub packs, reach Hub spawn, capture the automatic form, and close without selecting a child |
+| `CubeCraft` | `experience:CubeCraft` | Complete lobby packs, reach lobby spawn, and close without entering a minigame |
 
-Use this command with the selector shown in the matrix and connect the reviewed CLI client to its loopback listener. Replace only the value after `--upstream` for each run. The `experience:` selector resolves both Featured and Creator Experiences through Minecraft services. CubeCraft follows the same owner-controlled, read-only path without a separate repeated risk confirmation. Its public policy boundary still applies. Do not add bypass, mutation, replay, or anti-cheat evasion behavior to the release command.
+Create a one-line scenario file containing `{"op":"quit"}`. Use the selector shown in the matrix and replace only the value after `--server` for each run. The `experience:` selector resolves both Featured and Creator Experiences through Minecraft services. CubeCraft follows the same owner-controlled, read-only path without a separate repeated risk confirmation. Its public policy boundary still applies. Do not add bypass, mutation, replay, or anti-cheat evasion behavior to the release command.
 
 ```powershell
 .\bin\bedrock-debug-proxy.exe `
-    run `
-    --listen "127.0.0.1:19134" `
-    --upstream "experience:The Hive" `
+    golem network `
+    --server "experience:The Hive" `
     --auth device `
-    --allow-unauthenticated-client `
-    --follow-transfers `
-    --decrypt-resource-packs
+    --decrypt-resource-packs `
+    --capture .local\validation\the-hive `
+    --validation-report validation\local\<REVISION>\the-hive.json `
+    --server-label "The Hive" `
+    --validation-result pass `
+    --input .local\validation\quit.jsonl
 ```
+
+Create `.local\validation\quit.jsonl` with the single line `{"op":"quit"}`. `golem network` reaches spawn before it reads the scenario input. Do not add waits or interactions.
 
 Before or alongside the public matrix, the agent may use the PHP Golem CLI against a disposable local development server to exercise plugin commands, forms, inventories, movement, events, and other server-side behavior. Keep that simulation journal separate from Go network-client captures. The authenticated Go `golem network` sessions are the public-server protocol reports used by the release matrix.
 
 For every server, confirm all of the following before recording `pass`.
 
 1. Device authentication and Experience resolution succeed when applicable.
-2. The CLI or retail client connects to the proxy and reaches spawn.
-3. The session retains bidirectional decoded traffic for at least 30 seconds after spawn without an unexplained disconnect. Record only interactions actually performed.
+2. The Golem client completes the join flow and reaches spawn, then closes immediately.
+3. No movement, lobby item or form selection, or minigame entry occurs.
 4. Client-to-server and server-to-client traffic are present.
 5. Decoded packets are present.
 6. Offered resource packs complete without an unexplained error.
@@ -94,9 +98,9 @@ If a server cannot be tested, create an `incomplete` report. If an anomaly occur
 
 For every offered encrypted pack, the release capture must contain a successful derived decrypted archive and no decryption error. Add `resource_pack_decryption=pass` to the report checks whenever the server offers encrypted packs. A missing content key, unsupported encryption variant, or partial decryption is a release failure, not a reason to accept the encrypted archive as sufficient evidence. The original encrypted archive remains local evidence until cleanup.
 
-The Enchanted report must include `enchanted_form_review=pass` and `enchanted_route_matrix=pass`. The server sends the form automatically when the player joins. The agent must inventory the current entries, classify maintenance/status and navigation entries, and test each actionable top-level child from a fresh Hub session. If a child sends another form, select one available nested child; if it sends `Transfer`, follow every hop and complete every offered pack exchange before spawn and stability. Return to the Hub before the next top-level child. `transfer_following=pass` and `resource_pack_transfer=pass` apply when those flows occur; use `not_applicable` only when the reviewed route matrix proves that the current flow did not use them. A Hub-only session without form review and route outcomes does not satisfy the Enchanted release gate.
+For Enchanted, the automatically sent Hub form is captured, but no entry is selected during release validation. The report does not require a form inventory or child-route matrix. Explore child routes separately when collecting the server packs.
 
-The CubeCraft report uses the normal read-only path. Do not ask for a separate repeated rejection, kick, or ban confirmation and do not require `risk_acknowledged` in the report. The readiness command still requires a complete authenticated session, successful pack decryption, spawn, stable traffic, and verified artifacts. The lack of a separate confirmation is not permission or a policy exception.
+The CubeCraft report uses the normal read-only path. Do not ask for a separate repeated rejection, kick, or ban confirmation and do not require `risk_acknowledged` in the report. The readiness command still requires an authenticated session, successful pack decryption, spawn, bidirectional decoded traffic, and verified artifacts. The lack of a separate confirmation is not permission or a policy exception.
 
 ## 4. Generate one report per server
 
@@ -108,7 +112,7 @@ Use the exact capture directory printed by the matching run. The following examp
     -Capture .\captures\<THE-HIVE-SESSION> `
     -Server "The Hive" `
     -Result pass `
-    -Check @("cli_session=pass", "authenticated_upstream=pass", "post_spawn_stability=pass", "experience_resolution=pass", "resource_pack_decryption=pass") `
+    -Check @("cli_session=pass", "authenticated_upstream=pass", "experience_resolution=pass", "resource_pack_decryption=pass") `
     -Output ".\validation\local\$revision\the-hive.json"
 ```
 
@@ -120,7 +124,7 @@ Review each JSON file before using it. Then run the matrix gate.
 .\tools\check-release-readiness.ps1 -Revision $revision
 ```
 
-The command must print `pass` for all six servers. This gate verifies report structure, client-mode checks, Enchanted form/route review, conditional transfer checks, encrypted-pack decryption, and revision matching. It does not replace agent review of local captures and route ledgers. Retail reports use normal_session=pass instead of the three CLI session checks.
+The command must print `pass` for all six servers. This gate verifies report structure, client mode, authentication, spawn and capture evidence, encrypted-pack decryption, and revision matching. It does not replace agent review of local captures. Retail reports use `normal_session=pass`; the required path uses `cli_session=pass` and `authenticated_upstream=pass`.
 
 ## 5. Create the release
 
