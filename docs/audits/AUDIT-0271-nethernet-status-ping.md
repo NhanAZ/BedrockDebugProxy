@@ -18,10 +18,10 @@ The pinned local `third_party/gophertunnel/minecraft/nethernet.go` implementatio
 
 ## Validation
 
-- Automated checks: `tools/format.ps1`, `tools/quality.ps1`, and the focused proxy and Experience regression tests passed. The paired BedrockPackArchive fixture test passed with synthetic root and transferred-hop captures. Exact stamped-producer verification and six-server validation remain pending for `0.6.1`.
-- Live validation: `not_observed` for the corrected revision. The earlier `0.6.0` capture establishes the unsupported ping symptom only.
-- Capture or report: private verified capture [session-20261120T195739Z](https://github.com/BedrockDebugProxy-Captures/session-20261120T195739Z/releases/tag/capture-archive).
+- Automated checks: `tools/format.ps1` and `tools/quality.ps1` passed. BedrockPackArchive commit [`902cb09`](https://github.com/NhanAZ-Tools/BedrockPackArchive/commit/902cb0993cc6d573a73814fd753c0e1daa59fca7) updates its synthetic root and transferred-hop fixture for producer `0.6.1`; its exact stamped-producer fixture, full `go test -count=1 ./...`, `go vet ./...`, and clean Windows build passed.
+- Live validation: the corrected `0.6.1` OneBlockOnline packs-only session completed and retained three packs. The six-server release matrix later passed at runtime revision `9a30db76d47111344230c167824b9c57a56bad04`; see [AUDIT-0272](AUDIT-0272-full-session-release-gate.md).
+- Capture or report: the symptom capture [session-20261120T195739Z](https://github.com/BedrockDebugProxy-Captures/session-20261120T195739Z/releases/tag/capture-archive) and corrected OneBlockOnline capture [session-20261120T210631Z](https://github.com/BedrockDebugProxy-Captures/session-20261120T210631Z/releases/tag/capture-archive) are private, verified archives.
 
 ## Limitations and follow-up
 
-This change suppresses only an unsupported optional status ping on transports that explicitly report no support. It does not alter packet exchange, authentication, pack handling, or RakNet transfer diagnostics. Update the paired BedrockPackArchive compatibility record with the exact producer commit and rerun its fixture against the stamped producer. Build and validate `0.6.1` on OneBlockOnline, then complete the six-server release gate before publication.
+This change suppresses only an unsupported optional status ping on transports that explicitly report no support. It does not alter packet exchange, authentication, pack handling, or RakNet transfer diagnostics. The paired BedrockPackArchive compatibility change is recorded by commit `902cb0993cc6d573a73814fd753c0e1daa59fca7`. A fresh 14-Experience pack acquisition remains part of the coordinated release work.

@@ -29,10 +29,10 @@ The corrected NetherNet behavior also passed a live OneBlockOnline packs-only ex
 
 ## Validation
 
-- Automated checks: the runtime commit passed `tools/quality.ps1`. The exact stamped `0.6.1` binary passed the focused BedrockPackArchive producer-verification fixture. The six-report `tools/check-release-readiness.ps1` gate passed for runtime revision `9a30db76d47111344230c167824b9c57a56bad04`.
+- Automated checks: the runtime commit passed `tools/quality.ps1`. The exact stamped `0.6.1` binary passed the focused BedrockPackArchive producer-verification fixture in paired consumer commit [`902cb09`](https://github.com/NhanAZ-Tools/BedrockPackArchive/commit/902cb0993cc6d573a73814fd753c0e1daa59fca7). The six-report `tools/check-release-readiness.ps1` gate passed for runtime revision `9a30db76d47111344230c167824b9c57a56bad04`.
 - Live validation: pass for The Hive, Galaxite, Lifeboat, Mineville Zeqa, Enchanted, and CubeCraft. Enchanted's Hub form remained unanswered. CubeCraft stopped at its lobby.
 - Capture or report: sanitized reports are under `validation/local/9a30db76d47111344230c167824b9c57a56bad04/`. Raw captures remain in ignored local storage until release, private-handoff synchronization, and cleanup gates finish.
 
 ## Limitations and follow-up
 
-The six reports establish the authenticated protocol flow and post-spawn stability observed by the Go client. They do not establish retail rendering or gameplay. Run the release-readiness checker in documentation-only mode after this documentation commit and before publishing. The paired BedrockPackArchive commit and the fresh 14-Experience snapshot batch remain part of the coordinated release work.
+The six reports establish the authenticated protocol flow and post-spawn stability observed by the Go client. They do not establish retail rendering or gameplay. Run the release-readiness checker in documentation-only mode after the next documentation commit and before publishing. The paired BedrockPackArchive producer compatibility update is complete. The fresh 14-Experience snapshot batch is still in progress.
