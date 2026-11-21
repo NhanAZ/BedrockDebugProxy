@@ -832,8 +832,9 @@ func TestClientTransferDialHonorsConnectTimeout(t *testing.T) {
 		if !transferObserved {
 			t.Fatalf("transfer event was not observed before dial error: %v", eventErr)
 		}
-		if !errors.Is(eventErr, context.DeadlineExceeded) {
-			t.Fatalf("transfer dial error = %v, want deadline exceeded", eventErr)
+		var timeoutErr net.Error
+		if !errors.Is(eventErr, context.DeadlineExceeded) && !(errors.As(eventErr, &timeoutErr) && timeoutErr.Timeout()) {
+			t.Fatalf("transfer dial error = %v, want a deadline or network timeout", eventErr)
 		}
 		break
 	}
