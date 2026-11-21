@@ -10,6 +10,7 @@ import (
 	"net"
 	"net/http"
 	"net/http/httptest"
+	"os"
 	"strconv"
 	"strings"
 	"sync/atomic"
@@ -833,7 +834,7 @@ func TestClientTransferDialHonorsConnectTimeout(t *testing.T) {
 			t.Fatalf("transfer event was not observed before dial error: %v", eventErr)
 		}
 		var timeoutErr net.Error
-		if !errors.Is(eventErr, context.DeadlineExceeded) && !(errors.As(eventErr, &timeoutErr) && timeoutErr.Timeout()) {
+		if !errors.Is(eventErr, context.DeadlineExceeded) && !errors.Is(eventErr, os.ErrDeadlineExceeded) && !(errors.As(eventErr, &timeoutErr) && timeoutErr.Timeout()) {
 			t.Fatalf("transfer dial error = %v, want a deadline or network timeout", eventErr)
 		}
 		break
