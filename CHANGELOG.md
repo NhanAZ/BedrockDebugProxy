@@ -6,7 +6,20 @@ Detailed rationale remains in [`docs/audits/`](docs/audits/).
 
 ## [Unreleased]
 
-- Apply the Go Golem `--connect-timeout` independently to every followed transfer hop, and expose a bounded per-hop upstream deadline on `run`. Timeout messages now identify the configured proxy deadline instead of claiming the destination server did not respond.
+## [0.6.2] - 2026-11-21
+
+Supported Bedrock version: 1.26.62 (protocol 2225).
+
+[All changes since v0.6.1](https://github.com/NhanAZ/BedrockDebugProxy/compare/v0.6.1...v0.6.2)
+
+### Fixed
+
+- Apply `--connect-timeout` to each Go Golem transfer hop and add the same bounded per-hop deadline to `run`. Timeout messages now identify the configured proxy deadline.
+- Bound HTTPS NetherNet transfer probes by the configured upstream deadline, capped at one minute, while retaining the existing RakNet fallback and recording its evidence.
+
+### Documentation
+
+- Correct the acquisition catalog to record Rob a Mob and Treasure Hunt as Enchanted child destinations with their own Experience selectors.
 
 ## [0.6.1] - 2026-11-21
 
@@ -94,7 +107,7 @@ Supported Bedrock version: 1.26.61 (protocol 2225).
 - Release validation now always enables resource-pack decryption, requires every encrypted offered pack to produce a decrypted archive without errors, and no longer adds a separate repeated CubeCraft risk-acknowledgement gate.
 - Release stewardship now requires the agent to read the private maintainer handoff after publishing, synchronize the recovery mirror, and remove local captures and derived decrypted pack artifacts afterward.
 - Protocol updates now include a paired protocol-baseline and compatibility update in the private BedrockPackArchive repository before the update is complete.
-- Clarified that `Rob a Mob` is a separate Featured Experience rather than an Enchanted child, and removed the stale `Steal a Mob` child-flow assumption from the validation catalog.
+- Clarified that `Rob a Mob` has its own Experience selector and pack target, and removed the assumption that selecting the historical `Steal a Mob` form label must transfer to it.
 - Reworked Enchanted release validation to inventory the live Hub form, test actionable child routes from fresh Hub sessions, follow only observed transfers and nested forms, and classify direct or unavailable outcomes without forcing a fixed hop workflow.
 
 ### Fixed

@@ -33,11 +33,18 @@ For every actionable top-level child, start from a fresh Hub session, select the
 
 For pack acquisition, return to the Hub before testing the next top-level child. Follow observed transfers and nested forms, complete each offered pack exchange, and retain a route history so unchanged pack-bearing routes can be refreshed without probing every child again. This route survey is separate from release validation.
 
-The Enchanted child menu is dynamic. `Steal a Mob` is a historical form label, while `Rob a Mob` is a separate experience. Do not conflate the standalone pack destination with an Enchanted child route.
+The Enchanted child menu is dynamic. `Rob a Mob` and `Treasure Hunt` are Enchanted child destinations with separate Experience selectors and pack targets. Keep each as its own acquisition entry while retaining Enchanted as its parent in route history. The `Steal a Mob` form label does not prove that selecting it transfers to the separate `Rob a Mob` selector. Inspect the current response and classify the observed behavior.
 
 ## Additional Experience references
 
 These entries are useful for exploratory research but are not release gates.
+
+### Enchanted child destinations with separate selectors
+
+| Experience | Selector | Relationship |
+| --- | --- | --- |
+| Rob a Mob | `experience:Rob a Mob` | Enchanted child with its own pack target |
+| Treasure Hunt | `experience:Treasure Hunt` | Enchanted child with its own pack target |
 
 ### Featured Experiences
 
