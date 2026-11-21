@@ -9,6 +9,9 @@ The client resolves a literal `HOST:PORT` or an `experience:NAME` selector,
 authenticates when requested, completes the upstream login and resource-pack
 exchange, calls `DoSpawn`, and then reads server packets into a bounded event
 stream. It recognizes server text, forms, disconnects, and Transfer packets.
+The `--connect-timeout` deadline applies independently to the initial
+connection and every followed transfer hop, including that hop's login,
+resource-pack exchange, and spawn.
 Its direct dial uses the same per-connection bounded URL-pack cache as proxy
 sessions, so offers that provide HTTPS pack URLs can complete before spawn.
 Transfer following is enabled by default. RakNet hops preserve the previous

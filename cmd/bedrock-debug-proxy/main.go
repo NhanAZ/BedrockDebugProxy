@@ -418,6 +418,7 @@ func runProxy(args []string, stdout, stderr io.Writer) int {
 	binaryPreview := flags.Int("decoded-binary-preview", 32, "decoded binary preview bytes")
 	maxCollection := flags.Int("max-decoded-items", 0, "decoded items per collection - zero keeps all")
 	decryptResourcePacks := flags.Bool("decrypt-resource-packs", false, "derive decrypted resource pack artifacts when a supported content key is available")
+	connectTimeout := flags.Duration("connect-timeout", 15*time.Minute, "deadline for each upstream login and resource-pack exchange")
 	webViewer := flags.Bool("web-viewer", false, "open a live read-only capture viewer in the default browser")
 	flags.Usage = func() {
 		_, _ = fmt.Fprintln(stderr, "Usage - bedrock-debug-proxy run --upstream HOST:PORT|experience:NAME [options]")
@@ -432,6 +433,10 @@ func runProxy(args []string, stdout, stderr io.Writer) int {
 	}
 	if *upstream == "" {
 		_, _ = fmt.Fprintln(stderr, "--upstream is required.")
+		return 2
+	}
+	if *connectTimeout <= 0 || *connectTimeout > 30*time.Minute {
+		_, _ = fmt.Fprintln(stderr, "--connect-timeout must be positive and at most 30m.")
 		return 2
 	}
 	if *packsOnly {
@@ -557,6 +562,7 @@ func runProxy(args []string, stdout, stderr io.Writer) int {
 		"auth_mode":                    *authMode,
 		"allow_unauthenticated_client": strconv.FormatBool(*allowUnauthenticated),
 		"follow_transfers":             strconv.FormatBool(*followTransfers),
+		"upstream_dial_timeout":        connectTimeout.String(),
 		"protocol_id":                  strconv.FormatInt(int64(protocol.CurrentProtocol), 10),
 		"game_version":                 protocol.CurrentVersion,
 		"decrypt_resource_packs":       strconv.FormatBool(*decryptResourcePacks),
@@ -629,6 +635,7 @@ func runProxy(args []string, stdout, stderr io.Writer) int {
 		DecodedBinaryPreviewBytes:  *binaryPreview,
 		MaxDecodedCollectionItems:  *maxCollection,
 		DecryptResourcePacks:       *decryptResourcePacks,
+		UpstreamDialTimeout:        *connectTimeout,
 	})
 	if err != nil {
 		err = errors.Join(err, target.Close())

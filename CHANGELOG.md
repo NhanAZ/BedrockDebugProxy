@@ -6,6 +6,8 @@ Detailed rationale remains in [`docs/audits/`](docs/audits/).
 
 ## [Unreleased]
 
+- Apply the Go Golem `--connect-timeout` independently to every followed transfer hop, and expose a bounded per-hop upstream deadline on `run`. Timeout messages now identify the configured proxy deadline instead of claiming the destination server did not respond.
+
 ## [0.6.1] - 2026-11-21
 
 Supported Bedrock version: 1.26.62 (protocol 2225).

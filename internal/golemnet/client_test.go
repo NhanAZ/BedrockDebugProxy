@@ -798,6 +798,78 @@ func TestClientFollowsTransferAndPreservesScenarioEvents(t *testing.T) {
 	}
 }
 
+func TestClientTransferDialHonorsConnectTimeout(t *testing.T) {
+	ctx, cancel := context.WithTimeout(t.Context(), 8*time.Second)
+	defer cancel()
+	first, err := (minecraft.ListenConfig{AuthenticationDisabled: true, AllowUnknownPackets: true, AllowInvalidPackets: true}).Listen("raknet", "127.0.0.1:0")
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer func() { _ = first.Close() }()
+	serverErrors := make(chan error, 1)
+	go serveGolemTransferHop(ctx, first, "127.0.0.1:19133", true, serverErrors)
+	network := &blockingTransferDialNetwork{Network: minecraft.NewRakNet(nil)}
+	client, err := New(Config{
+		Address:         first.Addr().String(),
+		Network:         network,
+		FollowTransfers: true,
+		ConnectTimeout:  time.Second,
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := client.Start(ctx); err != nil {
+		t.Fatal(err)
+	}
+	started := time.Now()
+	transferObserved := false
+	for {
+		_, eventErr := client.NextEvent(ctx)
+		if eventErr == nil {
+			transferObserved = true
+			continue
+		}
+		if !transferObserved {
+			t.Fatalf("transfer event was not observed before dial error: %v", eventErr)
+		}
+		if !errors.Is(eventErr, context.DeadlineExceeded) {
+			t.Fatalf("transfer dial error = %v, want deadline exceeded", eventErr)
+		}
+		break
+	}
+	if elapsed := time.Since(started); elapsed > 3*time.Second {
+		t.Fatalf("transfer dial took %s, want the configured 1s deadline", elapsed)
+	}
+	report := client.Snapshot()
+	if len(report.Transfers) != 1 || report.Transfers[0].Followed || report.Transfers[0].FollowError == "" {
+		t.Fatalf("transfer report = %+v", report.Transfers)
+	}
+	if err := client.Close(); err != nil {
+		t.Fatal(err)
+	}
+	if err := <-serverErrors; err != nil {
+		t.Fatal(err)
+	}
+}
+
+type blockingTransferDialNetwork struct {
+	minecraft.Network
+	dials atomic.Int32
+}
+
+func (n *blockingTransferDialNetwork) DialContext(ctx context.Context, address string) (net.Conn, error) {
+	n.dials.Add(1)
+	return n.Network.DialContext(ctx, address)
+}
+
+func (n *blockingTransferDialNetwork) PingContext(ctx context.Context, address string) ([]byte, error) {
+	if n.dials.Load() > 0 {
+		<-ctx.Done()
+		return nil, ctx.Err()
+	}
+	return n.Network.PingContext(ctx, address)
+}
+
 func TestServiceNetherNetTransferIDClassification(t *testing.T) {
 	const target = "22222222-2222-4222-8222-222222222222"
 	for _, test := range []struct {

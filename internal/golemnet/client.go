@@ -461,20 +461,22 @@ func (c *Client) followTransfer(transfer *Transfer, previous *minecraft.Conn, ho
 		network = raknet
 	}
 	nextHop := hop + 1
-	conn, err := c.dial(c.ctx, address, network, identity, client, localAddr, clientGUID, nextHop)
+	connectCtx, cancelConnect := context.WithTimeout(c.ctx, c.config.ConnectTimeout)
+	defer cancelConnect()
+	conn, err := c.dial(connectCtx, address, network, identity, client, localAddr, clientGUID, nextHop)
 	if err != nil {
 		transfer.FollowError = err.Error()
 		c.updateTransfer(transfer)
 		return fmt.Errorf("dial transfer target %s: %w", transfer.Target, err)
 	}
-	if err := conn.DoSpawnContext(c.ctx); err != nil {
+	if err := conn.DoSpawnContext(connectCtx); err != nil {
 		_ = conn.CloseImmediately()
 		transfer.FollowError = err.Error()
 		c.updateTransfer(transfer)
 		return fmt.Errorf("spawn transfer target %s: %w", transfer.Target, err)
 	}
 	if c.config.ResourcePackObserver != nil {
-		if err := c.config.ResourcePackObserver(c.ctx, conn, nextHop); err != nil {
+		if err := c.config.ResourcePackObserver(connectCtx, conn, nextHop); err != nil {
 			_ = conn.CloseImmediately()
 			transfer.FollowError = err.Error()
 			c.updateTransfer(transfer)

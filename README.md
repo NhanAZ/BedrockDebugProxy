@@ -94,6 +94,8 @@ Resource-pack archives, metadata, checksums, download information, and content k
 .\bin\bedrock-debug-proxy.exe run --upstream "<UPSTREAM>" --decrypt-resource-packs
 ```
 
+`run` bounds each upstream login and resource-pack exchange with `--connect-timeout`, which defaults to 15 minutes and accepts values up to 30 minutes. A timeout reports that the configured proxy deadline expired. Inspect the retained packet evidence before attributing the timeout to the server. Each followed transfer hop receives its own deadline.
+
 Unsupported encryption variants retain the original archive and produce structured error evidence instead of a guessed fallback.
 
 To capture resource packs without opening a local listener or connecting a Minecraft client, use packs-only mode.

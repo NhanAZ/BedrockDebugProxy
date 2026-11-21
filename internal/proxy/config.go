@@ -6,6 +6,7 @@ import (
 	"io"
 	"net"
 	"strings"
+	"time"
 
 	"github.com/NhanAZ/BedrockDebugProxy/internal/capture"
 	"github.com/sandertv/gophertunnel/minecraft"
@@ -26,6 +27,7 @@ type Config struct {
 	DecodedBinaryPreviewBytes  int
 	MaxDecodedCollectionItems  int
 	DecryptResourcePacks       bool
+	UpstreamDialTimeout        time.Duration
 }
 
 func (c *Config) normalize() error {
@@ -55,6 +57,12 @@ func (c *Config) normalize() error {
 	if c.Output == nil {
 		c.Output = io.Discard
 	}
+	if c.UpstreamDialTimeout == 0 {
+		c.UpstreamDialTimeout = defaultUpstreamDialTimeout
+	}
+	if c.UpstreamDialTimeout <= 0 || c.UpstreamDialTimeout > maxUpstreamDialTimeout {
+		return fmt.Errorf("upstream dial timeout must be positive and at most %s", maxUpstreamDialTimeout)
+	}
 	if c.MaxDecompressedBytes == 0 {
 		c.MaxDecompressedBytes = 64 << 20
 	}
@@ -71,6 +79,13 @@ func (c *Config) normalize() error {
 		return errors.New("maximum decoded collection items cannot be negative")
 	}
 	return nil
+}
+
+func (c Config) upstreamDialTimeout() time.Duration {
+	if c.UpstreamDialTimeout <= 0 {
+		return defaultUpstreamDialTimeout
+	}
+	return c.UpstreamDialTimeout
 }
 
 func validateAddress(address string) error {

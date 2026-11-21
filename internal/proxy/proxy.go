@@ -27,16 +27,12 @@ import (
 )
 
 const (
-	sessionID                 = "session-1"
-	transferGracePeriod       = 5 * time.Second
-	transferRouteProbeTimeout = 750 * time.Millisecond
-	upstreamDialPingTimeout   = 5 * time.Second
-	// A resource-pack exchange can legitimately take many minutes on a
-	// featured experience. Galaxite advertises 460 chunks and the observed
-	// server pace delivered only 186 chunks in five minutes while still making
-	// progress. Keep the wait bounded while allowing that active exchange to
-	// complete.
-	upstreamDialTimeout = 15 * time.Minute
+	sessionID                  = "session-1"
+	transferGracePeriod        = 5 * time.Second
+	transferRouteProbeTimeout  = 750 * time.Millisecond
+	upstreamDialPingTimeout    = 5 * time.Second
+	defaultUpstreamDialTimeout = 15 * time.Minute
+	maxUpstreamDialTimeout     = 30 * time.Minute
 	// Enchanted's featured-experience edge can drop fragmented 1492-byte
 	// handshake probes on the transfer target. Keep transfer probes within a
 	// single common UDP datagram while leaving initial connections unchanged.
@@ -579,7 +575,7 @@ func (r *Runner) Run(ctx context.Context) error {
 			reason := "BedrockDebugProxy could not connect to the destination server"
 			var timeoutErr *upstreamDialTimeoutError
 			if errors.As(state.slot.err, &timeoutErr) {
-				reason = fmt.Sprintf("The destination server did not respond within %s", timeoutErr.timeout)
+				reason = fmt.Sprintf("The upstream login and resource-pack exchange exceeded the configured %s deadline", timeoutErr.timeout)
 			}
 			_ = listener.Disconnect(clientConn, reason)
 			_ = clientConn.Close()
@@ -953,7 +949,8 @@ func (r *Runner) connectUpstream(ctx context.Context, target string, network bed
 		return nil, nil, err
 	}
 	live.Info("Connecting upstream - %s (hop %d) - waiting for upstream login and resource-pack exchange (buffered by design)", target, hop)
-	dialCtx, cancelDial := context.WithTimeout(ctx, upstreamDialTimeout)
+	dialTimeout := r.config.upstreamDialTimeout()
+	dialCtx, cancelDial := context.WithTimeout(ctx, dialTimeout)
 	defer cancelDial()
 	urlResourcePacks := urlpackcache.New(dialCtx)
 	recordPacket := observer.PacketFunc("upstream", connectionID)
@@ -1004,7 +1001,7 @@ func (r *Runner) connectUpstream(ctx context.Context, target string, network bed
 		message := "Upstream login and resource-pack exchange failed after %s"
 		if timedOut {
 			message = "Upstream login and resource-pack exchange timed out after %s"
-			err = &upstreamDialTimeoutError{timeout: upstreamDialTimeout, err: err}
+			err = &upstreamDialTimeoutError{timeout: dialTimeout, err: err}
 		}
 		live.Info(message, waitDuration)
 		fields := map[string]any{
@@ -1014,7 +1011,7 @@ func (r *Runner) connectUpstream(ctx context.Context, target string, network bed
 			"wait_duration": waitDuration.String(),
 		}
 		if timedOut {
-			fields["timeout_duration"] = upstreamDialTimeout.String()
+			fields["timeout_duration"] = dialTimeout.String()
 		}
 		captureErr := r.recordAtHop("upstream.dial_error", capture.SeverityError, fields, hop)
 		setCaptureFailure(network.Failures, captureErr)

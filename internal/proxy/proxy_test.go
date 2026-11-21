@@ -42,6 +42,35 @@ func TestUpstreamDialTimeoutErrorPreservesCause(t *testing.T) {
 	}
 }
 
+func TestConfigNormalizesAndBoundsUpstreamDialTimeout(t *testing.T) {
+	for _, test := range []struct {
+		name    string
+		timeout time.Duration
+		want    time.Duration
+		wantErr bool
+	}{
+		{name: "default", want: defaultUpstreamDialTimeout},
+		{name: "configured", timeout: 3 * time.Minute, want: 3 * time.Minute},
+		{name: "non-positive", timeout: -time.Second, wantErr: true},
+		{name: "over maximum", timeout: maxUpstreamDialTimeout + time.Second, wantErr: true},
+	} {
+		t.Run(test.name, func(t *testing.T) {
+			config := &Config{
+				UpstreamAddress:     "127.0.0.1:19132",
+				UpstreamDialTimeout: test.timeout,
+				Recorder:            &capture.Recorder{},
+			}
+			err := config.normalize()
+			if (err != nil) != test.wantErr {
+				t.Fatalf("normalize() error = %v, want error %t", err, test.wantErr)
+			}
+			if !test.wantErr && config.UpstreamDialTimeout != test.want {
+				t.Fatalf("normalized upstream dial timeout = %s, want %s", config.UpstreamDialTimeout, test.want)
+			}
+		})
+	}
+}
+
 func TestConnectUpstreamBoundsAddressDiscoveryPing(t *testing.T) {
 	tests := []struct {
 		name          string
