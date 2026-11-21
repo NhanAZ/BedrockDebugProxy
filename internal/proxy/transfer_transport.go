@@ -17,7 +17,17 @@ import (
 	"github.com/sandertv/gophertunnel/minecraft"
 )
 
-const transferNetherNetProbeTimeout = 10 * time.Second
+const transferNetherNetProbeMaxTimeout = time.Minute
+
+func transferNetherNetProbeTimeout(configured time.Duration) time.Duration {
+	if configured <= 0 {
+		configured = defaultUpstreamDialTimeout
+	}
+	if configured > transferNetherNetProbeMaxTimeout {
+		return transferNetherNetProbeMaxTimeout
+	}
+	return configured
+}
 
 func transferHTTPSAddress(target string) (string, error) {
 	host, port, err := net.SplitHostPort(strings.TrimSpace(target))
@@ -34,12 +44,12 @@ func transferHTTPSAddress(target string) (string, error) {
 	return "https://" + net.JoinHostPort(host, strconv.FormatUint(portNumber, 10)), nil
 }
 
-func transferHTTPSNetherNet(ctx context.Context, target string) (minecraft.Network, string, error) {
+func transferHTTPSNetherNet(ctx context.Context, target string, timeout time.Duration) (minecraft.Network, string, error) {
 	address, err := transferHTTPSAddress(target)
 	if err != nil {
 		return nil, "", err
 	}
-	probeCtx, cancel := context.WithTimeout(ctx, transferNetherNetProbeTimeout)
+	probeCtx, cancel := context.WithTimeout(ctx, timeout)
 	defer cancel()
 	network, err := experience.NewHTTPSNetherNetNetwork(probeCtx, http.DefaultClient, address)
 	if err != nil {
@@ -88,14 +98,15 @@ func (r *Runner) prepareTransferHop(ctx context.Context, state *hopState, hop in
 		live.Info("Transfer route selected the existing NetherNet signaling connection for a server-sent network ID")
 		return nil
 	}
-	if network, address, err := transferHTTPSNetherNet(ctx, state.target); err == nil {
+	probeTimeout := transferNetherNetProbeTimeout(r.config.upstreamDialTimeout())
+	if network, address, err := transferHTTPSNetherNet(ctx, state.target, probeTimeout); err == nil {
 		state.transferNetwork = network
 		state.transferAddress = address
 		state.transferRouteProbed = true
 		captureErr := r.recordAtHop("transfer.route_probe", capture.SeverityInfo, map[string]any{
 			"address":   state.target,
 			"transport": "nethernet-https",
-			"timeout":   transferNetherNetProbeTimeout.String(),
+			"timeout":   probeTimeout.String(),
 		}, hop)
 		setCaptureFailure(failures, captureErr)
 		if captureErr != nil {
@@ -108,7 +119,7 @@ func (r *Runner) prepareTransferHop(ctx context.Context, state *hopState, hop in
 			"address":            state.target,
 			"transport":          "nethernet-https",
 			"fallback_transport": "raknet",
-			"timeout":            transferNetherNetProbeTimeout.String(),
+			"timeout":            probeTimeout.String(),
 			"best_effort":        true,
 			"error":              err.Error(),
 			"error_type":         fmt.Sprintf("%T", err),

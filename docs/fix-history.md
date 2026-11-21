@@ -14,13 +14,23 @@ Every new entry should state the symptom, root cause, implementation commits, ev
 
 ## Compatibility and bug index
 
+### FIX-0181 - Bound HTTPS NetherNet transfer probes by the hop budget
+
+- Symptom: an Enchanted Dragons transfer reached the proxy, but the next hop fell back from HTTPS NetherNet to RakNet after the HTTPS probe expired at 10 seconds. A Golem session entering through the Enchanted lobby followed the same server-sent `Transfer` successfully and received the child server's packs.
+- Classification: local route-discovery timeout. The probe failure did not establish that Dragons was unavailable.
+- Root cause: the proxy applied a fixed 10-second timeout to the HTTPS `/v1/join` route discovery, while Go Golem allowed the caller's connection budget. The proxy abandoned the valid route early and tried a RakNet path that did not work for this target.
+- Implementation: use the configured upstream dial budget for HTTPS NetherNet discovery, capped at one minute. This honors shorter per-hop budgets and avoids an unbounded probe under the proxy's longer default.
+- Evidence and validation: deterministic tests cover shorter configured budgets, the one-minute cap, and timeout details retained in `transfer.route_probe`. See [AUDIT-0274](audits/AUDIT-0274-transfer-nethernet-probe-budget.md).
+- Status: the focused regression tests pass. Exact-revision Enchanted Dragons traversal and the refreshed pack snapshot are pending.
+- Related history: [FIX-0180](#fix-0180-enforce-connection-deadlines-on-every-transfer-hop) introduced bounded per-hop connection deadlines but did not remove the shorter route-discovery limit.
+
 ### FIX-0180 - Enforce connection deadlines on every transfer hop
 
 - Symptom: a route acquisition could wait for the fixed Enchanted child reconnect budget even though its configured Go Golem connection timeout was shorter. The local navigator timeout had been coupled to BedrockDebugProxy's 15-minute default upstream deadline.
 - Classification: local timeout propagation and workflow-budget defect. The wait did not establish that the server was unavailable.
 - Root cause: Go Golem canceled the initial connection context after login, then followed `Transfer` using the long-lived session context. BedrockPackArchive also lacked a configurable upstream deadline and used a 16-minute Enchanted child wait to outlast the proxy's fixed 15-minute default.
 - Implementation: apply `ConnectTimeout` to each Golem transfer dial, spawn, and resource-pack observer. Add bounded `run --connect-timeout` and `fetch --connect-timeout` options. BedrockPackArchive defaults each upstream hop to 3 minutes, permits up to 15 minutes for slower pack offers, and adds a one-minute local shutdown margin for Enchanted and Mineville child reconnects. Timeout wording names the expired proxy deadline instead of asserting that the remote server did not respond. Capture schema and importer contracts are unchanged.
-- Evidence and validation: deterministic `TestClientTransferDialHonorsConnectTimeout` blocks the transfer route probe until its context ends and checks the configured deadline and transfer report. Synthetic BedrockPackArchive importer coverage includes a decoded `Transfer` event and a resource pack at hop 2. The Go Golem Enchanted route observation is not used as permanent evidence because its local capture included derived decrypted pack content. See [the paired compatibility audit](audits/AUDIT-0274-transfer-hop-timeouts.md).
+- Evidence and validation: deterministic `TestClientTransferDialHonorsConnectTimeout` blocks the transfer route probe until its context ends and checks the configured deadline and transfer report. Synthetic BedrockPackArchive importer coverage includes a decoded `Transfer` event and a resource pack at hop 2. The Go Golem Enchanted route observation is not used as permanent evidence because its local capture included derived decrypted pack content. See [the paired compatibility audit](audits/AUDIT-0273-transfer-hop-timeouts.md).
 - Status: implementation is locally validated. Fresh exact-revision live validation remains required for the applicable release gate. For a focused live check, run one Enchanted child route with the stamped build and `--connect-timeout 3m`, confirm the observed `Transfer`, next-hop resource-pack exchange, and capture closure, then inspect the retained capture if it fails. Do not infer server unavailability from the timeout alone.
 - Related history: [FIX-0133](#fix-0133-allow-slow-active-resource-pack-exchanges-to-finish) documents a prior Galaxite offer with active chunk progress beyond five minutes. That evidence is why the timeout remains configurable up to 15 minutes; it does not justify waiting that long on a route without a demonstrated need.
 

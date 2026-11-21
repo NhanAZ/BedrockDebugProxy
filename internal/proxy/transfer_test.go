@@ -218,7 +218,8 @@ func TestPrepareTransferHopRecordsHTTPSProbeFailureBeforeRakNetFallback(t *testi
 	if err != nil {
 		t.Fatal(err)
 	}
-	runner := &Runner{config: Config{Recorder: recorder}}
+	const configuredTimeout = 45 * time.Second
+	runner := &Runner{config: Config{Recorder: recorder, UpstreamDialTimeout: configuredTimeout}}
 	state := &hopState{target: strings.TrimPrefix(server.URL, "https://")}
 	failures := bedrock.NewFailureSink(nil)
 	if err := runner.prepareTransferHop(context.Background(), state, 2, nil, failures, newLiveReporter(io.Discard)); err != nil {
@@ -250,7 +251,7 @@ func TestPrepareTransferHopRecordsHTTPSProbeFailureBeforeRakNetFallback(t *testi
 		if err := json.Unmarshal(event.Data, &fields); err != nil {
 			return err
 		}
-		if fields.Address != state.target || fields.Transport != "nethernet-https" || fields.FallbackTransport != "raknet" || fields.Timeout != transferNetherNetProbeTimeout.String() || !fields.BestEffort || !strings.Contains(fields.Error, "503") || event.Severity != capture.SeverityWarn {
+		if fields.Address != state.target || fields.Transport != "nethernet-https" || fields.FallbackTransport != "raknet" || fields.Timeout != configuredTimeout.String() || !fields.BestEffort || !strings.Contains(fields.Error, "503") || event.Severity != capture.SeverityWarn {
 			t.Errorf("HTTPS transfer route event = %+v severity %s", fields, event.Severity)
 		}
 		found = true
@@ -260,6 +261,25 @@ func TestPrepareTransferHopRecordsHTTPSProbeFailureBeforeRakNetFallback(t *testi
 	}
 	if !found {
 		t.Fatal("failed HTTPS NetherNet probe was not recorded before RakNet fallback")
+	}
+}
+
+func TestTransferNetherNetProbeTimeoutUsesConfiguredBudgetWithMaximum(t *testing.T) {
+	for _, test := range []struct {
+		name       string
+		configured time.Duration
+		want       time.Duration
+	}{
+		{name: "short configured budget", configured: 15 * time.Second, want: 15 * time.Second},
+		{name: "maximum configured budget", configured: time.Minute, want: time.Minute},
+		{name: "long configured budget is capped", configured: 15 * time.Minute, want: time.Minute},
+		{name: "default budget is capped", want: time.Minute},
+	} {
+		t.Run(test.name, func(t *testing.T) {
+			if got := transferNetherNetProbeTimeout(test.configured); got != test.want {
+				t.Fatalf("transferNetherNetProbeTimeout(%s) = %s, want %s", test.configured, got, test.want)
+			}
+		})
 	}
 }
 
