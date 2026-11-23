@@ -107,6 +107,7 @@ function Invoke-RestMethod {
 				"| Release tag | n/a | `" + test.tag + "` |",
 				"| Release commit | n/a | `1111111111111111111111111111111111111111` |",
 				"| Published | n/a | `2026-10-05T00:00:00Z` |",
+				"Process guide: [protocol update workflow](https://github.com/fixture/project/blob/main/docs/protocol-updates.md)",
 			} {
 				if !strings.Contains(issue.Body, expected) {
 					t.Fatalf("issue is missing %q: %s", expected, issue.Body)

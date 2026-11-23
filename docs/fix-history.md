@@ -14,6 +14,15 @@ Every new entry should state the symptom, root cause, implementation commits, ev
 
 ## Compatibility and bug index
 
+### FIX-0183 - Build protocol issue links with the resolved repository
+
+- Symptom: the protocol release issue linked to `https://github.com//blob/main/docs/protocol-updates.md`.
+- Classification: issue-template construction defect in the notification workflow.
+- Root cause: the script interpolated the process-guide URL before it copied `GITHUB_REPOSITORY` into the repository variable.
+- Implementation: resolve and validate the repository before constructing the issue body. The watcher test checks the generated link.
+- Evidence and validation: workflow run [45215096393](https://github.com/NhanAZ/BedrockDebugProxy/actions/runs/45215096393) created issue [#12](https://github.com/NhanAZ/BedrockDebugProxy/issues/12) with the malformed URL. The corrected synthetic issue case expects the complete repository link.
+- Status: fixed. Issue #12 now links to the correct process guide.
+
 ### FIX-0182 - Handle untitled protocol issue records
 
 - Symptom: the scheduled Mojang protocol watcher failed while comparing open issues because an API record had no `title` property.

@@ -117,6 +117,22 @@ if (-not $versionChanged -and -not $protocolChanged) {
 }
 
 $issueTitle = "[Protocol update] Mojang $latestTag (protocol $latestProtocol)"
+if (-not $CreateIssue) {
+    Write-Host "Protocol update detected, but issue creation was not requested."
+    Write-Host "Would open: $issueTitle"
+    exit 0
+}
+
+if ([string]::IsNullOrWhiteSpace($Repository)) {
+    $Repository = [string]$env:GITHUB_REPOSITORY
+}
+if ([string]::IsNullOrWhiteSpace($Repository)) {
+    throw "Repository is required when creating an issue."
+}
+if ([string]::IsNullOrWhiteSpace($env:GITHUB_TOKEN)) {
+    throw "GITHUB_TOKEN is required when creating an issue."
+}
+
 $published = $release.published_at
 if ($published -is [DateTime] -or $published -is [DateTimeOffset]) {
     $published = $published.ToUniversalTime().ToString("yyyy-MM-ddTHH:mm:ssZ", [Globalization.CultureInfo]::InvariantCulture)
@@ -149,22 +165,6 @@ This issue is a review trigger only. It is not an instruction to copy schemas or
 
 No product code or dependency was changed by this workflow.
 "@
-
-if (-not $CreateIssue) {
-    Write-Host "Protocol update detected, but issue creation was not requested."
-    Write-Host "Would open: $issueTitle"
-    exit 0
-}
-
-if ([string]::IsNullOrWhiteSpace($Repository)) {
-    $Repository = [string]$env:GITHUB_REPOSITORY
-}
-if ([string]::IsNullOrWhiteSpace($Repository)) {
-    throw "Repository is required when creating an issue."
-}
-if ([string]::IsNullOrWhiteSpace($env:GITHUB_TOKEN)) {
-    throw "GITHUB_TOKEN is required when creating an issue."
-}
 
 $openIssues = @()
 for ($page = 1; $page -le 10; $page++) {
