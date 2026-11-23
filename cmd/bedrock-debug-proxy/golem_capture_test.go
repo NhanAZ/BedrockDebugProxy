@@ -13,6 +13,7 @@ import (
 	"github.com/NhanAZ/BedrockDebugProxy/internal/capture"
 	"github.com/NhanAZ/BedrockDebugProxy/internal/golemnet"
 	"github.com/sandertv/gophertunnel/minecraft"
+	"github.com/sandertv/gophertunnel/minecraft/protocol"
 	"github.com/sandertv/gophertunnel/minecraft/protocol/packet"
 )
 
@@ -114,7 +115,7 @@ func TestGolemCaptureWritesCanonicalEvidence(t *testing.T) {
 		RawLayers:     []string{"bedrock_packet_payload"},
 		Values: map[string]string{
 			"protocol_id":            "2225",
-			"game_version":           "1.26.62",
+			"game_version":           protocol.CurrentVersion,
 			"decrypt_resource_packs": "true",
 		},
 	})
@@ -153,9 +154,9 @@ func TestGolemCaptureWritesCanonicalEvidence(t *testing.T) {
 	}
 	if err := evidence.recordJSON(context.Background(), "session.negotiated", capture.SeverityInfo, capture.DirectionInternal, "upstream", "negotiated", 1, map[string]any{
 		"downstream_protocol_id":  2225,
-		"downstream_game_version": "1.26.62",
+		"downstream_game_version": protocol.CurrentVersion,
 		"upstream_protocol_id":    2225,
-		"upstream_game_version":   "1.26.62",
+		"upstream_game_version":   protocol.CurrentVersion,
 	}); err != nil {
 		t.Fatal(err)
 	}

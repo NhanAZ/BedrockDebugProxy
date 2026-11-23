@@ -24,14 +24,14 @@ func TestMojangProtocolWatcherReleaseMetadata(t *testing.T) {
 		name, tag, value, protocol   string
 		issue, issueListWithoutTitle bool
 	}{
-		{"plain", "v1.26.62", "2225", "2225", false, false},
-		{"italic release body", "v1.26.62", "*2225*", "2225", false, false},
-		{"bold", "v1.26.62", "**2225**", "2225", false, false},
-		{"inline code", "v1.26.62", "`2225`", "2225", false, false},
-		{"mismatched emphasis", "v1.26.62", "*2225**", "unknown", false, false},
-		{"new protocol only", "v1.26.62", "*2226*", "2226", true, false},
-		{"new game version", "v1.26.63", "*2225*", "2225", true, false},
-		{"missing issue title", "v1.26.63", "*2225*", "2225", true, true},
+		{"plain", "v1.26.66", "2225", "2225", false, false},
+		{"italic release body", "v1.26.66", "*2225*", "2225", false, false},
+		{"bold", "v1.26.66", "**2225**", "2225", false, false},
+		{"inline code", "v1.26.66", "`2225`", "2225", false, false},
+		{"mismatched emphasis", "v1.26.66", "*2225**", "unknown", false, false},
+		{"new protocol only", "v1.26.66", "*2226*", "2226", true, false},
+		{"new game version", "v1.26.67", "*2225*", "2225", true, false},
+		{"missing issue title", "v1.26.67", "*2225*", "2225", true, true},
 	} {
 		t.Run(test.name, func(t *testing.T) {
 			root := t.TempDir()
@@ -102,7 +102,7 @@ function Invoke-RestMethod {
 				t.Fatalf("issue title = %q", issue.Title)
 			}
 			for _, expected := range []string{
-				"| Game version | `1.26.62` | `" + strings.TrimPrefix(test.tag, "v") + "` |",
+				"| Game version | `1.26.66` | `" + strings.TrimPrefix(test.tag, "v") + "` |",
 				"| Network protocol | `2225` | `" + test.protocol + "` |",
 				"| Release tag | n/a | `" + test.tag + "` |",
 				"| Release commit | n/a | `1111111111111111111111111111111111111111` |",

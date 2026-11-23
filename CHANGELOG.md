@@ -6,6 +6,12 @@ Detailed rationale remains in [`docs/audits/`](docs/audits/).
 
 ## [Unreleased]
 
+Supported Bedrock version: 1.26.66 (protocol 2225).
+
+### Changed
+
+- Updated the selected Bedrock client metadata and schema baseline to 1.26.66. The official v1.26.66 schema tree matches the reviewed v1.26.62 tree, so the protocol ID, packet codec, and capture schema remain unchanged.
+
 ## [0.6.2] - 2026-11-21
 
 Supported Bedrock version: 1.26.62 (protocol 2225).

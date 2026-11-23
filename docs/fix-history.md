@@ -14,6 +14,15 @@ Every new entry should state the symptom, root cause, implementation commits, ev
 
 ## Compatibility and bug index
 
+### FIX-0184 - Update the stable metadata baseline to Bedrock 1.26.66
+
+- Symptom: the scheduled watcher reported the official stable `v1.26.66` release because the project baseline still named `1.26.62`.
+- Classification: stable schema metadata update. No packet implementation defect was found.
+- Root cause: Mojang published a newer stable schema release after the current project baseline.
+- Implementation: select client metadata and schema version `1.26.66`, retaining protocol `2225`, the reviewed 1.26.60 codec, and capture schema `bedrockdebugproxy.capture.v1`. The full `v1.26.66` schema tree matches `v1.26.62`, so no packet definitions changed.
+- Evidence and validation: [the 1.26.66 protocol review](research/protocol-1.26.66.md) records the official release, immutable tag commit, identical tree hashes, protocol cross-check, and license terms. The producer metadata tests and BedrockPackArchive compatibility tests cover the new version without changing the archive contract. [The protocol audit](audits/AUDIT-0278-protocol-1.26.66-metadata.md) and [the paired fixture follow-up](audits/AUDIT-0279-paired-protocol-1.26.66-validation.md) record validation and both repository revisions.
+- Status: implemented as a metadata-only update. Live server and retail-client compatibility are not claimed.
+
 ### FIX-0183 - Build protocol issue links with the resolved repository
 
 - Symptom: the protocol release issue linked to `https://github.com//blob/main/docs/protocol-updates.md`.
