@@ -14,6 +14,15 @@ Every new entry should state the symptom, root cause, implementation commits, ev
 
 ## Compatibility and bug index
 
+### FIX-0182 - Handle untitled protocol issue records
+
+- Symptom: the scheduled Mojang protocol watcher failed while comparing open issues because an API record had no `title` property.
+- Classification: issue-list API shape handling defect in the notification workflow.
+- Root cause: strict mode raised when duplicate detection accessed `.title` directly on every non-pull-request record.
+- Implementation: inspect the `title` property safely, warn and skip records without it, and continue excluding pull requests from issue deduplication.
+- Evidence and validation: run [45200163935](https://github.com/NhanAZ/BedrockDebugProxy/actions/runs/45200163935) failed with the missing-property error. A synthetic watcher case covers an untitled API record and verifies notification creation continues. All API calls and issue creation remain mocked in the test.
+- Status: fixed. No protocol code or runtime behavior changed.
+
 ### FIX-0181 - Bound HTTPS NetherNet transfer probes by the hop budget
 
 - Symptom: an Enchanted Dragons transfer reached the proxy, but the next hop fell back from HTTPS NetherNet to RakNet after the HTTPS probe expired at 10 seconds. A Golem session entering through the Enchanted lobby followed the same server-sent `Transfer` successfully and received the child server's packs.

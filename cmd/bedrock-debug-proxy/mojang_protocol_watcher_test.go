@@ -21,16 +21,17 @@ func TestMojangProtocolWatcherReleaseMetadata(t *testing.T) {
 		t.Fatal(err)
 	}
 	for _, test := range []struct {
-		name, tag, value, protocol string
-		issue                      bool
+		name, tag, value, protocol   string
+		issue, issueListWithoutTitle bool
 	}{
-		{"plain", "v1.26.62", "2225", "2225", false},
-		{"italic release body", "v1.26.62", "*2225*", "2225", false},
-		{"bold", "v1.26.62", "**2225**", "2225", false},
-		{"inline code", "v1.26.62", "`2225`", "2225", false},
-		{"mismatched emphasis", "v1.26.62", "*2225**", "unknown", false},
-		{"new protocol only", "v1.26.62", "*2226*", "2226", true},
-		{"new game version", "v1.26.63", "*2225*", "2225", true},
+		{"plain", "v1.26.62", "2225", "2225", false, false},
+		{"italic release body", "v1.26.62", "*2225*", "2225", false, false},
+		{"bold", "v1.26.62", "**2225**", "2225", false, false},
+		{"inline code", "v1.26.62", "`2225`", "2225", false, false},
+		{"mismatched emphasis", "v1.26.62", "*2225**", "unknown", false, false},
+		{"new protocol only", "v1.26.62", "*2226*", "2226", true, false},
+		{"new game version", "v1.26.63", "*2225*", "2225", true, false},
+		{"missing issue title", "v1.26.63", "*2225*", "2225", true, true},
 	} {
 		t.Run(test.name, func(t *testing.T) {
 			root := t.TempDir()
@@ -47,6 +48,10 @@ func TestMojangProtocolWatcherReleaseMetadata(t *testing.T) {
 				t.Fatal(err)
 			}
 			quote := func(path string) string { return "'" + strings.ReplaceAll(path, "'", "''") + "'" }
+			issueListResponse := "return @()"
+			if test.issueListWithoutTitle {
+				issueListResponse = "return @(@{ number = 2; state = 'open' })"
+			}
 			command := "$env:GITHUB_TOKEN = 'synthetic-watcher-test-token'\n" +
 				"$fixture = Get-Content -Raw -LiteralPath " + quote(fixturePath) + " | ConvertFrom-Json\n" +
 				"$issuePath = " + quote(issuePath) + "\n" + `
@@ -61,7 +66,7 @@ function Invoke-RestMethod {
             $Body | Set-Content -LiteralPath $issuePath
             return @{number = 1; html_url = 'https://example.invalid/issue'}
         }
-        return @()
+				` + issueListResponse + `
     }
     throw "Unexpected request $Uri"
 }

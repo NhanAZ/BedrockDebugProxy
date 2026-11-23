@@ -12,6 +12,8 @@ The [`check-mojang-protocol.yml`](../.github/workflows/check-mojang-protocol.yml
 
 The workflow is a notification mechanism only. It does not copy schemas, update dependencies, edit packet code, or claim that a protocol update is required. Treat its issue as a report to triage, verify the release tag and schemas, record research evidence, and then follow the update procedure below. A release issue does not replace focused tests or the live validation gates.
 
+Issue deduplication ignores pull requests and API records that do not contain a `title` field.
+
 The network protocol value may be plain digits or enclosed in balanced Markdown italic, bold, or inline-code markers. A missing or malformed value remains `unknown`. Generated issue tables preserve the actual baseline and release values, resolved commit, and UTC publication time. The script tests mock every API request and issue post, including a protocol-only change with an unchanged game-version tag.
 
 ## Current baseline

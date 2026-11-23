@@ -178,8 +178,19 @@ for ($page = 1; $page -le 10; $page++) {
     }
 }
 $existing = @($openIssues | Where-Object {
-        $isPullRequest = $null -ne $_.PSObject.Properties["pull_request"]
-        -not $isPullRequest -and [string]$_.title -eq $issueTitle
+        if ($null -eq $_) {
+            return $false
+        }
+        $properties = $_.PSObject.Properties
+        if ($null -ne $properties["pull_request"]) {
+            return $false
+        }
+        $title = $properties["title"]
+        if ($null -eq $title) {
+            Write-Warning "Ignoring an open-issue API record without a title during protocol notice deduplication."
+            return $false
+        }
+        [string]$title.Value -eq $issueTitle
     })
 if ($existing.Count -ne 0) {
     Write-Host "An issue for $latestTag already exists: #$(($existing[0]).number) $($existing[0].html_url)"
